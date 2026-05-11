@@ -339,6 +339,29 @@ tr:hover td{background:#fef9f7}
               <input type="hidden" id="f-tec-id">
               <input type="hidden" id="f-tec-email">
             </div>
+            <div class="field">
+              <label>Secondo tecnico (se presente)</label>
+              <select id="f-tec2-select">
+                <option value="">– Nessuno –</option>
+              </select>
+              <input type="hidden" id="f-tec2-display">
+              <input type="hidden" id="f-tec2-id">
+              <input type="hidden" id="f-tec2-email">
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;align-items:flex-end;flex-wrap:wrap;gap:8px">
+            <div class="field" style="flex:0 0 160px">
+              <label>Data sopralluogo *</label>
+              <input type="date" id="f-data">
+            </div>
+            <div class="field" style="flex:0 0 110px">
+              <label>Ora inizio</label>
+              <input type="time" id="f-da">
+            </div>
+            <div class="field" style="flex:0 0 110px">
+              <label>Ora fine</label>
+              <input type="time" id="f-a">
+            </div>
           </div>
           <div class="row" style="margin-top:10px;align-items:flex-end;flex-wrap:wrap;gap:8px">
             <div class="field">
@@ -1225,7 +1248,8 @@ async function initForm(snap=null){
     'f-nr-imp','f-nr-ind','f-nr-lav','f-nr-lav-str','f-costi','f-stato-lav','f-note-lav',
     'f-oss-tec','f-oss-int','f-note-for-m','f-data-ritorno','cant-detail']
   clearIds.forEach(id=>{const el=$(id);if(el)el.value=''})
-  ;['f-qual-ppre','f-tec-select'].forEach(id=>{const el=$(id);if(el)el.selectedIndex=0})
+  ;['f-qual-ppre','f-tec-select','f-tec2-select'].forEach(id=>{const el=$(id);if(el)el.selectedIndex=0})
+  ;['f-tec2-display','f-tec2-id','f-tec2-email'].forEach(id=>vSet(id,''))
   // reset stage toggle a No
   const stageVisNo=$('f-stage-vis-no'); if(stageVisNo)stageVisNo.checked=true
   const stageVisH=$('f-stage-vis'); if(stageVisH)stageVisH.value=''
@@ -1668,6 +1692,7 @@ async function saveVisita(stato){
   saveTabData()
   const cant_id=vGet('f-cant-id')
   const tec_id=vGet('f-tec-id')
+  const tec2_id=vGet('f-tec2-id')
   const data_v=vGet('f-data')
   if(!cant_id){toast('Seleziona un cantiere (Tab Cantiere)','warn');activateTab(1);return}
   if(S.imprese.length===0||!S.imprese[0].impresa_id){toast('Seleziona l\'impresa principale (Tab Imprese)','warn');activateTab(2);return}
@@ -1683,6 +1708,7 @@ async function saveVisita(stato){
       ora_visita:vGet('f-da')||null,
       ora_fine:vGet('f-a')||null,
       tecnico_id:tec_id,
+      tecnico2_id:tec2_id||null,
       cantiere_id:cant_id,
       impresa_id:S.imprese[0].impresa_id,
       nr_lavoratori:+vGet('f-nr-lav')||0,
@@ -1793,10 +1819,14 @@ function buildSnap(vid=null){
     oss_tec:vGet('f-oss-tec'),
     nr_lavoratori:+vGet('f-nr-lav')||0,
     nr_lavoratori_stranieri:+vGet('f-nr-lav-str')||0,
-    // tecnico
+    // tecnico principale
     tecnico_id:vGet('f-tec-id')||null,
     tecnico_email:vGet('f-tec-email')||null,
     tec_display:vGet('f-tec-display')||null,
+    // secondo tecnico
+    tecnico2_id:vGet('f-tec2-id')||null,
+    tecnico2_email:vGet('f-tec2-email')||null,
+    tec2_display:vGet('f-tec2-display')||null,
     // persona presente
     ppre_titolo:vGet('f-ppre-titolo')||null,
     nom_ppre:[vGet('f-ppre-titolo'),vGet('f-ppre-nome'),vGet('f-ppre-cog')].map(s=>s.trim()).filter(Boolean).join(' ')||null,
@@ -1829,10 +1859,14 @@ function applySnap(snap){
   }
   if(snap.qual_ppre){const sel=$('f-qual-ppre');if(sel){for(let o of sel.options)if(o.value===snap.qual_ppre){sel.value=snap.qual_ppre;break}}}
   if(snap.tel_ppre)vSet('f-tel-ppre',snap.tel_ppre)
-  // tecnico
+  // tecnico principale
   if(snap.tecnico_email)setTecnicoFromEmail(snap.tecnico_email)
   else if(snap.tec_display)vSet('f-tec-display',snap.tec_display)
   if(snap.tecnico_id)vSet('f-tec-id',snap.tecnico_id)
+  // secondo tecnico
+  if(snap.tecnico2_email)setTecnico2FromEmail(snap.tecnico2_email)
+  else if(snap.tec2_display)vSet('f-tec2-display',snap.tec2_display)
+  if(snap.tecnico2_id)vSet('f-tec2-id',snap.tecnico2_id)
 
   // Ripristina lavorazioni a cascata
   renderLavTags()
@@ -1862,7 +1896,6 @@ const TECNICI_LIST=[
 ]
 function populateTecnicoSelect(){
   const sel=$('f-tec-select'); if(!sel)return
-  // rimuove opzioni esistenti tranne la prima (placeholder)
   while(sel.options.length>1) sel.remove(1)
   TECNICI_LIST.forEach((t,i)=>{
     const o=document.createElement('option'); o.value=i; o.textContent=t.nome; sel.appendChild(o)
@@ -1875,15 +1908,36 @@ function populateTecnicoSelect(){
     const t=TECNICI_LIST[idx]
     vSet('f-tec-display',t.nome)
     vSet('f-tec-email',t.email)
-    // cerca id nella tabella tecnici tramite email
     const{data}=await sb.from('tecnici').select('tecnico_id').eq('email',t.email).maybeSingle()
     vSet('f-tec-id',data?.tecnico_id||'')
+  }
+  // Secondo tecnico
+  const sel2=$('f-tec2-select'); if(!sel2)return
+  while(sel2.options.length>1) sel2.remove(1)
+  TECNICI_LIST.forEach((t,i)=>{
+    const o=document.createElement('option'); o.value=i; o.textContent=t.nome; sel2.appendChild(o)
+  })
+  sel2.onchange=async()=>{
+    const idx=+sel2.value
+    if(isNaN(idx)||sel2.value===''){
+      vSet('f-tec2-display',''); vSet('f-tec2-email',''); vSet('f-tec2-id',''); return
+    }
+    const t=TECNICI_LIST[idx]
+    vSet('f-tec2-display',t.nome)
+    vSet('f-tec2-email',t.email)
+    const{data}=await sb.from('tecnici').select('tecnico_id').eq('email',t.email).maybeSingle()
+    vSet('f-tec2-id',data?.tecnico_id||'')
   }
 }
 function setTecnicoFromEmail(email){
   const sel=$('f-tec-select'); if(!sel||!email)return
   const idx=TECNICI_LIST.findIndex(t=>t.email===email)
   if(idx>=0){ sel.value=idx; vSet('f-tec-display',TECNICI_LIST[idx].nome); vSet('f-tec-email',TECNICI_LIST[idx].email) }
+}
+function setTecnico2FromEmail(email){
+  const sel=$('f-tec2-select'); if(!sel||!email)return
+  const idx=TECNICI_LIST.findIndex(t=>t.email===email)
+  if(idx>=0){ sel.value=idx; vSet('f-tec2-display',TECNICI_LIST[idx].nome); vSet('f-tec2-email',TECNICI_LIST[idx].email) }
 }
 
 // ── COMUNI PADOVA ──────────────────────────────────────────────────────────────
