@@ -2348,7 +2348,10 @@ function bindRowActions(){
   document.querySelectorAll('[data-act="pdf"]').forEach(b=>b.onclick=()=>genPDF(b.dataset.id))
   document.querySelectorAll('[data-act="snap"]').forEach(b=>b.onclick=()=>exportSnapFromDB(b.dataset.id))
 }
-$('btn-pdf').onclick=()=>{if(S.savedId)genPDF(S.savedId)}
+$('btn-pdf').onclick=()=>{
+  if(!S.savedId){toast('Salva prima la visita per generare il PDF','warn');return}
+  genPDF(S.savedId)
+}
 
 // ── LISTA CANTIERI ──
 async function loadCantieri(q=''){
@@ -2528,13 +2531,16 @@ async function exportSnapFromDB(vid){
 async function genPDF(vid){
   toast('Generazione PDF…')
   try{
-    const{data:v}=await sb.from('visite').select(`*,tecnici(*),cantieri(*,committenti(*)),imprese(*)`).eq('visita_id',vid).single()
+    if(!vid){toast('ID visita mancante','err');return}
+    if(!window.jspdf?.jsPDF){toast('Libreria PDF non caricata — ricarica la pagina','err');return}
+
+    const{data:v,error:eV}=await sb.from('visite').select(`*,tecnici(*),cantieri(*,committenti(*)),imprese(*)`).eq('visita_id',vid).single()
+    if(eV)throw new Error('Errore caricamento visita: '+eV.message)
     const{data:chk}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
     const{data:lavs}=await sb.from('visite_lavorazioni').select('lavorazione').eq('visita_id',vid)
     const{data:imps}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf)').eq('visita_id',vid).order('ordine')
 
     if(!v){toast('Visita non trovata','err');return}
-
 
     const{jsPDF}=window.jspdf
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
