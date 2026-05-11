@@ -1,0 +1,2502 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Gestionale Visite – Formedil Padova</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --orange:#E7500F;--grey:#565C66;--green:#95C22F;--white:#fff;
+  --light:#f4f4f4;--border:#ddd;--danger:#c0392b;--warn:#e67e22;--ok:#27ae60;
+  --radius:8px;--shadow:0 2px 8px rgba(0,0,0,.12);--header-h:68px;--nav-h:50px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;color:#222;background:var(--light);min-height:100vh}
+input,select,textarea{font-family:inherit;font-size:14px;width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;outline:none;transition:border .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 0 0 2px rgba(231,80,15,.1)}
+input[readonly]{background:#f8f8f8;color:#666;cursor:default}
+textarea{resize:vertical;min-height:70px}
+button{font-family:inherit;font-size:14px;cursor:pointer;border:none;border-radius:var(--radius);padding:9px 16px;transition:opacity .15s,transform .1s;white-space:nowrap}
+button:active{transform:scale(.97)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--orange);color:#fff}
+.btn-secondary{background:var(--grey);color:#fff}
+.btn-success{background:var(--ok);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-outline{background:transparent;border:2px solid var(--orange);color:var(--orange)}
+.btn-sm{padding:5px 11px;font-size:12px}
+.btn-icon{background:none;padding:4px 8px;font-size:16px;border:none}
+label{display:block;font-weight:600;margin-bottom:4px;color:var(--grey);font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+.field{margin-bottom:13px}
+.field-inline{display:flex;gap:8px;align-items:flex-end}
+.row{display:flex;gap:12px}
+.row>.field{flex:1;min-width:0}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.badge-alto{background:#fde8e8;color:var(--danger)}
+.badge-medio{background:#fef3e2;color:var(--warn)}
+.badge-basso{background:#e8f8ee;color:var(--ok)}
+.badge-nr{background:#eee;color:#777}
+.badge-bozza{background:#eef;color:#555}
+.badge-definitivo{background:#e8f8ee;color:var(--ok)}
+.sect-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--grey);background:var(--light);padding:5px 10px;border-radius:var(--radius);margin-bottom:10px;margin-top:4px}
+/* LOADING */
+#screen-loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--orange);z-index:9999}
+.load-logo{color:#fff;font-size:22px;font-weight:700;letter-spacing:1px;text-align:center}
+.load-logo small{display:block;font-size:13px;font-weight:400;opacity:.8;margin-top:4px}
+/* LOGIN */
+#screen-login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--orange) 0%,#b83d0a 100%);padding:20px}
+.login-card{background:#fff;border-radius:16px;padding:36px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.login-card h1{font-size:19px;color:var(--orange);margin-bottom:3px}
+.login-card p{color:var(--grey);font-size:12px;margin-bottom:24px}
+.login-card button{width:100%;margin-top:6px}
+.login-err{background:#fde8e8;color:var(--danger);padding:8px 12px;border-radius:var(--radius);margin-bottom:10px;font-size:13px;display:none}
+/* APP */
+#screen-app{display:flex;flex-direction:column;min-height:100vh}
+header{height:var(--header-h);background:var(--orange);display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:200;box-shadow:var(--shadow)}
+.header-logo{height:52px;width:auto;flex-shrink:1;max-width:min(280px,calc(100vw - 130px))}
+.user-area{display:flex;align-items:center;gap:8px;color:#fff;font-size:12px;flex-shrink:0}
+.user-area button{background:rgba(255,255,255,.2);color:#fff;padding:5px 11px;font-size:12px}
+nav{height:var(--nav-h);background:var(--grey);display:flex;align-items:center;gap:3px;padding:0 10px;overflow-x:auto;position:sticky;top:var(--header-h);z-index:190}
+nav button{background:none;color:rgba(255,255,255,.7);padding:6px 13px;border-radius:var(--radius);font-size:13px;border:2px solid transparent;white-space:nowrap}
+nav button.active,nav button:hover{color:#fff;border-color:rgba(255,255,255,.35)}
+nav button.active{background:rgba(255,255,255,.15)}
+main{flex:1;padding:14px;max-width:920px;margin:0 auto;width:100%}
+/* DASHBOARD */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.stat-card{background:#fff;border-radius:var(--radius);padding:14px;text-align:center;box-shadow:var(--shadow)}
+.stat-card .num{font-size:30px;font-weight:800;color:var(--orange)}
+.stat-card .lbl{font-size:11px;color:var(--grey);margin-top:3px;text-transform:uppercase}
+.card{background:#fff;border-radius:var(--radius);padding:15px;box-shadow:var(--shadow);margin-bottom:14px}
+.card h3{font-size:14px;margin-bottom:12px;color:var(--grey);border-bottom:2px solid var(--light);padding-bottom:7px;text-transform:uppercase;letter-spacing:.5px}
+/* TABLE */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--light);padding:7px 9px;text-align:left;font-weight:600;color:var(--grey);font-size:11px;text-transform:uppercase}
+td{padding:7px 9px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:hover td{background:#fef9f7}
+.tbl-actions{display:flex;gap:5px}
+/* FORM */
+.form-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.form-header h2{font-size:16px;color:var(--grey)}
+.ipc-live-wrap{display:flex;align-items:center;gap:8px}
+.ipc-live-val{font-size:16px;font-weight:800}
+/* TAB BAR */
+.tab-bar{display:flex;gap:0;overflow-x:auto;margin-bottom:14px;border-bottom:2px solid var(--border);white-space:nowrap}
+.tab-btn{background:none;border:none;border-bottom:3px solid transparent;border-radius:0;padding:8px 13px;color:var(--grey);font-size:12px;font-weight:600;transition:all .15s;margin-bottom:-2px}
+.tab-btn.active{color:var(--orange);border-bottom-color:var(--orange)}
+.tab-btn.has-rilievi{color:var(--danger)}
+.tab-btn.has-rilievi.active{border-bottom-color:var(--danger)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+/* CHECKLIST */
+.zona-gruppo{margin-bottom:18px}
+.zona-gruppo h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--grey);background:var(--light);padding:5px 10px;border-radius:var(--radius);margin-bottom:6px}
+.check-item{display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #f0f0f0}
+.check-item:last-child{border-bottom:none}
+.check-label{flex:1;font-size:13px;color:#333;line-height:1.3}
+.check-radios{display:flex;gap:3px;flex-shrink:0}
+.check-radios label{display:flex;flex-direction:column;align-items:center;cursor:pointer;margin:0}
+.check-radios input[type=radio]{display:none}
+.radio-chip{font-size:11px;font-weight:700;padding:3px 6px;border-radius:4px;border:2px solid #ccc;background:#fff;color:#999;cursor:pointer}
+.check-radios input[type=radio]:checked+.radio-chip.na{border-color:#aaa;background:#eee;color:#555}
+.check-radios input[type=radio]:checked+.radio-chip.ver{border-color:var(--ok);background:#e8f8ee;color:var(--ok)}
+.check-radios input[type=radio]:checked+.radio-chip.ncm{border-color:var(--warn);background:#fef3e2;color:var(--warn)}
+.check-radios input[type=radio]:checked+.radio-chip.ncp{border-color:var(--danger);background:#fde8e8;color:var(--danger)}
+.check-radios input[type=radio]:checked+.radio-chip.oss{border-color:#8e44ad;background:#f5eef8;color:#8e44ad}
+.nota-item{padding:6px 4px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #f0f0f0}
+.nota-item .nota-label{font-size:12px;color:#888;width:180px;flex-shrink:0}
+.nota-item input{max-width:300px}
+/* IMPRESE ACCORDION */
+.imp-accordion{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
+.imp-acc-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--light);cursor:pointer;user-select:none}
+.imp-acc-header .imp-name{font-weight:700;font-size:13px;color:var(--grey)}
+.imp-acc-header .imp-actions{display:flex;gap:6px;align-items:center}
+.imp-acc-body{padding:14px;display:none;border-top:1px solid var(--border)}
+.imp-acc-body.open{display:block}
+/* AUTOCOMPLETE */
+.autocomplete-wrap{position:relative}
+.ac-list{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:200px;overflow-y:auto;z-index:300;box-shadow:var(--shadow)}
+.ac-list div{padding:8px 12px;cursor:pointer;font-size:13px}
+.ac-list div:hover,.ac-list div.active{background:#fef8f5;color:var(--orange)}
+/* RIEPILOGO */
+.riepilogo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.rp-item{background:var(--light);padding:8px 11px;border-radius:var(--radius)}
+.rp-item .rp-k{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.4px}
+.rp-item .rp-v{font-weight:600;color:#222;margin-top:2px;font-size:13px}
+.ipc-box{text-align:center;padding:18px;border-radius:var(--radius);margin-bottom:14px}
+.ipc-box.ALTO{background:#fde8e8;border:2px solid var(--danger)}
+.ipc-box.MEDIO{background:#fef3e2;border:2px solid var(--warn)}
+.ipc-box.BASSO{background:#e8f8ee;border:2px solid var(--ok)}
+.ipc-box.NR{background:#eee;border:2px solid #bbb}
+.ipc-box .ipc-val{font-size:34px;font-weight:900;margin-bottom:4px}
+.ipc-box.ALTO .ipc-val{color:var(--danger)}
+.ipc-box.MEDIO .ipc-val{color:var(--warn)}
+.ipc-box.BASSO .ipc-val{color:var(--ok)}
+.ipc-box.NR .ipc-val{color:#888}
+.ipc-counters{display:flex;justify-content:center;gap:18px;font-size:12px;color:#666;margin-top:5px}
+.save-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:2px solid var(--border)}
+/* IMPORT */
+.drop-zone{border:3px dashed var(--border);border-radius:var(--radius);padding:36px;text-align:center;color:#aaa;cursor:pointer;transition:all .2s}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--orange);background:#fef8f5;color:var(--orange)}
+/* SEARCH */
+.search-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.search-bar input{flex:1;min-width:160px}
+.search-bar select{max-width:140px}
+/* TOAST */
+#toast-area{position:fixed;bottom:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:7px}
+.toast{background:#333;color:#fff;padding:10px 16px;border-radius:var(--radius);font-size:13px;box-shadow:var(--shadow);animation:tin .3s ease;max-width:300px}
+.toast.ok{background:var(--ok)}
+.toast.err{background:var(--danger)}
+.toast.warn{background:var(--warn)}
+@keyframes tin{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-box{background:#fff;border-radius:12px;padding:22px;width:100%;max-width:500px;box-shadow:0 8px 32px rgba(0,0,0,.2);max-height:92vh;overflow-y:auto}
+.modal-box h3{margin-bottom:14px;color:var(--grey);font-size:16px}
+.modal-actions{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+/* FOTO */
+.foto-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-bottom:18px}
+.foto-slot{border:2px dashed var(--border);border-radius:var(--radius);background:#fafafa;padding:10px;text-align:center;position:relative;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:border .2s}
+.foto-slot.privacy-slot{border-color:#8e44ad;background:#fdf5ff}
+.foto-slot.uploaded{border-style:solid;border-color:var(--ok);background:#f3fcf5}
+.foto-slot label.foto-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--grey);margin-bottom:0}
+.foto-slot.privacy-slot label.foto-lbl{color:#8e44ad}
+.foto-preview{width:100%;max-width:140px;height:110px;object-fit:cover;border-radius:6px;display:none;cursor:pointer;margin-top:4px}
+.foto-slot.uploaded .foto-preview{display:block}
+.foto-placeholder{font-size:28px;opacity:.3;margin-bottom:4px}
+.foto-slot.uploaded .foto-placeholder{display:none}
+.foto-progress{width:100%;height:4px;background:#eee;border-radius:2px;overflow:hidden;display:none}
+.foto-progress-bar{height:100%;background:var(--orange);width:0%;transition:width .3s}
+.foto-link{font-size:10px;color:var(--ok);word-break:break-all;display:none;margin-top:4px}
+.foto-slot.uploaded .foto-link{display:block}
+.btn-foto-del{position:absolute;top:5px;right:5px;background:var(--danger);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0}
+.foto-slot.uploaded .btn-foto-del{display:flex}
+.foto-info{font-size:10px;color:#aaa;margin-top:2px}
+/* CONFIRM DIALOG */
+.confirm-box{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:420px;text-align:center}
+.confirm-box h3{font-size:17px;margin-bottom:10px}
+.confirm-box p{color:var(--grey);font-size:13px;margin-bottom:18px;line-height:1.5}
+.confirm-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.check-inline{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;font-size:13px;text-transform:none;letter-spacing:0}
+.check-inline input{width:auto;cursor:pointer}
+.hidden{display:none!important}
+.check-nota-wrap{padding:2px 4px 6px 4px;display:none}
+.check-nota-wrap.show{display:block}
+.check-nota-wrap textarea{min-height:44px;font-size:12px;border-color:#e0c4b0;background:#fffaf7;resize:vertical}
+.check-nota-wrap textarea:focus{border-color:var(--orange)}
+.figura-coord-box{background:var(--light);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;border-left:3px solid var(--orange)}
+.figura-coord-box .figura-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--orange);margin-bottom:8px}
+.sogg-toggle{display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:8px}
+.sogg-toggle label{flex:1;text-align:center;padding:7px;cursor:pointer;font-size:12px;font-weight:600;color:var(--grey);background:#fff;text-transform:none;letter-spacing:0;margin:0;transition:all .15s}
+.sogg-toggle input[type=radio]{display:none}
+.sogg-toggle input[type=radio]:checked+span{background:var(--orange);color:#fff;display:block}
+.tipo-chips{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tipo-chip{display:inline-block}
+.tipo-chip input[type=radio]{display:none}
+.tipo-chip span{display:block;padding:5px 13px;border-radius:20px;border:2px solid var(--border);background:#fff;color:var(--grey);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.tipo-chip input[type=radio]:checked+span{border-color:var(--grey);background:var(--grey);color:#fff}
+@media(max-width:600px){
+  .row{flex-direction:column;gap:0}
+  .check-radios{gap:2px}
+  .radio-chip{font-size:10px;padding:2px 4px}
+  main{padding:8px}
+  .riepilogo-grid{grid-template-columns:1fr}
+  .brand span{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="screen-loading">
+  <div class="load-logo">FORMEDIL PADOVA<small>Caricamento…</small></div>
+</div>
+
+<!-- LOGIN -->
+<div id="screen-login" class="hidden">
+  <div class="login-card">
+    <h1>Formedil Padova</h1>
+    <p>Gestionale Visite — accesso riservato al team</p>
+    <div class="login-err" id="login-err"></div>
+    <div class="field"><label>Email</label><input type="email" id="l-email" autocomplete="email"></div>
+    <div class="field"><label>Password</label><input type="password" id="l-pwd" autocomplete="current-password"></div>
+    <button class="btn-primary" id="btn-login">Accedi</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="screen-app" class="hidden">
+  <header>
+    <!-- Logo Formedil Padova completo – negativo su arancione – font Balrow -->
+    <svg class="header-logo" viewBox="0 0 272 60" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Formedil Padova – Scuola Costruzioni Giuseppe Jappelli">
+      <defs>
+        <!-- Clip per le linee di hatching della foglia -->
+        <clipPath id="lc-hdr">
+          <path d="M 10,59 C 1,48 0,28 0,14 C 0,4 4,0 10,0 C 16,0 20,4 20,14 C 20,28 19,48 10,59 Z"/>
+        </clipPath>
+      </defs>
+
+      <!-- ── PITTOGRAMMA (viewbox 0–50 × 0–60) ── -->
+
+      <!-- Sezione destra/arancione: overlay scuro (bg header arancione filtra) -->
+      <path d="M 35,8 L 48,0 L 50,0 L 50,60 L 35,60 Z" fill="rgba(0,0,0,.22)"/>
+
+      <!-- Sezione grigia centrale (negativo → bianca) -->
+      <path d="M 16,8 L 16,60 L 35,60 L 35,8 Z" fill="white"/>
+
+      <!-- Foglia verde a goccia (teardrop) – elemento identitario del brand -->
+      <path d="M 10,59 C 1,48 0,28 0,14 C 0,4 4,0 10,0 C 16,0 20,4 20,14 C 20,28 19,48 10,59 Z" fill="#95C22F"/>
+
+      <!-- Hatching diagonale nella foglia (bianco semitrasparente) -->
+      <g clip-path="url(#lc-hdr)" stroke="rgba(255,255,255,.50)" stroke-width="2.4" stroke-linecap="round">
+        <line x1="0"  y1="36" x2="14" y2="3"/>
+        <line x1="2"  y1="47" x2="17" y2="14"/>
+        <line x1="4"  y1="56" x2="19" y2="25"/>
+        <line x1="7"  y1="59" x2="19" y2="37"/>
+      </g>
+
+      <!-- Divisore grigio/arancione -->
+      <line x1="35" y1="8" x2="35" y2="60" stroke="rgba(255,255,255,.38)" stroke-width=".9"/>
+
+      <!-- Circuito: linee (arancione = bg visibile attraverso la sezione bianca) -->
+      <line x1="23" y1="44" x2="28" y2="16" stroke="#E7500F" stroke-width="2.3" stroke-linecap="round"/>
+      <line x1="28" y1="16" x2="34" y2="28" stroke="#E7500F" stroke-width="2.3" stroke-linecap="round"/>
+
+      <!-- Circuito: nodi bianchi (negativo → arancione) -->
+      <circle cx="28" cy="16" r="4.5" fill="#E7500F"/>
+      <circle cx="23" cy="44" r="4.5" fill="#E7500F"/>
+      <circle cx="34" cy="28" r="4.5" fill="#E7500F"/>
+
+      <!-- ── TESTO in Balrow ── -->
+      <text x="60" y="14"
+            font-family="Balrow,'Segoe UI',system-ui,sans-serif"
+            font-size="9.5" font-weight="700" fill="white" letter-spacing="1.8">FORMEDIL PADOVA</text>
+      <text x="60" y="38"
+            font-family="Balrow,'Segoe UI',system-ui,sans-serif"
+            font-size="17" font-weight="700" fill="white" letter-spacing="0.3">SCUOLA COSTRUZIONI</text>
+      <text x="62" y="53"
+            font-family="Balrow,'Segoe UI',system-ui,sans-serif"
+            font-size="10" font-style="italic" fill="rgba(255,255,255,.86)">Giuseppe Jappelli</text>
+    </svg>
+    <div class="user-area">
+      <span id="lbl-user"></span>
+      <button id="btn-logout">Esci</button>
+    </div>
+  </header>
+  <nav>
+    <button class="active" data-view="dashboard">🏠 Dashboard</button>
+    <button data-view="form" id="nav-nuova">➕ Nuova visita</button>
+    <button data-view="lista">📋 Visite</button>
+    <button data-view="import">📥 Importa</button>
+  </nav>
+  <main>
+
+    <!-- DASHBOARD -->
+    <section id="view-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="num" id="s-tot">–</div><div class="lbl">Visite anno</div></div>
+        <div class="stat-card"><div class="num" id="s-alto" style="color:var(--danger)">–</div><div class="lbl">IPC Alto</div></div>
+        <div class="stat-card"><div class="num" id="s-medio" style="color:var(--warn)">–</div><div class="lbl">IPC Medio</div></div>
+        <div class="stat-card"><div class="num" id="s-basso" style="color:var(--ok)">–</div><div class="lbl">IPC Basso/NR</div></div>
+      </div>
+      <div class="card">
+        <h3>Ultime visite</h3>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>Verbale</th><th>Data</th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th>Stato</th><th></th></tr></thead>
+          <tbody id="tbody-dash"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- FORM VISITA -->
+    <section id="view-form" class="hidden">
+      <div class="form-header">
+        <h2 id="form-title">Nuova Visita</h2>
+        <div class="ipc-live-wrap">
+          <span id="ipc-lbl" style="font-size:12px;color:var(--grey);margin-right:4px">IPC:</span>
+          <span id="ipc-val" class="badge badge-nr">NR</span>
+          <span id="ipc-cnt" style="font-size:11px;color:#aaa;margin-left:4px"></span>
+        </div>
+      </div>
+      <div class="tab-bar" id="tab-bar"></div>
+
+      <!-- TAB 0: DATI VISITA -->
+      <div class="tab-content active" data-tab="0">
+        <div class="card">
+          <div class="sect-title">Verbale</div>
+          <div class="row" style="align-items:flex-end">
+            <div class="field" style="flex:0 0 180px">
+              <label>N° Verbale</label>
+              <input type="text" id="f-verbale" readonly>
+            </div>
+            <div class="field">
+              <label>Tecnico responsabile</label>
+              <select id="f-tec-select">
+                <option value="">– Seleziona tecnico –</option>
+              </select>
+              <input type="hidden" id="f-tec-display">
+              <input type="hidden" id="f-tec-id">
+              <input type="hidden" id="f-tec-email">
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;align-items:flex-end;flex-wrap:wrap;gap:8px">
+            <div class="field">
+              <label>Tipologia di accesso</label>
+              <select id="f-tipo" style="font-size:13px">
+                <option value="5">Programmata</option>
+                <option value="1">Su segnalazione</option>
+                <option value="2">Su richiesta</option>
+                <option value="3">Per protocolli di intesa</option>
+                <option value="4">Indicata da RLS/RLST</option>
+                <option value="6">Cantiere qualità</option>
+                <option value="7">Indicata dal CPT</option>
+              </select>
+            </div>
+            <div class="field" style="flex:0 0 100px">
+              <label>Accesso n°</label>
+              <input type="text" id="f-acc-cant" placeholder="N°">
+            </div>
+            <div class="field" style="flex:0 0 auto">
+              <label style="white-space:nowrap;font-size:12px">Aff. RLST?</label>
+              <div class="tipo-chips" style="margin-top:5px">
+                <label class="tipo-chip"><input type="radio" name="rlst-aff" id="f-rlst-si" value="si"><span>Sì</span></label>
+                <label class="tipo-chip"><input type="radio" name="rlst-aff" id="f-rlst-no" value="no" checked><span>No</span></label>
+              </div>
+              <input type="hidden" id="f-rlst">
+            </div>
+            <div class="field" style="flex:0 0 auto">
+              <label style="white-space:nowrap;font-size:12px">Visita stage?</label>
+              <div class="tipo-chips" style="margin-top:5px">
+                <label class="tipo-chip"><input type="radio" name="stage-vis" id="f-stage-vis-si" value="si"><span>Sì</span></label>
+                <label class="tipo-chip"><input type="radio" name="stage-vis" id="f-stage-vis-no" value="no" checked><span>No</span></label>
+              </div>
+              <input type="hidden" id="f-stage-vis">
+            </div>
+          </div>
+          <div id="field-nom-stage" style="display:none;margin-top:4px">
+            <div class="field" style="max-width:280px;margin-bottom:6px"><label>Nominativo stagista</label><input type="text" id="f-nom-stage" placeholder="Nome Cognome"></div>
+          </div>
+          <div class="sect-title" style="margin-top:10px">Persona presente alla visita</div>
+          <div class="row">
+            <div class="field" style="flex:0 0 110px"><label>Titolo</label>
+              <select id="f-ppre-titolo"><option value="">–</option><option>Sig.</option><option>Sig.ra</option><option>Dott.</option><option>Dott.ssa</option><option>Geom.</option><option>P.I.</option><option>Ing.</option><option>Arch.</option><option>Avv.</option><option>Prof.</option></select>
+            </div>
+            <div class="field"><label>Nome</label><input type="text" id="f-ppre-nome" placeholder="Nome"></div>
+            <div class="field"><label>Cognome</label><input type="text" id="f-ppre-cog" placeholder="Cognome"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>In qualità di</label>
+              <select id="f-qual-ppre">
+                <option value="">– Seleziona qualifica –</option>
+                <option>Addetto alla documentazione</option>
+                <option>Autonomo</option>
+                <option>Capo cantiere</option>
+                <option>Collaboratore esterno</option>
+                <option>Committente</option>
+                <option>Coordinatore</option>
+                <option>Dipendente</option>
+                <option>Dipendente ditta affidataria</option>
+                <option>Dipendente ditta in subappalto</option>
+                <option>Direttore tecnico di cantiere</option>
+                <option>Direttore tecnico impresa</option>
+                <option>Geometra di cantiere</option>
+                <option>Impiegato tecnico</option>
+                <option>Lavoratore</option>
+                <option>Lavoratore autonomo</option>
+                <option>Operaio</option>
+                <option>Operaio del committente</option>
+                <option>Preposto</option>
+                <option>Responsabile del Modello di Organizzazione e Gestione</option>
+                <option>Responsabile di cantiere</option>
+                <option>RLS</option>
+                <option>RSGSL</option>
+                <option>RSPP</option>
+                <option>RSPP aziendale</option>
+                <option>Socio dipendente</option>
+                <option>Socio titolare</option>
+                <option>Subappaltatore</option>
+                <option>Tecnico</option>
+                <option>Tecnico di cantiere</option>
+                <option>Tecnico impresa</option>
+                <option>Tecnico incaricato dal committente</option>
+                <option>Titolare</option>
+                <option>Tutor aziendale</option>
+                <option>Altro</option>
+              </select>
+            </div>
+            <div class="field"><label>Contatto telefonico</label><input type="tel" id="f-tel-ppre" placeholder="+39 …"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 1: CANTIERE -->
+      <div class="tab-content" data-tab="1">
+        <div class="card">
+          <div class="sect-title">Cantiere *</div>
+          <div class="field">
+            <label>Cerca cantiere</label>
+            <div class="autocomplete-wrap">
+              <input type="text" id="f-cant-search" placeholder="Indirizzo, etichetta, comune…" autocomplete="off">
+              <div class="ac-list hidden" id="cant-list"></div>
+            </div>
+            <input type="hidden" id="f-cant-id">
+            <div id="cant-detail" style="font-size:12px;color:var(--grey);margin-top:5px"></div>
+          </div>
+          <button class="btn-outline btn-sm" id="btn-new-cant">+ Nuovo cantiere</button>
+          <div class="row" style="margin-top:12px">
+            <div class="field"><label>Accesso cantiere n° (dal DB cantiere)</label><input type="text" id="f-acc-cant2" placeholder="Codice accesso interno" readonly style="background:#f8f8f8"></div>
+            <div class="field"><label>Protocollo interno</label><input type="text" id="f-prot-int" placeholder="Prot. richiesta"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Codice CNCE</label><input type="text" id="f-cnce" placeholder="Cod. CNCE"></div>
+            <div class="field"><label>Codice univoco cantiere</label><input type="text" id="f-cod-uni" placeholder="Cod. univoco"></div>
+          </div>
+          <div class="field"><label>Data prevista ultimazione lavori</label><input type="date" id="f-data-ult"></div>
+          <div class="sect-title">Committente</div>
+          <div class="sogg-toggle">
+            <label><input type="radio" name="comm-sogg" id="comm-radio-pf" value="PF" checked><span>👤 Persona fisica</span></label>
+            <label><input type="radio" name="comm-sogg" id="comm-radio-pg" value="PG"><span>🏢 Persona giuridica</span></label>
+          </div>
+          <div class="tipo-chips">
+            <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-pub" value="1"><span>🏛 Pubblico</span></label>
+            <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-priv" value="2"><span>🏠 Privato</span></label>
+            <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-nd" value="3"><span>— N/D</span></label>
+          </div>
+          <div class="field">
+            <label>Cerca committente esistente</label>
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <div class="autocomplete-wrap" style="flex:1">
+                <input type="text" id="f-comm-search" placeholder="Cerca per nome, CF o PIVA…" autocomplete="off">
+                <div class="ac-list hidden" id="comm-list"></div>
+              </div>
+              <button class="btn-outline btn-sm" id="btn-new-comm" type="button" style="white-space:nowrap;margin-top:1px">+ Nuovo</button>
+            </div>
+            <input type="hidden" id="f-comm-id">
+          </div>
+          <!-- PERSONA FISICA -->
+          <div id="comm-pf-fields">
+            <div class="row">
+              <div class="field" style="flex:0 0 110px"><label>Titolo</label>
+                <select id="f-comm-titolo">
+                  <option value="">–</option>
+                  <option>Sig.</option><option>Sig.ra</option><option>Dott.</option><option>Dott.ssa</option>
+                  <option>Geom.</option><option>P.I.</option><option>Ing.</option><option>Arch.</option><option>Avv.</option><option>Prof.</option>
+                </select>
+              </div>
+              <div class="field"><label>Nome *</label><input type="text" id="f-comm-nome" placeholder="Nome"></div>
+              <div class="field"><label>Cognome *</label><input type="text" id="f-comm-cog" placeholder="Cognome"></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>Codice fiscale</label><input type="text" id="f-comm-cf" placeholder="XXXXXX00X00X000X" maxlength="16" style="text-transform:uppercase"></div>
+              <div class="field"><label>Email</label><input type="email" id="f-comm-email" placeholder="email@…"></div>
+              <div class="field"><label>Telefono</label><input type="tel" id="f-comm-tel" placeholder="+39…"></div>
+            </div>
+          </div>
+          <!-- PERSONA GIURIDICA -->
+          <div id="comm-pg-fields" class="hidden">
+            <div class="field"><label>Ragione sociale *</label><input type="text" id="f-comm-rag-soc" placeholder="Denominazione"></div>
+            <div class="row">
+              <div class="field"><label>Partita IVA</label><input type="text" id="f-comm-piva" placeholder="IT + 11 cifre" maxlength="13"></div>
+              <div class="field"><label>Codice fiscale</label><input type="text" id="f-comm-cf-pg" placeholder="CF azienda" maxlength="16"></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>Email</label><input type="email" id="f-comm-email-pg" placeholder="email@…"></div>
+              <div class="field"><label>Telefono</label><input type="tel" id="f-comm-tel-pg" placeholder="+39…"></div>
+            </div>
+          </div>
+          <input type="hidden" id="f-comm-tipo">
+          <div class="sect-title">Figure di coordinamento</div>
+          <div class="row">
+            <div class="field"><label><span class="check-inline"><input type="checkbox" id="f-coord"> Presenza di coordinamento in cantiere</span></label></div>
+          </div>
+          <div class="figura-coord-box">
+            <div class="figura-title">Responsabile dei lavori (RL)</div>
+            <div class="row">
+              <div class="field" style="flex:0 0 110px"><label>Titolo</label>
+                <select id="f-rl-titolo"><option value="">–</option><option>Sig.</option><option>Sig.ra</option><option>Dott.</option><option>Dott.ssa</option><option>Geom.</option><option>P.I.</option><option>Ing.</option><option>Arch.</option><option>Avv.</option></select>
+              </div>
+              <div class="field"><label>Nome</label><input type="text" id="f-rl-nome" placeholder="Nome"></div>
+              <div class="field"><label>Cognome</label><input type="text" id="f-rl-cog" placeholder="Cognome"></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>Email</label><input type="email" id="f-rl-email" placeholder="email@…"></div>
+              <div class="field"><label>Telefono</label><input type="tel" id="f-rl-tel" placeholder="+39…"></div>
+            </div>
+          </div>
+          <div class="figura-coord-box">
+            <div class="figura-title">Coordinatore Sicurezza in fase di Progettazione (CSP)</div>
+            <div class="row">
+              <div class="field" style="flex:0 0 110px"><label>Titolo</label>
+                <select id="f-csp-titolo"><option value="">–</option><option>Sig.</option><option>Sig.ra</option><option>Dott.</option><option>Dott.ssa</option><option>Geom.</option><option>P.I.</option><option>Ing.</option><option>Arch.</option><option>Avv.</option></select>
+              </div>
+              <div class="field"><label>Nome</label><input type="text" id="f-csp-nome" placeholder="Nome"></div>
+              <div class="field"><label>Cognome</label><input type="text" id="f-csp-cog" placeholder="Cognome"></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>Email</label><input type="email" id="f-csp-email" placeholder="email@…"></div>
+              <div class="field"><label>Telefono</label><input type="tel" id="f-csp-tel" placeholder="+39…"></div>
+            </div>
+          </div>
+          <div class="figura-coord-box">
+            <div class="figura-title">Coordinatore Sicurezza in fase di Esecuzione (CSE)</div>
+            <div class="row">
+              <div class="field" style="flex:0 0 110px"><label>Titolo</label>
+                <select id="f-cse-titolo"><option value="">–</option><option>Sig.</option><option>Sig.ra</option><option>Dott.</option><option>Dott.ssa</option><option>Geom.</option><option>P.I.</option><option>Ing.</option><option>Arch.</option><option>Avv.</option></select>
+              </div>
+              <div class="field"><label>Nome</label><input type="text" id="f-cse-nome" placeholder="Nome"></div>
+              <div class="field"><label>Cognome</label><input type="text" id="f-cse-cog" placeholder="Cognome"></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>Email</label><input type="email" id="f-cse-email" placeholder="email@…"></div>
+              <div class="field"><label>Telefono</label><input type="tel" id="f-cse-tel" placeholder="+39…"></div>
+            </div>
+          </div>
+          <div class="sect-title">Dati cantiere al momento della visita</div>
+          <div class="row">
+            <div class="field"><label>N° imprese presenti</label><input type="number" id="f-nr-imp" min="0" value="0"></div>
+            <div class="field"><label>N° ditte individuali</label><input type="number" id="f-nr-ind" min="0" value="0"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>N° lavoratori rilevati (totale)</label><input type="number" id="f-nr-lav" min="0" value="0"></div>
+            <div class="field"><label>di cui stranieri</label><input type="number" id="f-nr-lav-str" min="0" value="0"></div>
+          </div>
+          <div class="field"><label>Importo lavori</label>
+            <select id="f-importo">
+              <option value="">– Seleziona –</option>
+              <option value="1">Fino a 250.000 €</option><option value="2">250.001 – 500.000 €</option>
+              <option value="3">500.001 – 1.000.000 €</option><option value="4">1.000.001 – 1.500.000 €</option>
+              <option value="5">1.500.001 – 2.500.000 €</option><option value="6">2.500.001 – 3.500.000 €</option>
+              <option value="7">3.500.001 – 5.000.000 €</option><option value="8">5.000.001 – 10.000.000 €</option>
+              <option value="11">Non disponibile</option>
+            </select>
+          </div>
+          <div class="field"><label>Costi della sicurezza</label><input type="text" id="f-costi" placeholder="es. previsti e/o esposti"></div>
+          <div class="field"><label>Stato dei lavori – fasi lavorazioni</label><textarea id="f-stato-lav" rows="2" placeholder="Descrizione stato avanzamento lavori"></textarea></div>
+          <div class="field">
+            <label>Lavorazioni in corso</label>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:5px">
+              <div class="row">
+                <div class="field" style="margin-bottom:0;flex:1">
+                  <label style="font-size:11px">Genere</label>
+                  <select id="lav-sel-genere"><option value="">— Seleziona genere —</option></select>
+                </div>
+                <div class="field" style="margin-bottom:0;flex:1">
+                  <label style="font-size:11px">Fase</label>
+                  <select id="lav-sel-fase" disabled><option value="">— prima seleziona genere —</option></select>
+                </div>
+              </div>
+              <div class="row" style="align-items:flex-end">
+                <div class="field" style="margin-bottom:0;flex:1">
+                  <label style="font-size:11px">Lavorazione specifica</label>
+                  <select id="lav-sel-lavorazione" disabled><option value="">— prima seleziona fase —</option></select>
+                </div>
+                <button type="button" id="btn-add-lav" class="btn-primary btn-sm" disabled style="flex-shrink:0;height:36px">+ Aggiungi</button>
+              </div>
+              <div id="lav-tags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px"></div>
+            </div>
+          </div>
+          <div class="field"><label>Note lavorazioni</label><textarea id="f-note-lav" rows="2" placeholder="Note generali alle fasi di lavorazione"></textarea></div>
+        </div>
+      </div>
+
+      <!-- ZONE CHECKLIST 2–11: generate JS -->
+
+      <!-- TAB 2: IMPRESE (prima delle zone checklist) -->
+      <div class="tab-content" data-tab="2">
+        <div class="card">
+          <h3>Imprese presenti in cantiere</h3>
+          <p style="font-size:12px;color:#888;margin-bottom:12px">
+            Impresa 1 è l'impresa principale (quella dell'Osservatorio). Aggiungi le altre presenti.
+          </p>
+          <div id="imp-accordion-list"></div>
+          <button class="btn-outline btn-sm" id="btn-add-imp" style="margin-top:8px">+ Aggiungi impresa</button>
+        </div>
+      </div>
+
+      <!-- TAB 13: NOTE -->
+      <div class="tab-content" data-tab="13">
+        <div class="card">
+          <div class="sect-title">Osservazioni del tecnico</div>
+          <div class="field"><label>Osservazioni (visibili nel report / PDF)</label><textarea id="f-oss-tec" rows="4"></textarea></div>
+          <div class="field"><label>Osservazioni INTERNE (non visibili nel report)</label><textarea id="f-oss-int" rows="3" style="border-color:#f39c12;background:#fffef5"></textarea></div>
+          <div class="sect-title">Formazione e segnalazioni</div>
+          <div class="field"><label><span class="check-inline"><input type="checkbox" id="f-note-for-sn"> Contattare l'ufficio corsi per regolarizzare la formazione mancante</span></label></div>
+          <div class="field"><label>Note sulla formazione mancante</label><textarea id="f-note-for-m" rows="2"></textarea></div>
+          <div class="field"><label><span class="check-inline"><input type="checkbox" id="f-segnalazione"> Propongo segnalazione a SISAL / ITL</span></label></div>
+          <div class="sect-title">Visita di ritorno</div>
+          <div class="field"><label>Data / periodo previsto visita successiva</label><input type="date" id="f-data-ritorno"></div>
+        </div>
+      </div>
+
+      <!-- TAB 14: FOTO -->
+      <div class="tab-content" data-tab="14">
+        <div class="card">
+          <h3>📷 Foto verbale</h3>
+          <p style="font-size:12px;color:#888;margin-bottom:14px">
+            Scatta o seleziona le foto del sopralluogo. Le immagini vengono compresse automaticamente
+            e archiviate in Google Drive nella cartella del verbale.
+            La foto Privacy è il documento con firma del responsabile.
+          </p>
+          <div class="field" style="margin-bottom:14px">
+            <label><span class="check-inline"><input type="checkbox" id="f-privacy"> Privacy acquisita (documento firmato dal responsabile)</span></label>
+          </div>
+          <div class="foto-grid" id="foto-grid">
+            <!-- slot generati da JS -->
+          </div>
+          <div id="foto-upload-all-wrap" style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-primary btn-sm" id="btn-foto-upload-all">☁ Carica tutte le foto su Drive</button>
+            <span id="foto-status" style="font-size:12px;color:#888;align-self:center"></span>
+          </div>
+          <p style="font-size:11px;color:#aaa;margin-top:12px">
+            ⚠ Le foto vengono caricate su Drive solo dopo aver salvato la visita almeno come bozza
+            oppure cliccando "Carica tutte le foto su Drive".
+          </p>
+        </div>
+      </div>
+
+      <!-- TAB 15: RIEPILOGO -->
+      <div class="tab-content" data-tab="15">
+        <div class="card">
+          <h3>Riepilogo e salvataggio</h3>
+          <div id="rp-ipc-box" class="ipc-box NR">
+            <div class="ipc-val" id="rp-ipc-val">NR</div>
+            <div style="font-size:13px;color:#666">Indice di Pericolosità del Cantiere</div>
+            <div class="ipc-counters" id="rp-ipc-cnt">NC+: 0 &nbsp; NC-: 0 &nbsp; OSS: 0</div>
+          </div>
+          <div class="riepilogo-grid" id="rp-dati"></div>
+          <div id="rp-zone"></div>
+          <div class="save-actions">
+            <button class="btn-secondary" id="btn-bozza">💾 Salva bozza</button>
+            <button class="btn-primary" id="btn-final">✅ Definitivo</button>
+            <button class="btn-outline" id="btn-snap-exp">📤 Snapshot</button>
+            <button class="btn-success hidden" id="btn-pdf">🖨 PDF</button>
+            <button class="btn-outline hidden" id="btn-email-verbale" style="border-color:var(--grey);color:var(--grey)">📧 Invia verbale</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;margin-top:12px">
+        <button class="btn-outline" id="btn-prev">◀ Precedente</button>
+        <button class="btn-primary" id="btn-next">Successivo ▶</button>
+      </div>
+    </section>
+
+    <!-- LISTA VISITE -->
+    <section id="view-lista" class="hidden">
+      <div class="card">
+        <h3>Elenco visite</h3>
+        <div class="search-bar">
+          <input type="text" id="q-search" placeholder="Verbale, cantiere, impresa…">
+          <select id="q-ipc"><option value="">Tutti IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">NR</option></select>
+          <select id="q-stato"><option value="">Tutti stati</option><option value="bozza">Bozza</option><option value="definitivo">Definitivo</option></select>
+          <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button>
+        </div>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>Verbale</th><th>Data</th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th>Stato</th><th></th></tr></thead>
+          <tbody id="tbody-lista"></tbody></table>
+        </div>
+        <div id="lista-empty" class="hidden" style="text-align:center;padding:24px;color:#aaa">Nessuna visita trovata</div>
+      </div>
+    </section>
+
+    <!-- IMPORTA -->
+    <section id="view-import" class="hidden">
+      <div class="card">
+        <h3>Importa snapshot visita</h3>
+        <p style="font-size:13px;color:#888;margin-bottom:14px">
+          Carica un file .json esportato in precedenza. Potrai modificare tutti i dati
+          (inclusa l'impresa principale) prima di salvare come nuova visita.
+        </p>
+        <div class="drop-zone" id="drop-zone">
+          <p style="font-size:15px">📂 Trascina qui il file .json</p>
+          <small>oppure clicca per selezionare</small>
+          <input type="file" id="file-imp" accept=".json" style="display:none">
+        </div>
+        <div id="imp-preview" class="hidden" style="margin-top:14px">
+          <div class="card" style="box-shadow:none;border:1px solid var(--border)">
+            <h4 style="margin-bottom:8px;color:var(--grey)">Snapshot rilevato</h4>
+            <div id="imp-info" style="font-size:13px;line-height:1.8"></div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn-primary" id="btn-load-snap">Apri nel form</button>
+              <button class="btn-outline" id="btn-cancel-imp">Annulla</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- MODAL CANTIERE -->
+<div class="modal-overlay hidden" id="modal-cant">
+  <div class="modal-box">
+    <h3>Nuovo cantiere</h3>
+    <div class="row">
+      <div class="field" style="flex:3"><label>Indirizzo *</label><input type="text" id="mc-ind"></div>
+      <div class="field" style="flex:1"><label>Civico *</label><input type="text" id="mc-civ"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Comune *</label><select id="mc-com"><option value="">– Seleziona comune –</option></select></div>
+      <div class="field"><label>CAP <span style="font-weight:400;font-size:11px;color:#aaa">(auto)</span></label><input type="text" id="mc-cap" maxlength="5" readonly style="background:#f8f8f8" placeholder="si compila da Comune"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Tipo intervento</label>
+        <select id="mc-tip-int"><option value="">–</option><option value="1">Costruzione</option><option value="2">Ristrutturazione</option><option value="3">Demolizione</option><option value="4">Ampliamento</option></select></div>
+      <div class="field"><label>Tipo opera</label>
+        <select id="mc-tip-ope"><option value="">–</option><option value="2">Civile</option><option value="1">Industriale</option><option value="3">Commerciale</option><option value="5">Stradale</option><option value="8">Scolastica</option><option value="16">Altro</option></select></div>
+    </div>
+    <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma"></div>
+    <div class="modal-actions">
+      <button class="btn-outline" id="btn-mc-cancel">Annulla</button>
+      <button class="btn-primary" id="btn-mc-save">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUOVA IMPRESA -->
+<div class="modal-overlay hidden" id="modal-imp">
+  <div class="modal-box" style="max-width:560px">
+    <h3>🏢 Nuova impresa</h3>
+    <div class="sect-title">Dati anagrafici</div>
+    <div class="field"><label>Ragione sociale *</label><input type="text" id="mi-nome" placeholder="Ragione sociale…"></div>
+    <div class="row">
+      <div class="field"><label>Partita IVA *</label><input type="text" id="mi-piva" placeholder="IT…" style="border-color:var(--orange)"></div>
+      <div class="field"><label>Codice fiscale</label><input type="text" id="mi-cf" placeholder="CF…"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Indirizzo sede</label><input type="text" id="mi-ind" placeholder="Via/Piazza…"></div>
+      <div class="field"><label>Comune</label>
+        <input type="text" id="mi-com" placeholder="Comune…" list="mi-comuni-dl" autocomplete="off">
+        <datalist id="mi-comuni-dl"></datalist>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Email</label><input type="email" id="mi-email" placeholder="info@…"></div>
+      <div class="field"><label>Telefono</label><input type="tel" id="mi-tel" placeholder="+39…"></div>
+    </div>
+    <div class="sect-title" style="margin-top:10px">Cantiere / Sicurezza</div>
+    <div class="row">
+      <div class="field"><label>Badge cantiere</label><input type="text" id="mi-badge" placeholder="N° badge"></div>
+      <div class="field"><label>Patente a crediti</label><input type="text" id="mi-pat" placeholder="N° o esito"></div>
+    </div>
+    <div class="field"><label>Iscrizione CEIV</label>
+      <select id="mi-ceiv">
+        <option value="">– Seleziona –</option>
+        <option>C.E.I.V.</option>
+        <option>EDILCASSA VENETO</option>
+        <option>CASSA EDILE BELLUNO</option>
+        <option>CASSA EDILE VENEZIA</option>
+        <option>CASSA EDILE VICENZA</option>
+        <option>ALTRO</option>
+      </select>
+    </div>
+    <div class="field"><label>Certificazioni</label>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">
+        <label class="check-inline"><input type="checkbox" id="mi-cert-1"> Asseverata</label>
+        <label class="check-inline"><input type="checkbox" id="mi-cert-2"> Certificata OHSAS 18001</label>
+        <label class="check-inline"><input type="checkbox" id="mi-cert-3"> UNI EN ISO 45001</label>
+        <label class="check-inline"><input type="checkbox" id="mi-cert-4"> Sistema Qualità UNI EN ISO 9001</label>
+        <label class="check-inline"><input type="checkbox" id="mi-cert-5"> Certificazione ambientale ISO 14001</label>
+      </div>
+    </div>
+    <div class="field">
+      <label>L'impresa potrebbe ospitare uno stagista?</label>
+      <div class="tipo-chips" style="margin-top:6px">
+        <label class="tipo-chip"><input type="radio" name="mi-stage" value="si"><span>Sì</span></label>
+        <label class="tipo-chip"><input type="radio" name="mi-stage" value="no" checked><span>No</span></label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" id="btn-mi-cancel">Annulla</button>
+      <button class="btn-primary" id="btn-mi-save">💾 Salva impresa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUOVO COMMITTENTE -->
+<div class="modal-overlay hidden" id="modal-comm">
+  <div class="modal-box" style="max-width:520px">
+    <h3>👤 Nuovo committente</h3>
+    <div class="sogg-toggle" style="margin-bottom:10px">
+      <label><input type="radio" name="mc-sogg" id="mc-sogg-pf" value="PF" checked><span>👤 Persona fisica</span></label>
+      <label><input type="radio" name="mc-sogg" id="mc-sogg-pg" value="PG"><span>🏢 Persona giuridica</span></label>
+    </div>
+    <div class="tipo-chips" style="margin-bottom:12px">
+      <label class="tipo-chip"><input type="radio" name="mc-tipo" id="mc-tipo-pub" value="1"><span>🏛 Pubblico</span></label>
+      <label class="tipo-chip"><input type="radio" name="mc-tipo" id="mc-tipo-priv" value="2" checked><span>🏠 Privato</span></label>
+      <label class="tipo-chip"><input type="radio" name="mc-tipo" id="mc-tipo-nd" value="3"><span>— N/D</span></label>
+    </div>
+    <!-- PF -->
+    <div id="mc-pf-fields">
+      <div class="row">
+        <div class="field" style="flex:0 0 100px"><label>Titolo</label>
+          <select id="mc-comm-titolo">
+            <option value="">–</option>
+            <option>Sig.</option><option>Sig.ra</option><option>Dott.</option><option>Dott.ssa</option>
+            <option>Geom.</option><option>Ing.</option><option>Arch.</option><option>Avv.</option>
+          </select>
+        </div>
+        <div class="field"><label>Nome *</label><input type="text" id="mc-comm-nome" placeholder="Nome"></div>
+        <div class="field"><label>Cognome *</label><input type="text" id="mc-comm-cog" placeholder="Cognome"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Codice fiscale</label><input type="text" id="mc-comm-cf" placeholder="CF" maxlength="16" style="text-transform:uppercase"></div>
+        <div class="field"><label>Email</label><input type="email" id="mc-comm-email" placeholder="email@…"></div>
+        <div class="field"><label>Telefono</label><input type="tel" id="mc-comm-tel" placeholder="+39…"></div>
+      </div>
+    </div>
+    <!-- PG -->
+    <div id="mc-pg-fields" class="hidden">
+      <div class="field"><label>Ragione sociale *</label><input type="text" id="mc-comm-rag-soc" placeholder="Denominazione"></div>
+      <div class="row">
+        <div class="field"><label>Partita IVA</label><input type="text" id="mc-comm-piva" placeholder="IT…" maxlength="13"></div>
+        <div class="field"><label>Codice fiscale</label><input type="text" id="mc-comm-cf-pg" placeholder="CF azienda" maxlength="16"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Email</label><input type="email" id="mc-comm-email-pg" placeholder="email@…"></div>
+        <div class="field"><label>Telefono</label><input type="tel" id="mc-comm-tel-pg" placeholder="+39…"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" id="btn-mc-comm-cancel">Annulla</button>
+      <button class="btn-primary" id="btn-mc-comm-save">💾 Salva committente</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL INVIO VERBALE EMAIL -->
+<div class="modal-overlay hidden" id="modal-email-verbale">
+  <div class="modal-box" style="max-width:500px">
+    <h3 style="margin-bottom:10px;color:var(--grey);font-size:15px">📧 Destinatari verbale</h3>
+    <p style="font-size:12px;color:#666;margin-bottom:14px">Le seguenti figure riceveranno il verbale. Verranno aperti come destinatari nel tuo client email.</p>
+    <div id="email-verbale-list" style="margin-bottom:14px;max-height:240px;overflow-y:auto"></div>
+    <div class="field" style="margin-bottom:14px">
+      <label>Oggetto email</label>
+      <input type="text" id="email-verbale-oggetto" placeholder="Verbale sopralluogo…">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn-outline btn-sm" id="btn-ev-copia" type="button">📋 Copia indirizzi</button>
+      <button class="btn-primary btn-sm" id="btn-ev-apri" type="button">📧 Apri client email</button>
+      <button class="btn-secondary btn-sm" id="btn-ev-close" type="button">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM VERBALE (per snapshot) -->
+<div class="modal-overlay hidden" id="modal-verbale">
+  <div class="confirm-box">
+    <h3>Numero verbale</h3>
+    <p id="conf-verb-txt"></p>
+    <div class="confirm-actions">
+      <button class="btn-outline" id="btn-verb-mantieni">Mantieni originale</button>
+      <button class="btn-primary" id="btn-verb-nuovo">Assegna nuovo progressivo</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-area"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+
+const SB_URL='https://utdantrfugnmqsuujxbe.supabase.co'
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0ZGFudHJmdWdubXFzdXVqeGJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNjEzMTYsImV4cCI6MjA5MzgzNzMxNn0.L6YUgMD9rYPtqZCn5-c6hB-ok5nSCISpSolj_a-pcmM'
+const sb=createClient(SB_URL,SB_KEY)
+
+const LAV_DATA={
+  'Canalizzazioni':{
+    'Posa manufatti e lavori a fondo scavo':['assemblaggio, saldatura, sigillatura e rivestimento','deposito provvisorio del materiale/tubazioni','formazione del letto di appoggio','movimento macchine operatrici','posa coppelle di protezione','posizionamento manufatti a fondo scavo','realizzazioni pozzetti, camerette, nicchie, ecc.'],
+    'Rinterri, rifiniture e ripristini stradali':['formazione pozzetti, chiusini','movimento macchine operatrici','pulizia e sgombero area','reinterri e compattamento','rullatura','stesura manto bituminoso'],
+    'Scavi e movimenti terra':['deposito provvisorio materiali di scavo','esercizio impianti aggottamento','ispezioni ricerca sottosuolo','movimento autocarri e macchine operatrici','posa paratie e sostegni contro terra','predisposizione paratie e sostegni contro terra','preparazione, delimitazione e sgombero area','scavo a sezione obbligata','taglio e demolizione manto stradale','valutazione ambientale: vegetale, colturale, archeologico, urbano, geomorfologico']
+  },
+  'Costruzioni edili in genere':{
+    'Coperture':['approvigionamento e trasporto interno materiali','formazione ponteggi, piattaforme e piani di lavoro','movimento macchine operatrici ed impianti di sollevamento','posa di accessori (grondaie, scossaline, camini, ecc.)','posa manto di copertura','predisposizione appoggi','preparazione botole e asole','pulizia e movimentazione dei residui','realizzazione struttura di copertura','stesura matte, primer, impermeabilizzanti','taglio, demolizione, scanalatura calcestruzzo e murature','tracciamenti'],
+    'Demolizioni':['accertamenti ed assaggi delle strutture','demolizioni rimozione materiali di sovrastrutture e strutture non portanti','demolizioni meccanizzate','demolizioni strutture portanti','formazione ponteggi, piattaforme e piani di lavoro','movimento macchine operatrici ed impianti di sollevamento','preparazione percorsi e depositi','preparazione, delimitazione e sgombero area','protezione botole e asole','rafforzamenti e risanamenti provvisori, puntellamenti strutture da salvaguardare','rimozione e sgombero macerie'],
+    'Impianti dell\'opera in costruzione':['approvigionamento e trasporto interno materiali','formazione ponteggi, piattaforme e piani di lavoro','movimento macchine operatrici ed impianti di sollevamento','posa sanitari, corpi radianti','posizionamento terminali e apparecchi utilizzatori','predisposizione letto d\'appoggio','preparazione, delimitazione e sgombero area','protezione delle aperture verso il vuoto o vani','pulizia e movimentazione dei residui','realizzazione impianti','taglio, demolizione, scanalatura calcestruzzo e murature','tracciamenti'],
+    'Manutenzione e riparazione':['confezione malte','definizione e realizzazione accessi ai posti di lavoro','formazione ponteggi, piattaforme e piani di lavoro','manutenzione opere in ferro','preparazione, delimitazione e sgombero area','pulizia delle superfici esterne (idropitture - sabbiature)','revisione delle coperture','rifacimento dei manti di copertura','ripristini minori e rappezzi','sollevamento e trasporto dei materiali','sostituzione di grondaie, pluviali e faldali','stesura malte e vernici'],
+    'Murature, intonaci, finiture e opere esterne':['allacciamenti','approvigionamento e trasporto interno materiali','confezione malte ed intonaci (tradizionali e industriali)','formazione intonaci (tradizionali e industriali)','formazione ponteggi, piattaforme e piani di lavoro','movimento macchine operatrici ed impianti di sollevamento','posa laterizi/pietre','posa serramenti, ringhiere','predisposizione letto d\'appoggio','preparazione, delimitazione e sgombero area','protezione delle aperture verso il vuoto o vani','pulizia e movimentazione dei residui','sistemazione area esterna','stesura malte, polveri, vernici','tracciamenti'],
+    'Prefabbricati':['allestimento delle protezioni in opera','movimento macchine operatrici','predisposizione delle protezioni a piè d\'opera','preparazione, delimitazione e sgombero area','sollevamento e posa in opera pilastri','sollevamento e posa in opera rampe di scale','sollevamento e posa in opera setti o pannelli verticali','sollevamento e posa in opera solai orizzontali','sollevamento e posa in opera travi','sorveglianza e controllo delle operazioni','sostegno e puntellatura degli elementi isolati','stoccaggio elementi strutturali'],
+    'Ristrutturazioni':['approvigionamento e trasporto interno materiali','confezione malte ed intonaci (tradizionali e industriali)','demolizione strutture portanti','demolizione strutture non portanti','formazione intonaci (tradizionali e industriali)','formazione nuove strutture portanti','formazione ponteggi, piattaforme e piani di lavoro','formazione tagli e scanalature di ancoraggio','interventi di consolidamento strutturale','movimento macchine operatrici ed impianti di sollevamento','posa laterizi/pietre','posa serramenti, ringhiere, sanitari, corpi radianti','preparazione, delimitazione e sgombero area','protezione botole e asole','pulizia e movimentazione dei residui','puntellamento strutture da demolire e/o salvaguardare','rimozione e sgombero macerie','rimozione manuale materiali e sovrastrutture','stesura malte, polveri, vernici','tracciamenti'],
+    'Scavi di sbancamento e di fondazione':['carico e rimozione materiali di scavo','deposito provvisorio materiali di scavo','esercizio impianti di aggottamento','interventi con attrezzi manuali per regolarizzazione superficie di scavo e pulizia','movimento macchine operatrici','predisposizioni paratie sostegno contra terra ed opere di carpenteria per la messa in opera','predisposizione, ancoraggio e posa di passerelle, parapetti e andatoie provvisorie','preparazione, delimitazione e sgombero area','ripristino viabilità e pulizia','scavi di fondazione','tracciamento'],
+    'Strutture in c.a. tradizionali':['approvigionamento, lavorazione e posa armature metalliche','disarmo delle casserature','formazione ponteggi, piattaforme e piani di lavoro','getto calcestruzzo','movimento macchine operatrici','preparazione delimitazione e sgombero area','preparazione e posa casserature','protezione botole e asole','pulizia e movimentazione delle casserature','ripristino viabilità','sorveglianza e controllo della presa']
+  },
+  'Costruzioni stradali in genere':{
+    'Manti bituminosi':['finitura manuale','fornitura del conglomerato bituminoso','movimento autocarri e macchine operatrici','preparazione fondo','preparazione, delimitazione e pulizia area','pulizia finale (anche con macchina spazzolatrice - aspiratrice)','rullaggio','stesura manto con vibrofinitrice'],
+    'Opere di completamento':['fornitura e posa di attrezzature di servizio (banchine, marciapiedi, paletti, impianti di illuminazione e segnalazione, guard-rails, spartitraffico, sistemazioni a verde, ecc.)','fornitura e posa pozzetti, tombini e chiusini; formazione basamenti e strutture di sostegno per le attrezzature di servizio','realizzazione vani di ispezione per utenze sotterranee sulla superficie stradale','realizzazione canali di raccolta e smaltimento delle acque meteoriche'],
+    'Rifacimento manti':['demolizione manti con escavatore','finitura manuale','fornitura del conglomerato bituminoso','fresatura','movimento autocarri e macchine operatrici','preparazione fondo','preparazione, delimitazione e pulizia area','pulizia finale e apertura al traffico','pulizia fondo e bordo area (moto-scopa e pulizia manuale)','rifilatura manti','rullaggio','stesura manto con vibrofinitrice','trasporto materiali di risulta'],
+    'Scavi di sbancamento, fondazione e movimento terra':['carico e rimozione materiali di scavo','deposito provvisorio materiali di scavo','formazione rilevati, cassonetti e costipatura','ispezioni ricerca sottosuolo','movimento autocarri e macchine operatrici','predisposizione e posa sostegni contro terra','preparazione, delimitazione e sgombero area','scavi di fondazione','scavi di sbancamento','valutazione ambientale: vegetale, colturale, archeologico, urbano, geomorfologico'],
+    'Strutture in c.a. industrializzate':['approvvigionamento e posa ferro lavorato','chiusura delle casseforme e regolazione','disarmo e rimozione casseforme','getto calcestruzzo','movimento macchine operatrici','preparazione e posa casseforme','preparazione e posa ponteggi, piattaforme e piani di lavoro','preparazione, delimitazione, sgombero area','pulizia, preparazione e rotazione delle casseforme','rotazione ponteggi, piattaforme e piani di lavoro'],
+    'Strutture prefabbricate':['allestimento e/o completamento delle protezioni in opera','movimento macchine operatrici','opere di completamento','predisposizione delle protezioni a piè d\'opera','preparazione, delimitazione, sgombero area','sollevamento e posa in opera degli elementi di impalcato','sollevamento e posa in opera di conci prefabbricati','sollevamento e posa in opera di travi','sorveglianza e controllo delle operazioni','stoccaggio elementi strutturali prefabbricati']
+  },
+  'Fognature, pozzi e gallerie':{
+    'Gallerie':['attività di scavo con utensili ad aria compressa','attività di scavo manuale','esercizio apparecchi di sollevamento (montacarichi)','esercizio impianti di ventilazione, illuminazione, eduzione acqua','infossaggio','movimento ed esercizio macchine operatrici','opere di finitura','posa in opera di carpenterie e/o strutture di sostegno','predisposizione sostegni e carpenterie','preparazione, delimitazione, sgombero area','rimozione, trasporto e sollevamento del materiale di scavo','rivestimento in calcestruzzo'],
+    'Pozzi':['attività di scavo meccanico','esercizio apparecchi di sollevamento (montacarichi)','movimento ed esercizio macchine operatrici','posa in opera di carpenterie e/o strutture di sostegno','predisposizione sostegni e carpenterie','preparazione, delimitazione, sgombero area','rimozione, sollevamento deposito e trasporto materiali di scavo','rivestimento di sostegno in calcestruzzo','rivestimento in muratura e finiture','scavo con utensili manuali','valutazione ambientale: vegetale, colturale, archeologico, urbano, geomorfologico']
+  },
+  'Fondazioni speciali':{
+    'Jet grouting':['confezionamento miscela d\'iniezione','iniezione della miscela di iniezione ad alta pressione','ispezioni ricerca sottosuolo','perforazione del terreno','predisposizione macchine ed impianti','preparazione del piano di lavoro e posizionamento della sonda di perforazione','preparazione, delimitazione, sgombero area','pulizia e sgombero area','recupero delle aste','tracciamenti','valutazione ambientale: vegetale, colturale, archeologico, urbano, geomorfologico'],
+    'Micropali':['infissione dei tiranti metallici','iniezione della miscela strutturale','ispezioni ricerca sottosuolo','messa in tensione dei tiranti metallici','movimentazione autocarri e macchine operatrici','perforazione del terreno','posizionamento dell\'escavatore (sonda di perforazione)','predisposizione macchine ed impianti','preparazione del piano di lavoro dell\'escavatore','preparazione, delimitazione, sgombero area','pulizia e sgombero area','tracciamenti','valutazione ambientale: vegetale, colturale, archeologico, urbano, geomorfologico'],
+    'Pali battuti':['infissione','ispezioni ricerca sottosuolo','movimentazione autocarri e macchine operatrici','posizionamento del battipalo','predisposizione macchine ed impianti','preparazione del piano di lavoro','preparazione, delimitazione, sgombero area','pulizia e sgombero area','tracciamenti e infossamento del palo','trasporto e posizionamento del palo','valutazione ambientale: vegetale, colturale, archeologico, urbano, geomorfologico'],
+    'Pali trivellati':['estrazione dell\'avampozzo mediante attrezzatura vibrante','getto del calcestruzzo','infossaggio tubo di rivestimento (avampozzo) mediante attrezzatura vibrante','ispezioni ricerca sottosuolo','movimentazione autocarri e macchine operatrici','posa in opera della camicia a perdere','posizionamento dell\'escavatore','predisposizione macchine ed impianti','preparazione del piano di lavoro dell\'escavatore','preparazione, delimitazione, sgombero area','pulizia e sgombero area','scavo del palo','tracciamenti','trasporto e posa delle gabbie di armatura','trivellazione del terreno (preforo)','valutazione ambientale: vegetale, culturale, archeologica, urbana, geomorfologica'],
+    'Paratie monolitiche':['allontanamento del materiale di scavo','estrazione dei setti giunto','getti di calcestruzzo e recupero fango bentonitico','ispezioni ricerca sottosuolo','movimentazione autocarri e macchine operatrici','posa dei setti-giunto','predisposizione macchine ed impianti','preparazione e posa gabbie metalliche di armatura','preparazione, delimitazione, sgombero area','pulizia e sgombero area','scavo della trincea guida, getto e riempimento con inerti','scavo di profondità con l\'impiego di fango bentonitico','valutazione ambientale: vegetale, colturale, archeologico, urbano, geomorfologico']
+  },
+  'Gallerie':{
+    'Opere strutturali per il rivestimento':['approvvigionamento e posa ferro','attività di scavo con esplosivi','disarmo delle casseforme','formazione piani di lavoro e sistemi di accesso','getto calcestruzzo','movimentazione e pulizia delle casseforme','movimento ed esercizio macchine operatrici','predisposizione vie di accesso','preparazione delimitazione e sgombero area','preparazione e posa casseforme','ripristino viabilità','sorveglianza e controllo della posa','vibrazione calcestruzzo'],
+    'Scavi di avanzamento e rivestimento di prima fase':['attività di scavo con esplosivi (caricamento, brillamento, sfumo)','attività di scavo meccanico','disgaggio di sicurezza','esercizio apparecchi di sollevamento - trasporto','esercizio impianti aggottamento','movimento ed esercizio macchine operatrici','perforazione di rocce','posa in opera di carpenterie e/o strutture di sostegno','predisposizione vie di accesso al fronte dello scavo','predisposizioni paratie, sostegni e carpenterie','preparazione, delimitazione e sgombero area','rimozione, trasporto e deposito materiali di scavo','rivestimento di prima fase con calcestruzzo proiettato','valutazione ambientale: vegetale, colturale, archeologico, urbano, geomorfologico']
+  },
+  'Impermeabilizzazioni':{
+    'Bitume e guaine su muri e solai':['preparazione, delimitazione, sgombero area','stesura, riscaldamento e incollaggio delle guaine','trattamento delle superfici con asfalto bitume, primer a caldo','trattamento di finitura delle superfici','valutazione ambientale'],
+    'Impermeabilizzazioni di terre (geomembrane)':['preparazione, delimitazione, sgombero area','stesura, riscaldamento e incollaggio delle guaine','trattamento delle superfici con asfalto bitume, primer a caldo','trattamento di finitura delle superfici','valutazione ambientale']
+  },
+  'Lavorazioni ferroviarie':{
+    'Approvvigionamento e posa traversine e binari':['delimitazione aree di deposito e preassemblaggio','formazione dei carrelli e trasporto in opera','formazione dei convogli e carrelli','formazione tronchi di binario su traversine','movimento macchine operatrici','posa in opera, collegamenti e regolazioni','preparazione e sgombero area','regolazione e taglio binari','trasporto e posa rotaie','trasporto e posa traversine'],
+    'Compattamento, livellamento e opere di finitura':['fornitura e stesura inerti','livellamento e compattamento con rincalzatrice','movimento macchine operatrici','posa cordoli, pozzetti, chiusini, finitura (getto)','pulizia e sgombero area','rullatura','stesura manto bituminoso'],
+    'Scavi, demolizioni e sottofondi':['carico e rimozioni materiali di risulta','demolizioni preesistenze e scavi','formazione cassonetti, livellamento','getto calcestruzzo','ispezione ricerca sottosuolo','movimento ed esercizio macchine operatrici ed autocarri','preparazione, delimitazione, sgombero area','stesura stabilizzato, compattamento','valutazione ambientale: vegetale, culturale, archeologico, urbano, geomorfologico']
+  },
+  'Verniciature industriali':{
+    'Sabbiatura e idropulitura':['messa in opera delle protezioni di contenimento dei prodotti impiegati','preparazione, delimitazione, sgombero area','pulizia area','raccolta del materiale disperso','trattamento delle superfici (sabbiatura e/o idropulitura)'],
+    'Verniciatura':['preparazione dei prodotti (primer, vernici ecc.)','preparazione delle superfici','preparazione, delimitazione, sgombero area','pulizia e manutenzione delle attrezzature','pulizia e sgombero area','trattamento delle superfici a pennello','trattamento delle superfici a spruzzo']
+  }
+}
+const ZONE_LBL={1:'Impianti di cantiere',2:'Protezione luoghi di lavoro',3:'Apparecchi di sollevamento',4:'Attrezzature, scale, utensili',5:'Macchine di cantiere',6:'Opere provvisionali',7:'DPI',8:'Documentazione',9:'Soggetti',10:'Formazione'}
+const TIPO_IMP_OPT={1:'Affidataria',2:'Affidataria ed esecutrice',3:'Esecutrice'}
+const CERTIF_OPT={1:'Asseverata',2:'Certificata OHSAS 18001',3:'UNI EN ISO 45001',4:'Sistema Qualità UNI EN ISO 9001',5:'Certificazione ambientale ISO 14001'}
+const CEIV_OPT=['C.E.I.V.','EDILCASSA VENETO','CASSA EDILE BELLUNO','CASSA EDILE VENEZIA','CASSA EDILE VICENZA','ALTRO']
+
+// ── STATE ──
+let S={
+  user:null,tecnico:null,
+  voci:[],byZona:{},
+  fd:{},        // form data: tutto tranne checklist
+  checklist:{}, // {codice:valore}
+  noteChk:{},   // {codice:nota text}
+  imprese:[],   // [{impresa_id,impresa_nome,att,nom_prec,...,tip_imp,certif:[]}]
+  lavorazioni:[],
+  tab:0,
+  savedId:null,
+  // callback per dialog verbale
+  _verbCb:null
+}
+const TOTAL_TABS=15 // 0..14
+
+// ── UTILS ──
+const $=id=>document.getElementById(id)
+function uuid(){return crypto.randomUUID()}
+function today(){return new Date().toISOString().slice(0,10)}
+function fmtDate(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateString('it-IT')}
+function toast(msg,type='',ms=3500){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;$('toast-area').appendChild(t);setTimeout(()=>t.remove(),ms)}
+function show(id){$(id).classList.remove('hidden')}
+function hide(id){$(id).classList.add('hidden')}
+function calcIPC(chk){
+  const vals=Object.values(chk)
+  const np=vals.filter(v=>v==='NC+').length
+  const nm=vals.filter(v=>v==='NC-').length
+  const os=vals.filter(v=>v==='OSS').length
+  let ipc
+  if(np>=1||nm>3)ipc='ALTO'
+  else if(os>6||(nm>=1&&nm<=3))ipc='MEDIO'
+  else if(os>=1&&os<=6)ipc='BASSO'
+  else ipc='NR'
+  return{ipc,np,nm,os}
+}
+function ipcCls(ipc){return{ALTO:'badge-alto',MEDIO:'badge-medio',BASSO:'badge-basso',NR:'badge-nr'}[ipc]||'badge-nr'}
+function vGet(id){return $(id)?.value}
+function vSet(id,v){if($(id))$(id).value=v??''}
+function cGet(id){return $(id)?.checked}
+function cSet(id,v){if($(id))$(id).checked=!!v}
+
+// ── AUTH ──
+async function initAuth(){
+  const{data:{session}}=await sb.auth.getSession()
+  if(session)await onLogin(session.user)
+  else showScr('login')
+  sb.auth.onAuthStateChange((_,s)=>s?onLogin(s.user):showScr('login'))
+}
+async function onLogin(user){
+  S.user=user
+  let{data:tec}=await sb.from('tecnici').select('*').eq('email',user.email).single()
+  if(!tec){
+    const p=user.email.split('@')[0].split('.')
+    const nome=p[0]||'';const cog=p[1]||''
+    const{data:nt}=await sb.from('tecnici').insert({tecnico_id:uuid(),tecnico_cognome:cog||user.email,tecnico_nome:nome,email:user.email}).select().single()
+    tec=nt
+  }
+  S.tecnico=tec
+  $('lbl-user').textContent=tec?`${tec.tecnico_nome} ${tec.tecnico_cognome}`:user.email
+  await loadVoci()
+  showScr('app')
+  populateTecnicoSelect()
+  populateComuniSelect()
+  navTo('dashboard')
+}
+$('btn-login').onclick=async()=>{
+  const{error}=await sb.auth.signInWithPassword({email:vGet('l-email'),password:vGet('l-pwd')})
+  if(error){const e=$('login-err');e.textContent=error.message;e.style.display='block'}
+}
+$('l-pwd').onkeydown=e=>{if(e.key==='Enter')$('btn-login').click()}
+$('btn-logout').onclick=()=>sb.auth.signOut()
+
+// ── SCREEN / NAV ──
+function showScr(n){
+  ['loading','login','app'].forEach(s=>$(('screen-'+s))?.classList.toggle('hidden',s!==n))
+}
+function navTo(view){
+  document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
+  ;['dashboard','form','lista','import'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  if(view==='dashboard')loadDash()
+  if(view==='lista')loadLista()
+}
+document.querySelectorAll('nav button[data-view]').forEach(b=>{
+  b.onclick=()=>{if(b.dataset.view==='form')initForm();navTo(b.dataset.view)}
+})
+
+// ── VOCI CHECKLIST ──
+async function loadVoci(){
+  const{data}=await sb.from('checklist_voci').select('*').order('ordine')
+  S.voci=data||[]
+  S.byZona={}
+  for(const v of S.voci){if(!S.byZona[v.zona_osserv])S.byZona[v.zona_osserv]=[];S.byZona[v.zona_osserv].push(v)}
+  buildTabs()
+}
+
+// ── BUILD TAB BAR ──
+function buildTabs(){
+  const bar=$('tab-bar')
+  bar.innerHTML=''
+  const tabs=[
+    [0,'📋 Visita'],
+    [1,'🏗️ Cantiere'],
+    [2,'🏢 Imprese'],
+    ...[...Array(10)].map((_,i)=>[i+3,`${i+1}. ${ZONE_LBL[i+1]}`]),
+    [13,'📝 Note'],
+    [14,'📷 Foto'],
+    [15,'✅ Riepilogo']
+  ]
+  tabs.forEach(([n,lbl])=>{
+    const b=document.createElement('button')
+    b.className='tab-btn'
+    b.dataset.ti=n
+    b.textContent=lbl
+    b.onclick=()=>{saveTabData();activateTab(n);renderZoneTab(n)}
+    bar.appendChild(b)
+  })
+  // Build zone tab divs 3–12 if not already present (zone 1–10)
+  const ref=$('[data-tab="13"]')
+  const form=$('view-form')
+  for(let z=1;z<=10;z++){
+    const ti=z+2
+    if(!form.querySelector(`[data-tab="${ti}"]`)){
+      const d=document.createElement('div')
+      d.className='tab-content'
+      d.dataset.tab=ti
+      d.innerHTML=`<div class="card"><h3>${ZONE_LBL[z]}</h3><div id="zi-${z}"></div></div>`
+      form.insertBefore(d,ref)
+    }
+  }
+  activateTab(0)
+}
+
+function activateTab(n){
+  S.tab=n
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',+b.dataset.ti===n))
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',+c.dataset.tab===n))
+  $('btn-prev').disabled=n===0
+  $('btn-next').disabled=n===15
+  if(n===15)buildRiepilogo()
+  if(n===2)renderImpreseAccordion()
+  if(n===14)initFotoTab()
+}
+
+// ── ZONE RENDER ──
+function renderZoneTab(ti){
+  const z=ti-2
+  if(z<1||z>10)return
+  const con=$(`zi-${z}`)
+  if(!con)return
+  const voci=S.byZona[z]||[]
+  if(!voci.length){con.innerHTML='<p style="color:#aaa;font-size:13px">Nessuna voce</p>';return}
+  const byPref={}
+  for(const v of voci){if(!byPref[v.prefisso])byPref[v.prefisso]=[];byPref[v.prefisso].push(v)}
+  con.innerHTML=Object.entries(byPref).map(([pref,items])=>`
+    <div class="zona-gruppo">
+      <h4>${pref.replace(/_/g,' ')}</h4>
+      ${items.map(item=>{
+        if(item.is_nota){
+          // voce-nota separata: nascosta, ogni voce ha già il proprio campo note inline
+          return ''
+        }
+        const cur=S.checklist[item.codice]||'NA'
+        const nota=S.noteChk[item.codice]||''
+        const notaShow=(cur!=='NA'||nota)?'show':''
+        return`<div class="check-item" style="flex-direction:column;align-items:stretch;gap:0">
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 4px">
+            <span class="check-label">${item.descrizione}</span>
+            <div class="check-radios">
+              ${[['NA','na'],['VER','ver'],['NC-','ncm'],['NC+','ncp'],['OSS','oss']].map(([o,cls])=>`
+                <label><input type="radio" name="c_${item.codice}" value="${o}" data-c="${item.codice}" ${cur===o?'checked':''}>
+                <span class="radio-chip ${cls}">${o}</span></label>`).join('')}
+            </div>
+          </div>
+          <div class="check-nota-wrap ${notaShow}" id="nw-${item.codice}">
+            <textarea data-nota="${item.codice}" placeholder="Note sul rilievo…" rows="2">${nota.replace(/</g,'&lt;')}</textarea>
+          </div>
+        </div>`
+      }).join('')}
+    </div>`).join('')
+  con.querySelectorAll('input[type=radio]').forEach(r=>{
+    r.onchange=()=>{
+      S.checklist[r.dataset.c]=r.value
+      const nw=$(`nw-${r.dataset.c}`)
+      if(nw)nw.classList.toggle('show',r.value!=='NA')
+      updateIPCLive();updateZoneDots()
+    }
+  })
+  con.querySelectorAll('textarea[data-nota]').forEach(t=>{
+    t.oninput=()=>S.noteChk[t.dataset.nota]=t.value
+  })
+  con.querySelectorAll('input[data-nota]').forEach(i=>{
+    i.oninput=()=>S.noteChk[i.dataset.nota]=i.value
+  })
+}
+
+function saveTabData(){
+  const ti=S.tab
+  // zone tab save (tabs 3–12 = zone 1–10)
+  if(ti>=3&&ti<=12){
+    const z=ti-2
+    const con=$(`zi-${z}`)
+    if(con){
+      con.querySelectorAll('input[type=radio]:checked').forEach(r=>S.checklist[r.dataset.c]=r.value)
+      con.querySelectorAll('textarea[data-nota]').forEach(t=>S.noteChk[t.dataset.nota]=t.value)
+      con.querySelectorAll('input[data-nota]').forEach(i=>S.noteChk[i.dataset.nota]=i.value)
+    }
+  }
+}
+
+// ── IPC LIVE ──
+function updateIPCLive(){
+  const{ipc,np,nm,os}=calcIPC(S.checklist)
+  const el=$('ipc-val')
+  el.textContent=ipc==='NR'?'Nessun Rilievo':ipc
+  el.className='badge '+ipcCls(ipc)
+  $('ipc-cnt').textContent=`NC+:${np} NC-:${nm} OSS:${os}`
+}
+function updateZoneDots(){
+  for(let z=1;z<=10;z++){
+    const ti=z+2
+    const voci=S.byZona[z]||[]
+    const hr=voci.some(v=>!v.is_nota&&['NC+','NC-','OSS'].includes(S.checklist[v.codice]))
+    const btn=document.querySelector(`.tab-btn[data-ti="${ti}"]`)
+    if(btn)btn.classList.toggle('has-rilievi',hr)
+  }
+}
+
+// ── FORM NAV ──
+$('btn-prev').onclick=()=>{saveTabData();activateTab(S.tab-1)}
+$('btn-next').onclick=()=>{saveTabData();activateTab(S.tab+1)}
+
+// ── INIT FORM ──
+async function initForm(snap=null){
+  S.fd={}; S.checklist={}; S.noteChk={}; S.imprese=[]; S.lavorazioni=[]; S.savedId=null; S.foto={}
+  hide('btn-pdf')
+  hide('btn-email-verbale')
+
+  const nr=await nextVerbale()
+  vSet('f-verbale',nr)
+  S.fd.nr_verbale=nr
+
+  vSet('f-data',today())
+  vSet('f-da',new Date().toTimeString().slice(0,5))
+  vSet('f-a','')
+  // Pre-seleziona il tecnico loggato
+  if(S.tecnico?.email) setTecnicoFromEmail(S.tecnico.email)
+  vSet('f-tec-id',S.tecnico?.tecnico_id||'')
+
+  // Clear all fields
+  const clearIds=['f-nr-verb','f-ppre-titolo','f-ppre-nome','f-ppre-cog','f-qual-ppre','f-tel-ppre','f-nom-stage',
+    'f-acc-cant','f-cant-search','f-cant-id','f-prot-int','f-cnce','f-cod-uni','f-data-ult',
+    'f-acc-cant2','f-comm-search','f-comm-id',
+    'f-comm-titolo','f-comm-nome','f-comm-cog','f-comm-cf','f-comm-email','f-comm-tel',
+    'f-comm-rag-soc','f-comm-piva','f-comm-cf-pg','f-comm-email-pg','f-comm-tel-pg',
+    'f-rl-nome','f-rl-cog','f-rl-email','f-rl-tel',
+    'f-csp-nome','f-csp-cog','f-csp-email','f-csp-tel',
+    'f-cse-nome','f-cse-cog','f-cse-email','f-cse-tel',
+    'f-nr-imp','f-nr-ind','f-nr-lav','f-nr-lav-str','f-costi','f-stato-lav','f-note-lav',
+    'f-oss-tec','f-oss-int','f-note-for-m','f-data-ritorno','cant-detail']
+  clearIds.forEach(id=>{const el=$(id);if(el)el.value=''})
+  ;['f-qual-ppre','f-tec-select'].forEach(id=>{const el=$(id);if(el)el.selectedIndex=0})
+  // reset stage toggle a No
+  const stageVisNo=$('f-stage-vis-no'); if(stageVisNo)stageVisNo.checked=true
+  const stageVisH=$('f-stage-vis'); if(stageVisH)stageVisH.value=''
+  $('field-nom-stage').style.display='none'
+  const rlstNo=$('f-rlst-no'); if(rlstNo)rlstNo.checked=true
+  const rlstH=$('f-rlst'); if(rlstH)rlstH.value=''
+  ;['f-privacy','f-coord','f-note-for-sn','f-segnalazione'].forEach(id=>cSet(id,false))
+  ;['f-nr-lav','f-nr-lav-str','f-nr-imp','f-nr-ind'].forEach(id=>vSet(id,'0'))
+
+  buildLavChecks()
+  $('form-title').textContent=snap?'Nuova visita da snapshot':'Nuova Visita'
+
+  if(snap){
+    applySnap(snap)
+  }else{
+    // Impresa 1 vuota (principale)
+    S.imprese=[{_idx:0,impresa_id:'',impresa_nome:'',piva:'',cf_imp:'',ind_imp:'',com_imp:'',att:'',capo_nome:'',capo_cog:'',badge:'',pat:'',note_fasilav:'',tipo_imp:'',certif:[],ceiv:'',stage_imp:'',is_principale:true}]
+  }
+
+  activateTab(0)
+  updateIPCLive()
+}
+
+async function nextVerbale(){
+  const yr=new Date().getFullYear()
+  const{data}=await sb.from('visite').select('nr_verbale').like('nr_verbale',`CPT/${yr}/%`).order('nr_verbale',{ascending:false}).limit(1)
+  if(!data?.length)return`CPT/${yr}/0001`
+  const last=parseInt(data[0].nr_verbale.split('/')[2])||0
+  return`CPT/${yr}/${String(last+1).padStart(4,'0')}`
+}
+
+function buildLavChecks(){
+  // Popola il select Genere
+  const selG=$('lav-sel-genere')
+  const selF=$('lav-sel-fase')
+  const selL=$('lav-sel-lavorazione')
+  const btnAdd=$('btn-add-lav')
+  if(!selG)return
+
+  // Genere options
+  selG.innerHTML='<option value="">— Seleziona genere —</option>'
+  Object.keys(LAV_DATA).forEach(g=>{
+    const o=document.createElement('option');o.value=g;o.textContent=g;selG.appendChild(o)
+  })
+
+  selG.onchange=()=>{
+    const g=selG.value
+    selF.innerHTML='<option value="">— Seleziona fase —</option>'
+    selL.innerHTML='<option value="">— prima seleziona fase —</option>'
+    selF.disabled=!g; selL.disabled=true; btnAdd.disabled=true
+    if(g){
+      Object.keys(LAV_DATA[g]).forEach(f=>{
+        const o=document.createElement('option');o.value=f;o.textContent=f;selF.appendChild(o)
+      })
+    }
+  }
+
+  selF.onchange=()=>{
+    const g=selG.value,f=selF.value
+    selL.innerHTML='<option value="">— Seleziona lavorazione —</option>'
+    selL.disabled=!f; btnAdd.disabled=true
+    if(g&&f){
+      LAV_DATA[g][f].forEach(l=>{
+        const o=document.createElement('option');o.value=l;o.textContent=l;selL.appendChild(o)
+      })
+    }
+  }
+
+  selL.onchange=()=>{ btnAdd.disabled=!selL.value }
+
+  btnAdd.onclick=()=>{
+    const g=selG.value,f=selF.value,l=selL.value
+    if(!g||!f||!l)return
+    // Evita duplicati
+    const dup=S.lavorazioni.some(x=>x.genere===g&&x.fase===f&&x.lavorazione===l)
+    if(dup){toast('Lavorazione già aggiunta','warn');return}
+    S.lavorazioni.push({genere:g,fase:f,lavorazione:l})
+    renderLavTags()
+    // Reset selects
+    selG.value=''; selF.innerHTML='<option value="">— prima seleziona genere —</option>';
+    selL.innerHTML='<option value="">— prima seleziona fase —</option>';
+    selF.disabled=true; selL.disabled=true; btnAdd.disabled=true
+  }
+  renderLavTags()
+}
+
+function renderLavTags(){
+  const wrap=$('lav-tags'); if(!wrap)return
+  wrap.innerHTML=S.lavorazioni.map((l,i)=>`
+    <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:#fef0ea;border:1px solid #f0c4b0;color:#7a2800;padding:3px 9px;border-radius:14px;max-width:100%">
+      <span style="font-weight:700">${l.genere}</span>
+      <span style="color:#aaa">›</span>
+      <span>${l.fase}</span>
+      <span style="color:#aaa">›</span>
+      <span style="font-style:italic">${l.lavorazione}</span>
+      <button type="button" onclick="removeLav(${i})" style="background:none;border:none;color:#c0392b;font-size:14px;padding:0 2px;cursor:pointer;line-height:1" title="Rimuovi">×</button>
+    </span>`).join('')
+}
+
+function removeLav(i){
+  S.lavorazioni.splice(i,1)
+  renderLavTags()
+}
+
+// Toggle: si tratta di visita stage? → apre il campo nome
+document.querySelectorAll('input[name="stage-vis"]').forEach(r=>{
+  r.onchange=()=>{
+    const isSi=r.value==='si'
+    $('field-nom-stage').style.display=isSi?'block':'none'
+    const h=$('f-stage-vis'); if(h)h.value=isSi?'1':''
+    if(!isSi)vSet('f-nom-stage','')
+  }
+})
+
+// Toggle: affiancamento RLST Sì/No → aggiorna hidden field
+document.querySelectorAll('input[name="rlst-aff"]').forEach(r=>{
+  r.onchange=()=>{
+    const h=$('f-rlst'); if(h)h.value=r.value==='si'?'1':''
+  }
+})
+
+// ── IMPRESE ACCORDION ──
+function renderImpreseAccordion(){
+  const wrap=$('imp-accordion-list')
+  wrap.innerHTML=S.imprese.map((im,idx)=>impreseAccordionHTML(im,idx)).join('')
+  // Events
+  wrap.querySelectorAll('.imp-acc-header').forEach(h=>{
+    h.onclick=()=>{
+      const body=h.nextElementSibling
+      body.classList.toggle('open')
+    }
+  })
+  // Nuova impresa btns
+  wrap.querySelectorAll('[data-imp-new]').forEach(b=>{
+    b.onclick=e=>{
+      e.stopPropagation()
+      _modalImpIdx=+b.dataset.impNew
+      // pre-compila ragione sociale dal testo cercato
+      const searchVal=$(`im-search-${_modalImpIdx}`)?.value||''
+      const nomeEl=$('mi-nome');if(nomeEl)nomeEl.value=searchVal
+      ;['mi-piva','mi-cf','mi-ind','mi-com','mi-email','mi-tel','mi-badge','mi-pat','mi-ceiv'].forEach(id=>{const el=$(id);if(el)el.value=''})
+      ;[1,2,3,4,5].forEach(c=>{const el=$(`mi-cert-${c}`);if(el)el.checked=false})
+      const stageNo=document.querySelector('input[name="mi-stage"][value="no"]');if(stageNo)stageNo.checked=true
+      // Popola datalist comuni modal
+      const miDl=$('mi-comuni-dl');if(miDl&&!miDl.children.length)COMUNI_PD.forEach(c=>{const o=document.createElement('option');o.value=c;miDl.appendChild(o)})
+      show('modal-imp')
+    }
+  })
+  // Remove btns
+  wrap.querySelectorAll('[data-imp-remove]').forEach(b=>{
+    b.onclick=e=>{
+      e.stopPropagation()
+      const idx=+b.dataset.impRemove
+      if(idx===0){toast('L\'impresa principale non può essere rimossa','warn');return}
+      S.imprese.splice(idx,1)
+      renderImpreseAccordion()
+    }
+  })
+  // Autocomplete for each impresa
+  S.imprese.forEach((_,idx)=>{
+    setupAC(`im-search-${idx}`,`im-list-${idx}`, async q=>{
+      const{data}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva').or(`impresa_nome.ilike.%${q}%,impresa_cf.ilike.%${q}%,piva.ilike.%${q}%`).eq('elimina',0).limit(8)
+      return(data||[]).map(i=>({id:i.impresa_id,label:`${i.impresa_nome}${i.impresa_cf?' – '+i.impresa_cf:''}`,piva:i.piva||''}))
+    },item=>{
+      S.imprese[idx].impresa_id=item.id
+      S.imprese[idx].impresa_nome=item.label.split(' – ')[0]
+      if(item.cf&&!S.imprese[idx].cf_imp)S.imprese[idx].cf_imp=item.cf
+      if(item.piva&&!S.imprese[idx].piva)S.imprese[idx].piva=item.piva
+      $(`im-search-${idx}`).value=item.label
+      renderImpreseAccordion()
+    })
+    // Field listeners
+    ;['att','capo_nome','capo_cog','note_fasilav','email_verbale'].forEach(f=>{
+      const el=$(`im-${f}-${idx}`)
+      if(el)el.oninput=()=>S.imprese[idx][f]=el.value
+    })
+    const tiEl=$(`im-tipo-${idx}`)
+    if(tiEl)tiEl.onchange=()=>S.imprese[idx].tipo_imp=tiEl.value
+  })
+}
+
+function impreseAccordionHTML(im,idx){
+  const title=im.impresa_nome||(idx===0?'Impresa principale (non selezionata)':'Impresa '+(idx+1))
+  const isPrinc=idx===0
+  const capNome=im.capo_nome||''
+  const capCog=im.capo_cog||''
+  return`<div class="imp-accordion">
+    <div class="imp-acc-header">
+      <span class="imp-name">${isPrinc?'1️⃣ Principale – ':''+(idx+1)+'. '}${title}</span>
+      <div class="imp-actions">
+        ${!isPrinc?`<button class="btn-danger btn-sm" data-imp-remove="${idx}" title="Rimuovi">✕</button>`:''}
+        <span style="color:#aaa;font-size:18px">▾</span>
+      </div>
+    </div>
+    <div class="imp-acc-body${idx===0?' open':''}">
+      <div class="field">
+        <label>Ragione sociale${isPrinc?' *':''}</label>
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <div class="autocomplete-wrap" style="flex:1">
+            <input type="text" id="im-search-${idx}" value="${im.impresa_nome}" placeholder="Cerca per nome o P.IVA…" autocomplete="off">
+            <div class="ac-list hidden" id="im-list-${idx}"></div>
+          </div>
+          <button class="btn-outline btn-sm" data-imp-new="${idx}" type="button" style="white-space:nowrap;margin-top:1px">+ Nuova</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Partita IVA</label><input type="text" id="im-piva-${idx}" value="${im.piva||''}" placeholder="IT…" readonly style="background:#f8f8f8"></div>
+        <div class="field"><label>Codice fiscale</label><input type="text" id="im-cf_imp-${idx}" value="${im.cf_imp||''}" placeholder="CF…" readonly style="background:#f8f8f8"></div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Tipologia</label>
+          <select id="im-tipo-${idx}">
+            <option value="">–</option>
+            ${Object.entries(TIPO_IMP_OPT).map(([v,l])=>`<option value="${v}" ${im.tipo_imp==v?'selected':''}>${v} – ${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>Attività svolta in cantiere</label><input type="text" id="im-att-${idx}" value="${im.att||''}" placeholder="es. Murature, Strutture…"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Cap./Prep. – Nome</label><input type="text" id="im-capo_nome-${idx}" value="${capNome}" placeholder="Nome"></div>
+        <div class="field"><label>Cap./Prep. – Cognome</label><input type="text" id="im-capo_cog-${idx}" value="${capCog}" placeholder="Cognome"></div>
+      </div>
+      <div class="field"><label>Email invio verbale</label><input type="email" id="im-email_verbale-${idx}" value="${im.email_verbale||''}" placeholder="Lascia vuoto per usare quella in anagrafica…"></div>
+      <div class="field"><label>Note fasi lavorazione (questa impresa)</label><textarea id="im-note_fasilav-${idx}" rows="2">${im.note_fasilav||''}</textarea></div>
+    </div>
+  </div>`
+}
+
+$('btn-add-imp').onclick=()=>{
+  S.imprese.push({impresa_id:'',impresa_nome:'',piva:'',cf_imp:'',ind_imp:'',com_imp:'',att:'',capo_nome:'',capo_cog:'',badge:'',pat:'',note_fasilav:'',tipo_imp:'',certif:[],ceiv:'',stage_imp:'',is_principale:false})
+  renderImpreseAccordion()
+}
+
+// ── AUTOCOMPLETE CANTIERE ──
+setupAC('f-cant-search','cant-list', async q=>{
+  const{data}=await sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce').or(`cantiere_indirizzo.ilike.%${q}%,cantiere_etichetta.ilike.%${q}%,comune_nome.ilike.%${q}%`).eq('elimina',0).limit(10)
+  return(data||[]).map(c=>({id:c.cantiere_id,label:c.cantiere_etichetta||`${c.cantiere_indirizzo} ${c.cantiere_civico}`,detail:`${c.cantiere_indirizzo} ${c.cantiere_civico}${c.comune_nome?' – '+c.comune_nome:''}`,extra:c}))
+},item=>{
+  vSet('f-cant-id',item.id)
+  $('cant-detail').textContent=item.detail||''
+  S.fd.cantiere_id=item.id
+  if(item.extra){
+    vSet('f-prot-int',item.extra.prot_int||'')
+    vSet('f-cnce',item.extra.cantiere_cnce||'')
+    vSet('f-cod-uni',item.extra.nodo_id||'')
+    vSet('f-acc-cant2',item.extra.acc_cant||'')
+  }
+})
+
+// ── MODAL NUOVO COMMITTENTE ──
+$('btn-new-comm').onclick=()=>{
+  // reset modal
+  $('mc-sogg-pf').checked=true;$('mc-tipo-priv').checked=true
+  ;['mc-comm-titolo','mc-comm-nome','mc-comm-cog','mc-comm-cf','mc-comm-email','mc-comm-tel',
+    'mc-comm-rag-soc','mc-comm-piva','mc-comm-cf-pg','mc-comm-email-pg','mc-comm-tel-pg'].forEach(id=>{
+    const el=$(id);if(el)el.value=''
+  })
+  $('mc-pf-fields').classList.remove('hidden')
+  $('mc-pg-fields').classList.add('hidden')
+  // pre-compila con il testo cercato
+  const q=vGet('f-comm-search').trim()
+  if(q){const el=$('mc-comm-nome');if(el)el.value=q}
+  show('modal-comm')
+}
+$('btn-mc-comm-cancel').onclick=()=>hide('modal-comm')
+document.querySelectorAll('input[name="mc-sogg"]').forEach(r=>{
+  r.onchange=()=>{
+    const isPG=r.value==='PG'
+    $('mc-pf-fields').classList.toggle('hidden',isPG)
+    $('mc-pg-fields').classList.toggle('hidden',!isPG)
+  }
+})
+$('btn-mc-comm-save').onclick=async()=>{
+  const isPG=$('mc-sogg-pg').checked
+  let nome,cf,piva,email,tel
+  if(isPG){
+    nome=vGet('mc-comm-rag-soc').trim()
+    if(!nome){toast('Ragione sociale obbligatoria','warn');$('mc-comm-rag-soc').focus();return}
+    piva=vGet('mc-comm-piva').trim()||null
+    cf=vGet('mc-comm-cf-pg').trim()||piva
+    email=vGet('mc-comm-email-pg').trim()||null
+    tel=vGet('mc-comm-tel-pg').trim()||null
+  }else{
+    const n=vGet('mc-comm-nome').trim(),c=vGet('mc-comm-cog').trim()
+    if(!n||!c){toast('Nome e Cognome obbligatori','warn');return}
+    const tit=vGet('mc-comm-titolo').trim()
+    nome=[tit,n,c].filter(Boolean).join(' ')
+    cf=vGet('mc-comm-cf').trim()||null
+    piva=null
+    email=vGet('mc-comm-email').trim()||null
+    tel=vGet('mc-comm-tel').trim()||null
+  }
+  const tipoVal=document.querySelector('input[name="mc-tipo"]:checked')?.value||null
+  const comm={
+    committente_id:uuid(),
+    committente_nome:nome,
+    tipo_sogg:isPG?'PG':'PF',
+    committente_tipo:+tipoVal||null,
+    cf_piva:cf,
+    piva:piva||cf,
+    email,
+    telefono:tel,
+    elimina:0
+  }
+  const{error}=await sb.from('committenti').insert(comm)
+  if(error){toast('Errore: '+error.message,'err');return}
+  // Popola il form committente inline
+  vSet('f-comm-id',comm.committente_id)
+  vSet('f-comm-search',nome)
+  if(isPG){
+    $('comm-radio-pg').checked=true;toggleCommSogg('PG')
+    vSet('f-comm-rag-soc',nome)
+    if(piva)vSet('f-comm-piva',piva)
+    if(cf)vSet('f-comm-cf-pg',cf)
+    if(email)vSet('f-comm-email-pg',email)
+    if(tel)vSet('f-comm-tel-pg',tel)
+  }else{
+    $('comm-radio-pf').checked=true;toggleCommSogg('PF')
+    const parts=nome.split(' ')
+    vSet('f-comm-nome',parts.slice(-2,-1)[0]||'')
+    vSet('f-comm-cog',parts.slice(-1)[0]||'')
+    if(cf)vSet('f-comm-cf',cf)
+    if(email)vSet('f-comm-email',email)
+    if(tel)vSet('f-comm-tel',tel)
+  }
+  if(tipoVal)setCommTipo(tipoVal)
+  hide('modal-comm')
+  toast('Committente "'+nome+'" creato e selezionato','ok')
+}
+
+// ── AUTOCOMPLETE COMMITTENTE ──
+setupAC('f-comm-search','comm-list', async q=>{
+  const{data}=await sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,email,telefono,piva,tipo_sogg').or(`committente_nome.ilike.%${q}%,cf_piva.ilike.%${q}%,piva.ilike.%${q}%`).eq('elimina',0).limit(8)
+  return(data||[]).map(c=>({id:c.committente_id,label:c.committente_nome,extra:c}))
+},item=>{
+  vSet('f-comm-id',item.id)
+  if(item.extra){
+    const isPG=item.extra.tipo_sogg==='PG'||!!item.extra.piva
+    const pgRad=$('comm-radio-pg'),pfRad=$('comm-radio-pf')
+    if(isPG){if(pgRad)pgRad.checked=true;toggleCommSogg('PG')}
+    else{if(pfRad)pfRad.checked=true;toggleCommSogg('PF')}
+    if(isPG){
+      vSet('f-comm-rag-soc',item.extra.committente_nome||'')
+      vSet('f-comm-piva',item.extra.piva||'')
+      vSet('f-comm-cf-pg',item.extra.cf_piva||'')
+      vSet('f-comm-email-pg',item.extra.email||'')
+      vSet('f-comm-tel-pg',item.extra.telefono||'')
+    }else{
+      // Cerca di splittare nome committente in titolo/nome/cognome (best effort)
+      vSet('f-comm-cf',item.extra.cf_piva||'')
+      vSet('f-comm-email',item.extra.email||'')
+      vSet('f-comm-tel',item.extra.telefono||'')
+    }
+    if(item.extra.committente_tipo)setCommTipo(String(item.extra.committente_tipo))
+  }
+})
+
+// ── MODAL NUOVA IMPRESA ──
+let _modalImpIdx=0
+$('btn-mi-cancel').onclick=()=>hide('modal-imp')
+$('btn-mi-save').onclick=async()=>{
+  const nome=vGet('mi-nome').trim()
+  const piva=vGet('mi-piva').trim()
+  if(!nome){toast('Ragione sociale obbligatoria','warn');$('mi-nome').focus();return}
+  if(!piva){toast('Partita IVA obbligatoria','warn');$('mi-piva').focus();return}
+  const cf=vGet('mi-cf').trim()||null
+  const imp={
+    impresa_id:uuid(),
+    impresa_nome:nome,
+    impresa_cf:cf||piva,
+    elimina:0
+  }
+  const{error}=await sb.from('imprese').insert(imp)
+  if(error){toast('Errore salvataggio impresa: '+error.message,'err');return}
+  // Leggi tutti i campi del modal
+  const certif=[1,2,3,4,5].filter(c=>$(`mi-cert-${c}`)?.checked)
+  const stageVal=document.querySelector('input[name="mi-stage"]:checked')?.value||''
+  // Aggiorna stato accordion con tutti i dati inseriti
+  const idx=_modalImpIdx
+  Object.assign(S.imprese[idx],{
+    impresa_id:imp.impresa_id,
+    impresa_nome:nome,
+    piva,
+    cf_imp:cf||'',
+    ind_imp:vGet('mi-ind').trim(),
+    com_imp:vGet('mi-com').trim(),
+    badge:vGet('mi-badge').trim(),
+    pat:vGet('mi-pat').trim(),
+    ceiv:vGet('mi-ceiv'),
+    certif,
+    stage_imp:stageVal
+  })
+  renderImpreseAccordion()
+  hide('modal-imp')
+  toast('Impresa "'+nome+'" creata e selezionata','ok')
+}
+
+// ── MODAL CANTIERE ──
+$('btn-new-cant').onclick=()=>show('modal-cant')
+$('btn-mc-cancel').onclick=()=>hide('modal-cant')
+$('btn-mc-save').onclick=async()=>{
+  const ind=vGet('mc-ind').trim();const civ=vGet('mc-civ').trim()
+  if(!ind||!civ){toast('Indirizzo e civico obbligatori','warn');return}
+  const c={cantiere_id:uuid(),cantiere_indirizzo:ind,cantiere_civico:civ,comune_nome:vGet('mc-com').trim()||null,cantiere_cap:vGet('mc-cap').trim()||null,cantiere_tip_int:+vGet('mc-tip-int')||null,cantiere_tip_ope:+vGet('mc-tip-ope')||null,cantiere_etichetta:vGet('mc-etich').trim()||null,elimina:0}
+  const{error}=await sb.from('cantieri').insert(c)
+  if(error){toast('Errore: '+error.message,'err');return}
+  vSet('f-cant-id',c.cantiere_id)
+  vSet('f-cant-search',c.cantiere_etichetta||`${ind} ${civ}`)
+  $('cant-detail').textContent=`${ind} ${civ}${c.comune_nome?' – '+c.comune_nome:''}`
+  S.fd.cantiere_id=c.cantiere_id
+  hide('modal-cant');toast('Cantiere creato','ok')
+}
+
+// ── GENERIC AUTOCOMPLETE ──
+function setupAC(inId,listId,fetchFn,onSel){
+  const inp=$(inId),lst=$(listId)
+  if(!inp||!lst)return
+  let tm=null,lq=''
+  inp.oninput=()=>{
+    clearTimeout(tm)
+    const q=inp.value.trim()
+    if(q.length<2){lst.classList.add('hidden');return}
+    if(q===lq)return;lq=q
+    tm=setTimeout(async()=>{
+      const items=await fetchFn(q)
+      if(!items.length){lst.classList.add('hidden');return}
+      lst.innerHTML=items.map((it,i)=>`<div data-i="${i}">${it.label}</div>`).join('')
+      lst.classList.remove('hidden')
+      lst.querySelectorAll('div').forEach((d,i)=>{
+        d.onclick=()=>{inp.value=items[i].label;lst.classList.add('hidden');onSel(items[i])}
+      })
+    },280)
+  }
+  document.addEventListener('click',e=>{if(!inp.contains(e.target)&&!lst.contains(e.target))lst.classList.add('hidden')})
+}
+
+// ── SAVE ──
+async function saveVisita(stato){
+  saveTabData()
+  const cant_id=vGet('f-cant-id')
+  const tec_id=vGet('f-tec-id')
+  const data_v=vGet('f-data')
+  if(!cant_id){toast('Seleziona un cantiere (Tab Cantiere)','warn');activateTab(1);return}
+  if(S.imprese.length===0||!S.imprese[0].impresa_id){toast('Seleziona l\'impresa principale (Tab Imprese)','warn');activateTab(2);return}
+  if(!data_v){toast('Inserisci la data della visita','warn');activateTab(0);return}
+
+  try{
+    const vid=S.fd.visita_id||uuid()
+    S.fd.visita_id=vid
+    const vistaRow={
+      visita_id:vid,
+      nr_verbale:vGet('f-verbale'),
+      data_visita:data_v,
+      ora_visita:vGet('f-da')||null,
+      ora_fine:vGet('f-a')||null,
+      tecnico_id:tec_id,
+      cantiere_id:cant_id,
+      impresa_id:S.imprese[0].impresa_id,
+      nr_lavoratori:+vGet('f-nr-lav')||0,
+      nr_lavoratori_stranieri:+vGet('f-nr-lav-str')||0,
+      // estesi Tab 0
+      acc_cant:vGet('f-acc-cant')||null,
+      nom_ppre:[vGet('f-ppre-titolo'),vGet('f-ppre-nome'),vGet('f-ppre-cog')].map(s=>s.trim()).filter(Boolean).join(' ')||null,
+      qual_ppre:vGet('f-qual-ppre')||null,
+      tel_ppre:vGet('f-tel-ppre')||null,
+      stage_sn:false,
+      stage_vis:vGet('f-stage-vis')==='1',
+      nom_stage:vGet('f-nom-stage')||null,
+      rlst_sn:vGet('f-rlst')==='1',
+      privacy:cGet('f-privacy'),
+      // Tab 1 – figure coordinamento
+      resp_lav:[vGet('f-rl-titolo'),vGet('f-rl-nome'),vGet('f-rl-cog')].filter(Boolean).join(' ')||null,
+      rl_email:vGet('f-rl-email')||null,
+      rl_tel:vGet('f-rl-tel')||null,
+      csp:[vGet('f-csp-titolo'),vGet('f-csp-nome'),vGet('f-csp-cog')].filter(Boolean).join(' ')||null,
+      csp_email:vGet('f-csp-email')||null,
+      csp_tel:vGet('f-csp-tel')||null,
+      cse:[vGet('f-cse-titolo'),vGet('f-cse-nome'),vGet('f-cse-cog')].filter(Boolean).join(' ')||null,
+      cse_email:vGet('f-cse-email')||null,
+      cse_tel:vGet('f-cse-tel')||null,
+      // Tab 1 – committente
+      comm_tipo_sogg:document.querySelector('input[name="comm-sogg"]:checked')?.value||'PF',
+      comm_tipo:+vGet('f-comm-tipo')||null,
+      comm_titolo:vGet('f-comm-titolo')||null,
+      comm_nome:vGet('f-comm-nome')||null,
+      comm_cog:vGet('f-comm-cog')||null,
+      comm_cf:vGet('f-comm-cf')||vGet('f-comm-cf-pg')||null,
+      comm_email:vGet('f-comm-email')||vGet('f-comm-email-pg')||null,
+      comm_tel:vGet('f-comm-tel')||vGet('f-comm-tel-pg')||null,
+      comm_piva:vGet('f-comm-piva')||null,
+      comm_rag_soc:vGet('f-comm-rag-soc')||null,
+      nr_imp:+vGet('f-nr-imp')||null,
+      nr_ind:+vGet('f-nr-ind')||null,
+      coord:cGet('f-coord'),
+      costi:vGet('f-costi')||null,
+      stato_lav:vGet('f-stato-lav')||null,
+      // Tab Note
+      oss_tec:vGet('f-oss-tec')||null,
+      oss_tec_int:vGet('f-oss-int')||null,
+      note_for_sn:cGet('f-note-for-sn'),
+      note_for_m:vGet('f-note-for-m')||null,
+      segnalazione:cGet('f-segnalazione'),
+      data_ritorno:vGet('f-data-ritorno')||null,
+      stato
+    }
+
+    if(S.savedId===vid){
+      const{error}=await sb.from('visite').update(vistaRow).eq('visita_id',vid)
+      if(error)throw error
+    }else{
+      const{error}=await sb.from('visite').insert(vistaRow)
+      if(error)throw error
+      S.savedId=vid
+    }
+
+    // Checklist (save non-NA + note)
+    await sb.from('visite_checklist').delete().eq('visita_id',vid)
+    const chkRows=[
+      ...Object.entries(S.checklist).filter(([,v])=>v!=='NA').map(([codice,valore])=>({visita_id:vid,codice,valore})),
+      ...Object.entries(S.noteChk).filter(([,v])=>v?.trim()).map(([codice,nota])=>({visita_id:vid,codice,valore:'NA',nota}))
+    ]
+    if(chkRows.length)await sb.from('visite_checklist').insert(chkRows)
+
+    // Lavorazioni (genere › fase › lavorazione)
+    await sb.from('visite_lavorazioni').delete().eq('visita_id',vid)
+    if(S.lavorazioni.length)await sb.from('visite_lavorazioni').insert(
+      S.lavorazioni.map(l=>({visita_id:vid,genere:l.genere,fase:l.fase,lavorazione:l.lavorazione}))
+    )
+
+    // Imprese presenti
+    await sb.from('visite_imprese_presenti').delete().eq('visita_id',vid)
+    const impRows=S.imprese.filter(im=>im.impresa_id).map((im,i)=>({
+      visita_id:vid,impresa_id:im.impresa_id,
+      att:im.att||null,nom_prec:[im.capo_nome||'',im.capo_cog||''].map(s=>s.trim()).filter(Boolean).join(' ')||im.nom_prec||null,badge:im.badge||null,
+      pat:im.pat||null,note_fasilav:im.note_fasilav||null,
+      tipo_imp:+im.tipo_imp||null,is_principale:i===0,ordine:i
+    }))
+    if(impRows.length)await sb.from('visite_imprese_presenti').insert(impRows)
+
+    // Snapshot
+    const snap=buildSnap(vid)
+    await sb.from('visite_snapshot').upsert({visita_id:vid,snapshot:snap},{onConflict:'visita_id'})
+
+    show('btn-pdf')
+    show('btn-email-verbale')
+    toast(`Visita salvata come ${stato==='bozza'?'bozza':'definitivo'}`, 'ok')
+  }catch(e){toast('Errore: '+e.message,'err');console.error(e)}
+}
+
+function buildSnap(vid=null){
+  return{
+    visita_id:vid||S.fd.visita_id,
+    nr_verbale_origine:vGet('f-verbale'),
+    cantiere_id:vGet('f-cant-id'),
+    cantiere_label:vGet('f-cant-search'),
+    cantiere_detail:$('cant-detail')?.textContent||'',
+    committente_id:vGet('f-comm-id'),
+    checklist:{...S.checklist},
+    note_checklist:{...S.noteChk},
+    lavorazioni:[...S.lavorazioni],
+    imprese:S.imprese.map(im=>({...im})),
+    stato_lav:vGet('f-stato-lav'),
+    note_lav:vGet('f-note-lav'),
+    oss_tec:vGet('f-oss-tec'),
+    nr_lavoratori:+vGet('f-nr-lav')||0,
+    nr_lavoratori_stranieri:+vGet('f-nr-lav-str')||0,
+    // tecnico
+    tecnico_id:vGet('f-tec-id')||null,
+    tecnico_email:vGet('f-tec-email')||null,
+    tec_display:vGet('f-tec-display')||null,
+    // persona presente
+    ppre_titolo:vGet('f-ppre-titolo')||null,
+    nom_ppre:[vGet('f-ppre-titolo'),vGet('f-ppre-nome'),vGet('f-ppre-cog')].map(s=>s.trim()).filter(Boolean).join(' ')||null,
+    qual_ppre:vGet('f-qual-ppre')||null,
+    tel_ppre:vGet('f-tel-ppre')||null,
+    acc_cant:vGet('f-acc-cant')||null,
+    exported_at:new Date().toISOString()
+  }
+}
+
+function applySnap(snap){
+  S.checklist={...(snap.checklist||{})}
+  S.noteChk={...(snap.note_checklist||{})}
+  S.lavorazioni=[...(snap.lavorazioni||[])]
+  S.imprese=(snap.imprese||[]).map((im,i)=>({...im,is_principale:i===0}))
+  if(!S.imprese.length)S.imprese=[{impresa_id:'',impresa_nome:'',piva:'',cf_imp:'',ind_imp:'',com_imp:'',att:'',capo_nome:'',capo_cog:'',badge:'',pat:'',note_fasilav:'',tipo_imp:'',certif:[],ceiv:'',stage_imp:'',is_principale:true}]
+
+  if(snap.cantiere_id){vSet('f-cant-id',snap.cantiere_id);vSet('f-cant-search',snap.cantiere_label||'');if($('cant-detail'))$('cant-detail').textContent=snap.cantiere_detail||''}
+  vSet('f-nr-lav',snap.nr_lavoratori||0)
+  vSet('f-nr-lav-str',snap.nr_lavoratori_stranieri||0)
+  vSet('f-stato-lav',snap.stato_lav||'')
+  vSet('f-note-lav',snap.note_lav||'')
+  vSet('f-oss-tec',snap.oss_tec||'')
+  // nome+cognome persona presente (split su primo spazio)
+  if(snap.nom_ppre){
+    if(snap.ppre_titolo){vSet('f-ppre-titolo',snap.ppre_titolo)}
+    const fullName=snap.ppre_titolo?snap.nom_ppre.replace(snap.ppre_titolo,'').trim():snap.nom_ppre
+    const parts=fullName.split(' ')
+    vSet('f-ppre-nome',parts[0]||'');vSet('f-ppre-cog',parts.slice(1).join(' ')||'')
+  }
+  if(snap.qual_ppre){const sel=$('f-qual-ppre');if(sel){for(let o of sel.options)if(o.value===snap.qual_ppre){sel.value=snap.qual_ppre;break}}}
+  if(snap.tel_ppre)vSet('f-tel-ppre',snap.tel_ppre)
+  // tecnico
+  if(snap.tecnico_email)setTecnicoFromEmail(snap.tecnico_email)
+  else if(snap.tec_display)vSet('f-tec-display',snap.tec_display)
+  if(snap.tecnico_id)vSet('f-tec-id',snap.tecnico_id)
+
+  // Ripristina lavorazioni a cascata
+  renderLavTags()
+
+  updateIPCLive();updateZoneDots()
+}
+
+$('btn-bozza').onclick=()=>saveVisita('bozza')
+$('btn-final').onclick=()=>saveVisita('definitivo')
+$('btn-snap-exp').onclick=()=>{
+  saveTabData()
+  const snap=buildSnap()
+  const blob=new Blob([JSON.stringify(snap,null,2)],{type:'application/json'})
+  const url=URL.createObjectURL(blob)
+  const a=document.createElement('a');a.href=url;a.download=`snap_${snap.nr_verbale_origine||'visita'}.json`;a.click();URL.revokeObjectURL(url)
+  toast('Snapshot esportato','ok')
+}
+
+// ── TECNICI ───────────────────────────────────────────────────────────────────
+const TECNICI_LIST=[
+  {nome:'Arch. Marco Camuffo',     email:'marco.camuffo@did.scuolaedilepadova.net'},
+  {nome:'Arch. Nicola De Marco',   email:'nicola.demarco@did.scuolaedilepadova.net'},
+  {nome:'Arch. Tommaso Visentini', email:'tommaso.visentini@did.scuolaedilepadova.net'},
+  {nome:'Geom. Mirco Canova',      email:'mirco.canova@did.scuolaedilepadova.net'},
+  {nome:'Ing. Paolo Balladore',    email:'paolo.balladore@did.scuolaedilepadova.net'},
+  {nome:'P.I. Franco Caon',        email:'franco.caon@did.scuolaedilepadova.net'},
+]
+function populateTecnicoSelect(){
+  const sel=$('f-tec-select'); if(!sel)return
+  // rimuove opzioni esistenti tranne la prima (placeholder)
+  while(sel.options.length>1) sel.remove(1)
+  TECNICI_LIST.forEach((t,i)=>{
+    const o=document.createElement('option'); o.value=i; o.textContent=t.nome; sel.appendChild(o)
+  })
+  sel.onchange=async()=>{
+    const idx=+sel.value
+    if(isNaN(idx)||sel.value===''){
+      vSet('f-tec-display',''); vSet('f-tec-email',''); vSet('f-tec-id',''); return
+    }
+    const t=TECNICI_LIST[idx]
+    vSet('f-tec-display',t.nome)
+    vSet('f-tec-email',t.email)
+    // cerca id nella tabella tecnici tramite email
+    const{data}=await sb.from('tecnici').select('tecnico_id').eq('email',t.email).maybeSingle()
+    vSet('f-tec-id',data?.tecnico_id||'')
+  }
+}
+function setTecnicoFromEmail(email){
+  const sel=$('f-tec-select'); if(!sel||!email)return
+  const idx=TECNICI_LIST.findIndex(t=>t.email===email)
+  if(idx>=0){ sel.value=idx; vSet('f-tec-display',TECNICI_LIST[idx].nome); vSet('f-tec-email',TECNICI_LIST[idx].email) }
+}
+
+// ── COMUNI PADOVA ──────────────────────────────────────────────────────────────
+const COMUNI_PD=['Abano Terme','Agna','Albignasego','Anguillara Veneta','Arquà Petrarca','Arquà Polesine','Arre','Arzergrande','Bagnoli di Sopra','Baone','Barbona','Battaglia Terme','Boara Pisani','Borgoricco','Bovolenta','Brugine','Cadoneghe','Campodarsego','Campodoro','Camposampiero','Campo San Martino','Candiana','Carceri','Cartura','Casale di Scodosia','Casalserugo','Castelbaldo','Cervarese Santa Croce','Chioggia','Cittadella','Codevigo','Conselve','Correzzola','Curtarolo','Due Carrare','Este','Fontaniva','Galliera Veneta','Galzignano Terme','Gazzo','Granze','Guarda Veneta','Legnaro','Limena','Loreggia','Lozzo Atestino','Masi','Massanzago','Megliadino San Fidenzio','Megliadino San Vitale','Merlara','Mestrino','Monselice','Montagnana','Montegrotto Terme','Motta','Noventa Padovana','Ospedaletto Euganeo','Padova','Pernumia','Piacenza d\'Adige','Piazzola sul Brenta','Piombino Dese','Piove di Sacco','Polverara','Ponso','Pontelongo','Ponte San Nicolò','Pozzonovo','Rovolon','Rubano','Saccolongo','San Giorgio delle Pertiche','San Giorgio in Bosco','San Martino di Lupari','San Pietro in Gu','San Pietro Viminario','Sant\'Angelo di Piove di Sacco','Sant\'Elena','Sant\'Urbano','Saonara','Selvazzano Dentro','Solesino','Stanghella','Teolo','Terrassa Padovana','Tombolo','Torre di Mosto','Trebaseleghe','Tribano','Urbana','Veggiano','Vescovana','Vighizzolo d\'Este','Vigodarzere','Vigonovo','Vigonza','Villa del Conte','Villa Estense','Villafranca Padovana','Villanova di Camposampiero','Vo\'']
+
+const CAP_PD={
+  'Abano Terme':'35031','Agna':'35021','Albignasego':'35020','Anguillara Veneta':'35022',
+  'Arquà Petrarca':'35032','Arquà Polesine':'45031','Arre':'35020','Arzergrande':'35020',
+  'Bagnoli di Sopra':'35023','Baone':'35030','Barbona':'35040','Battaglia Terme':'35041',
+  'Boara Pisani':'35040','Borgoricco':'35010','Bovolenta':'35024','Brugine':'35020',
+  'Cadoneghe':'35010','Campodarsego':'35011','Campodoro':'35010','Camposampiero':'35012',
+  'Campo San Martino':'35010','Candiana':'35020','Carceri':'35040','Cartura':'35025',
+  'Casale di Scodosia':'35040','Casalserugo':'35020','Castelbaldo':'35040',
+  'Cervarese Santa Croce':'35030','Chioggia':'30015','Cittadella':'35013','Codevigo':'35020',
+  'Conselve':'35026','Correzzola':'35020','Curtarolo':'35010','Due Carrare':'35020',
+  'Este':'35042','Fontaniva':'35014','Galliera Veneta':'35015','Galzignano Terme':'35030',
+  'Gazzo':'35010','Granze':'35040','Guarda Veneta':'45030','Legnaro':'35020','Limena':'35010',
+  'Loreggia':'35010','Lozzo Atestino':'35034','Masi':'35040','Massanzago':'35010',
+  'Megliadino San Fidenzio':'35040','Megliadino San Vitale':'35040','Merlara':'35040',
+  'Mestrino':'35035','Monselice':'35043','Montagnana':'35044','Montegrotto Terme':'35036',
+  'Motta':'35060','Noventa Padovana':'35027','Ospedaletto Euganeo':'35045','Padova':'35100',
+  'Pernumia':'35020','Piacenza d\'Adige':'35040','Piazzola sul Brenta':'35016',
+  'Piombino Dese':'35017','Piove di Sacco':'35028','Polverara':'35020','Ponso':'35040',
+  'Pontelongo':'35029','Ponte San Nicolò':'35020','Pozzonovo':'35020','Rovolon':'35030',
+  'Rubano':'35030','Saccolongo':'35030','San Giorgio delle Pertiche':'35010',
+  'San Giorgio in Bosco':'35010','San Martino di Lupari':'35018','San Pietro in Gu':'35010',
+  'San Pietro Viminario':'35020','Sant\'Angelo di Piove di Sacco':'35020',
+  'Sant\'Elena':'35040','Sant\'Urbano':'35040','Saonara':'35020','Selvazzano Dentro':'35030',
+  'Solesino':'35047','Stanghella':'35048','Teolo':'35037','Terrassa Padovana':'35020',
+  'Tombolo':'35019','Torre di Mosto':'30020','Trebaseleghe':'35010','Tribano':'35020',
+  'Urbana':'35040','Veggiano':'35030','Vescovana':'35040','Vighizzolo d\'Este':'35040',
+  'Vigodarzere':'35010','Vigonovo':'35010','Vigonza':'35010','Villa del Conte':'35010',
+  'Villa Estense':'35040','Villafranca Padovana':'35010','Villanova di Camposampiero':'35010',
+  'Vo\'':'35030'
+}
+
+function populateComuniSelect(){
+  const sel=$('mc-com'); if(!sel)return
+  COMUNI_PD.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o) })
+  // CAP auto-fill
+  sel.onchange=()=>{
+    const cap=CAP_PD[sel.value]||''
+    const capEl=$('mc-cap')
+    if(capEl){capEl.value=cap;capEl.readOnly=!!cap;capEl.style.background=cap?'#f8f8f8':'#fff'}
+  }
+}
+
+// ── TOGGLE COMMITTENTE PERSONA FISICA / GIURIDICA ──────────────────────────────
+function toggleCommSogg(tipo){
+  const pfF=$('comm-pf-fields'),pgF=$('comm-pg-fields')
+  if(!pfF||!pgF)return
+  if(tipo==='PG'){pfF.classList.add('hidden');pgF.classList.remove('hidden')}
+  else{pfF.classList.remove('hidden');pgF.classList.add('hidden')}
+}
+document.querySelectorAll('input[name="comm-sogg"]').forEach(r=>{
+  r.onchange=()=>toggleCommSogg(r.value)
+})
+
+// Tastini tipo committente → sincronizza hidden f-comm-tipo
+document.querySelectorAll('input[name="comm-tipo"]').forEach(r=>{
+  r.onchange=()=>{ const h=$('f-comm-tipo'); if(h)h.value=r.value }
+})
+function setCommTipo(val){
+  const r=document.querySelector(`input[name="comm-tipo"][value="${val}"]`)
+  if(r){r.checked=true;const h=$('f-comm-tipo');if(h)h.value=val}
+}
+
+// ── FOTO ──────────────────────────────────────────────────────────────────────
+const FOTO_SLOTS=[
+  {tipo:'foto1', label:'Foto 1', icon:'📷', privacy:false},
+  {tipo:'foto2', label:'Foto 2', icon:'📷', privacy:false},
+  {tipo:'foto3', label:'Foto 3', icon:'📷', privacy:false},
+  {tipo:'foto4', label:'Foto 4', icon:'📷', privacy:false},
+  {tipo:'privacy', label:'Privacy (firma)', icon:'🔒', privacy:true},
+]
+
+// Stato foto: { foto1:{file,base64,fileId,url,nome}, ... }
+if(!S.foto)S.foto={}
+
+async function initFotoTab(){
+  if(!S.foto)S.foto={}
+  const grid=$('foto-grid')
+  if(!grid)return
+  // Se la visita è già salvata, carica le foto da DB (se non già in memoria)
+  const vid=S.savedId||S.fd.visita_id
+  if(vid&&!Object.keys(S.foto).length) await loadFotoExisting(vid)
+  grid.innerHTML=FOTO_SLOTS.map(sl=>fotoSlotHTML(sl)).join('')
+  FOTO_SLOTS.forEach(sl=>refreshSlotUI(sl.tipo))
+  FOTO_SLOTS.forEach(sl=>{
+    const inp=$(`fi-${sl.tipo}`)
+    if(inp)inp.onchange=e=>onFotoSelect(sl.tipo,e.target.files[0])
+  })
+  const btnAll=$('btn-foto-upload-all')
+  if(btnAll)btnAll.onclick=()=>uploadTutteLeFoto()
+}
+
+function fotoSlotHTML(sl){
+  return`<div class="foto-slot${sl.privacy?' privacy-slot':''}" id="fslot-${sl.tipo}">
+    <label class="foto-lbl">${sl.icon} ${sl.label}</label>
+    <div class="foto-placeholder">📷</div>
+    <img class="foto-preview" id="fprev-${sl.tipo}" alt="${sl.label}" onclick="window.open(document.getElementById('flink-${sl.tipo}')?.dataset?.url,'_blank')">
+    <div class="foto-progress" id="fprog-${sl.tipo}"><div class="foto-progress-bar" id="fpbar-${sl.tipo}"></div></div>
+    <a class="foto-link" id="flink-${sl.tipo}" target="_blank" href="#">↗ Apri su Drive</a>
+    <div class="foto-info" id="finfo-${sl.tipo}"></div>
+    <label class="btn-primary btn-sm" style="cursor:pointer;margin-top:4px">
+      Seleziona foto
+      <input type="file" id="fi-${sl.tipo}" accept="image/*" capture="environment" style="display:none">
+    </label>
+    <button class="btn-foto-del" id="fdel-${sl.tipo}" title="Elimina" onclick="deleteFoto('${sl.tipo}')">✕</button>
+  </div>`
+}
+
+function refreshSlotUI(tipo){
+  const fo=S.foto[tipo]
+  const slot=$(`fslot-${tipo}`)
+  if(!slot)return
+  if(fo?.url){
+    slot.classList.add('uploaded')
+    const prev=$(`fprev-${tipo}`)
+    if(prev)prev.src=fo.thumb||fo.url
+    const lnk=$(`flink-${tipo}`)
+    if(lnk){lnk.href=fo.url;lnk.dataset.url=fo.url;lnk.textContent='↗ Apri su Drive'}
+    const info=$(`finfo-${tipo}`)
+    if(info)info.textContent=fo.nome||''
+  } else if(fo?.base64){
+    slot.classList.remove('uploaded')
+    const prev=$(`fprev-${tipo}`)
+    if(prev){prev.src='data:image/jpeg;base64,'+fo.base64;prev.style.display='block'}
+    const info=$(`finfo-${tipo}`)
+    if(info)info.textContent=`${fo.nome||''} – pronta per il caricamento`
+  } else {
+    slot.classList.remove('uploaded')
+    const prev=$(`fprev-${tipo}`)
+    if(prev){prev.style.display='none';prev.src=''}
+    const info=$(`finfo-${tipo}`)
+    if(info)info.textContent=''
+  }
+}
+
+async function onFotoSelect(tipo, file){
+  if(!file)return
+  try{
+    $(`finfo-${tipo}`).textContent='Compressione...'
+    const {base64, nome, sizeKb} = await compressFoto(file)
+    S.foto[tipo]={base64, nome, sizeKb, mimeType:'image/jpeg'}
+    refreshSlotUI(tipo)
+    $(`finfo-${tipo}`).textContent=`${nome} (${sizeKb} KB) – pronta`
+    // Se la visita è già salvata, carica subito
+    if(S.savedId){
+      await uploadSingolaFoto(tipo)
+    }
+  }catch(e){toast('Errore selezione foto: '+e.message,'err')}
+}
+
+async function compressFoto(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader()
+    reader.onload=ev=>{
+      const img=new Image()
+      img.onload=()=>{
+        const MAX=1200
+        let w=img.width, h=img.height
+        if(w>MAX){h=Math.round(h*(MAX/w));w=MAX}
+        if(h>MAX){w=Math.round(w*(MAX/h));h=MAX}
+        const canvas=document.createElement('canvas')
+        canvas.width=w; canvas.height=h
+        canvas.getContext('2d').drawImage(img,0,0,w,h)
+        const b64Full=canvas.toDataURL('image/jpeg',0.82)
+        const b64=b64Full.split(',')[1]
+        const sizeKb=Math.round(b64.length*3/4/1024)
+        const ext=file.name.split('.').pop().toLowerCase()
+        const nome=file.name.replace(/\.[^.]+$/,`_${Date.now()}.jpg`)
+        resolve({base64:b64, nome, sizeKb, mimeType:'image/jpeg'})
+      }
+      img.onerror=reject
+      img.src=ev.target.result
+    }
+    reader.onerror=reject
+    reader.readAsDataURL(file)
+  })
+}
+
+async function uploadSingolaFoto(tipo){
+  const fo=S.foto[tipo]
+  if(!fo?.base64||fo.url)return  // già caricata o non presente
+  const verbale=vGet('f-verbale')
+  if(!verbale){toast('Salva prima la visita per caricare le foto','warn');return}
+  const vid=S.savedId||S.fd.visita_id
+  if(!vid){toast('Salva prima la visita per caricare le foto','warn');return}
+  // progress
+  const prog=$(`fprog-${tipo}`), bar=$(`fpbar-${tipo}`)
+  if(prog)prog.style.display='block'
+  if(bar)bar.style.width='30%'
+  try{
+    const {data:{session}}=await sb.auth.getSession()
+    const token=session?.access_token
+    if(!token)throw new Error('Sessione scaduta, effettua il login')
+    const res=await fetch(`${SB_URL}/functions/v1/upload-foto`,{
+      method:'POST',
+      headers:{
+        'Authorization':`Bearer ${token}`,
+        'Content-Type':'application/json',
+        'apikey':SB_KEY
+      },
+      body:JSON.stringify({
+        visita_id:vid,
+        nr_verbale:verbale,
+        tipo,
+        nome_file:fo.nome,
+        mime_type:fo.mimeType||'image/jpeg',
+        image_base64:fo.base64
+      })
+    })
+    if(bar)bar.style.width='80%'
+    const data=await res.json()
+    if(!res.ok||data.error)throw new Error(data.error||'Errore upload')
+    // Salva in Supabase
+    await sb.from('visite_foto').upsert({
+      visita_id:vid, tipo,
+      drive_file_id:data.drive_file_id,
+      drive_url:data.drive_url,
+      thumb_url:data.thumb_url||null,
+      nome_file:fo.nome,
+      dimensione_kb:fo.sizeKb||null
+    },{onConflict:'visita_id,tipo'})
+    // Aggiorna stato locale
+    S.foto[tipo]={...fo, url:data.drive_url, thumb:data.thumb_url, fileId:data.drive_file_id, base64:null}
+    if(bar)bar.style.width='100%'
+    setTimeout(()=>{if(prog)prog.style.display='none'},600)
+    refreshSlotUI(tipo)
+    toast(`${tipo} caricata su Drive ✓`,'ok')
+  }catch(e){
+    if(prog)prog.style.display='none'
+    toast('Errore caricamento foto: '+e.message,'err')
+  }
+}
+
+async function uploadTutteLeFoto(){
+  // Prima salva la visita se non ancora salvata
+  if(!S.savedId){
+    toast('Salvo la visita prima di caricare le foto…','warn')
+    await saveVisita('bozza')
+    if(!S.savedId){toast('Impossibile salvare la visita','err');return}
+  }
+  const pending=FOTO_SLOTS.filter(sl=>S.foto[sl.tipo]?.base64&&!S.foto[sl.tipo]?.url)
+  if(!pending.length){toast('Nessuna foto in attesa di caricamento','warn');return}
+  $('foto-status').textContent=`Caricamento ${pending.length} foto…`
+  for(const sl of pending){
+    $('foto-status').textContent=`Caricamento ${sl.label}…`
+    await uploadSingolaFoto(sl.tipo)
+  }
+  $('foto-status').textContent='Tutte le foto caricate ✓'
+  setTimeout(()=>{ $('foto-status').textContent='' },3000)
+}
+
+async function deleteFoto(tipo){
+  const fo=S.foto[tipo]
+  if(!fo)return
+  if(!confirm(`Eliminare ${tipo}?`))return
+  // Rimuovi da Supabase
+  if(S.savedId||S.fd.visita_id){
+    const vid=S.savedId||S.fd.visita_id
+    await sb.from('visite_foto').delete().eq('visita_id',vid).eq('tipo',tipo)
+  }
+  delete S.foto[tipo]
+  refreshSlotUI(tipo)
+  toast(`${tipo} eliminata`,'ok')
+}
+
+async function loadFotoExisting(vid){
+  if(!vid)return
+  const {data}=await sb.from('visite_foto').select('*').eq('visita_id',vid)
+  if(!data?.length)return
+  for(const r of data){
+    S.foto[r.tipo]={url:r.drive_url, thumb:r.thumb_url, fileId:r.drive_file_id, nome:r.nome_file, sizeKb:r.dimensione_kb}
+  }
+}
+
+// ── RIEPILOGO ──
+function buildRiepilogo(){
+  const{ipc,np,nm,os}=calcIPC(S.checklist)
+  const box=$('rp-ipc-box');box.className='ipc-box '+ipc
+  $('rp-ipc-val').textContent=ipc==='NR'?'Nessun Rilievo':ipc
+  $('rp-ipc-cnt').textContent=`NC+: ${np}   NC-: ${nm}   OSS: ${os}`
+
+  $('rp-dati').innerHTML=[
+    ['Verbale',vGet('f-verbale')],
+    ['Data',fmtDate(vGet('f-data'))],
+    ['Cantiere',vGet('f-cant-search')||'-'],
+    ['Impresa principale',S.imprese[0]?.impresa_nome||'-'],
+    ['Tecnico',vGet('f-tec-display')],
+    ['N° lavoratori',vGet('f-nr-lav')||'0'],
+  ].map(([k,v])=>`<div class="rp-item"><div class="rp-k">${k}</div><div class="rp-v">${v||'-'}</div></div>`).join('')
+
+  let zoneHtml=''
+  for(let z=1;z<=10;z++){
+    const ril=(S.byZona[z]||[]).filter(v=>!v.is_nota&&['NC+','NC-','OSS'].includes(S.checklist[v.codice]))
+    if(!ril.length)continue
+    zoneHtml+=`<div style="margin-bottom:10px"><strong style="font-size:12px;color:var(--grey)">${ZONE_LBL[z]}</strong>
+    <div style="margin-top:4px">${ril.map(v=>{
+      const vl=S.checklist[v.codice]
+      const cls=vl==='NC+'?'badge-alto':vl==='NC-'?'badge-medio':'badge-nr'
+      return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f0f0f0;font-size:12px">
+        <span class="badge ${cls}">${vl}</span>${v.descrizione}</div>`
+    }).join('')}</div></div>`
+  }
+  $('rp-zone').innerHTML=zoneHtml||'<p style="color:#aaa;font-size:13px">Nessun rilievo registrato</p>'
+}
+
+// ── DASHBOARD ──
+async function loadDash(){
+  const yr=new Date().getFullYear()
+  const{data}=await sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).gte('data_visita',`${yr}-01-01`).lte('data_visita',`${yr}-12-31`).eq('elimina',0).order('data_visita',{ascending:false}).limit(50)
+  const vs=data||[]
+  $('s-tot').textContent=vs.length
+  $('s-alto').textContent=vs.filter(v=>v.ipc==='ALTO').length
+  $('s-medio').textContent=vs.filter(v=>v.ipc==='MEDIO').length
+  $('s-basso').textContent=vs.filter(v=>v.ipc==='BASSO'||v.ipc==='NR'||!v.ipc).length
+  $('tbody-dash').innerHTML=vs.slice(0,10).map(v=>vtRow(v)).join('')||'<tr><td colspan="7" style="text-align:center;color:#aaa;padding:18px">Nessuna visita quest\'anno</td></tr>'
+  bindRowActions()
+}
+
+// ── LISTA ──
+async function loadLista(){
+  const q=vGet('q-search').trim()
+  const fi=vGet('q-ipc');const fs=vGet('q-stato')
+  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).eq('elimina',0).order('data_visita',{ascending:false}).limit(200)
+  if(fi)qb=qb.eq('ipc',fi)
+  if(fs)qb=qb.eq('stato',fs)
+  const{data}=await qb
+  let vs=data||[]
+  if(q){const ql=q.toLowerCase();vs=vs.filter(v=>v.nr_verbale?.toLowerCase().includes(ql)||v.cantieri?.cantiere_indirizzo?.toLowerCase().includes(ql)||v.cantieri?.cantiere_etichetta?.toLowerCase().includes(ql)||v.imprese?.impresa_nome?.toLowerCase().includes(ql))}
+  const tbody=$('tbody-lista')
+  if(!vs.length){tbody.innerHTML='';show('lista-empty')}
+  else{hide('lista-empty');tbody.innerHTML=vs.map(v=>vtRow(v)).join('');bindRowActions()}
+}
+$('btn-cerca').onclick=loadLista
+$('q-search').onkeydown=e=>{if(e.key==='Enter')loadLista()}
+
+function vtRow(v){
+  const cant=v.cantieri?.cantiere_etichetta||v.cantieri?.cantiere_indirizzo||'-'
+  const ipc=v.ipc||'NR'
+  return`<tr>
+    <td>${v.nr_verbale||'-'}</td><td>${fmtDate(v.data_visita)}</td>
+    <td>${cant}</td><td>${v.imprese?.impresa_nome||'-'}</td>
+    <td><span class="badge ${ipcCls(ipc)}">${ipc}</span></td>
+    <td><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span></td>
+    <td><div class="tbl-actions">
+      <button class="btn-primary btn-sm" data-act="pdf" data-id="${v.visita_id}">PDF</button>
+      <button class="btn-outline btn-sm" data-act="snap" data-id="${v.visita_id}">📤</button>
+    </div></td>
+  </tr>`
+}
+function bindRowActions(){
+  document.querySelectorAll('[data-act="pdf"]').forEach(b=>b.onclick=()=>genPDF(b.dataset.id))
+  document.querySelectorAll('[data-act="snap"]').forEach(b=>b.onclick=()=>exportSnapFromDB(b.dataset.id))
+}
+$('btn-pdf').onclick=()=>{if(S.savedId)genPDF(S.savedId)}
+
+// ── EMAIL VERBALE ──
+function inviEmailVerbale(){
+  const emails=[]
+  // Committente
+  const isPG=$('comm-radio-pg')?.checked
+  const commEmail=(isPG?vGet('f-comm-email-pg'):vGet('f-comm-email'))?.trim()
+  if(commEmail){
+    const commNome=vGet('f-comm-search')||'Committente'
+    emails.push({ruolo:'Committente',nome:commNome,email:commEmail})
+  }
+  // Responsabile Lavoratori
+  const rlEmail=vGet('f-rl-email')?.trim()
+  if(rlEmail){
+    const rlNome=[vGet('f-rl-nome'),vGet('f-rl-cog')].filter(Boolean).join(' ')||'RL'
+    emails.push({ruolo:'RL',nome:rlNome,email:rlEmail})
+  }
+  // CSP
+  const cspEmail=vGet('f-csp-email')?.trim()
+  if(cspEmail){
+    const cspNome=[vGet('f-csp-nome'),vGet('f-csp-cog')].filter(Boolean).join(' ')||'CSP'
+    emails.push({ruolo:'CSP',nome:cspNome,email:cspEmail})
+  }
+  // CSE
+  const cseEmail=vGet('f-cse-email')?.trim()
+  if(cseEmail){
+    const cseNome=[vGet('f-cse-nome'),vGet('f-cse-cog')].filter(Boolean).join(' ')||'CSE'
+    emails.push({ruolo:'CSE',nome:cseNome,email:cseEmail})
+  }
+  // Imprese – email verbale override
+  S.imprese.forEach((im,idx)=>{
+    const ev=(im.email_verbale||vGet(`im-email_verbale-${idx}`)||'').trim()
+    if(ev) emails.push({ruolo:'Impresa',nome:im.impresa_nome||`Impresa ${idx+1}`,email:ev})
+  })
+
+  if(!emails.length){toast('Nessun indirizzo email presente tra le figure della visita','warn');return}
+
+  // Render lista destinatari
+  $('email-verbale-list').innerHTML=emails.map(e=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #eee;font-size:13px">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--grey);min-width:72px;letter-spacing:.4px">${e.ruolo}</span>
+      <span style="flex:1;color:#333">${e.nome}</span>
+      <span style="color:var(--orange);font-size:12px">${e.email}</span>
+    </div>`).join('')
+
+  // Oggetto predefinito
+  const nrVerb=vGet('f-verbale')||''
+  const cant=vGet('f-cant-search')||''
+  $('email-verbale-oggetto').value=`Verbale sopralluogo${nrVerb?' n° '+nrVerb:''}${cant?' – '+cant:''}`
+
+  window._evEmails=emails
+  show('modal-email-verbale')
+}
+
+$('btn-email-verbale').onclick=inviEmailVerbale
+$('btn-ev-close').onclick=()=>hide('modal-email-verbale')
+$('btn-ev-apri').onclick=()=>{
+  const to=(window._evEmails||[]).map(e=>e.email).join(',')
+  const subj=encodeURIComponent($('email-verbale-oggetto')?.value||'')
+  window.open(`mailto:${to}?subject=${subj}`,'_self')
+}
+$('btn-ev-copia').onclick=()=>{
+  const lista=(window._evEmails||[]).map(e=>e.email).join('; ')
+  navigator.clipboard?.writeText(lista)
+    .then(()=>toast('Indirizzi copiati negli appunti','ok'))
+    .catch(()=>toast('Copia non disponibile in questo contesto','warn'))
+}
+
+// ── IMPORT SNAPSHOT ──
+let pendingSnap=null
+const dz=$('drop-zone')
+dz.onclick=()=>$('file-imp').click()
+dz.ondragover=e=>{e.preventDefault();dz.classList.add('drag-over')}
+dz.ondragleave=()=>dz.classList.remove('drag-over')
+dz.ondrop=e=>{e.preventDefault();dz.classList.remove('drag-over');if(e.dataTransfer.files[0])readSnapFile(e.dataTransfer.files[0])}
+$('file-imp').onchange=e=>{if(e.target.files[0])readSnapFile(e.target.files[0])}
+
+function readSnapFile(f){
+  const r=new FileReader()
+  r.onload=e=>{
+    try{
+      pendingSnap=JSON.parse(e.target.result)
+      $('imp-info').innerHTML=`
+        <p><b>Verbale origine:</b> ${pendingSnap.nr_verbale_origine||'N/D'}</p>
+        <p><b>Cantiere:</b> ${pendingSnap.cantiere_label||'N/D'}</p>
+        <p><b>Impresa principale:</b> ${pendingSnap.imprese?.[0]?.impresa_nome||'N/D'}</p>
+        <p><b>Voci compilate:</b> ${Object.keys(pendingSnap.checklist||{}).length}</p>
+        <p><b>Esportato:</b> ${pendingSnap.exported_at?new Date(pendingSnap.exported_at).toLocaleString('it-IT'):'N/D'}</p>`
+      show('imp-preview')
+    }catch{toast('File JSON non valido','err')}
+  }
+  r.readAsText(f)
+}
+
+$('btn-load-snap').onclick=async()=>{
+  if(!pendingSnap)return
+  // Dialog: mantenere o assegnare nuovo verbale?
+  const origNr=pendingSnap.nr_verbale_origine
+  $('conf-verb-txt').innerHTML=`Verbale originale: <strong>${origNr||'N/D'}</strong><br><br>Vuoi mantenere il numero originale o assegnarne uno nuovo?`
+  show('modal-verbale')
+  S._verbCb=async(mantieni)=>{
+    hide('modal-verbale')
+    await initForm(pendingSnap)
+    if(mantieni&&origNr){
+      vSet('f-verbale',origNr)
+      S.fd.nr_verbale=origNr
+    }
+    // else il nextVerbale() chiamato da initForm è già nuovo
+    hide('imp-preview')
+    pendingSnap=null
+    navTo('form')
+    toast(mantieni?`Verbale ${origNr} mantenuto`:'Nuovo progressivo assegnato')
+  }
+}
+$('btn-verb-mantieni').onclick=()=>S._verbCb?.(true)
+$('btn-verb-nuovo').onclick=()=>S._verbCb?.(false)
+$('btn-cancel-imp').onclick=()=>{pendingSnap=null;hide('imp-preview')}
+
+// ── EXPORT SNAP FROM DB ──
+async function exportSnapFromDB(vid){
+  const{data}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).single()
+  if(!data?.snapshot){toast('Snapshot non trovato','warn');return}
+  const blob=new Blob([JSON.stringify(data.snapshot,null,2)],{type:'application/json'})
+  const url=URL.createObjectURL(blob)
+  const a=document.createElement('a');a.href=url;a.download=`snap_${vid}.json`;a.click();URL.revokeObjectURL(url)
+  toast('Snapshot esportato','ok')
+}
+
+// ── PDF ──
+async function genPDF(vid){
+  toast('Generazione PDF…')
+  try{
+    const{data:v}=await sb.from('visite').select(`*,tecnici(*),cantieri(*,committenti(*)),imprese(*)`).eq('visita_id',vid).single()
+    const{data:chk}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
+    const{data:lavs}=await sb.from('visite_lavorazioni').select('lavorazione').eq('visita_id',vid)
+    const{data:imps}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf)').eq('visita_id',vid).order('ordine')
+
+    const{jsPDF}=window.jspdf
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
+    const PW=210,L=14,W=PW-28
+    const cO=[231,80,15],cG=[86,92,102],cL=[244,244,244],cW=[255,255,255]
+
+    let y=14
+    // HEADER
+    doc.setFillColor(...cO);doc.rect(0,0,PW,22,'F')
+    doc.setTextColor(...cW).setFontSize(15).setFont(undefined,'bold')
+    doc.text('FORMEDIL PADOVA – Verbale di Sopralluogo in Cantiere',L,10)
+    doc.setFontSize(9).setFont(undefined,'normal')
+    doc.text('Area Sicurezza e Salute – CPT Padova',L,16)
+    doc.text(`N° ${v.nr_verbale||'-'}`,PW-L,10,{align:'right'})
+    doc.text(fmtDate(v.data_visita),PW-L,16,{align:'right'})
+    y=28
+
+    // IPC
+    const ipc=v.ipc||'NR'
+    const ipcC=ipc==='ALTO'?[192,57,43]:ipc==='MEDIO'?[230,126,34]:ipc==='BASSO'?[39,174,96]:[150,150,150]
+    doc.setFillColor(...ipcC);doc.roundedRect(L,y,W,15,3,3,'F')
+    doc.setTextColor(...cW).setFontSize(12).setFont(undefined,'bold')
+    doc.text(`IPC: ${ipc==='NR'?'NESSUN RILIEVO':ipc}`,PW/2,y+6,{align:'center'})
+    doc.setFontSize(8).setFont(undefined,'normal')
+    doc.text(`NC+: ${v.ipc_nc_plus||0}   NC-: ${v.ipc_nc_minus||0}   OSS: ${v.ipc_oss||0}`,PW/2,y+12,{align:'center'})
+    y+=21
+
+    // DATI VISITA
+    const infoRows=[
+      ['Tecnico',`${v.tecnici?.tecnico_nome||''} ${v.tecnici?.tecnico_cognome||''}`],
+      ['Data visita',fmtDate(v.data_visita)+(v.ora_visita?` – dalle ore ${v.ora_visita}`:'')+( v.ora_fine?` alle ${v.ora_fine}`:'')],
+      ['Accesso cantiere n°',v.acc_cant||'-'],
+      ['Persona presente',`${v.nom_ppre||'-'}${v.qual_ppre?' ('+v.qual_ppre+')':''}`],
+      ['Tipo visita',['','Su segnalazione','Su richiesta','Per protocolli','Indicata RLS/RLST','Programmata','Cantiere qualità','Indicata CPT'][v.tipo_vis||0]||'-'],
+      ['RLST affiancamento',v.rlst_sn?'Sì':'No'],
+      ['Cantiere',`${v.cantieri?.cantiere_etichetta||''} ${v.cantieri?.cantiere_indirizzo||''} ${v.cantieri?.cantiere_civico||''}`.trim()],
+      ['Comune',v.cantieri?.comune_nome||'-'],
+      ['Committente',v.cantieri?.committenti?.committente_nome||'-'],
+      ['CSE',v.cse||'-'],
+      ['N° imprese',v.nr_imp||'-'],['N° lavoratori',`${v.nr_lavoratori||0} (str.: ${v.nr_lavoratori_stranieri||0})`],
+    ]
+    doc.autoTable({startY:y,margin:{left:L,right:L},body:infoRows,columnStyles:{0:{cellWidth:50,fontStyle:'bold',fillColor:cL},1:{fillColor:cW}},styles:{fontSize:8,cellPadding:2.5,lineColor:[220,220,220],lineWidth:0.3},theme:'grid'})
+    y=doc.lastAutoTable.finalY+5
+
+    // IMPRESE PRESENTI
+    if(imps?.length){
+      doc.setTextColor(...cG).setFontSize(9).setFont(undefined,'bold').text('IMPRESE PRESENTI',L,y);y+=4
+      doc.autoTable({startY:y,margin:{left:L,right:L},
+        head:[['','Ragione Sociale','CF/PIVA','Tipologia','Capocantiere','Lavoratori','Badge','Patente']],
+        body:imps.map((im,i)=>[i===0?'★ P':i+1,im.imprese?.impresa_nome||'-',im.imprese?.impresa_cf||'-',TIPO_IMP_OPT[im.tipo_imp]||'-',[im.capo_nome||'',im.capo_cog||''].filter(Boolean).join(' ')||im.nom_prec||'-','-',im.badge||'-',im.pat||'-']),
+        headStyles:{fillColor:cO,textColor:cW,fontStyle:'bold',fontSize:7},
+        styles:{fontSize:7,cellPadding:2},theme:'grid',margin:{left:L,right:L}})
+      y=doc.lastAutoTable.finalY+5
+    }
+
+    // LAVORAZIONI
+    if(lavs?.length){
+      const lavList=lavs.map(l=>LAVORAZIONI[l.lavorazione]||`Cod.${l.lavorazione}`).join(', ')
+      doc.setFontSize(8).setFont(undefined,'bold').setTextColor(...cG).text('Lavorazioni:',L,y)
+      doc.setFont(undefined,'normal')
+      const ls=doc.splitTextToSize(lavList,W-20)
+      doc.text(ls,L+22,y);y+=ls.length*4+4
+    }
+
+    // RILIEVI
+    const nonNA=(chk||[]).filter(c=>c.valore!=='NA')
+    if(nonNA.length){
+      doc.setFontSize(9).setFont(undefined,'bold').setTextColor(...cG).text('RILIEVI CHECKLIST',L,y);y+=3
+      const byZona={}
+      for(const c of nonNA){const vo=S.voci.find(x=>x.codice===c.codice);if(!vo)continue;const z=vo.zona_osserv;if(!byZona[z])byZona[z]=[];byZona[z].push({...c,descrizione:vo.descrizione})}
+      const rows=[]
+      for(const[z,items]of Object.entries(byZona)){
+        rows.push([{content:ZONE_LBL[z]?.toUpperCase()||'',colSpan:3,styles:{fillColor:cG,textColor:cW,fontStyle:'bold',fontSize:7}}])
+        items.forEach(it=>rows.push([it.valore,it.descrizione,it.nota||'']))
+      }
+      doc.autoTable({startY:y,margin:{left:L,right:L},head:[['Esito','Voce','Note']],body:rows,
+        columnStyles:{0:{cellWidth:14,fontStyle:'bold',halign:'center'},1:{cellWidth:100},2:{}},
+        headStyles:{fillColor:cO,textColor:cW,fontStyle:'bold',fontSize:7},
+        styles:{fontSize:7,cellPadding:2,lineColor:[220,220,220],lineWidth:0.3},theme:'grid',
+        didParseCell:d=>{if(d.cell.raw?.content)return;if(d.column.index===0&&d.section==='body'){const vl=d.cell.text[0];if(vl==='NC+')d.cell.styles.textColor=[192,57,43];else if(vl==='NC-')d.cell.styles.textColor=[230,126,34];else if(vl==='OSS')d.cell.styles.textColor=[142,68,173];else if(vl==='VER')d.cell.styles.textColor=[39,174,96]}}
+      })
+      y=doc.lastAutoTable.finalY+5
+    }
+
+    // OSS_TEC + NOTE + PRESCRIZIONI
+    const addBlock=(title,text)=>{
+      if(!text?.trim())return
+      if(y>255){doc.addPage();y=18}
+      doc.setFontSize(9).setFont(undefined,'bold').setTextColor(...cG).text(title,L,y);y+=5
+      doc.setFont(undefined,'normal').setFontSize(8).setTextColor(60,60,60)
+      const ls=doc.splitTextToSize(text,W)
+      doc.text(ls,L,y);y+=ls.length*4+5
+    }
+    addBlock('OSSERVAZIONI DEL TECNICO',v.oss_tec)
+    if(v.segnalazione){
+      if(y>255){doc.addPage();y=18}
+      doc.setFillColor(192,57,43);doc.roundedRect(L,y,W,10,2,2,'F')
+      doc.setTextColor(...cW).setFontSize(9).setFont(undefined,'bold')
+      doc.text('⚠ PROPOSTA SEGNALAZIONE A SISAL / ITL',PW/2,y+6,{align:'center'})
+      y+=14
+    }
+
+    // FOOTER
+    const np=doc.getNumberOfPages()
+    for(let p=1;p<=np;p++){
+      doc.setPage(p)
+      doc.setFillColor(...cG);doc.rect(0,287,PW,10,'F')
+      doc.setTextColor(...cW).setFontSize(7).setFont(undefined,'normal')
+      doc.text('Formedil Padova – Area Sicurezza e Salute – formedilpadova.it',L,293)
+      doc.text(`${v.nr_verbale||''} | Pag. ${p}/${np}`,PW-L,293,{align:'right'})
+    }
+
+    doc.save(`Verbale_${v.nr_verbale||vid}.pdf`)
+    toast('PDF generato','ok')
+  }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
+}
+
+// ── START ──
+initAuth()
+</script>
+</body>
+</html>
