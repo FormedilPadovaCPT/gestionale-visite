@@ -914,16 +914,21 @@ tr:hover td{background:#fef9f7}
 <!-- MODAL INVIO VERBALE EMAIL -->
 <div class="modal-overlay hidden" id="modal-email-verbale">
   <div class="modal-box" style="max-width:500px">
-    <h3 style="margin-bottom:10px;color:var(--grey);font-size:15px">📧 Destinatari verbale</h3>
-    <p style="font-size:12px;color:#666;margin-bottom:14px">Le seguenti figure riceveranno il verbale. Verranno aperti come destinatari nel tuo client email.</p>
-    <div id="email-verbale-list" style="margin-bottom:14px;max-height:240px;overflow-y:auto"></div>
+    <h3 style="margin-bottom:10px;color:var(--grey);font-size:15px">📧 Invia verbale</h3>
+    <p style="font-size:12px;color:#666;margin-bottom:14px">Il PDF del verbale sarà generato e inviato automaticamente da <strong>cptpd@did.scuolaedilepadova.net</strong> ai seguenti destinatari.</p>
+    <div id="email-verbale-list" style="margin-bottom:14px;max-height:220px;overflow-y:auto"></div>
     <div class="field" style="margin-bottom:14px">
       <label>Oggetto email</label>
       <input type="text" id="email-verbale-oggetto" placeholder="Verbale sopralluogo…">
     </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+    <div class="field" style="margin-bottom:14px">
+      <label>Testo aggiuntivo <span style="font-weight:400;font-size:11px;color:#aaa">(facoltativo)</span></label>
+      <textarea id="email-verbale-testo" rows="2" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:13px;resize:vertical" placeholder="Gentile…"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center">
+      <span id="email-verbale-status" style="font-size:12px;color:var(--grey);flex:1"></span>
       <button class="btn-outline btn-sm" id="btn-ev-copia" type="button">📋 Copia indirizzi</button>
-      <button class="btn-primary btn-sm" id="btn-ev-apri" type="button">📧 Apri client email</button>
+      <button class="btn-primary btn-sm" id="btn-ev-invia" type="button">📤 Invia ora</button>
       <button class="btn-secondary btn-sm" id="btn-ev-close" type="button">Chiudi</button>
     </div>
   </div>
@@ -2455,16 +2460,58 @@ function inviEmailVerbale(){
 
 $('btn-email-verbale').onclick=inviEmailVerbale
 $('btn-ev-close').onclick=()=>hide('modal-email-verbale')
-$('btn-ev-apri').onclick=()=>{
-  const to=(window._evEmails||[]).map(e=>e.email).join(',')
-  const subj=encodeURIComponent($('email-verbale-oggetto')?.value||'')
-  window.open(`mailto:${to}?subject=${subj}`,'_self')
-}
 $('btn-ev-copia').onclick=()=>{
   const lista=(window._evEmails||[]).map(e=>e.email).join('; ')
   navigator.clipboard?.writeText(lista)
     .then(()=>toast('Indirizzi copiati negli appunti','ok'))
     .catch(()=>toast('Copia non disponibile in questo contesto','warn'))
+}
+$('btn-ev-invia').onclick=async()=>{
+  const emails=window._evEmails||[]
+  if(!emails.length){toast('Nessun destinatario','warn');return}
+  const vid=S.savedId||S.fd?.visita_id
+  if(!vid){toast('Salva prima la visita','warn');return}
+
+  const btn=$('btn-ev-invia')
+  const status=$('email-verbale-status')
+  btn.disabled=true; btn.textContent='⏳ Generazione PDF…'; status.textContent=''
+
+  try{
+    // 1. Genera PDF come base64
+    const pdfBase64=await genPDF(vid,'base64')
+    if(!pdfBase64) throw new Error('Generazione PDF fallita')
+
+    btn.textContent='⏳ Invio in corso…'
+
+    // 2. Chiama la Edge Function
+    const{data,error}=await sb.functions.invoke('send-verbale',{
+      body:{
+        to: emails.map(e=>e.email),
+        subject: $('email-verbale-oggetto')?.value||'',
+        nrVerbale: vGet('f-verbale')||'',
+        cantiere: vGet('f-cant-search')||'',
+        testoExtra: $('email-verbale-testo')?.value||'',
+        pdfBase64
+      }
+    })
+    if(error) throw new Error(error.message||JSON.stringify(error))
+    if(data?.error) throw new Error(data.error)
+
+    // 3. Successo
+    const nDest=emails.length
+    status.style.color='var(--ok)'
+    status.textContent=`✅ Inviato a ${nDest} destinatar${nDest===1?'io':'i'}`
+    btn.textContent='✅ Inviato'
+    toast(`Verbale inviato a ${nDest} destinatar${nDest===1?'io':'i'}`, 'ok')
+    setTimeout(()=>hide('modal-email-verbale'), 2000)
+
+  }catch(e){
+    status.style.color='var(--danger)'
+    status.textContent='Errore: '+e.message
+    btn.disabled=false; btn.textContent='📤 Riprova'
+    toast('Errore invio: '+e.message,'err')
+    console.error('send-verbale:',e)
+  }
 }
 
 // ── IMPORT SNAPSHOT ──
@@ -2532,7 +2579,7 @@ async function exportSnapFromDB(vid){
 }
 
 // ── PDF ──
-async function genPDF(vid){
+async function genPDF(vid, output='save'){
   toast('Generazione PDF…')
   try{
     if(!vid){toast('ID visita mancante','err');return}
@@ -2711,6 +2758,7 @@ async function genPDF(vid){
     setFont('normal',7,[180,180,180])
     doc.text(`Generato il ${new Date().toLocaleString('it-IT')} – Formedil Padova CPT`,PW/2,y,{align:'center'})
 
+    if(output==='base64') return doc.output('datauristring')
     doc.save(`verbale_${v.nr_verbale||vid}.pdf`)
     toast('PDF generato','ok')
   }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
