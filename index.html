@@ -2517,124 +2517,178 @@ async function genPDF(vid){
     const{data:lavs}=await sb.from('visite_lavorazioni').select('lavorazione').eq('visita_id',vid)
     const{data:imps}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf)').eq('visita_id',vid).order('ordine')
 
+    if(!v){toast('Visita non trovata','err');return}
+
+
     const{jsPDF}=window.jspdf
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
     const PW=210,L=14,W=PW-28
-    const cO=[231,80,15],cG=[86,92,102],cL=[244,244,244],cW=[255,255,255]
+    let y=0
 
-    let y=14
+    const ORANGE=[231,80,15],GREY=[86,92,102],WHITE=[255,255,255],LIGHT=[248,248,248]
+    const setFont=(style='normal',sz=9,color=GREY)=>{doc.setFont('helvetica',style);doc.setFontSize(sz);doc.setTextColor(...color)}
+    const ln=(h=5)=>{y+=h}
+    const hLine=(lx=L,rx=PW-L,color=[220,220,220])=>{doc.setDrawColor(...color);doc.line(lx,y,rx,y)}
+    const box=(bx,by,bw,bh,fill=LIGHT,stroke=[220,220,220])=>{doc.setFillColor(...fill);doc.setDrawColor(...stroke);doc.roundedRect(bx,by,bw,bh,2,2,'FD')}
+    const cell=(label,val,cx,cy,cw,ch=8)=>{
+      box(cx,cy,cw,ch,LIGHT)
+      setFont('bold',7,GREY);doc.text(label,cx+2,cy+3.5)
+      setFont('normal',9,[30,30,30])
+      const s=doc.splitTextToSize(String(val||'–'),cw-4)
+      doc.text(s[0],cx+2,cy+7)
+    }
+    const TIPO_ACC={1:'Su segnalazione',2:'Su richiesta',3:'Per protocolli di intesa',4:'Indicata da RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT'}
+
     // HEADER
-    doc.setFillColor(...cO);doc.rect(0,0,PW,22,'F')
-    doc.setTextColor(...cW).setFontSize(15).setFont(undefined,'bold')
-    doc.text('FORMEDIL PADOVA – Verbale di Sopralluogo in Cantiere',L,10)
-    doc.setFontSize(9).setFont(undefined,'normal')
-    doc.text('Area Sicurezza e Salute – CPT Padova',L,16)
-    doc.text(`N° ${v.nr_verbale||'-'}`,PW-L,10,{align:'right'})
-    doc.text(fmtDate(v.data_visita),PW-L,16,{align:'right'})
+    doc.setFillColor(...ORANGE);doc.rect(0,0,PW,22,'F')
+    setFont('bold',15,WHITE);doc.text('FORMEDIL PADOVA',L,10)
+    setFont('normal',8,WHITE);doc.text('Scuola Costruzioni Giuseppe Jappelli',L,15)
+    setFont('bold',10,WHITE);doc.text('VERBALE DI SOPRALLUOGO IN CANTIERE',PW-L,11,{align:'right'})
     y=28
 
-    // IPC
-    const ipc=v.ipc||'NR'
-    const ipcC=ipc==='ALTO'?[192,57,43]:ipc==='MEDIO'?[230,126,34]:ipc==='BASSO'?[39,174,96]:[150,150,150]
-    doc.setFillColor(...ipcC);doc.roundedRect(L,y,W,15,3,3,'F')
-    doc.setTextColor(...cW).setFontSize(12).setFont(undefined,'bold')
-    doc.text(`IPC: ${ipc==='NR'?'NESSUN RILIEVO':ipc}`,PW/2,y+6,{align:'center'})
-    doc.setFontSize(8).setFont(undefined,'normal')
-    doc.text(`NC+: ${v.ipc_nc_plus||0}   NC-: ${v.ipc_nc_minus||0}   OSS: ${v.ipc_oss||0}`,PW/2,y+12,{align:'center'})
-    y+=21
+    // RIGA VERBALE / DATA / TECNICO
+    const tecNome=v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():''
+    const tipoAcc=TIPO_ACC[v.tipo_accesso]||'Programmata'
+    const cw4=W/4
+    cell('N° Verbale',v.nr_verbale,L,y,cw4)
+    cell('Data',fmtDate(v.data_visita),L+cw4,y,cw4)
+    cell('Ora inizio – fine',`${v.ora_visita||'–'} → ${v.ora_fine||'–'}`,L+cw4*2,y,cw4)
+    cell('Tecnico',tecNome||'–',L+cw4*3,y,cw4)
+    ln(11)
+    cell('Tipologia accesso',tipoAcc,L,y,cw4*2)
+    cell('Accesso n°',v.acc_cant||'–',L+cw4*2,y,cw4)
+    cell('RLST presente',v.rlst_sn?'Sì':'No',L+cw4*3,y,cw4)
+    ln(12)
 
-    // DATI VISITA
-    const infoRows=[
-      ['Tecnico',`${v.tecnici?.tecnico_nome||''} ${v.tecnici?.tecnico_cognome||''}`],
-      ['Data visita',fmtDate(v.data_visita)+(v.ora_visita?` – dalle ore ${v.ora_visita}`:'')+( v.ora_fine?` alle ${v.ora_fine}`:'')],
-      ['Accesso cantiere n°',v.acc_cant||'-'],
-      ['Persona presente',`${v.nom_ppre||'-'}${v.qual_ppre?' ('+v.qual_ppre+')':''}`],
-      ['Tipo visita',['','Su segnalazione','Su richiesta','Per protocolli','Indicata RLS/RLST','Programmata','Cantiere qualità','Indicata CPT'][v.tipo_vis||0]||'-'],
-      ['RLST affiancamento',v.rlst_sn?'Sì':'No'],
-      ['Cantiere',`${v.cantieri?.cantiere_etichetta||''} ${v.cantieri?.cantiere_indirizzo||''} ${v.cantieri?.cantiere_civico||''}`.trim()],
-      ['Comune',v.cantieri?.comune_nome||'-'],
-      ['Committente',v.cantieri?.committenti?.committente_nome||'-'],
-      ['CSE',v.cse||'-'],
-      ['N° imprese',v.nr_imp||'-'],['N° lavoratori',`${v.nr_lavoratori||0} (str.: ${v.nr_lavoratori_stranieri||0})`],
-    ]
-    doc.autoTable({startY:y,margin:{left:L,right:L},body:infoRows,columnStyles:{0:{cellWidth:50,fontStyle:'bold',fillColor:cL},1:{fillColor:cW}},styles:{fontSize:8,cellPadding:2.5,lineColor:[220,220,220],lineWidth:0.3},theme:'grid'})
-    y=doc.lastAutoTable.finalY+5
+    // CANTIERE
+    doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
+    setFont('bold',9,WHITE);doc.text('CANTIERE',L+2,y+4.5)
+    ln(8)
+    const cant=v.cantieri||{}
+    const cantLabel=cant.cantiere_etichetta||`${cant.cantiere_indirizzo||''} ${cant.cantiere_civico||''}`.trim()
+    const cw3=W/3
+    cell('Indirizzo / Etichetta',cantLabel,L,y,cw3*2)
+    cell('Comune',cant.comune_nome||'–',L+cw3*2,y,cw3)
+    ln(11)
+    cell('Prot. interno',cant.prot_int||'–',L,y,cw3)
+    cell('CNCE',cant.cantiere_cnce||'–',L+cw3,y,cw3)
+    cell('Cod. unico',cant.nodo_id||'–',L+cw3*2,y,cw3)
+    ln(12)
 
-    // IMPRESE PRESENTI
-    if(imps?.length){
-      doc.setTextColor(...cG).setFontSize(9).setFont(undefined,'bold').text('IMPRESE PRESENTI',L,y);y+=4
-      doc.autoTable({startY:y,margin:{left:L,right:L},
-        head:[['','Ragione Sociale','CF/PIVA','Tipologia','Capocantiere','Lavoratori','Badge','Patente']],
-        body:imps.map((im,i)=>[i===0?'★ P':i+1,im.imprese?.impresa_nome||'-',im.imprese?.impresa_cf||'-',TIPO_IMP_OPT[im.tipo_imp]||'-',[im.capo_nome||'',im.capo_cog||''].filter(Boolean).join(' ')||im.nom_prec||'-','-',im.badge||'-',im.pat||'-']),
-        headStyles:{fillColor:cO,textColor:cW,fontStyle:'bold',fontSize:7},
-        styles:{fontSize:7,cellPadding:2},theme:'grid',margin:{left:L,right:L}})
-      y=doc.lastAutoTable.finalY+5
-    }
+    // IMPRESE
+    doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
+    setFont('bold',9,WHITE);doc.text('IMPRESE PRESENTI',L+2,y+4.5)
+    ln(8)
+    const impList=imps&&imps.length?imps:[{imprese:{impresa_nome:v.imprese?.impresa_nome||'–',impresa_cf:''},is_principale:true,att:null}]
+    impList.forEach((im,i)=>{
+      const nome=im.imprese?.impresa_nome||'–'
+      const cf=im.imprese?.impresa_cf||''
+      const prefix=i===0?'① Principale':'  Subappaltatrice'
+      setFont(i===0?'bold':'normal',8,[30,30,30])
+      doc.text(`${prefix} – ${nome}${cf?' ('+cf+')':''}`,L+2,y+3)
+      if(im.att){setFont('normal',7,GREY);doc.text(`Attività: ${im.att}`,L+6,y+7)}
+      ln(im.att?9:5)
+    })
+    ln(4)
+
+    // FIGURE
+    doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
+    setFont('bold',9,WHITE);doc.text('FIGURE E PERSONE',L+2,y+4.5)
+    ln(8)
+    const figRows=[]
+    if(v.nom_ppre)figRows.push(['Persona presente',`${v.nom_ppre}${v.qual_ppre?' ('+v.qual_ppre+')':''}${v.tel_ppre?' – '+v.tel_ppre:''}`])
+    const commNome=v.comm_rag_soc||[v.comm_titolo,v.comm_nome,v.comm_cog].filter(Boolean).join(' ')
+    if(commNome)figRows.push(['Committente',`${commNome}${v.comm_cf?' – CF: '+v.comm_cf:''}`])
+    if(v.resp_lav)figRows.push(['Resp. Lavoratori',`${v.resp_lav}${v.rl_email?' – '+v.rl_email:''}`])
+    if(v.csp)figRows.push(['CSP',`${v.csp}${v.csp_email?' – '+v.csp_email:''}`])
+    if(v.cse)figRows.push(['CSE',`${v.cse}${v.cse_email?' – '+v.cse_email:''}`])
+    if(figRows.length){figRows.forEach(([lbl,val])=>{cell(lbl,val,L,y,W,8);ln(10)})}
+    else{setFont('normal',8,GREY);doc.text('Nessuna figura registrata',L+2,y+4);ln(7)}
+    ln(3)
 
     // LAVORAZIONI
-    if(lavs?.length){
-      const lavList=lavs.map(l=>LAVORAZIONI[l.lavorazione]||`Cod.${l.lavorazione}`).join(', ')
-      doc.setFontSize(8).setFont(undefined,'bold').setTextColor(...cG).text('Lavorazioni:',L,y)
-      doc.setFont(undefined,'normal')
-      const ls=doc.splitTextToSize(lavList,W-20)
-      doc.text(ls,L+22,y);y+=ls.length*4+4
-    }
+    doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
+    setFont('bold',9,WHITE);doc.text('LAVORAZIONI IN CORSO',L+2,y+4.5)
+    ln(8)
+    if(lavs&&lavs.length){
+      const lavText=lavs.map(l=>l.lavorazione).filter(Boolean).join(' • ')
+      setFont('normal',8,[30,30,30])
+      const split=doc.splitTextToSize(lavText,W-4)
+      doc.text(split,L+2,y+3);ln(split.length*4+5)
+    }else{setFont('normal',8,GREY);doc.text('Non specificate',L+2,y+4);ln(7)}
+    ln(3)
 
-    // RILIEVI
-    const nonNA=(chk||[]).filter(c=>c.valore!=='NA')
-    if(nonNA.length){
-      doc.setFontSize(9).setFont(undefined,'bold').setTextColor(...cG).text('RILIEVI CHECKLIST',L,y);y+=3
-      const byZona={}
-      for(const c of nonNA){const vo=S.voci.find(x=>x.codice===c.codice);if(!vo)continue;const z=vo.zona_osserv;if(!byZona[z])byZona[z]=[];byZona[z].push({...c,descrizione:vo.descrizione})}
-      const rows=[]
-      for(const[z,items]of Object.entries(byZona)){
-        rows.push([{content:ZONE_LBL[z]?.toUpperCase()||'',colSpan:3,styles:{fillColor:cG,textColor:cW,fontStyle:'bold',fontSize:7}}])
-        items.forEach(it=>rows.push([it.valore,it.descrizione,it.nota||'']))
+    // IPC
+    const chkMap={};(chk||[]).forEach(r=>{chkMap[r.codice]={valore:r.valore,nota:r.nota}})
+    const {ipc,np,nm,os}=calcIPC(chkMap)
+    const ipcColor=ipc==='ALTO'?[231,80,15]:ipc==='MEDIO'?[230,160,0]:ipc==='BASSO'?[39,174,96]:[150,150,150]
+    doc.setFillColor(...ipcColor);doc.rect(L,y,W,10,'F')
+    setFont('bold',12,WHITE);doc.text(`IPC: ${ipc}`,L+4,y+7)
+    setFont('normal',9,WHITE);doc.text(`NP: ${np}  NM: ${nm}  OS: ${os}`,PW-L-2,y+7,{align:'right'})
+    ln(14)
+
+    // CHECKLIST per zona
+    if(S.voci&&S.voci.length){
+      const vociByZona={}
+      S.voci.forEach(vv=>{if(!vociByZona[vv.zona_osserv])vociByZona[vv.zona_osserv]=[];vociByZona[vv.zona_osserv].push(vv)})
+      for(const [zona,voci] of Object.entries(vociByZona)){
+        const risposte=voci.filter(vv=>chkMap[vv.codice]&&chkMap[vv.codice].valore!=='NA')
+        if(!risposte.length)continue
+        if(y>260){doc.addPage();y=15}
+        setFont('bold',8,ORANGE);doc.text(zona.toUpperCase(),L,y)
+        hLine(L,PW-L,ORANGE);ln(5)
+        const tRows=risposte.map(vv=>{
+          const r=chkMap[vv.codice]||{}
+          return[vv.codice,vv.voce_checklist||'',r.valore||'',r.nota||'']
+        })
+        doc.autoTable({startY:y,head:[['Cod.','Voce','Esito','Note']],body:tRows,
+          styles:{fontSize:7,cellPadding:1.5},
+          headStyles:{fillColor:GREY,textColor:WHITE,fontStyle:'bold'},
+          columnStyles:{0:{cellWidth:12},2:{cellWidth:14,halign:'center'},3:{cellWidth:40}},
+          margin:{left:L,right:L},tableWidth:W,
+          didParseCell:(d)=>{
+            if(d.section==='body'&&d.column.index===2){
+              const val=d.cell.raw
+              if(val==='NP')d.cell.styles.textColor=[231,80,15]
+              else if(val==='NM')d.cell.styles.textColor=[230,160,0]
+              else if(val==='OS')d.cell.styles.textColor=[39,174,96]
+            }
+          }
+        })
+        y=doc.lastAutoTable.finalY+4
       }
-      doc.autoTable({startY:y,margin:{left:L,right:L},head:[['Esito','Voce','Note']],body:rows,
-        columnStyles:{0:{cellWidth:14,fontStyle:'bold',halign:'center'},1:{cellWidth:100},2:{}},
-        headStyles:{fillColor:cO,textColor:cW,fontStyle:'bold',fontSize:7},
-        styles:{fontSize:7,cellPadding:2,lineColor:[220,220,220],lineWidth:0.3},theme:'grid',
-        didParseCell:d=>{if(d.cell.raw?.content)return;if(d.column.index===0&&d.section==='body'){const vl=d.cell.text[0];if(vl==='NC+')d.cell.styles.textColor=[192,57,43];else if(vl==='NC-')d.cell.styles.textColor=[230,126,34];else if(vl==='OSS')d.cell.styles.textColor=[142,68,173];else if(vl==='VER')d.cell.styles.textColor=[39,174,96]}}
+    }
+    ln(3)
+
+    // NOTE
+    if(v.oss_tec||v.note_for_m){
+      if(y>245){doc.addPage();y=15}
+      doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
+      setFont('bold',9,WHITE);doc.text('NOTE',L+2,y+4.5);ln(8)
+      ;[['Osservazioni tecniche',v.oss_tec],['Note per il mittente',v.note_for_m]].forEach(([lbl,val])=>{
+        if(!val)return
+        setFont('bold',7,GREY);doc.text(lbl+':',L,y);ln(4)
+        setFont('normal',8,[30,30,30])
+        const split=doc.splitTextToSize(val,W-4)
+        doc.text(split,L+2,y);ln(split.length*4+3)
       })
-      y=doc.lastAutoTable.finalY+5
     }
 
-    // OSS_TEC + NOTE + PRESCRIZIONI
-    const addBlock=(title,text)=>{
-      if(!text?.trim())return
-      if(y>255){doc.addPage();y=18}
-      doc.setFontSize(9).setFont(undefined,'bold').setTextColor(...cG).text(title,L,y);y+=5
-      doc.setFont(undefined,'normal').setFontSize(8).setTextColor(60,60,60)
-      const ls=doc.splitTextToSize(text,W)
-      doc.text(ls,L,y);y+=ls.length*4+5
-    }
-    addBlock('OSSERVAZIONI DEL TECNICO',v.oss_tec)
-    if(v.segnalazione){
-      if(y>255){doc.addPage();y=18}
-      doc.setFillColor(192,57,43);doc.roundedRect(L,y,W,10,2,2,'F')
-      doc.setTextColor(...cW).setFontSize(9).setFont(undefined,'bold')
-      doc.text('⚠ PROPOSTA SEGNALAZIONE A SISAL / ITL',PW/2,y+6,{align:'center'})
-      y+=14
-    }
+    // FIRMA
+    if(y>255){doc.addPage();y=15}
+    y=Math.max(y,260)
+    hLine();ln(5)
+    setFont('normal',8,GREY)
+    doc.text(`Il Tecnico: ${tecNome||'–'}`,L,y)
+    doc.text('Firma: ___________________________',PW-L,y,{align:'right'})
+    ln(5)
+    setFont('normal',7,[180,180,180])
+    doc.text(`Generato il ${new Date().toLocaleString('it-IT')} – Formedil Padova CPT`,PW/2,y,{align:'center'})
 
-    // FOOTER
-    const np=doc.getNumberOfPages()
-    for(let p=1;p<=np;p++){
-      doc.setPage(p)
-      doc.setFillColor(...cG);doc.rect(0,287,PW,10,'F')
-      doc.setTextColor(...cW).setFontSize(7).setFont(undefined,'normal')
-      doc.text('Formedil Padova – Area Sicurezza e Salute – formedilpadova.it',L,293)
-      doc.text(`${v.nr_verbale||''} | Pag. ${p}/${np}`,PW-L,293,{align:'right'})
-    }
-
-    doc.save(`Verbale_${v.nr_verbale||vid}.pdf`)
+    doc.save(`verbale_${v.nr_verbale||vid}.pdf`)
     toast('PDF generato','ok')
   }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
 }
-
-// ── START ──
-initAuth()
 </script>
 </body>
 </html>
