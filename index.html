@@ -1734,6 +1734,7 @@ async function saveVisita(stato){
   if(!cant_id){toast('Seleziona un cantiere (Tab Cantiere)','warn');activateTab(1);return}
   if(S.imprese.length===0||!S.imprese[0].impresa_id){toast('Seleziona l\'impresa principale (Tab Imprese)','warn');activateTab(2);return}
   if(!data_v){toast('Inserisci la data della visita','warn');activateTab(0);return}
+  if(!tec_id){toast('Seleziona il tecnico (Tab Visita)','warn');activateTab(0);return}
 
   try{
     const vid=S.fd.visita_id||uuid()
@@ -1931,6 +1932,23 @@ const TECNICI_LIST=[
   {nome:'Ing. Paolo Balladore',    email:'paolo.balladore@did.scuolaedilepadova.net'},
   {nome:'P.I. Franco Caon',        email:'franco.caon@did.scuolaedilepadova.net'},
 ]
+// Recupera o crea il record tecnico nel DB per una voce di TECNICI_LIST
+async function getOrCreateTecnicoId(t){
+  let{data}=await sb.from('tecnici').select('tecnico_id').eq('email',t.email).maybeSingle()
+  if(!data){
+    const parts=t.nome.replace(/^[^.]+\.\s*/,'').split(' ')
+    const nome=parts[0]||''
+    const cognome=parts.slice(1).join(' ')||''
+    const{data:nt}=await sb.from('tecnici').insert({
+      tecnico_id:uuid(),
+      tecnico_nome:nome,
+      tecnico_cognome:cognome,
+      email:t.email
+    }).select('tecnico_id').single()
+    data=nt
+  }
+  return data?.tecnico_id||''
+}
 function populateTecnicoSelect(){
   const sel=$('f-tec-select'); if(!sel)return
   while(sel.options.length>1) sel.remove(1)
@@ -1945,8 +1963,7 @@ function populateTecnicoSelect(){
     const t=TECNICI_LIST[idx]
     vSet('f-tec-display',t.nome)
     vSet('f-tec-email',t.email)
-    const{data}=await sb.from('tecnici').select('tecnico_id').eq('email',t.email).maybeSingle()
-    vSet('f-tec-id',data?.tecnico_id||'')
+    vSet('f-tec-id', await getOrCreateTecnicoId(t))
   }
   // Secondo tecnico
   const sel2=$('f-tec2-select'); if(!sel2)return
@@ -1962,8 +1979,7 @@ function populateTecnicoSelect(){
     const t=TECNICI_LIST[idx]
     vSet('f-tec2-display',t.nome)
     vSet('f-tec2-email',t.email)
-    const{data}=await sb.from('tecnici').select('tecnico_id').eq('email',t.email).maybeSingle()
-    vSet('f-tec2-id',data?.tecnico_id||'')
+    vSet('f-tec2-id', await getOrCreateTecnicoId(t))
   }
 }
 function setTecnicoFromEmail(email){
