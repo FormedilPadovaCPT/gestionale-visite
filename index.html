@@ -288,6 +288,7 @@ tr:hover td{background:#fef9f7}
     <button class="active" data-view="dashboard">🏠 Dashboard</button>
     <button data-view="form" id="nav-nuova">➕ Nuova visita</button>
     <button data-view="lista">📋 Visite</button>
+    <button data-view="cantieri">🏗️ Cantieri</button>
     <button data-view="import">📥 Importa</button>
   </nav>
   <main>
@@ -723,6 +724,27 @@ tr:hover td{background:#fef9f7}
       </div>
     </section>
 
+    <!-- LISTA CANTIERI -->
+    <section id="view-cantieri" class="hidden">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <h3 style="margin:0">Elenco cantieri</h3>
+          <button class="btn-primary btn-sm" id="btn-nuovo-cant-lista">+ Nuovo cantiere</button>
+        </div>
+        <div class="search-bar">
+          <input type="text" id="q-cant" placeholder="Indirizzo, comune, etichetta…" style="flex:1">
+          <button class="btn-primary btn-sm" id="btn-cerca-cant">Cerca</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Etichetta / Indirizzo</th><th>Comune</th><th>Prot. Int.</th><th>CNCE</th><th>Visite</th><th></th></tr></thead>
+            <tbody id="tbody-cantieri"></tbody>
+          </table>
+        </div>
+        <div id="cantieri-empty" class="hidden" style="text-align:center;padding:24px;color:#aaa">Nessun cantiere trovato</div>
+      </div>
+    </section>
+
     <!-- IMPORTA -->
     <section id="view-import" class="hidden">
       <div class="card">
@@ -1066,9 +1088,10 @@ function showScr(n){
 }
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','import'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','import'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   if(view==='dashboard')loadDash()
   if(view==='lista')loadLista()
+  if(view==='cantieri')loadCantieri()
 }
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
   b.onclick=()=>{if(b.dataset.view==='form')initForm();navTo(b.dataset.view)}
@@ -1411,7 +1434,9 @@ function renderImpreseAccordion(){
   // Autocomplete for each impresa
   S.imprese.forEach((_,idx)=>{
     setupAC(`im-search-${idx}`,`im-list-${idx}`, async q=>{
-      const{data}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva').or(`impresa_nome.ilike.%${q}%,impresa_cf.ilike.%${q}%,piva.ilike.%${q}%`).eq('elimina',0).limit(8)
+      let qb=sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva').eq('elimina',0).order('impresa_nome').limit(20)
+      if(q)qb=qb.or(`impresa_nome.ilike.%${q}%,impresa_cf.ilike.%${q}%,piva.ilike.%${q}%`)
+      const{data}=await qb
       return(data||[]).map(i=>({id:i.impresa_id,label:`${i.impresa_nome}${i.impresa_cf?' – '+i.impresa_cf:''}`,piva:i.piva||''}))
     },item=>{
       S.imprese[idx].impresa_id=item.id
@@ -1486,7 +1511,9 @@ $('btn-add-imp').onclick=()=>{
 
 // ── AUTOCOMPLETE CANTIERE ──
 setupAC('f-cant-search','cant-list', async q=>{
-  const{data}=await sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce').or(`cantiere_indirizzo.ilike.%${q}%,cantiere_etichetta.ilike.%${q}%,comune_nome.ilike.%${q}%`).eq('elimina',0).limit(10)
+  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce').eq('elimina',0).order('cantiere_indirizzo').limit(20)
+  if(q)qb=qb.or(`cantiere_indirizzo.ilike.%${q}%,cantiere_etichetta.ilike.%${q}%,comune_nome.ilike.%${q}%`)
+  const{data}=await qb
   return(data||[]).map(c=>({id:c.cantiere_id,label:c.cantiere_etichetta||`${c.cantiere_indirizzo} ${c.cantiere_civico}`,detail:`${c.cantiere_indirizzo} ${c.cantiere_civico}${c.comune_nome?' – '+c.comune_nome:''}`,extra:c}))
 },item=>{
   vSet('f-cant-id',item.id)
@@ -1583,7 +1610,9 @@ $('btn-mc-comm-save').onclick=async()=>{
 
 // ── AUTOCOMPLETE COMMITTENTE ──
 setupAC('f-comm-search','comm-list', async q=>{
-  const{data}=await sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,email,telefono,piva,tipo_sogg').or(`committente_nome.ilike.%${q}%,cf_piva.ilike.%${q}%,piva.ilike.%${q}%`).eq('elimina',0).limit(8)
+  let qb=sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,email,telefono,piva,tipo_sogg').eq('elimina',0).order('committente_nome').limit(20)
+  if(q)qb=qb.or(`committente_nome.ilike.%${q}%,cf_piva.ilike.%${q}%,piva.ilike.%${q}%`)
+  const{data}=await qb
   return(data||[]).map(c=>({id:c.committente_id,label:c.committente_nome,extra:c}))
 },item=>{
   vSet('f-comm-id',item.id)
@@ -1669,21 +1698,29 @@ function setupAC(inId,listId,fetchFn,onSel){
   const inp=$(inId),lst=$(listId)
   if(!inp||!lst)return
   let tm=null,lq=''
+  const renderItems=async(q)=>{
+    const items=await fetchFn(q)
+    if(!items.length){
+      lst.innerHTML='<div style="color:#aaa;font-style:italic">Nessun risultato</div>'
+      lst.classList.remove('hidden')
+      setTimeout(()=>lst.classList.add('hidden'),1500)
+      return
+    }
+    lst.innerHTML=items.map((it,i)=>`<div data-i="${i}">${it.label}</div>`).join('')
+    lst.classList.remove('hidden')
+    lst.querySelectorAll('div[data-i]').forEach((d,i)=>{
+      d.onclick=()=>{inp.value=items[i].label;lst.classList.add('hidden');onSel(items[i])}
+    })
+  }
   inp.oninput=()=>{
     clearTimeout(tm)
     const q=inp.value.trim()
-    if(q.length<2){lst.classList.add('hidden');return}
+    if(q.length<2){lst.classList.add('hidden');lq='';return}
     if(q===lq)return;lq=q
-    tm=setTimeout(async()=>{
-      const items=await fetchFn(q)
-      if(!items.length){lst.classList.add('hidden');return}
-      lst.innerHTML=items.map((it,i)=>`<div data-i="${i}">${it.label}</div>`).join('')
-      lst.classList.remove('hidden')
-      lst.querySelectorAll('div').forEach((d,i)=>{
-        d.onclick=()=>{inp.value=items[i].label;lst.classList.add('hidden');onSel(items[i])}
-      })
-    },280)
+    tm=setTimeout(()=>renderItems(q),280)
   }
+  inp.ondblclick=()=>{clearTimeout(tm);lq='';renderItems('')}
+  inp.placeholder=(inp.placeholder||'')+' (doppio click = tutti)'
   document.addEventListener('click',e=>{if(!inp.contains(e.target)&&!lst.contains(e.target))lst.classList.add('hidden')})
 }
 
@@ -2296,6 +2333,53 @@ function bindRowActions(){
   document.querySelectorAll('[data-act="snap"]').forEach(b=>b.onclick=()=>exportSnapFromDB(b.dataset.id))
 }
 $('btn-pdf').onclick=()=>{if(S.savedId)genPDF(S.savedId)}
+
+// ── LISTA CANTIERI ──
+async function loadCantieri(q=''){
+  const qStr=q||vGet('q-cant')?.trim()||''
+  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina').eq('elimina',0).order('cantiere_indirizzo').limit(200)
+  if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.%${qStr}%,cantiere_etichetta.ilike.%${qStr}%,comune_nome.ilike.%${qStr}%`)
+  const{data,error}=await qb
+  if(error){toast('Errore caricamento cantieri: '+error.message,'err');return}
+  const rows=data||[]
+  const tbody=$('tbody-cantieri')
+  const empty=$('cantieri-empty')
+  if(!rows.length){tbody.innerHTML='';empty.classList.remove('hidden');return}
+  empty.classList.add('hidden')
+  // Conta visite per cantiere
+  const ids=rows.map(c=>c.cantiere_id)
+  const{data:vCounts}=await sb.from('visite').select('cantiere_id').in('cantiere_id',ids).eq('elimina',0)
+  const countMap={}
+  ;(vCounts||[]).forEach(v=>{countMap[v.cantiere_id]=(countMap[v.cantiere_id]||0)+1})
+  tbody.innerHTML=rows.map(c=>{
+    const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
+    return`<tr>
+      <td><strong>${label}</strong></td>
+      <td>${c.comune_nome||'–'}</td>
+      <td>${c.prot_int||'–'}</td>
+      <td>${c.cantiere_cnce||'–'}</td>
+      <td><span class="badge badge-bozza">${countMap[c.cantiere_id]||0}</span></td>
+      <td><button class="btn-primary btn-sm" data-cant-id="${c.cantiere_id}" data-cant-label="${label}" data-cant-detail="${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}${c.comune_nome?' – '+c.comune_nome:''}">+ Visita</button></td>
+    </tr>`
+  }).join('')
+  // Click "+ Visita": apre nuova visita precompilando il cantiere
+  tbody.querySelectorAll('[data-cant-id]').forEach(btn=>{
+    btn.onclick=()=>{
+      initForm()
+      navTo('form')
+      // Precompila cantiere
+      setTimeout(()=>{
+        vSet('f-cant-id',btn.dataset.cantId)
+        vSet('f-cant-search',btn.dataset.cantLabel)
+        const det=$('cant-detail');if(det)det.textContent=btn.dataset.cantDetail
+        S.fd.cantiere_id=btn.dataset.cantId
+      },100)
+    }
+  })
+}
+$('btn-cerca-cant').onclick=()=>loadCantieri()
+$('q-cant').onkeydown=e=>{if(e.key==='Enter')loadCantieri()}
+$('btn-nuovo-cant-lista').onclick=()=>show('modal-cant')
 
 // ── EMAIL VERBALE ──
 function inviEmailVerbale(){
