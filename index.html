@@ -2478,9 +2478,11 @@ $('file-imp').onchange=e=>{if(e.target.files[0])readSnapFile(e.target.files[0])}
 
 function readSnapFile(f){
   const r=new FileReader()
+  r.onerror=()=>toast('Errore lettura file','err')
   r.onload=e=>{
     try{
       pendingSnap=JSON.parse(e.target.result)
+      if(!pendingSnap||typeof pendingSnap!=='object'){throw new Error('Formato JSON non riconosciuto')}
       $('imp-info').innerHTML=`
         <p><b>Verbale origine:</b> ${pendingSnap.nr_verbale_origine||'N/D'}</p>
         <p><b>Cantiere:</b> ${pendingSnap.cantiere_label||'N/D'}</p>
@@ -2488,7 +2490,7 @@ function readSnapFile(f){
         <p><b>Voci compilate:</b> ${Object.keys(pendingSnap.checklist||{}).length}</p>
         <p><b>Esportato:</b> ${pendingSnap.exported_at?new Date(pendingSnap.exported_at).toLocaleString('it-IT'):'N/D'}</p>`
       show('imp-preview')
-    }catch{toast('File JSON non valido','err')}
+    }catch(err){toast('File JSON non valido: '+err.message,'err');console.error(err)}
   }
   r.readAsText(f)
 }
@@ -2500,17 +2502,19 @@ $('btn-load-snap').onclick=async()=>{
   $('conf-verb-txt').innerHTML=`Verbale originale: <strong>${origNr||'N/D'}</strong><br><br>Vuoi mantenere il numero originale o assegnarne uno nuovo?`
   show('modal-verbale')
   S._verbCb=async(mantieni)=>{
-    hide('modal-verbale')
-    await initForm(pendingSnap)
-    if(mantieni&&origNr){
-      vSet('f-verbale',origNr)
-      S.fd.nr_verbale=origNr
-    }
-    // else il nextVerbale() chiamato da initForm è già nuovo
-    hide('imp-preview')
-    pendingSnap=null
-    navTo('form')
-    toast(mantieni?`Verbale ${origNr} mantenuto`:'Nuovo progressivo assegnato')
+    try{
+      hide('modal-verbale')
+      const snapToLoad=pendingSnap
+      pendingSnap=null
+      await initForm(snapToLoad)
+      if(mantieni&&origNr){
+        vSet('f-verbale',origNr)
+        S.fd.nr_verbale=origNr
+      }
+      hide('imp-preview')
+      navTo('form')
+      toast(mantieni?`Verbale ${origNr} mantenuto`:'Nuovo progressivo assegnato','ok')
+    }catch(e){toast('Errore importazione: '+e.message,'err');console.error('Import error:',e)}
   }
 }
 $('btn-verb-mantieni').onclick=()=>S._verbCb?.(true)
