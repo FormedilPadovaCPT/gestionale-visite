@@ -1848,72 +1848,216 @@ async function saveVisita(stato){
 function buildSnap(vid=null){
   return{
     visita_id:vid||S.fd.visita_id,
+    // Tab 0 – Visita
     nr_verbale_origine:vGet('f-verbale'),
-    cantiere_id:vGet('f-cant-id'),
-    cantiere_label:vGet('f-cant-search'),
-    cantiere_detail:$('cant-detail')?.textContent||'',
-    committente_id:vGet('f-comm-id'),
-    checklist:{...S.checklist},
-    note_checklist:{...S.noteChk},
-    lavorazioni:[...S.lavorazioni],
-    imprese:S.imprese.map(im=>({...im})),
-    stato_lav:vGet('f-stato-lav'),
-    note_lav:vGet('f-note-lav'),
-    oss_tec:vGet('f-oss-tec'),
-    nr_lavoratori:+vGet('f-nr-lav')||0,
-    nr_lavoratori_stranieri:+vGet('f-nr-lav-str')||0,
-    // tecnico principale
+    data_visita:vGet('f-data')||null,
+    ora_visita:vGet('f-da')||null,
+    ora_fine:vGet('f-a')||null,
+    tipo_accesso:vGet('f-tipo')||null,
+    acc_cant:vGet('f-acc-cant')||null,
+    rlst_sn:vGet('f-rlst')||null,
+    stage_vis:vGet('f-stage-vis')||null,
+    nom_stage:vGet('f-nom-stage')||null,
+    // Tab 0 – Persona presente
+    ppre_titolo:vGet('f-ppre-titolo')||null,
+    nom_ppre:[vGet('f-ppre-titolo'),vGet('f-ppre-nome'),vGet('f-ppre-cog')].map(s=>s.trim()).filter(Boolean).join(' ')||null,
+    ppre_nome:vGet('f-ppre-nome')||null,
+    ppre_cog:vGet('f-ppre-cog')||null,
+    qual_ppre:vGet('f-qual-ppre')||null,
+    tel_ppre:vGet('f-tel-ppre')||null,
+    // Tab 0 – Tecnici
     tecnico_id:vGet('f-tec-id')||null,
     tecnico_email:vGet('f-tec-email')||null,
     tec_display:vGet('f-tec-display')||null,
-    // secondo tecnico
     tecnico2_id:vGet('f-tec2-id')||null,
     tecnico2_email:vGet('f-tec2-email')||null,
     tec2_display:vGet('f-tec2-display')||null,
-    // persona presente
-    ppre_titolo:vGet('f-ppre-titolo')||null,
-    nom_ppre:[vGet('f-ppre-titolo'),vGet('f-ppre-nome'),vGet('f-ppre-cog')].map(s=>s.trim()).filter(Boolean).join(' ')||null,
-    qual_ppre:vGet('f-qual-ppre')||null,
-    tel_ppre:vGet('f-tel-ppre')||null,
-    acc_cant:vGet('f-acc-cant')||null,
+    // Tab 1 – Cantiere
+    cantiere_id:vGet('f-cant-id'),
+    cantiere_label:vGet('f-cant-search'),
+    cantiere_detail:$('cant-detail')?.textContent||'',
+    prot_int:vGet('f-prot-int')||null,
+    cnce:vGet('f-cnce')||null,
+    cod_uni:vGet('f-cod-uni')||null,
+    data_ult:vGet('f-data-ult')||null,
+    // Tab 1 – Committente
+    committente_id:vGet('f-comm-id')||null,
+    comm_tipo_sogg:document.querySelector('input[name="comm-sogg"]:checked')?.value||'PF',
+    comm_tipo:vGet('f-comm-tipo')||null,
+    comm_titolo:vGet('f-comm-titolo')||null,
+    comm_nome:vGet('f-comm-nome')||null,
+    comm_cog:vGet('f-comm-cog')||null,
+    comm_cf:vGet('f-comm-cf')||null,
+    comm_email:vGet('f-comm-email')||null,
+    comm_tel:vGet('f-comm-tel')||null,
+    comm_rag_soc:vGet('f-comm-rag-soc')||null,
+    comm_piva:vGet('f-comm-piva')||null,
+    comm_cf_pg:vGet('f-comm-cf-pg')||null,
+    comm_email_pg:vGet('f-comm-email-pg')||null,
+    comm_tel_pg:vGet('f-comm-tel-pg')||null,
+    // Tab 1 – Figure coordinamento
+    coord:cGet('f-coord'),
+    rl_titolo:vGet('f-rl-titolo')||null,
+    rl_nome:vGet('f-rl-nome')||null,
+    rl_cog:vGet('f-rl-cog')||null,
+    rl_email:vGet('f-rl-email')||null,
+    rl_tel:vGet('f-rl-tel')||null,
+    csp_titolo:vGet('f-csp-titolo')||null,
+    csp_nome:vGet('f-csp-nome')||null,
+    csp_cog:vGet('f-csp-cog')||null,
+    csp_email:vGet('f-csp-email')||null,
+    csp_tel:vGet('f-csp-tel')||null,
+    cse_titolo:vGet('f-cse-titolo')||null,
+    cse_nome:vGet('f-cse-nome')||null,
+    cse_cog:vGet('f-cse-cog')||null,
+    cse_email:vGet('f-cse-email')||null,
+    cse_tel:vGet('f-cse-tel')||null,
+    // Tab 1 – Dati cantiere al momento della visita
+    nr_imp:+vGet('f-nr-imp')||0,
+    nr_ind:+vGet('f-nr-ind')||0,
+    nr_lavoratori:+vGet('f-nr-lav')||0,
+    nr_lavoratori_stranieri:+vGet('f-nr-lav-str')||0,
+    importo:vGet('f-importo')||null,
+    costi:vGet('f-costi')||null,
+    stato_lav:vGet('f-stato-lav')||null,
+    note_lav:vGet('f-note-lav')||null,
+    // Tab 2 – Imprese
+    imprese:S.imprese.map(im=>({...im})),
+    // Checklist + lavorazioni
+    checklist:{...S.checklist},
+    note_checklist:{...S.noteChk},
+    lavorazioni:[...S.lavorazioni],
+    // Tab Note
+    oss_tec:vGet('f-oss-tec')||null,
+    oss_int:vGet('f-oss-int')||null,
+    note_for_sn:cGet('f-note-for-sn'),
+    note_for_m:vGet('f-note-for-m')||null,
+    segnalazione:cGet('f-segnalazione'),
+    data_ritorno:vGet('f-data-ritorno')||null,
+    // Foto
+    privacy:cGet('f-privacy'),
     exported_at:new Date().toISOString()
   }
 }
 
 function applySnap(snap){
+  // ── Checklist, lavorazioni, imprese ──────────────────────────────────────
   S.checklist={...(snap.checklist||{})}
   S.noteChk={...(snap.note_checklist||{})}
   S.lavorazioni=[...(snap.lavorazioni||[])]
   S.imprese=(snap.imprese||[]).map((im,i)=>({...im,is_principale:i===0}))
   if(!S.imprese.length)S.imprese=[{impresa_id:'',impresa_nome:'',piva:'',cf_imp:'',ind_imp:'',com_imp:'',att:'',capo_nome:'',capo_cog:'',badge:'',pat:'',note_fasilav:'',tipo_imp:'',certif:[],ceiv:'',stage_imp:'',is_principale:true}]
 
-  if(snap.cantiere_id){vSet('f-cant-id',snap.cantiere_id);vSet('f-cant-search',snap.cantiere_label||'');if($('cant-detail'))$('cant-detail').textContent=snap.cantiere_detail||''}
-  vSet('f-nr-lav',snap.nr_lavoratori||0)
-  vSet('f-nr-lav-str',snap.nr_lavoratori_stranieri||0)
-  vSet('f-stato-lav',snap.stato_lav||'')
-  vSet('f-note-lav',snap.note_lav||'')
-  vSet('f-oss-tec',snap.oss_tec||'')
-  // nome+cognome persona presente (split su primo spazio)
-  if(snap.nom_ppre){
-    if(snap.ppre_titolo){vSet('f-ppre-titolo',snap.ppre_titolo)}
-    const fullName=snap.ppre_titolo?snap.nom_ppre.replace(snap.ppre_titolo,'').trim():snap.nom_ppre
-    const parts=fullName.split(' ')
+  // ── Tab 0 – Dati visita ───────────────────────────────────────────────────
+  if(snap.data_visita)vSet('f-data',snap.data_visita)
+  if(snap.ora_visita)vSet('f-da',snap.ora_visita)
+  if(snap.ora_fine)vSet('f-a',snap.ora_fine)
+  if(snap.tipo_accesso)vSet('f-tipo',snap.tipo_accesso)
+  if(snap.acc_cant)vSet('f-acc-cant',snap.acc_cant)
+  // RLST
+  if(snap.rlst_sn!=null){
+    const v=snap.rlst_sn==='1'||snap.rlst_sn===true||snap.rlst_sn==='si'
+    vSet('f-rlst',v?'1':'0')
+    const rSi=$('f-rlst-si'),rNo=$('f-rlst-no')
+    if(rSi)rSi.checked=v; if(rNo)rNo.checked=!v
+  }
+  // Stage
+  if(snap.stage_vis!=null){
+    const v=snap.stage_vis==='1'||snap.stage_vis===true||snap.stage_vis==='si'
+    vSet('f-stage-vis',v?'1':'0')
+    const rSi=$('f-stage-vis-si'),rNo=$('f-stage-vis-no')
+    if(rSi)rSi.checked=v; if(rNo)rNo.checked=!v
+    if(v&&snap.nom_stage){vSet('f-nom-stage',snap.nom_stage);const el=$('field-nom-stage');if(el)el.style.display=''}
+  }
+  // Persona presente
+  if(snap.ppre_titolo)vSet('f-ppre-titolo',snap.ppre_titolo)
+  if(snap.ppre_nome){
+    vSet('f-ppre-nome',snap.ppre_nome)
+  }else if(snap.nom_ppre){
+    // compatibilità snapshot precedenti: split del nome completo
+    const full=snap.ppre_titolo?snap.nom_ppre.replace(snap.ppre_titolo,'').trim():snap.nom_ppre
+    const parts=full.split(' ')
     vSet('f-ppre-nome',parts[0]||'');vSet('f-ppre-cog',parts.slice(1).join(' ')||'')
   }
+  if(snap.ppre_cog)vSet('f-ppre-cog',snap.ppre_cog)
   if(snap.qual_ppre){const sel=$('f-qual-ppre');if(sel){for(let o of sel.options)if(o.value===snap.qual_ppre){sel.value=snap.qual_ppre;break}}}
   if(snap.tel_ppre)vSet('f-tel-ppre',snap.tel_ppre)
-  // tecnico principale
+  // Tecnico principale
   if(snap.tecnico_email)setTecnicoFromEmail(snap.tecnico_email)
   else if(snap.tec_display)vSet('f-tec-display',snap.tec_display)
   if(snap.tecnico_id)vSet('f-tec-id',snap.tecnico_id)
-  // secondo tecnico
+  // Secondo tecnico
   if(snap.tecnico2_email)setTecnico2FromEmail(snap.tecnico2_email)
   else if(snap.tec2_display)vSet('f-tec2-display',snap.tec2_display)
   if(snap.tecnico2_id)vSet('f-tec2-id',snap.tecnico2_id)
 
-  // Ripristina lavorazioni a cascata
-  renderLavTags()
+  // ── Tab 1 – Cantiere ──────────────────────────────────────────────────────
+  if(snap.cantiere_id){vSet('f-cant-id',snap.cantiere_id);vSet('f-cant-search',snap.cantiere_label||'');if($('cant-detail'))$('cant-detail').textContent=snap.cantiere_detail||''}
+  if(snap.prot_int)vSet('f-prot-int',snap.prot_int)
+  if(snap.cnce)vSet('f-cnce',snap.cnce)
+  if(snap.cod_uni)vSet('f-cod-uni',snap.cod_uni)
+  if(snap.data_ult)vSet('f-data-ult',snap.data_ult)
 
+  // ── Tab 1 – Committente ───────────────────────────────────────────────────
+  if(snap.committente_id)vSet('f-comm-id',snap.committente_id)
+  if(snap.comm_tipo_sogg){
+    const r=document.querySelector(`input[name="comm-sogg"][value="${snap.comm_tipo_sogg}"]`)
+    if(r){r.checked=true;r.dispatchEvent(new Event('change',{bubbles:true}))}
+  }
+  if(snap.comm_tipo)vSet('f-comm-tipo',snap.comm_tipo)
+  if(snap.comm_titolo)vSet('f-comm-titolo',snap.comm_titolo)
+  if(snap.comm_nome)vSet('f-comm-nome',snap.comm_nome)
+  if(snap.comm_cog)vSet('f-comm-cog',snap.comm_cog)
+  if(snap.comm_cf)vSet('f-comm-cf',snap.comm_cf)
+  if(snap.comm_email)vSet('f-comm-email',snap.comm_email)
+  if(snap.comm_tel)vSet('f-comm-tel',snap.comm_tel)
+  if(snap.comm_rag_soc)vSet('f-comm-rag-soc',snap.comm_rag_soc)
+  if(snap.comm_piva)vSet('f-comm-piva',snap.comm_piva)
+  if(snap.comm_cf_pg)vSet('f-comm-cf-pg',snap.comm_cf_pg)
+  if(snap.comm_email_pg)vSet('f-comm-email-pg',snap.comm_email_pg)
+  if(snap.comm_tel_pg)vSet('f-comm-tel-pg',snap.comm_tel_pg)
+
+  // ── Tab 1 – Figure coordinamento ─────────────────────────────────────────
+  if(snap.coord!=null)cSet('f-coord',snap.coord)
+  if(snap.rl_titolo)vSet('f-rl-titolo',snap.rl_titolo)
+  if(snap.rl_nome)vSet('f-rl-nome',snap.rl_nome)
+  if(snap.rl_cog)vSet('f-rl-cog',snap.rl_cog)
+  if(snap.rl_email)vSet('f-rl-email',snap.rl_email)
+  if(snap.rl_tel)vSet('f-rl-tel',snap.rl_tel)
+  if(snap.csp_titolo)vSet('f-csp-titolo',snap.csp_titolo)
+  if(snap.csp_nome)vSet('f-csp-nome',snap.csp_nome)
+  if(snap.csp_cog)vSet('f-csp-cog',snap.csp_cog)
+  if(snap.csp_email)vSet('f-csp-email',snap.csp_email)
+  if(snap.csp_tel)vSet('f-csp-tel',snap.csp_tel)
+  if(snap.cse_titolo)vSet('f-cse-titolo',snap.cse_titolo)
+  if(snap.cse_nome)vSet('f-cse-nome',snap.cse_nome)
+  if(snap.cse_cog)vSet('f-cse-cog',snap.cse_cog)
+  if(snap.cse_email)vSet('f-cse-email',snap.cse_email)
+  if(snap.cse_tel)vSet('f-cse-tel',snap.cse_tel)
+
+  // ── Tab 1 – Dati cantiere visita ─────────────────────────────────────────
+  vSet('f-nr-imp',snap.nr_imp||0)
+  vSet('f-nr-ind',snap.nr_ind||0)
+  vSet('f-nr-lav',snap.nr_lavoratori||0)
+  vSet('f-nr-lav-str',snap.nr_lavoratori_stranieri||0)
+  if(snap.importo)vSet('f-importo',snap.importo)
+  if(snap.costi)vSet('f-costi',snap.costi)
+  vSet('f-stato-lav',snap.stato_lav||'')
+  vSet('f-note-lav',snap.note_lav||'')
+
+  // ── Tab Note ──────────────────────────────────────────────────────────────
+  vSet('f-oss-tec',snap.oss_tec||'')
+  if(snap.oss_int)vSet('f-oss-int',snap.oss_int)
+  if(snap.note_for_sn!=null)cSet('f-note-for-sn',snap.note_for_sn)
+  if(snap.note_for_m)vSet('f-note-for-m',snap.note_for_m)
+  if(snap.segnalazione!=null)cSet('f-segnalazione',snap.segnalazione)
+  if(snap.data_ritorno)vSet('f-data-ritorno',snap.data_ritorno)
+
+  // ── Foto ──────────────────────────────────────────────────────────────────
+  if(snap.privacy!=null)cSet('f-privacy',snap.privacy)
+
+  // ── Aggiorna UI ───────────────────────────────────────────────────────────
+  renderLavTags()
   updateIPCLive();updateZoneDots()
 }
 
@@ -2570,12 +2714,108 @@ $('btn-cancel-imp').onclick=()=>{pendingSnap=null;hide('imp-preview')}
 
 // ── EXPORT SNAP FROM DB ──
 async function exportSnapFromDB(vid){
-  const{data}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).single()
-  if(!data?.snapshot){toast('Snapshot non trovato','warn');return}
-  const blob=new Blob([JSON.stringify(data.snapshot,null,2)],{type:'application/json'})
-  const url=URL.createObjectURL(blob)
-  const a=document.createElement('a');a.href=url;a.download=`snap_${vid}.json`;a.click();URL.revokeObjectURL(url)
-  toast('Snapshot esportato','ok')
+  // 1) Prova prima lo snapshot salvato
+  const{data:snapRow}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).maybeSingle()
+  if(snapRow?.snapshot){
+    const blob=new Blob([JSON.stringify(snapRow.snapshot,null,2)],{type:'application/json'})
+    const url=URL.createObjectURL(blob)
+    const a=document.createElement('a');a.href=url;a.download=`snap_${snapRow.snapshot.nr_verbale_origine||vid}.json`;a.click();URL.revokeObjectURL(url)
+    toast('Snapshot esportato','ok');return
+  }
+  // 2) Fallback: ricostruisce lo snapshot dai dati del DB
+  toast('Ricostruzione snapshot dal DB…')
+  try{
+    const{data:v}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*)`).eq('visita_id',vid).single()
+    if(!v){toast('Visita non trovata','err');return}
+    const{data:chkRows}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
+    const{data:lavRows}=await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid)
+    const{data:impRows}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva)').eq('visita_id',vid).order('ordine')
+    // Ricostruisce checklist e note
+    const checklist={},note_checklist={}
+    ;(chkRows||[]).forEach(r=>{
+      if(r.valore&&r.valore!=='NA')checklist[r.codice]=r.valore
+      if(r.nota)note_checklist[r.codice]=r.nota
+    })
+    // Ricostruisce imprese
+    const imprese=(impRows||[]).map((im,i)=>({
+      impresa_id:im.impresa_id||'',
+      impresa_nome:im.imprese?.impresa_nome||'',
+      piva:im.imprese?.piva||'',
+      cf_imp:im.imprese?.impresa_cf||'',
+      att:im.att||'',
+      is_principale:i===0
+    }))
+    const cant=v.cantieri||{}
+    const snap={
+      visita_id:vid,
+      nr_verbale_origine:v.nr_verbale||'',
+      data_visita:v.data_visita||null,
+      ora_visita:v.ora_visita||null,
+      ora_fine:v.ora_fine||null,
+      tipo_accesso:v.tipo_accesso||null,
+      acc_cant:v.acc_cant||null,
+      rlst_sn:v.rlst_sn,
+      stage_vis:v.stage_vis,
+      nom_stage:v.nom_stage||null,
+      ppre_titolo:null,
+      nom_ppre:v.nom_ppre||null,
+      qual_ppre:v.qual_ppre||null,
+      tel_ppre:v.tel_ppre||null,
+      tecnico_id:v.tecnico_id||null,
+      tecnico_email:v.tecnici?.email||null,
+      tec_display:v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():null,
+      cantiere_id:v.cantiere_id||null,
+      cantiere_label:cant.cantiere_etichetta||`${cant.cantiere_indirizzo||''} ${cant.cantiere_civico||''}`.trim(),
+      cantiere_detail:'',
+      prot_int:cant.prot_int||null,
+      cnce:cant.cantiere_cnce||null,
+      cod_uni:cant.nodo_id||null,
+      comm_tipo_sogg:v.comm_tipo_sogg||'PF',
+      comm_tipo:v.comm_tipo||null,
+      comm_titolo:v.comm_titolo||null,
+      comm_nome:v.comm_nome||null,
+      comm_cog:v.comm_cog||null,
+      comm_cf:v.comm_cf||null,
+      comm_email:v.comm_email||null,
+      comm_tel:v.comm_tel||null,
+      comm_rag_soc:v.comm_rag_soc||null,
+      comm_piva:v.comm_piva||null,
+      coord:v.coord||false,
+      rl_nome:v.resp_lav||null,
+      rl_email:v.rl_email||null,
+      rl_tel:v.rl_tel||null,
+      csp_nome:v.csp||null,
+      csp_email:v.csp_email||null,
+      csp_tel:v.csp_tel||null,
+      cse_nome:v.cse||null,
+      cse_email:v.cse_email||null,
+      cse_tel:v.cse_tel||null,
+      nr_imp:v.nr_imp||0,
+      nr_ind:v.nr_ind||0,
+      nr_lavoratori:v.nr_lavoratori||0,
+      nr_lavoratori_stranieri:v.nr_lavoratori_stranieri||0,
+      importo:v.importo||null,
+      costi:v.costi||null,
+      stato_lav:v.stato_lav||null,
+      note_lav:null,
+      imprese,
+      checklist,
+      note_checklist,
+      lavorazioni:(lavRows||[]).map(l=>({genere:l.genere,fase:l.fase,lavorazione:l.lavorazione})),
+      oss_tec:v.oss_tec||null,
+      oss_int:v.oss_tec_int||null,
+      note_for_sn:v.note_for_sn||false,
+      note_for_m:v.note_for_m||null,
+      segnalazione:v.segnalazione||false,
+      data_ritorno:v.data_ritorno||null,
+      exported_at:new Date().toISOString(),
+      _rebuilt_from_db:true
+    }
+    const blob=new Blob([JSON.stringify(snap,null,2)],{type:'application/json'})
+    const url=URL.createObjectURL(blob)
+    const a=document.createElement('a');a.href=url;a.download=`snap_${snap.nr_verbale_origine||vid}.json`;a.click();URL.revokeObjectURL(url)
+    toast('Snapshot ricostruito ed esportato','ok')
+  }catch(e){toast('Errore esportazione: '+e.message,'err');console.error(e)}
 }
 
 // ── PDF ──
@@ -2699,6 +2939,14 @@ async function genPDF(vid, output='save'){
     setFont('bold',12,WHITE);doc.text(`IPC: ${ipc}`,L+4,y+7)
     setFont('normal',9,WHITE);doc.text(`NP: ${np}  NM: ${nm}  OS: ${os}`,PW-L-2,y+7,{align:'right'})
     ln(14)
+
+    // Assicura che S.voci sia caricato (può mancare se il PDF è generato dalla lista senza aprire il form)
+    if(!S.voci||!S.voci.length){
+      const{data:vociDB}=await sb.from('checklist_voci').select('*').order('ordine')
+      S.voci=vociDB||[]
+      S.byZona={}
+      for(const vv of S.voci){if(!S.byZona[vv.zona_osserv])S.byZona[vv.zona_osserv]=[];S.byZona[vv.zona_osserv].push(vv)}
+    }
 
     // CHECKLIST per zona
     if(S.voci&&S.voci.length){
