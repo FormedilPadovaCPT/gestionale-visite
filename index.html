@@ -1744,6 +1744,8 @@ async function saveVisita(stato){
   try{
     const vid=S.fd.visita_id||uuid()
     S.fd.visita_id=vid
+    // Calcola IPC prima di salvare
+    const{ipc:ipcVal}=calcIPC(S.checklist)
     const vistaRow={
       visita_id:vid,
       nr_verbale:vGet('f-verbale'),
@@ -1756,6 +1758,9 @@ async function saveVisita(stato){
       impresa_id:S.imprese[0].impresa_id,
       nr_lavoratori:+vGet('f-nr-lav')||0,
       nr_lavoratori_stranieri:+vGet('f-nr-lav-str')||0,
+      ipc:ipcVal,
+      tipo_accesso:+vGet('f-tipo')||null,
+      elimina:0,
       // estesi Tab 0
       acc_cant:vGet('f-acc-cant')||null,
       nom_ppre:[vGet('f-ppre-titolo'),vGet('f-ppre-nome'),vGet('f-ppre-cog')].map(s=>s.trim()).filter(Boolean).join(' ')||null,
@@ -1812,11 +1817,18 @@ async function saveVisita(stato){
     }
 
     // Checklist (save non-NA + note)
+    // Merge valore e nota nello stesso record per evitare duplicati su (visita_id, codice)
     await sb.from('visite_checklist').delete().eq('visita_id',vid)
-    const chkRows=[
-      ...Object.entries(S.checklist).filter(([,v])=>v!=='NA').map(([codice,valore])=>({visita_id:vid,codice,valore})),
-      ...Object.entries(S.noteChk).filter(([,v])=>v?.trim()).map(([codice,nota])=>({visita_id:vid,codice,valore:'NA',nota}))
-    ]
+    const chkMerge={}
+    Object.entries(S.checklist).filter(([,v])=>v&&v!=='NA').forEach(([codice,valore])=>{
+      if(!chkMerge[codice])chkMerge[codice]={visita_id:vid,codice,valore,nota:null}
+      else chkMerge[codice].valore=valore
+    })
+    Object.entries(S.noteChk).filter(([,n])=>n?.trim()).forEach(([codice,nota])=>{
+      if(!chkMerge[codice])chkMerge[codice]={visita_id:vid,codice,valore:'NA',nota}
+      else chkMerge[codice].nota=nota
+    })
+    const chkRows=Object.values(chkMerge)
     if(chkRows.length)await sb.from('visite_checklist').insert(chkRows)
 
     // Lavorazioni (genere › fase › lavorazione)
@@ -2932,12 +2944,14 @@ async function genPDF(vid, output='save'){
     ln(3)
 
     // IPC
+    // chkMap mantiene {valore,nota} per il PDF; per calcIPC servono solo le stringhe valore
     const chkMap={};(chk||[]).forEach(r=>{chkMap[r.codice]={valore:r.valore,nota:r.nota}})
-    const {ipc,np,nm,os}=calcIPC(chkMap)
+    const chkValori={};(chk||[]).forEach(r=>{if(r.valore)chkValori[r.codice]=r.valore})
+    const {ipc,np,nm,os}=calcIPC(chkValori)
     const ipcColor=ipc==='ALTO'?[231,80,15]:ipc==='MEDIO'?[230,160,0]:ipc==='BASSO'?[39,174,96]:[150,150,150]
     doc.setFillColor(...ipcColor);doc.rect(L,y,W,10,'F')
     setFont('bold',12,WHITE);doc.text(`IPC: ${ipc}`,L+4,y+7)
-    setFont('normal',9,WHITE);doc.text(`NP: ${np}  NM: ${nm}  OS: ${os}`,PW-L-2,y+7,{align:'right'})
+    setFont('normal',9,WHITE);doc.text(`NC+: ${np}  NC-: ${nm}  OSS: ${os}`,PW-L-2,y+7,{align:'right'})
     ln(14)
 
     // Assicura che S.voci sia caricato (può mancare se il PDF è generato dalla lista senza aprire il form)
@@ -2953,14 +2967,18 @@ async function genPDF(vid, output='save'){
       const vociByZona={}
       S.voci.forEach(vv=>{if(!vociByZona[vv.zona_osserv])vociByZona[vv.zona_osserv]=[];vociByZona[vv.zona_osserv].push(vv)})
       for(const [zona,voci] of Object.entries(vociByZona)){
-        const risposte=voci.filter(vv=>chkMap[vv.codice]&&chkMap[vv.codice].valore!=='NA')
+        // chkMap ha {valore, nota} – filtriamo le voci con rilievo effettivo
+        const risposte=voci.filter(vv=>chkMap[vv.codice]&&chkMap[vv.codice].valore&&chkMap[vv.codice].valore!=='NA')
         if(!risposte.length)continue
         if(y>260){doc.addPage();y=15}
-        setFont('bold',8,ORANGE);doc.text(zona.toUpperCase(),L,y)
+        // Usa ZONE_LBL per il nome leggibile (zona è un numero intero)
+        const zonaLbl=(ZONE_LBL[zona]||String(zona)).toUpperCase()
+        setFont('bold',8,ORANGE);doc.text(zonaLbl,L,y)
         hLine(L,PW-L,ORANGE);ln(5)
         const tRows=risposte.map(vv=>{
           const r=chkMap[vv.codice]||{}
-          return[vv.codice,vv.voce_checklist||'',r.valore||'',r.nota||'']
+          // Usa "descrizione" (nome nel DB) oppure fallback su "voce_checklist" per compatibilità
+          return[vv.codice,vv.descrizione||vv.voce_checklist||'',r.valore||'',r.nota||'']
         })
         doc.autoTable({startY:y,head:[['Cod.','Voce','Esito','Note']],body:tRows,
           styles:{fontSize:7,cellPadding:1.5},
@@ -2970,9 +2988,10 @@ async function genPDF(vid, output='save'){
           didParseCell:(d)=>{
             if(d.section==='body'&&d.column.index===2){
               const val=d.cell.raw
-              if(val==='NP')d.cell.styles.textColor=[231,80,15]
-              else if(val==='NM')d.cell.styles.textColor=[230,160,0]
-              else if(val==='OS')d.cell.styles.textColor=[39,174,96]
+              // I valori reali nel DB sono NC+, NC-, OSS (non NP/NM/OS)
+              if(val==='NC+')d.cell.styles.textColor=[231,80,15]
+              else if(val==='NC-')d.cell.styles.textColor=[230,160,0]
+              else if(val==='OSS')d.cell.styles.textColor=[39,174,96]
             }
           }
         })
@@ -3011,6 +3030,11 @@ async function genPDF(vid, output='save'){
     toast('PDF generato','ok')
   }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
 }
+
+// ── ESPOSIZIONE GLOBALE funzioni usate in onclick inline ──
+// (necessario perché lo script è type="module" e non ha scope globale)
+window.removeLav = removeLav
+window.deleteFoto = deleteFoto
 
 // ── AVVIO ──
 document.addEventListener('DOMContentLoaded', initAuth)
