@@ -2424,18 +2424,19 @@ async function uploadSingolaFoto(tipo){
     const data=await res.json()
     // Salva sempre su Supabase (base64 inclusa per PDF – indipendente da Drive)
     const driveOk=res.ok&&!data.error
+    if(!driveOk) throw new Error(data.error||'Errore upload Drive')
     // Su Supabase salviamo solo metadati (no base64 — le foto risiedono esclusivamente su Drive)
-    await sb.from('visite_foto').upsert({
+    const{error:uErr}=await sb.from('visite_foto').upsert({
       visita_id:vid, tipo,
-      drive_file_id:driveOk?data.drive_file_id:null,
-      drive_url:driveOk?data.drive_url:null,
-      thumb_url:driveOk?(data.thumb_url||null):null,
+      drive_file_id:data.drive_file_id,
+      drive_url:data.drive_url||null,
+      thumb_url:data.thumb_url||null,
       nome_file:fo.nome,
       dimensione_kb:fo.sizeKb||null
     },{onConflict:'visita_id,tipo'})
-    if(!driveOk) throw new Error(data.error||'Errore upload Drive')
-    // Aggiorna stato locale
-    S.foto[tipo]={...fo, url:data.drive_url, thumb:data.thumb_url, fileId:data.drive_file_id, base64:null}
+    if(uErr) console.warn('visite_foto upsert:',uErr.message)
+    // Aggiorna stato locale — mantieni base64 in memoria per generazione PDF nella sessione corrente
+    S.foto[tipo]={...fo, url:data.drive_url, thumb:data.thumb_url, fileId:data.drive_file_id}
     if(bar)bar.style.width='100%'
     setTimeout(()=>{if(prog)prog.style.display='none'},600)
     refreshSlotUI(tipo)
