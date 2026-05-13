@@ -792,7 +792,7 @@ tr:hover td{background:#fef9f7}
       <div class="field"><label>Tipo opera</label>
         <select id="mc-tip-ope"><option value="">–</option><option value="2">Civile</option><option value="1">Industriale</option><option value="3">Commerciale</option><option value="5">Stradale</option><option value="8">Scolastica</option><option value="16">Altro</option></select></div>
     </div>
-    <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma"></div>
+    <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma" maxlength="50"></div>
     <div class="modal-actions">
       <button class="btn-outline" id="btn-mc-cancel">Annulla</button>
       <button class="btn-primary" id="btn-mc-save">Salva</button>
@@ -922,8 +922,8 @@ tr:hover td{background:#fef9f7}
       <input type="text" id="email-verbale-oggetto" placeholder="Verbale sopralluogo…">
     </div>
     <div class="field" style="margin-bottom:14px">
-      <label>Testo aggiuntivo <span style="font-weight:400;font-size:11px;color:#aaa">(facoltativo)</span></label>
-      <textarea id="email-verbale-testo" rows="2" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:13px;resize:vertical" placeholder="Gentile…"></textarea>
+      <label>Testo della comunicazione <span style="font-weight:400;font-size:11px;color:#aaa">(modificabile prima dell'invio)</span></label>
+      <textarea id="email-verbale-testo" rows="12" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:12px;resize:vertical;line-height:1.5" placeholder="Spett.le impresa…"></textarea>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center">
       <span id="email-verbale-status" style="font-size:12px;color:var(--grey);flex:1"></span>
@@ -1683,7 +1683,14 @@ $('btn-mi-save').onclick=async()=>{
 }
 
 // ── MODAL CANTIERE ──
-$('btn-new-cant').onclick=()=>show('modal-cant')
+function resetModalCantiere(){
+  ;['mc-ind','mc-civ','mc-etich','mc-cap'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  const com=$('mc-com');if(com)com.value=''
+  const ti=$('mc-tip-int');if(ti)ti.value=''
+  const to=$('mc-tip-ope');if(to)to.value=''
+  const capEl=$('mc-cap');if(capEl){capEl.readOnly=false;capEl.style.background='#fff'}
+}
+$('btn-new-cant').onclick=()=>{resetModalCantiere();show('modal-cant')}
 $('btn-mc-cancel').onclick=()=>hide('modal-cant')
 $('btn-mc-save').onclick=async()=>{
   const ind=vGet('mc-ind').trim();const civ=vGet('mc-civ').trim()
@@ -1695,7 +1702,10 @@ $('btn-mc-save').onclick=async()=>{
   vSet('f-cant-search',c.cantiere_etichetta||`${ind} ${civ}`)
   $('cant-detail').textContent=`${ind} ${civ}${c.comune_nome?' – '+c.comune_nome:''}`
   S.fd.cantiere_id=c.cantiere_id
-  hide('modal-cant');toast('Cantiere creato','ok')
+  hide('modal-cant')
+  toast('Cantiere creato','ok')
+  // Aggiorna la lista cantieri se è visibile
+  if(!$('view-cantieri')?.classList.contains('hidden'))loadCantieri()
 }
 
 // ── GENERIC AUTOCOMPLETE ──
@@ -1742,8 +1752,8 @@ async function saveVisita(stato){
   if(!tec_id){toast('Seleziona il tecnico (Tab Visita)','warn');activateTab(0);return}
 
   try{
-    const vid=S.fd.visita_id||uuid()
-    S.fd.visita_id=vid
+    let vid=S.fd.visita_id||S.savedId||null
+    if(!vid){vid=uuid();S.fd.visita_id=vid}
     // Calcola IPC prima di salvare
     const{ipc:ipcVal}=calcIPC(S.checklist)
     const vistaRow={
@@ -1807,14 +1817,31 @@ async function saveVisita(stato){
       stato
     }
 
-    if(S.savedId===vid){
+    // 1) Esiste già una riga con questo visita_id?
+    const{data:byId}=await sb.from('visite').select('visita_id').eq('visita_id',vid).maybeSingle()
+    if(byId){
+      // Aggiorna la riga esistente
       const{error}=await sb.from('visite').update(vistaRow).eq('visita_id',vid)
       if(error)throw error
-    }else{
-      const{error}=await sb.from('visite').insert(vistaRow)
-      if(error)throw error
-      S.savedId=vid
+    } else {
+      // 2) Esiste già una riga con questo nr_verbale (snap senza visita_id)?
+      const nrv=vistaRow.nr_verbale
+      const{data:byNr}=nrv?await sb.from('visite').select('visita_id').eq('nr_verbale',nrv).maybeSingle():{data:null}
+      if(byNr?.visita_id){
+        // Usa il visita_id esistente e aggiorna
+        vid=byNr.visita_id
+        vistaRow.visita_id=vid
+        S.fd.visita_id=vid
+        const{error}=await sb.from('visite').update(vistaRow).eq('visita_id',vid)
+        if(error)throw error
+      } else {
+        // 3) Visita davvero nuova: inserisci
+        const{error}=await sb.from('visite').insert(vistaRow)
+        if(error)throw error
+      }
     }
+    S.savedId=vid
+    S.fd.visita_id=vid
 
     // Checklist (save non-NA + note)
     // Merge valore e nota nello stesso record per evitare duplicati su (visita_id, codice)
@@ -1953,6 +1980,13 @@ function buildSnap(vid=null){
 }
 
 function applySnap(snap){
+  // Se lo snap proviene dal DB (ha visita_id), ripristina l'identità della visita
+  // così i salvataggi successivi faranno UPDATE invece di INSERT
+  if(snap.visita_id){
+    S.fd.visita_id=snap.visita_id
+    S.savedId=snap.visita_id
+  }
+
   // ── Checklist, lavorazioni, imprese ──────────────────────────────────────
   S.checklist={...(snap.checklist||{})}
   S.noteChk={...(snap.note_checklist||{})}
@@ -2367,16 +2401,18 @@ async function uploadSingolaFoto(tipo){
     })
     if(bar)bar.style.width='80%'
     const data=await res.json()
-    if(!res.ok||data.error)throw new Error(data.error||'Errore upload')
-    // Salva in Supabase
+    // Salva sempre su Supabase (base64 inclusa per PDF – indipendente da Drive)
+    const driveOk=res.ok&&!data.error
     await sb.from('visite_foto').upsert({
       visita_id:vid, tipo,
-      drive_file_id:data.drive_file_id,
-      drive_url:data.drive_url,
-      thumb_url:data.thumb_url||null,
+      drive_file_id:driveOk?data.drive_file_id:null,
+      drive_url:driveOk?data.drive_url:null,
+      thumb_url:driveOk?(data.thumb_url||null):null,
       nome_file:fo.nome,
-      dimensione_kb:fo.sizeKb||null
+      dimensione_kb:fo.sizeKb||null,
+      foto_base64:fo.base64||null
     },{onConflict:'visita_id,tipo'})
+    if(!driveOk) throw new Error(data.error||'Errore upload Drive')
     // Aggiorna stato locale
     S.foto[tipo]={...fo, url:data.drive_url, thumb:data.thumb_url, fileId:data.drive_file_id, base64:null}
     if(bar)bar.style.width='100%'
@@ -2385,7 +2421,16 @@ async function uploadSingolaFoto(tipo){
     toast(`${tipo} caricata su Drive ✓`,'ok')
   }catch(e){
     if(prog)prog.style.display='none'
-    toast('Errore caricamento foto: '+e.message,'err')
+    // Salva comunque la base64 su Supabase anche se Drive fallisce
+    const vid2=S.savedId||S.fd.visita_id
+    if(vid2&&fo?.base64){
+      await sb.from('visite_foto').upsert({
+        visita_id:vid2, tipo, nome_file:fo.nome, dimensione_kb:fo.sizeKb||null, foto_base64:fo.base64
+      },{onConflict:'visita_id,tipo'}).catch(()=>{})
+      toast(`Foto salvata localmente (Drive non raggiungibile)`,'warn')
+    } else {
+      toast('Errore caricamento foto: '+e.message,'err')
+    }
   }
 }
 
@@ -2559,7 +2604,7 @@ async function loadCantieri(q=''){
 }
 $('btn-cerca-cant').onclick=()=>loadCantieri()
 $('q-cant').onkeydown=e=>{if(e.key==='Enter')loadCantieri()}
-$('btn-nuovo-cant-lista').onclick=()=>show('modal-cant')
+$('btn-nuovo-cant-lista').onclick=()=>{resetModalCantiere();show('modal-cant')}
 
 // ── EMAIL VERBALE ──
 function inviEmailVerbale(){
@@ -2609,6 +2654,46 @@ function inviEmailVerbale(){
   const nrVerb=vGet('f-verbale')||''
   const cant=vGet('f-cant-search')||''
   $('email-verbale-oggetto').value=`Verbale sopralluogo${nrVerb?' n° '+nrVerb:''}${cant?' – '+cant:''}`
+
+  // ── LETTERA STANDARD IMPRESA PRINCIPALE ──
+  // Costruisce il testo della comunicazione (analoga alla lettera pag.1 del verbale Osservatorio)
+  const _giorni=['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato']
+  const _mesi=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre']
+  const dataStr=vGet('f-data')||''
+  let dataLeggibile=''
+  if(dataStr){
+    const d=new Date(dataStr+'T00:00:00')
+    if(!isNaN(d)){
+      dataLeggibile=`${_giorni[d.getDay()]} ${d.getDate()} ${_mesi[d.getMonth()]} ${d.getFullYear()}`
+    }
+  }
+  // Tecnico
+  const tecNomeLett=S.tecnico?`${S.tecnico.tecnico_nome||''} ${S.tecnico.tecnico_cognome||''}`.trim():''
+  // Impresa principale (primo elemento di S.imprese, oppure impresa della visita)
+  const impPrinc=S.imprese&&S.imprese.length?S.imprese[0]:null
+  const impNomeLett=impPrinc?.impresa_nome||''
+  // Cantiere: usa il dettaglio (es. "Via Abano nn – Selvazzano Dentro")
+  const cantDettaglio=($('cant-detail')?.textContent||cant||'').trim()
+
+  const letteraImpresa=
+`Spett.le impresa${impNomeLett?'\n'+impNomeLett:''}
+
+Oggetto: Prevenzione Infortuni – Cantiere ${cantDettaglio?'di '+cantDettaglio:''}
+
+${dataLeggibile?'Il giorno '+dataLeggibile+' è':'È'} passato nel vostro cantiere in oggetto, per fornirvi utili consigli in materia di prevenzione infortuni, uno dei nostri tecnici${tecNomeLett?', '+tecNomeLett:''}.
+
+Egli si è soffermato ad illustrare al VS personale in cantiere le più importanti norme che devono essere tenute presenti per garantire la sicurezza durante le varie fasi lavorative, con particolare riferimento a quelle in corso.
+
+In base a quanto previsto dalle norme che regolano il funzionamento dello scrivente Comitato Paritetico Territoriale potrà essere effettuata, entro breve termine, una successiva visita per constatare che i consigli forniti siano stati correttamente attuati.
+
+Per migliorare la conoscenza della normativa in materia di salute e sicurezza sul lavoro, in allegato troverà il verbale del sopralluogo effettuato.
+
+Distinti saluti.
+
+La presidenza del Formedil Padova – Area Sicurezza e Salute`
+
+  const testaEl=$('email-verbale-testo')
+  if(testaEl&&!testaEl.value.trim()) testaEl.value=letteraImpresa
 
   window._evEmails=emails
   show('modal-email-verbale')
@@ -2842,6 +2927,7 @@ async function genPDF(vid, output='save'){
     const{data:chk}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
     const{data:lavs}=await sb.from('visite_lavorazioni').select('lavorazione').eq('visita_id',vid)
     const{data:imps}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf)').eq('visita_id',vid).order('ordine')
+    const{data:fotoRec}=await sb.from('visite_foto').select('tipo,drive_url,thumb_url,foto_base64').eq('visita_id',vid)
 
     if(!v){toast('Visita non trovata','err');return}
 
@@ -3012,6 +3098,50 @@ async function genPDF(vid, output='save'){
         const split=doc.splitTextToSize(val,W-4)
         doc.text(split,L+2,y);ln(split.length*4+3)
       })
+    }
+
+    // FOTO – griglia 2×2 invisibile (~70×70 mm per foto)
+    const FOTO_TIPI=['foto1','foto2','foto3','foto4']
+    const imgMap={}
+    // 1) Base64 da DB (fonte più affidabile – salvata al momento del caricamento)
+    const dbFotoMap={}
+    ;(fotoRec||[]).forEach(r=>{dbFotoMap[r.tipo]=r})
+    for(const tipo of FOTO_TIPI){
+      const r=dbFotoMap[tipo]
+      if(r?.foto_base64) imgMap[tipo]='data:image/jpeg;base64,'+r.foto_base64
+    }
+    // 2) Fallback: base64 in memoria (foto selezionata nella sessione corrente ma non ancora salvata)
+    for(const tipo of FOTO_TIPI){
+      if(!imgMap[tipo]&&S.foto[tipo]?.base64) imgMap[tipo]='data:image/jpeg;base64,'+S.foto[tipo].base64
+    }
+    // 3) Ultimo tentativo: fetch dalla thumb/URL Drive (può fallire per CORS)
+    for(const tipo of FOTO_TIPI){
+      if(imgMap[tipo]) continue
+      const r=dbFotoMap[tipo]
+      const url=r?.thumb_url||r?.drive_url
+      if(!url) continue
+      try{
+        const res=await fetch(url)
+        if(res.ok){const blob=await res.blob();imgMap[tipo]=await new Promise((ok,ko)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=ko;fr.readAsDataURL(blob)})}
+      }catch(e){/* non raggiungibile */}
+    }
+    const hasFoto=FOTO_TIPI.some(t=>imgMap[t])
+    if(hasFoto){
+      if(y>115){doc.addPage();y=15}
+      doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
+      setFont('bold',9,WHITE);doc.text('DOCUMENTAZIONE FOTOGRAFICA',L+2,y+4.5)
+      ln(10)
+      // Griglia 2×2 – celle 70×70 mm centrate nella pagina
+      const FW=70,FH=70,FGAP=12
+      const fx=L+(W-2*FW-FGAP)/2  // padding simmetrico
+      const fPos=[[fx,y],[fx+FW+FGAP,y],[fx,y+FH+FGAP],[fx+FW+FGAP,y+FH+FGAP]]
+      for(let i=0;i<FOTO_TIPI.length;i++){
+        const uri=imgMap[FOTO_TIPI[i]]
+        if(!uri) continue
+        const[px,py]=fPos[i]
+        try{doc.addImage(uri,'JPEG',px,py,FW,FH,undefined,'FAST')}catch(e){/* formato non supportato */}
+      }
+      ln(2*FH+FGAP+10)
     }
 
     // FIRMA
