@@ -2424,10 +2424,12 @@ async function uploadSingolaFoto(tipo){
     // Salva comunque la base64 su Supabase anche se Drive fallisce
     const vid2=S.savedId||S.fd.visita_id
     if(vid2&&fo?.base64){
-      await sb.from('visite_foto').upsert({
-        visita_id:vid2, tipo, nome_file:fo.nome, dimensione_kb:fo.sizeKb||null, foto_base64:fo.base64
-      },{onConflict:'visita_id,tipo'}).catch(()=>{})
-      toast(`Foto salvata localmente (Drive non raggiungibile)`,'warn')
+      try{
+        await sb.from('visite_foto').upsert({
+          visita_id:vid2, tipo, nome_file:fo.nome, dimensione_kb:fo.sizeKb||null, foto_base64:fo.base64
+        },{onConflict:'visita_id,tipo'})
+      }catch(_){}
+      toast('Errore Drive: '+e.message+' – foto salvata localmente','warn')
     } else {
       toast('Errore caricamento foto: '+e.message,'err')
     }
@@ -3182,9 +3184,31 @@ async function genPDF(vid, output='save'){
     setFont('normal',7,[180,180,180])
     doc.text(`Generato il ${new Date().toLocaleString('it-IT')} – Formedil Padova CPT`,PW/2,y,{align:'center'})
 
-    if(output==='base64') return doc.output('datauristring')
+    // Salva PDF su Drive in background (non bloccante)
+    const _uploadPdfDrive=async(b64)=>{
+      try{
+        const{data:{session}}=await sb.auth.getSession()
+        const tkn=session?.access_token
+        const r=await fetch(`${SB_URL}/functions/v1/upload-pdf`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':`Bearer ${tkn}`,'apikey':SB_KEY},
+          body:JSON.stringify({pdf_base64:b64,nr_verbale:v.nr_verbale,data_visita:v.data_visita,visita_id:vid})
+        })
+        const d=await r.json()
+        if(d.ok)toast('PDF salvato su Drive ✓','ok')
+        else console.warn('upload-pdf:',d.error)
+      }catch(e){console.warn('upload-pdf:',e)}
+    }
+
+    if(output==='base64'){
+      const uri=doc.output('datauristring')
+      _uploadPdfDrive(uri.split(',')[1])   // upload in background
+      return uri
+    }
+    const pdfB64=doc.output('datauristring').split(',')[1]
     doc.save(`verbale_${v.nr_verbale||vid}.pdf`)
     toast('PDF generato','ok')
+    _uploadPdfDrive(pdfB64)   // upload in background
   }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
 }
 
