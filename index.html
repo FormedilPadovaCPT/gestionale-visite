@@ -2724,19 +2724,29 @@ $('btn-ev-invia').onclick=async()=>{
 
     btn.textContent='⏳ Invio in corso…'
 
-    // 2. Chiama la Edge Function
-    const{data,error}=await sb.functions.invoke('send-verbale',{
-      body:{
-        to: emails.map(e=>e.email),
-        subject: $('email-verbale-oggetto')?.value||'',
-        nrVerbale: vGet('f-verbale')||'',
-        cantiere: vGet('f-cant-search')||'',
-        testoExtra: $('email-verbale-testo')?.value||'',
-        pdfBase64
-      }
-    })
-    if(error) throw new Error(error.message||JSON.stringify(error))
-    if(data?.error) throw new Error(data.error)
+    // 2. Chiama la Edge Function (fetch diretto con timeout 90s)
+    const{data:{session}}=await sb.auth.getSession()
+    const token=session?.access_token
+    const ctrl=new AbortController()
+    const tOut=setTimeout(()=>ctrl.abort(),90000)
+    let resp
+    try{
+      resp=await fetch(`${SB_URL}/functions/v1/send-verbale`,{
+        method:'POST',
+        signal:ctrl.signal,
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`,'apikey':SB_KEY},
+        body:JSON.stringify({
+          to: emails.map(e=>e.email),
+          subject: $('email-verbale-oggetto')?.value||'',
+          nrVerbale: vGet('f-verbale')||'',
+          cantiere: vGet('f-cant-search')||'',
+          testoExtra: $('email-verbale-testo')?.value||'',
+          pdfBase64
+        })
+      })
+    }finally{clearTimeout(tOut)}
+    const data=await resp.json()
+    if(!resp.ok||data?.error) throw new Error(data?.error||`HTTP ${resp.status}`)
 
     // 3. Successo
     const nDest=emails.length
@@ -3103,27 +3113,16 @@ async function genPDF(vid, output='save'){
     // FOTO – griglia 2×2 invisibile (~70×70 mm per foto)
     const FOTO_TIPI=['foto1','foto2','foto3','foto4']
     const imgMap={}
-    // 1) Base64 da DB (fonte più affidabile – salvata al momento del caricamento)
+    // 1) Base64 da DB (salvata al momento del caricamento su Drive)
     const dbFotoMap={}
     ;(fotoRec||[]).forEach(r=>{dbFotoMap[r.tipo]=r})
     for(const tipo of FOTO_TIPI){
       const r=dbFotoMap[tipo]
       if(r?.foto_base64) imgMap[tipo]='data:image/jpeg;base64,'+r.foto_base64
     }
-    // 2) Fallback: base64 in memoria (foto selezionata nella sessione corrente ma non ancora salvata)
+    // 2) Fallback: base64 in memoria (foto selezionata ma non ancora caricata su Drive)
     for(const tipo of FOTO_TIPI){
       if(!imgMap[tipo]&&S.foto[tipo]?.base64) imgMap[tipo]='data:image/jpeg;base64,'+S.foto[tipo].base64
-    }
-    // 3) Ultimo tentativo: fetch dalla thumb/URL Drive (può fallire per CORS)
-    for(const tipo of FOTO_TIPI){
-      if(imgMap[tipo]) continue
-      const r=dbFotoMap[tipo]
-      const url=r?.thumb_url||r?.drive_url
-      if(!url) continue
-      try{
-        const res=await fetch(url)
-        if(res.ok){const blob=await res.blob();imgMap[tipo]=await new Promise((ok,ko)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=ko;fr.readAsDataURL(blob)})}
-      }catch(e){/* non raggiungibile */}
     }
     const hasFoto=FOTO_TIPI.some(t=>imgMap[t])
     if(hasFoto){
@@ -3133,13 +3132,41 @@ async function genPDF(vid, output='save'){
       ln(10)
       // Griglia 2×2 – celle 70×70 mm centrate nella pagina
       const FW=70,FH=70,FGAP=12
-      const fx=L+(W-2*FW-FGAP)/2  // padding simmetrico
+      const fx=L+(W-2*FW-FGAP)/2
       const fPos=[[fx,y],[fx+FW+FGAP,y],[fx,y+FH+FGAP],[fx+FW+FGAP,y+FH+FGAP]]
+      // Legge larghezza e altezza dall'header JPEG (sincrono, nessun Image element)
+      const jpegSize=dataUri=>{
+        try{
+          const b64=dataUri.includes(',')?dataUri.split(',')[1]:dataUri
+          const bin=atob(b64)
+          const bytes=new Uint8Array(bin.length)
+          for(let k=0;k<bin.length;k++)bytes[k]=bin.charCodeAt(k)
+          let j=2
+          while(j<bytes.length-9){
+            if(bytes[j]!==0xFF)break
+            const m=bytes[j+1]
+            const segLen=(bytes[j+2]<<8)|bytes[j+3]
+            if((m>=0xC0&&m<=0xC3)||(m>=0xC5&&m<=0xC7)||(m>=0xC9&&m<=0xCB)||(m>=0xCD&&m<=0xCF)){
+              return{w:(bytes[j+7]<<8)|bytes[j+8],h:(bytes[j+5]<<8)|bytes[j+6]}
+            }
+            j+=2+segLen
+          }
+        }catch(e){}
+        return{w:4,h:3}  // fallback proporzione 4:3
+      }
       for(let i=0;i<FOTO_TIPI.length;i++){
         const uri=imgMap[FOTO_TIPI[i]]
         if(!uri) continue
         const[px,py]=fPos[i]
-        try{doc.addImage(uri,'JPEG',px,py,FW,FH,undefined,'FAST')}catch(e){/* formato non supportato */}
+        try{
+          const{w,h}=jpegSize(uri)
+          // Fit proporzionale dentro la cella FW×FH (contain, centrato)
+          const ratio=w/h
+          let iw,ih
+          if(ratio>=1){iw=FW;ih=FW/ratio}else{ih=FH;iw=FH*ratio}
+          const ox=(FW-iw)/2, oy=(FH-ih)/2
+          doc.addImage(uri,'JPEG',px+ox,py+oy,iw,ih,undefined,'FAST')
+        }catch(e){/* formato non supportato */}
       }
       ln(2*FH+FGAP+10)
     }
