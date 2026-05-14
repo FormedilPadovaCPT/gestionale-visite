@@ -2960,182 +2960,339 @@ async function genPDF(vid, output='save'){
     if(eV)throw new Error('Errore caricamento visita: '+eV.message)
     const{data:chk}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
     const{data:lavs}=await sb.from('visite_lavorazioni').select('lavorazione').eq('visita_id',vid)
-    const{data:imps}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf)').eq('visita_id',vid).order('ordine')
-    const{data:fotoRec}=await sb.from('visite_foto').select('tipo,drive_url,thumb_url').eq('visita_id',vid)
+    const{data:imps}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,impresa_email_ref)').eq('visita_id',vid).order('ordine')
 
     if(!v){toast('Visita non trovata','err');return}
+
+    // Assicura che S.voci sia caricato
+    if(!S.voci||!S.voci.length){
+      const{data:vociDB}=await sb.from('checklist_voci').select('*').order('ordine')
+      S.voci=vociDB||[]
+    }
 
     const{jsPDF}=window.jspdf
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
     const PW=210,L=14,W=PW-28
     let y=0
 
-    const ORANGE=[231,80,15],GREY=[86,92,102],WHITE=[255,255,255],LIGHT=[248,248,248]
+    const ORANGE=[231,80,15],GREY=[86,92,102],WHITE=[255,255,255],BLUE=[52,103,147]
     const setFont=(style='normal',sz=9,color=GREY)=>{doc.setFont('helvetica',style);doc.setFontSize(sz);doc.setTextColor(...color)}
     const ln=(h=5)=>{y+=h}
-    const hLine=(lx=L,rx=PW-L,color=[220,220,220])=>{doc.setDrawColor(...color);doc.line(lx,y,rx,y)}
-    const box=(bx,by,bw,bh,fill=LIGHT,stroke=[220,220,220])=>{doc.setFillColor(...fill);doc.setDrawColor(...stroke);doc.roundedRect(bx,by,bw,bh,2,2,'FD')}
-    const cell=(label,val,cx,cy,cw,ch=8)=>{
-      box(cx,cy,cw,ch,LIGHT)
-      setFont('bold',7,GREY);doc.text(label,cx+2,cy+3.5)
-      setFont('normal',9,[30,30,30])
-      const s=doc.splitTextToSize(String(val||'–'),cw-4)
-      doc.text(s[0],cx+2,cy+7)
-    }
-    const TIPO_ACC={1:'Su segnalazione',2:'Su richiesta',3:'Per protocolli di intesa',4:'Indicata da RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT'}
+    const hLine=(color=GREY,lw=0.3)=>{doc.setDrawColor(...color);doc.setLineWidth(lw);doc.line(L,y,PW-L,y)}
 
-    // HEADER
-    doc.setFillColor(...ORANGE);doc.rect(0,0,PW,22,'F')
+    // Lookup maps
+    const TIPO_ACC={1:'Su segnalazione',2:'Su richiesta',3:'Per protocolli di intesa',4:'Indicata da RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT'}
+    const TIP_INT={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento'}
+    const TIP_OPE={1:'Industriale',2:'Civile',3:'Commerciale',5:'Stradale',8:'Scolastica',16:'Altro'}
+    const IMP_LBL={1:'fino a 250.000',2:'da 250.001 a 500.000',3:'da 500.001 a 1.000.000',4:'da 1.000.001 a 1.500.000',5:'da 1.500.001 a 2.500.000',6:'da 2.500.001 a 3.500.000',7:'da 3.500.001 a 5.000.000',8:'da 5.000.001 a 10.000.000',11:'non disponibile'}
+    const DUR_LBL={1:'< 30 giorni',2:'da 30 a 90 giorni',3:'da 3 a 6 mesi',4:'da 6 a 12 mesi',5:'> 12 mesi'}
+    const PREF_LBL={
+      'IMP_LOG':'Logistica','IMP_IGS':'Apprestamenti igienico-sanitari e di sicurezza',
+      'IMP_ELE':'Impianti elettrici','IMP_AGI':'Agibilità del cantiere',
+      'IMP_ORG':'Organizzazione del lavoro','IMP_SEG':'Segnaletica','IMP_CON':'Condizioni al contorno',
+      'PLL_SCA':'Aree di scavo','PLL_DEM':'Aree di demolizione','PLL_OCA':'Altre aree di pericolo','PLL_PER':'Opere in c.a.',
+      'SOL_GRU':'Gru','SOL_AUT':'Autogru / Gru su autocarro','SOL_ARG':'Argano',
+      'SOL_PIA':'Piattaforme di lavoro elevabili','SOL_ASO':'Altri apparecchi di sollevamento',
+      'ASU_ATT':'Attrezzature','ASU_SCA':'Scale','ASU_UTE':'Utensili',
+      'MAC_MAS':'Macchine movimento terra','MAC_MMM':'Macchine movimentazione materiale','MAC_MMT':'Macchine stradali',
+      'OPE_POF':'Ponteggi fissi','OPE_POS':'Ponteggi sospesi','OPE_POC':'Ponti su cavalletti',
+      'OPE_POT':'Ponti su ruote – trabattelli','OPE_DPC':'Altri DPC',
+      'PIN_IND':'Indumenti di protezione','PIN_TES':'Protezione della testa','PIN_PIE':'Protezione dei piedi',
+      'PIN_MAN':'Protezione delle mani','PIN_UDI':'Protezione dell\'udito',
+      'PIN_CAD':'Protezione controllo caduta dall\'alto','PIN_OCC':'Protezione degli occhi',
+      'PIN_RES':'Protezione delle vie respiratorie',
+      'DOC_GEN':'Generale','DOC_GEN_SOL':'Apparecchi di sollevamento','DOC_MA4':'Macchine e attrezzature',
+      'DOC_ELE':'Impianto elettrico e di terra','DOC_PON':'Ponteggi',
+      'SOG_FIG':'Nomine di figura di sistema',
+      'FOR_BAS':'Formazione di base','FOR_FIG':'Figura di sistema',
+      'FOR_RIS':'Form./addes. rischi specifici','FOR_ATM':'Form./addes. attrezzature/macchine'
+    }
+
+    // Data helpers
+    const _mesi=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre']
+    const _gg=['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato']
+    const fmtLeggibile=s=>{if(!s)return '';const d=new Date(s+'T00:00:00');if(isNaN(d))return s;return `${_gg[d.getDay()]} ${d.getDate()} ${_mesi[d.getMonth()]} ${d.getFullYear()}`}
+    const oggi=new Date()
+    const dataOggi=`${oggi.getDate().toString().padStart(2,'0')}/${(oggi.getMonth()+1).toString().padStart(2,'0')}/${oggi.getFullYear()}`
+
+    // Dati principali
+    const cant=v.cantieri||{}
+    const impPrinc=imps&&imps.length?imps[0]:null
+    const impNome=impPrinc?.imprese?.impresa_nome||v.imprese?.impresa_nome||''
+    const impCF=impPrinc?.imprese?.impresa_cf||v.imprese?.impresa_cf||''
+    const impEmail=impPrinc?.imprese?.impresa_email_ref||v.imprese?.impresa_email_ref||''
+    const impRuolo=impPrinc?.ruolo||''
+    const tecNome=v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():''
+    const cantLabel=cant.cantiere_etichetta||`${cant.cantiere_indirizzo||''} ${cant.cantiere_civico||''}`.trim()
+    const comuneLabel=cant.comune_nome||''
+    const cantDetail=[cantLabel,comuneLabel].filter(Boolean).join(' – ')
+
+    // chkMap
+    const chkMap={};(chk||[]).forEach(r=>{chkMap[r.codice]={valore:r.valore,nota:r.nota}})
+
+    // ════════════════════════════════════════════════
+    // PAGINA 1 – LETTERA DI ACCOMPAGNAMENTO
+    // ════════════════════════════════════════════════
+    y=14
+    doc.setFillColor(...ORANGE);doc.rect(0,0,PW,20,'F')
     setFont('bold',15,WHITE);doc.text('FORMEDIL PADOVA',L,10)
-    setFont('normal',8,WHITE);doc.text('Scuola Costruzioni Giuseppe Jappelli',L,15)
-    setFont('bold',10,WHITE);doc.text('VERBALE DI SOPRALLUOGO IN CANTIERE',PW-L,11,{align:'right'})
+    setFont('normal',7,WHITE);doc.text('Scuola Costruzioni Giuseppe Jappelli  ·  Ente unico formazione e sicurezza',L,16)
+    setFont('bold',9,WHITE);doc.text('Area Sicurezza e Salute',PW-L,10,{align:'right'})
     y=28
 
-    // RIGA VERBALE / DATA / TECNICO
-    const tecNome=v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():''
-    const tipoAcc=TIPO_ACC[v.tipo_accesso]||'Programmata'
-    const cw4=W/4
-    cell('N° Verbale',v.nr_verbale,L,y,cw4)
-    cell('Data',fmtDate(v.data_visita),L+cw4,y,cw4)
-    cell('Ora inizio – fine',`${v.ora_visita||'–'} → ${v.ora_fine||'–'}`,L+cw4*2,y,cw4)
-    cell('Tecnico',tecNome||'–',L+cw4*3,y,cw4)
-    ln(11)
-    cell('Tipologia accesso',tipoAcc,L,y,cw4*2)
-    cell('Accesso n°',v.acc_cant||'–',L+cw4*2,y,cw4)
-    cell('RLST presente',v.rlst_sn?'Sì':'No',L+cw4*3,y,cw4)
-    ln(12)
+    setFont('normal',10,GREY);doc.text(dataOggi,PW-L,y,{align:'right'})
+    y+=10
 
-    // CANTIERE
-    doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
-    setFont('bold',9,WHITE);doc.text('CANTIERE',L+2,y+4.5)
-    ln(8)
-    const cant=v.cantieri||{}
-    const cantLabel=cant.cantiere_etichetta||`${cant.cantiere_indirizzo||''} ${cant.cantiere_civico||''}`.trim()
-    const cw3=W/3
-    cell('Indirizzo / Etichetta',cantLabel,L,y,cw3*2)
-    cell('Comune',cant.comune_nome||'–',L+cw3*2,y,cw3)
-    ln(11)
-    cell('Prot. interno',cant.prot_int||'–',L,y,cw3)
-    cell('CNCE',cant.cantiere_cnce||'–',L+cw3,y,cw3)
-    cell('Cod. unico',cant.nodo_id||'–',L+cw3*2,y,cw3)
-    ln(12)
+    setFont('normal',10,[50,50,50]);doc.text('Spett.le impresa',PW-L-65,y)
+    if(impNome){setFont('bold',10,[30,30,30]);doc.text(impNome,PW-L-65,y+6)}
+    y+=20
 
-    // IMPRESE
-    doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
-    setFont('bold',9,WHITE);doc.text('IMPRESE PRESENTI',L+2,y+4.5)
-    ln(8)
-    const impList=imps&&imps.length?imps:[{imprese:{impresa_nome:v.imprese?.impresa_nome||'–',impresa_cf:''},is_principale:true,att:null}]
-    impList.forEach((im,i)=>{
-      const nome=im.imprese?.impresa_nome||'–'
-      const cf=im.imprese?.impresa_cf||''
-      const prefix=i===0?'① Principale':'  Subappaltatrice'
-      setFont(i===0?'bold':'normal',8,[30,30,30])
-      doc.text(`${prefix} – ${nome}${cf?' ('+cf+')':''}`,L+2,y+3)
-      if(im.att){setFont('normal',7,GREY);doc.text(`Attività: ${im.att}`,L+6,y+7)}
-      ln(im.att?9:5)
+    setFont('bold',11,[30,30,30]);doc.text('Prevenzione Infortuni',L,y);y+=6
+    if(cantDetail){setFont('normal',10,[50,50,50]);doc.text('Cantiere di '+cantDetail,L,y);y+=8}
+    y+=6
+
+    const dataLeg=fmtLeggibile(v.data_visita)
+    const corpo=` Il giorno ${dataLeg||fmtDate(v.data_visita)||'–'} è passato nel vostro cantiere in oggetto, per fornirvi utili consigli in materia di prevenzione infortuni, uno dei nostri tecnici${tecNome?', '+tecNome:''}.
+
+ Egli si è soffermato ad illustrare al VS personale in cantiere le più importanti norme che devono essere tenute presenti per garantire la sicurezza durante le varie fasi lavorative, con particolare riferimento a quelle in corso.
+
+ In base a quanto previsto dalle norme che regolano il funzionamento dello scrivente Comitato Paritetico Territoriale potrà essere effettuata, entro breve termine, una successiva visita per constatare che i consigli forniti siano stati correttamente attuati.
+
+ Per migliorare la conoscenza della normativa e salute sul lavoro in allegato troverà un estratto della normativa oggetto dell\'incontro in cantiere.`
+
+    setFont('normal',10,[40,40,40])
+    const bodyLines=doc.splitTextToSize(corpo,W)
+    doc.text(bodyLines,L,y);y+=bodyLines.length*5+14
+
+    setFont('normal',10,[40,40,40]);doc.text('Distinti saluti.',L+10,y);y+=14
+    setFont('italic',9,GREY)
+    doc.text('La presidenza del Scuola Edile CPT – Centro per la formazione e la sicurezza edile di Padova',L,y)
+
+    // ════════════════════════════════════════════════
+    // PAGINA 2 – DATI VISITA + CHECKLIST
+    // ════════════════════════════════════════════════
+    doc.addPage();y=10
+
+    // Header
+    doc.setFillColor(...ORANGE);doc.rect(0,0,PW,20,'F')
+    setFont('bold',13,WHITE);doc.text('FORMEDIL PADOVA',L,9)
+    setFont('normal',7,WHITE);doc.text('ENTE UNICO FORMAZIONE E SICUREZZA',L,15)
+    setFont('bold',10,WHITE);doc.text('Scuola Costruzioni Giuseppe Jappelli',PW-L,9,{align:'right'})
+    setFont('normal',7,WHITE);doc.text('VERBALE DI SOPRALLUOGO IN CANTIERE',PW-L,15,{align:'right'})
+    y=24
+
+    // Riga tecnico/data/tipo
+    doc.autoTable({startY:y,
+      head:[['TECNICO','DATA','TIPOLOGIA VISITA','ETICHETTA CANTIERE','NR VISITA']],
+      body:[[tecNome||'–',fmtDate(v.data_visita),TIPO_ACC[v.tipo_accesso]||'–',cant.cantiere_etichetta||'–',v.nr_verbale||'–']],
+      styles:{fontSize:8,cellPadding:2},
+      headStyles:{fillColor:GREY,textColor:WHITE,fontStyle:'bold',fontSize:7},
+      columnStyles:{0:{cellWidth:42},1:{cellWidth:22},2:{cellWidth:38},4:{cellWidth:18,halign:'center'}},
+      margin:{left:L,right:L},tableWidth:W,theme:'grid'
     })
-    ln(4)
+    y=doc.lastAutoTable.finalY+3
 
-    // FIGURE
+    // Sezione impresa
+    doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
+    setFont('bold',8,WHITE);doc.text('Dati dell\'impresa',L+2,y+4);y+=7
+
+    const LBL=[220,230,242]
+    doc.autoTable({startY:y,
+      body:[
+        [{content:'Nome',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:32}},{content:impNome||'–',colSpan:5,styles:{fontStyle:'bold'}}],
+        [{content:'Certificazioni impresa',styles:{fontStyle:'bold',fillColor:LBL}},{content:'',cellWidth:25},
+         {content:'Ruolo impresa',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:28}},{content:impRuolo||'–',cellWidth:25},
+         {content:'Codice fiscale',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:28}},{content:impCF||'–'}],
+        [{content:'Email resp. visita azienda',styles:{fontStyle:'bold',fillColor:LBL}},{content:impEmail||'',colSpan:5}]
+      ],
+      styles:{fontSize:7.5,cellPadding:1.8},
+      margin:{left:L,right:L},tableWidth:W,theme:'grid'
+    })
+    y=doc.lastAutoTable.finalY+3
+
+    // Sezione cantiere
+    doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
+    setFont('bold',8,WHITE);doc.text('Dati del cantiere',L+2,y+4);y+=7
+
+    const tipInt=TIP_INT[cant.cantiere_tip_int]||'–'
+    const tipOpe=TIP_OPE[cant.cantiere_tip_ope]||'–'
+    const impLbl=IMP_LBL[cant.cantiere_importo]||'–'
+    const durLbl=DUR_LBL[cant.cantiere_durata]||'–'
+
+    doc.autoTable({startY:y,
+      body:[
+        [{content:'INDIRIZZO',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:28}},
+         {content:cant.cantiere_indirizzo||'–',colSpan:2},
+         {content:'Numero',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:22}},
+         {content:cant.cantiere_civico||'–',cellWidth:20}],
+        [{content:'COMUNE',styles:{fontStyle:'bold',fillColor:LBL}},
+         {content:cant.comune_nome||'–'},
+         {content:'CAP',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:15}},
+         {content:cant.cantiere_cap||'–',cellWidth:20},
+         {content:'Tipo intervento',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:28}},
+         {content:'Importo',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:18}}],
+        // Row 3
+        [{content:'Codice CNCE',styles:{fontStyle:'bold',fillColor:LBL}},
+         {content:cant.cantiere_cnce||'–'},
+         {content:'Tipologia opera',styles:{fontStyle:'bold',fillColor:LBL}},
+         {content:tipOpe},
+         {content:'Durata',styles:{fontStyle:'bold',fillColor:LBL}},
+         {content:durLbl}],
+        [{content:'Totale lavoratori in cantiere',styles:{fontStyle:'bold',fillColor:LBL},colSpan:1},
+         {content:String(v.nr_lavoratori||0),cellWidth:20},
+         {content:'',colSpan:2},
+         {content:'di cui autonomi in cantiere',styles:{fontStyle:'bold',fillColor:LBL}},
+         {content:String(v.nr_ind||0)}]
+      ],
+      styles:{fontSize:7.5,cellPadding:1.8},
+      margin:{left:L,right:L},tableWidth:W,theme:'grid'
+    })
+    // Fix row 2 (tipo intervento / importo are missing values — add them properly below)
+    y=doc.lastAutoTable.finalY
+
+    // ── fix: righe tipo intervento e importo mancano i valori → li aggiungiamo come riga separata
+    // (il bug è che autoTable non accetta facilmente 6 colonne con dati misti)
+    // Override: ricreo la tabella cantiere in modo più semplice
+    // (già generata sopra — i valori tipInt e impLbl vanno inseriti)
+    // La riga 2 ha 6 celle ma tipInt e impLbl sono nelle posizioni 4 e 5 — autoTable le omette
+    // Risolvo con una tabella separata solo per quella riga
+    doc.autoTable({startY:y-0.1,
+      body:[[
+        {content:'Tipo intervento',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:38}},
+        {content:tipInt,cellWidth:45},
+        {content:'Importo lavori (€)',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:38}},
+        {content:impLbl}
+      ]],
+      styles:{fontSize:7.5,cellPadding:1.8},
+      margin:{left:L,right:L},tableWidth:W,theme:'grid'
+    })
+    y=doc.lastAutoTable.finalY+3
+
+    // N° imprese
+    doc.autoTable({startY:y,
+      body:[[
+        {content:'N° imprese presenti in cantiere',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:70}},
+        {content:String(v.nr_imp||1),cellWidth:30},
+        {content:'N° ditte individuali',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:50}},
+        {content:String(v.nr_ind||0)}
+      ]],
+      styles:{fontSize:7.5,cellPadding:1.8},
+      margin:{left:L,right:L},tableWidth:W,theme:'grid'
+    })
+    y=doc.lastAutoTable.finalY+3
+
+    // Sezione visita (lavorazioni)
+    doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
+    setFont('bold',8,WHITE);doc.text('Dati della visita',L+2,y+4);y+=7
+
+    const lavText=lavs&&lavs.length?lavs.map(l=>l.lavorazione).filter(Boolean).join(','):'–'
+    doc.autoTable({startY:y,
+      body:[[{content:'Lavorazioni:',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:28}},{content:lavText}]],
+      styles:{fontSize:7.5,cellPadding:1.8},
+      margin:{left:L,right:L},tableWidth:W,theme:'grid'
+    })
+    y=doc.lastAutoTable.finalY+4
+
+    // Box metodologia
+    const metodologia=[
+      'METODOLOGIA DI VALUTAZIONE INTERNA – CNCPT. CRITERI DI GIUDIZIO CHE IL TECNICO USA NELL\'EFFETTUAZIONE DELLA VISITA DI CONSULENZA TECNICA IN CANTIERE',
+      'NC+  inadempienze che espongono i lavoratori ad un rischio grave ed imminente (mancanza totale di parapetti su un ponteggio esteso);',
+      'NC-  inadempienze che espongono i lavoratori ad un rischio generico (mancanza totale recinzione di cantiere);',
+      'OSS  inadempienze la cui presenza non espone ad alcun rischio diretto (mancanza ricovero per attrezzi);'
+    ]
+    doc.setDrawColor(...ORANGE);doc.setLineWidth(0.5)
+    doc.setFillColor(255,245,240);doc.rect(L,y,W,26,'FD')
+    setFont('bold',7,ORANGE);doc.text(metodologia[0],L+2,y+4,{maxWidth:W-4})
+    setFont('normal',7,GREY)
+    doc.text(metodologia[1],L+2,y+11,{maxWidth:W-4})
+    doc.text(metodologia[2],L+2,y+16,{maxWidth:W-4})
+    doc.text(metodologia[3],L+2,y+21,{maxWidth:W-4})
+    y+=30
+
+    // ════════════════════════════════════════════════
+    // CHECKLIST COMPLETA – TUTTE LE VOCI
+    // ════════════════════════════════════════════════
+    // Header sezione
     doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
-    setFont('bold',9,WHITE);doc.text('FIGURE E PERSONE',L+2,y+4.5)
-    ln(8)
-    const figRows=[]
-    if(v.nom_ppre)figRows.push(['Persona presente',`${v.nom_ppre}${v.qual_ppre?' ('+v.qual_ppre+')':''}${v.tel_ppre?' – '+v.tel_ppre:''}`])
-    const commNome=v.comm_rag_soc||[v.comm_titolo,v.comm_nome,v.comm_cog].filter(Boolean).join(' ')
-    if(commNome)figRows.push(['Committente',`${commNome}${v.comm_cf?' – CF: '+v.comm_cf:''}`])
-    if(v.resp_lav)figRows.push(['Resp. Lavoratori',`${v.resp_lav}${v.rl_email?' – '+v.rl_email:''}`])
-    if(v.csp)figRows.push(['CSP',`${v.csp}${v.csp_email?' – '+v.csp_email:''}`])
-    if(v.cse)figRows.push(['CSE',`${v.cse}${v.cse_email?' – '+v.cse_email:''}`])
-    if(figRows.length){figRows.forEach(([lbl,val])=>{cell(lbl,val,L,y,W,8);ln(10)})}
-    else{setFont('normal',8,GREY);doc.text('Nessuna figura registrata',L+2,y+4);ln(7)}
-    ln(3)
+    setFont('bold',8,WHITE);doc.text('Verifiche effettuate',L+2,y+4.3)
+    y+=8
 
-    // LAVORAZIONI
-    doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
-    setFont('bold',9,WHITE);doc.text('LAVORAZIONI IN CORSO',L+2,y+4.5)
-    ln(8)
-    if(lavs&&lavs.length){
-      const lavText=lavs.map(l=>l.lavorazione).filter(Boolean).join(' • ')
-      setFont('normal',8,[30,30,30])
-      const split=doc.splitTextToSize(lavText,W-4)
-      doc.text(split,L+2,y+3);ln(split.length*4+5)
-    }else{setFont('normal',8,GREY);doc.text('Non specificate',L+2,y+4);ln(7)}
-    ln(3)
+    // Raggruppa per zona e prefisso
+    const vociByZona={}
+    ;(S.voci||[]).filter(vv=>!vv.is_nota).forEach(vv=>{
+      const z=vv.zona_osserv
+      if(!vociByZona[z])vociByZona[z]={}
+      const p=vv.prefisso||'_'
+      if(!vociByZona[z][p])vociByZona[z][p]=[]
+      vociByZona[z][p].push(vv)
+    })
 
-    // IPC
-    // chkMap mantiene {valore,nota} per il PDF; per calcIPC servono solo le stringhe valore
-    const chkMap={};(chk||[]).forEach(r=>{chkMap[r.codice]={valore:r.valore,nota:r.nota}})
-    const chkValori={};(chk||[]).forEach(r=>{if(r.valore)chkValori[r.codice]=r.valore})
-    const {ipc,np,nm,os}=calcIPC(chkValori)
-    const ipcColor=ipc==='ALTO'?[231,80,15]:ipc==='MEDIO'?[230,160,0]:ipc==='BASSO'?[39,174,96]:[150,150,150]
-    doc.setFillColor(...ipcColor);doc.rect(L,y,W,10,'F')
-    setFont('bold',12,WHITE);doc.text(`IPC: ${ipc}`,L+4,y+7)
-    setFont('normal',9,WHITE);doc.text(`NC+: ${np}  NC-: ${nm}  OSS: ${os}`,PW-L-2,y+7,{align:'right'})
-    ln(14)
+    for(const zona of Object.keys(vociByZona).map(Number).sort()){
+      const zonaLbl=(ZONE_LBL[zona]||String(zona)).toUpperCase()
+      const prefissi=vociByZona[zona]
 
-    // Assicura che S.voci sia caricato (può mancare se il PDF è generato dalla lista senza aprire il form)
-    if(!S.voci||!S.voci.length){
-      const{data:vociDB}=await sb.from('checklist_voci').select('*').order('ordine')
-      S.voci=vociDB||[]
-      S.byZona={}
-      for(const vv of S.voci){if(!S.byZona[vv.zona_osserv])S.byZona[vv.zona_osserv]=[];S.byZona[vv.zona_osserv].push(vv)}
-    }
+      // Intestazione zona (sfondo grigio)
+      doc.autoTable({startY:y,
+        head:[[{content:zonaLbl,colSpan:3,styles:{halign:'left'}}]],
+        body:[],
+        styles:{fontSize:7.5,cellPadding:2},
+        headStyles:{fillColor:GREY,textColor:WHITE,fontStyle:'bold',fontSize:8},
+        columnStyles:{0:{cellWidth:W-54},1:{cellWidth:18,halign:'center'},2:{cellWidth:36}},
+        margin:{left:L,right:L},tableWidth:W,theme:'grid'
+      })
+      y=doc.lastAutoTable.finalY
 
-    // CHECKLIST per zona
-    if(S.voci&&S.voci.length){
-      const vociByZona={}
-      S.voci.forEach(vv=>{if(!vociByZona[vv.zona_osserv])vociByZona[vv.zona_osserv]=[];vociByZona[vv.zona_osserv].push(vv)})
-      for(const [zona,voci] of Object.entries(vociByZona)){
-        // chkMap ha {valore, nota} – filtriamo le voci con rilievo effettivo
-        const risposte=voci.filter(vv=>chkMap[vv.codice]&&chkMap[vv.codice].valore&&chkMap[vv.codice].valore!=='NA')
-        if(!risposte.length)continue
-        if(y>260){doc.addPage();y=15}
-        // Usa ZONE_LBL per il nome leggibile (zona è un numero intero)
-        const zonaLbl=(ZONE_LBL[zona]||String(zona)).toUpperCase()
-        setFont('bold',8,ORANGE);doc.text(zonaLbl,L,y)
-        hLine(L,PW-L,ORANGE);ln(5)
-        const tRows=risposte.map(vv=>{
+      for(const [pref,voci] of Object.entries(prefissi)){
+        const prefLbl=PREF_LBL[pref]||pref
+        const rows=voci.map(vv=>{
           const r=chkMap[vv.codice]||{}
-          // Usa "descrizione" (nome nel DB) oppure fallback su "voce_checklist" per compatibilità
-          return[vv.codice,vv.descrizione||vv.voce_checklist||'',r.valore||'',r.nota||'']
+          const val=r.valore&&r.valore!=='NA'?r.valore:'n.v.'
+          return[vv.descrizione||'',val,r.nota||'']
         })
-        doc.autoTable({startY:y,head:[['Cod.','Voce','Esito','Note']],body:tRows,
+
+        doc.autoTable({startY:y,
+          head:[[{content:prefLbl,colSpan:3,styles:{halign:'left',fontStyle:'bold'}}]],
+          body:rows,
           styles:{fontSize:7,cellPadding:1.5},
-          headStyles:{fillColor:GREY,textColor:WHITE,fontStyle:'bold'},
-          columnStyles:{0:{cellWidth:12},2:{cellWidth:14,halign:'center'},3:{cellWidth:40}},
-          margin:{left:L,right:L},tableWidth:W,
+          headStyles:{fillColor:[230,230,230],textColor:[50,50,50],fontStyle:'bold',fontSize:7},
+          columnStyles:{
+            0:{cellWidth:W-54},
+            1:{cellWidth:18,halign:'center'},
+            2:{cellWidth:36}
+          },
+          margin:{left:L,right:L},tableWidth:W,theme:'grid',
           didParseCell:(d)=>{
-            if(d.section==='body'&&d.column.index===2){
+            if(d.section==='body'&&d.column.index===1){
               const val=d.cell.raw
-              // I valori reali nel DB sono NC+, NC-, OSS (non NP/NM/OS)
-              if(val==='NC+')d.cell.styles.textColor=[231,80,15]
-              else if(val==='NC-')d.cell.styles.textColor=[230,160,0]
+              if(val==='NC+')d.cell.styles.textColor=ORANGE
+              else if(val==='NC-')d.cell.styles.textColor=[200,140,0]
               else if(val==='OSS')d.cell.styles.textColor=[39,174,96]
+              else d.cell.styles.textColor=[180,180,180]  // n.v.
             }
           }
         })
-        y=doc.lastAutoTable.finalY+4
+        y=doc.lastAutoTable.finalY
       }
+      y+=2
     }
-    ln(3)
 
-    // NOTE
+    // ════════════════════════════════════════════════
+    // NOTE TECNICHE (se presenti)
+    // ════════════════════════════════════════════════
     if(v.oss_tec||v.note_for_m){
-      if(y>245){doc.addPage();y=15}
-      doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
-      setFont('bold',9,WHITE);doc.text('NOTE',L+2,y+4.5);ln(8)
+      doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
+      setFont('bold',8,WHITE);doc.text('NOTE',L+2,y+4);y+=7
       ;[['Osservazioni tecniche',v.oss_tec],['Note per il mittente',v.note_for_m]].forEach(([lbl,val])=>{
         if(!val)return
-        setFont('bold',7,GREY);doc.text(lbl+':',L,y);ln(4)
+        setFont('bold',7,GREY);doc.text(lbl+':',L,y);y+=4
         setFont('normal',8,[30,30,30])
         const split=doc.splitTextToSize(val,W-4)
-        doc.text(split,L+2,y);ln(split.length*4+3)
+        doc.text(split,L+2,y);y+=split.length*4+3
       })
+      y+=4
     }
 
-    // FOTO – griglia 2×2 invisibile (~70×70 mm per foto)
-    // Le foto risiedono su Drive; per il PDF usiamo la base64 in memoria (disponibile nella sessione corrente)
+    // FOTO – griglia 2×2 (~70×70 mm per foto)
     const FOTO_TIPI=['foto1','foto2','foto3','foto4']
     const imgMap={}
     for(const tipo of FOTO_TIPI){
