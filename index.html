@@ -281,6 +281,7 @@ tr:hover td{background:#fef9f7}
     </svg>
     <div class="user-area">
       <span id="lbl-user"></span>
+      <button id="btn-firme" title="Gestisci firme tecnici" style="background:transparent;border:1px solid rgba(255,255,255,.6);color:#fff;font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer;margin-right:6px">🖊 Firme</button>
       <button id="btn-logout">Esci</button>
     </div>
   </header>
@@ -1085,6 +1086,7 @@ async function onLogin(user){
   showScr('app')
   populateTecnicoSelect()
   populateComuniSelect()
+  loadFirmeCache()
   navTo('dashboard')
 }
 $('btn-login').onclick=async()=>{
@@ -3035,6 +3037,14 @@ async function genPDF(vid, output='save'){
     const impEmail=impPrinc?.imprese?.impresa_email_ref||v.imprese?.impresa_email_ref||''
     const impRuolo=impPrinc?.ruolo||''
     const tecNome=v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():''
+    const tecEmail=v.tecnici?.email||''
+    // Secondo tecnico
+    let tec2Nome='',tec2Email=''
+    if(v.tecnico2_id){
+      const{data:t2}=await sb.from('tecnici').select('tecnico_nome,tecnico_cognome,email').eq('tecnico_id',v.tecnico2_id).maybeSingle()
+      if(t2){tec2Nome=`${t2.tecnico_nome||''} ${t2.tecnico_cognome||''}`.trim();tec2Email=t2.email||''}
+    }
+    const nomStagePDF=v.stage_vis&&v.nom_stage?v.nom_stage:''
     const cantLabel=cant.cantiere_etichetta||`${cant.cantiere_indirizzo||''} ${cant.cantiere_civico||''}`.trim()
     const comuneLabel=cant.comune_nome||''
     const cantDetail=[cantLabel,comuneLabel].filter(Boolean).join(' – ')
@@ -3094,9 +3104,11 @@ async function genPDF(vid, output='save'){
     y=24
 
     // Riga tecnico/data/tipo
+    const _tecLines=[tecNome].concat(tec2Nome?['2° '+tec2Nome]:[]).concat(nomStagePDF?['Stagista: '+nomStagePDF]:[])
+    const _tecCell=_tecLines.filter(Boolean).join('\n')||'–'
     doc.autoTable({startY:y,
       head:[['TECNICO','DATA','TIPOLOGIA VISITA','ETICHETTA CANTIERE','NR VISITA']],
-      body:[[tecNome||'–',fmtDate(v.data_visita),TIPO_ACC[v.tipo_accesso]||'–',cant.cantiere_etichetta||'–',v.nr_verbale||'–']],
+      body:[[_tecCell,fmtDate(v.data_visita),TIPO_ACC[v.tipo_accesso]||'–',cant.cantiere_etichetta||'–',v.nr_verbale||'–']],
       styles:{fontSize:8,cellPadding:2},
       headStyles:{fillColor:GREY,textColor:WHITE,fontStyle:'bold',fontSize:7},
       columnStyles:{0:{cellWidth:42},1:{cellWidth:22},2:{cellWidth:38},4:{cellWidth:18,halign:'center'}},
@@ -3224,11 +3236,11 @@ async function genPDF(vid, output='save'){
     })
     y=doc.lastAutoTable.finalY+2
 
-    // Note del tecnico (se presenti)
+    // Note del tecnico (se presenti) – sfondo arancione chiaro, bordo grigio spesso
     if(v.oss_tec){
       doc.autoTable({startY:y,
-        body:[[{content:'Osservazioni del tecnico',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:42}},{content:v.oss_tec}]],
-        styles:{fontSize:7.5,cellPadding:1.8},
+        body:[[{content:'Osservazioni del tecnico',styles:{fontStyle:'bold',fillColor:[255,200,130],textColor:[80,50,10],cellWidth:42}},{content:v.oss_tec,styles:{fillColor:[255,243,224]}}]],
+        styles:{fontSize:7.5,cellPadding:1.8,lineColor:[86,92,102],lineWidth:0.7},
         margin:{left:L,right:L},tableWidth:W,theme:'grid'
       })
       y=doc.lastAutoTable.finalY+2
@@ -3387,13 +3399,45 @@ async function genPDF(vid, output='save'){
       ln(2*FH+FGAP+10)
     }
 
-    // FIRMA
+    // FIRMA – carica immagini firma da Supabase Storage
     if(y>255){doc.addPage();y=15}
     y=Math.max(y,260)
     hLine();ln(5)
     setFont('normal',8,GREY)
-    doc.text(`Il Tecnico: ${tecNome||'–'}`,L,y)
-    doc.text('Firma: ___________________________',PW-L,y,{align:'right'})
+
+    // Recupera base64 firma da Storage (usa cache sessione _firmaCache)
+    const _getFirmaB64=async(email)=>{
+      if(!email)return null
+      const fUrl=_firmaCache[email]
+      if(!fUrl)return null
+      try{
+        const sUrl=await getFirmaSignedUrl(fUrl)
+        if(!sUrl)return null
+        return await fetchImageBase64(sUrl)
+      }catch(e){return null}
+    }
+
+    const _drawFirma=async(nome,email,xPos,halfW)=>{
+      setFont('normal',8,GREY)
+      doc.text(`Tecnico: ${nome||'–'}`,xPos,y,{maxWidth:halfW-4})
+      const fb64=await _getFirmaB64(email)
+      if(fb64){
+        try{
+          const fmt=fb64.startsWith('/9j')?'JPEG':'PNG'
+          doc.addImage('data:image/'+fmt.toLowerCase()+';base64,'+fb64,fmt,xPos,y+3,42,14,undefined,'FAST')
+        }catch(e){doc.text('Firma: ___________________________',xPos,y+10)}
+      }else{
+        doc.text('Firma: ___________________________',xPos,y+10)
+      }
+    }
+
+    if(tec2Nome){
+      const half=(W-4)/2
+      await _drawFirma(tecNome,tecEmail,L,half)
+      await _drawFirma(tec2Nome,tec2Email,L+half+4,half)
+    }else{
+      await _drawFirma(tecNome,tecEmail,L,W)
+    }
     ln(5)
     setFont('normal',7,[180,180,180])
     doc.text(`Generato il ${new Date().toLocaleString('it-IT')} – Formedil Padova CPT`,PW/2,y,{align:'center'})
@@ -3426,6 +3470,131 @@ async function genPDF(vid, output='save'){
   }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
 }
 
+// ── GESTIONE FIRME TECNICI (Supabase Storage) ──
+
+// Cache locale firma_url per sessione: { email -> firma_url }
+const _firmaCache={}
+
+// Carica firma_url di tutti i tecnici dal DB e popola la cache
+async function loadFirmeCache(){
+  const{data}=await sb.from('tecnici').select('email,firma_url').not('firma_url','is',null)
+  if(data)data.forEach(r=>{if(r.email&&r.firma_url)_firmaCache[r.email]=r.firma_url})
+}
+
+// Restituisce un URL firmato (signed, 1h) partendo dall'URL Storage salvato nel DB
+async function getFirmaSignedUrl(firmaUrl){
+  if(!firmaUrl)return null
+  // estrae il path relativo dal bucket, es. firme-tecnici/abc.png
+  const marker='/object/public/firme-tecnici/'
+  const marker2='/object/sign/firme-tecnici/'
+  let storagePath=null
+  if(firmaUrl.includes(marker))storagePath=firmaUrl.split(marker)[1]
+  else if(firmaUrl.includes(marker2))storagePath=firmaUrl.split(marker2)[1].split('?')[0]
+  else storagePath=firmaUrl.split('/firme-tecnici/')[1]?.split('?')[0]
+  if(!storagePath)return null
+  const{data}=await sb.storage.from('firme-tecnici').createSignedUrl(storagePath,3600)
+  return data?.signedUrl||null
+}
+
+// Scarica un'immagine da URL e la converte in base64 (per jsPDF)
+async function fetchImageBase64(url){
+  try{
+    const r=await fetch(url)
+    if(!r.ok)return null
+    const blob=await r.blob()
+    return new Promise(res=>{
+      const rd=new FileReader()
+      rd.onload=e=>res(e.target.result.split(',')[1])
+      rd.onerror=()=>res(null)
+      rd.readAsDataURL(blob)
+    })
+  }catch(e){return null}
+}
+
+async function openModalFirme(){
+  const list=$('firme-list');if(!list)return
+  list.innerHTML='<div style="text-align:center;color:#888;font-size:12px;padding:12px">Caricamento...</div>'
+  show('modal-firme')
+
+  // Ricarica firma_url dal DB per tutti i tecnici
+  const{data:tecRows}=await sb.from('tecnici').select('email,tecnico_nome,tecnico_cognome,firma_url')
+  const tecMap={}
+  if(tecRows)tecRows.forEach(r=>{tecMap[r.email]={...r}})
+
+  list.innerHTML=''
+  for(const t of TECNICI_LIST){
+    const dbTec=tecMap[t.email]||{}
+    const firmaUrl=dbTec.firma_url||null
+    // Genera preview se c'è una firma
+    let previewHtml='<span style="font-size:11px;color:#aaa;font-style:italic">Nessuna firma caricata</span>'
+    if(firmaUrl){
+      try{
+        const sUrl=await getFirmaSignedUrl(firmaUrl)
+        if(sUrl)previewHtml=`<img src="${sUrl}" style="height:40px;max-width:120px;object-fit:contain;border:1px solid #ddd;border-radius:4px;background:#fff;padding:2px">`
+      }catch(e){}
+    }
+    const div=document.createElement('div')
+    div.style.cssText='display:flex;align-items:center;gap:12px;padding:10px;border:1px solid #e0e0e0;border-radius:8px;background:#fafafa'
+    div.innerHTML=`
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px">${t.nome}</div>
+        <div style="font-size:11px;color:#888;overflow:hidden;text-overflow:ellipsis">${t.email}</div>
+        ${firmaUrl?'<div style="font-size:10px;color:#27ae60;margin-top:2px">✓ Firma presente</div>':''}
+      </div>
+      ${previewHtml}
+      <label style="cursor:pointer;background:var(--orange);color:#fff;padding:6px 11px;border-radius:5px;font-size:12px;white-space:nowrap;flex-shrink:0">
+        ${firmaUrl?'🔄 Sostituisci':'📤 Carica'}
+        <input type="file" accept="image/png,image/jpeg,image/webp" style="display:none" data-email="${t.email}">
+      </label>
+      ${firmaUrl?`<button onclick="deleteFirmaDB('${t.email}')" title="Elimina firma" style="background:#e74c3c;color:#fff;border:none;border-radius:5px;padding:6px 9px;cursor:pointer;font-size:12px;flex-shrink:0">✕</button>`:''}
+    `
+    // Gestisci upload verso Supabase Storage
+    const input=div.querySelector('input[type=file]')
+    input.onchange=async(ev)=>{
+      const file=ev.target.files[0];if(!file)return
+      const btn=input.closest('label')
+      btn.textContent='⏳ Caricamento...'
+      try{
+        // Percorso nel bucket: {email_sanitizzata}.{ext}
+        const ext=file.name.split('.').pop().toLowerCase()||'png'
+        const safeName=t.email.replace(/[^a-z0-9@._-]/gi,'_')
+        const storagePath=`${safeName}.${ext}`
+        // Upload (upsert)
+        const{error:upErr}=await sb.storage.from('firme-tecnici').upload(storagePath,file,{upsert:true,contentType:file.type})
+        if(upErr)throw upErr
+        // Recupera URL pubblico del file
+        const{data:urlData}=sb.storage.from('firme-tecnici').getPublicUrl(storagePath)
+        const publicUrl=urlData?.publicUrl
+        if(!publicUrl)throw new Error('URL non disponibile')
+        // Aggiorna firma_url nel record tecnico
+        const{error:dbErr}=await sb.from('tecnici').update({firma_url:publicUrl}).eq('email',t.email)
+        if(dbErr)throw dbErr
+        _firmaCache[t.email]=publicUrl
+        toast('Firma salvata per '+t.nome,'ok')
+        openModalFirme()
+      }catch(e){toast('Errore upload firma: '+e.message,'err');console.error(e)}
+    }
+    list.appendChild(div)
+  }
+}
+
+window.deleteFirmaDB=async(email)=>{
+  const{data:row}=await sb.from('tecnici').select('firma_url').eq('email',email).maybeSingle()
+  if(row?.firma_url){
+    // Elimina file da Storage
+    const marker='/object/public/firme-tecnici/'
+    const storagePath=row.firma_url.includes(marker)?row.firma_url.split(marker)[1]:null
+    if(storagePath)await sb.storage.from('firme-tecnici').remove([storagePath])
+  }
+  await sb.from('tecnici').update({firma_url:null}).eq('email',email)
+  delete _firmaCache[email]
+  toast('Firma eliminata','ok')
+  openModalFirme()
+}
+$('btn-firme').onclick=openModalFirme
+$('btn-firme-close').onclick=()=>hide('modal-firme')
+$('modal-firme').onclick=(e)=>{if(e.target.id==='modal-firme')hide('modal-firme')}
+
 // ── ESPOSIZIONE GLOBALE funzioni usate in onclick inline ──
 // (necessario perché lo script è type="module" e non ha scope globale)
 window.removeLav = removeLav
@@ -3433,6 +3602,17 @@ window.deleteFoto = deleteFoto
 
 // ── AVVIO ──
 document.addEventListener('DOMContentLoaded', initAuth)
+<!-- MODAL FIRME TECNICI -->
+<div id="modal-firme" class="modal-overlay hidden" style="z-index:9999">
+  <div class="modal-box" style="max-width:480px">
+    <h3 style="margin-bottom:14px;color:var(--orange)">🖊 Firme tecnici</h3>
+    <p style="font-size:12px;color:#666;margin-bottom:14px">Carica l'immagine della firma per ogni tecnico. La firma apparirà in calce al verbale PDF. Formati supportati: PNG, JPG (sfondo trasparente consigliato).</p>
+    <div id="firme-list" style="display:flex;flex-direction:column;gap:10px"></div>
+    <div style="margin-top:18px;text-align:right">
+      <button class="btn-secondary" id="btn-firme-close">Chiudi</button>
+    </div>
+  </div>
+</div>
 </script>
 </body>
 </html>
