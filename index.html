@@ -3379,14 +3379,13 @@ async function genPDF(vid, output='save'){
           const r=chkMap[vv.codice]||{}
           const val=r.valore&&r.valore!=='NA'?r.valore:null
           if(!val) continue
-          rows.push([vv.descrizione||'',val,r.nota||''])
           const isViolazione=['OSS','NC+','NC-'].includes(val)
-          if(isViolazione){
-            if(vv.importo_sanzione) totalSanzione+=Number(vv.importo_sanzione)
-            if(vv.articolo){
-              rows.push([{content:vv.articolo,colSpan:3,styles:{fontStyle:'italic',fontSize:6,textColor:[120,100,80],fillColor:[255,252,248],cellPadding:{top:1,bottom:1.5,left:3,right:2}}}])
-            }
-          }
+          if(isViolazione&&vv.importo_sanzione) totalSanzione+=Number(vv.importo_sanzione)
+          // Mostra articolo di legge nella colonna descrizione (sotto il testo) per OSS/NC+/NC-
+          const descText=(isViolazione&&vv.articolo)
+            ?(vv.descrizione||'')+'\n'+vv.articolo
+            :(vv.descrizione||'')
+          rows.push([descText,val,r.nota||''])
         }
 
         if(!rows.length) continue  // nessun rilievo in questo sottogruppo → salta
@@ -3403,12 +3402,18 @@ async function genPDF(vid, output='save'){
           },
           margin:{left:L,right:L},tableWidth:W,theme:'grid',
           didParseCell:(d)=>{
-            if(d.section==='body'&&d.column.index===1){
-              const val=d.cell.raw
-              if(val==='NC+'){d.cell.styles.textColor=[200,30,30];d.cell.styles.fontStyle='bold'}
-              else if(val==='NC-'){d.cell.styles.textColor=[231,80,15];d.cell.styles.fontStyle='bold'}
-              else if(val==='OSS'){d.cell.styles.textColor=[160,120,0];d.cell.styles.fontStyle='bold'}
-              else if(val==='VER'){d.cell.styles.textColor=[39,174,96];d.cell.styles.fontStyle='bold'}
+            if(d.section==='body'){
+              if(d.column.index===1){
+                const val=d.cell.raw
+                if(val==='NC+'){d.cell.styles.textColor=[200,30,30];d.cell.styles.fontStyle='bold'}
+                else if(val==='NC-'){d.cell.styles.textColor=[231,80,15];d.cell.styles.fontStyle='bold'}
+                else if(val==='OSS'){d.cell.styles.textColor=[160,120,0];d.cell.styles.fontStyle='bold'}
+                else if(val==='VER'){d.cell.styles.textColor=[39,174,96];d.cell.styles.fontStyle='bold'}
+              }
+              // Articolo di legge nella colonna descrizione: seconda riga in corsivo grigio
+              if(d.column.index===0&&typeof d.cell.raw==='string'&&d.cell.raw.includes('\n')){
+                d.cell.styles.fontSize=7
+              }
             }
           }
         })
@@ -3424,15 +3429,25 @@ async function genPDF(vid, output='save'){
     if(totalSanzione>0){
       const fmtEur=(n)=>n.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})
       const sanzRidotta=totalSanzione/4
+      // Intestazione
+      doc.setFillColor(...ORANGE)
+      doc.rect(L,y,W,6,'F')
+      setFont('bold',8,WHITE)
+      doc.text('STIMA DELLE SANZIONI APPLICABILI',L+2,y+4.2)
+      y+=8
       doc.autoTable({startY:y,
         body:[
-          [{content:'STIMA DELLE SANZIONI APPLICABILI',colSpan:2,styles:{fontStyle:'bold',fillColor:ORANGE,textColor:WHITE,fontSize:8,halign:'left'}}],
-          ['Sanzione massima potenziale pari a:',{content:'€ '+fmtEur(totalSanzione),styles:{fontStyle:'bold',halign:'right',textColor:[180,30,30]}}],
-          ['Sanzione ridotta di 1/4 pari a:',{content:'€ '+fmtEur(sanzRidotta),styles:{fontStyle:'bold',halign:'right',textColor:[180,80,30]}}]
+          ['Sanzione massima potenziale pari a:','€ '+fmtEur(totalSanzione)],
+          ['Sanzione ridotta di 1/4 pari a:','€ '+fmtEur(sanzRidotta)]
         ],
-        styles:{fontSize:7.5,cellPadding:2.5},
-        columnStyles:{0:{cellWidth:W-50},1:{cellWidth:50}},
-        margin:{left:L,right:L},tableWidth:W,theme:'grid'
+        styles:{fontSize:8,cellPadding:3},
+        columnStyles:{0:{cellWidth:W-50},1:{cellWidth:50,halign:'right',fontStyle:'bold'}},
+        margin:{left:L,right:L},tableWidth:W,theme:'grid',
+        didParseCell:(d)=>{
+          if(d.column.index===1){
+            d.cell.styles.textColor=d.row.index===0?[180,30,30]:[180,80,30]
+          }
+        }
       })
       y=doc.lastAutoTable.finalY+4
     }
