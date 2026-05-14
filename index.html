@@ -3390,3 +3390,254 @@ document.addEventListener('DOMContentLoaded', initAuth)
 </script>
 </body>
 </html>
+]],
+      styles:{fontSize:7.5,cellPadding:1.8},
+      margin:{left:L,right:L},tableWidth:W,theme:'grid'
+    })
+    y=doc.lastAutoTable.finalY+2
+
+    // IPC – Indice di Pericolosità del Cantiere
+    const _cntNCp=(chk||[]).filter(r=>r.valore==='NC+').length
+    const _cntNCn=(chk||[]).filter(r=>r.valore==='NC-').length
+    const _cntOSS=(chk||[]).filter(r=>r.valore==='OSS').length
+    const _cntVER=(chk||[]).filter(r=>r.valore==='VER').length
+    let ipcLabel,ipcBg,ipcTxt
+    if(_cntNCp>0){ipcLabel='ALTO';ipcBg=[200,30,30];ipcTxt=WHITE}
+    else if(_cntNCn>0){ipcLabel='MEDIO';ipcBg=[231,80,15];ipcTxt=WHITE}
+    else if(_cntOSS>0){ipcLabel='BASSO';ipcBg=[180,140,0];ipcTxt=WHITE}
+    else{ipcLabel='NESSUN RILIEVO';ipcBg=[39,174,96];ipcTxt=WHITE}
+    const ipcDetail=`NC+: ${_cntNCp}   NC-: ${_cntNCn}   OSS: ${_cntOSS}   VER: ${_cntVER}`
+    doc.autoTable({startY:y,
+      body:[[
+        {content:'IPC – Indice di Pericolosità del Cantiere',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:90}},
+        {content:ipcLabel,styles:{fontStyle:'bold',fillColor:ipcBg,textColor:ipcTxt,halign:'center',cellWidth:32}},
+        {content:ipcDetail,styles:{fontSize:7,fillColor:[248,248,248],halign:'center'}}
+      ]],
+      styles:{fontSize:8,cellPadding:2.5},
+      margin:{left:L,right:L},tableWidth:W,theme:'grid'
+    })
+    y=doc.lastAutoTable.finalY+2
+
+    // Note del tecnico (se presenti)
+    if(v.oss_tec){
+      doc.autoTable({startY:y,
+        body:[[{content:'Osservazioni del tecnico',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:42}},{content:v.oss_tec}]],
+        styles:{fontSize:7.5,cellPadding:1.8},
+        margin:{left:L,right:L},tableWidth:W,theme:'grid'
+      })
+      y=doc.lastAutoTable.finalY+2
+    }
+    y+=2
+
+    // Box metodologia
+    const metodologia=[
+      'METODOLOGIA DI VALUTAZIONE INTERNA – CNCPT. CRITERI DI GIUDIZIO CHE IL TECNICO USA NELL\'EFFETTUAZIONE DELLA VISITA DI CONSULENZA TECNICA IN CANTIERE',
+      'NC+  inadempienze che espongono i lavoratori ad un rischio grave ed imminente (mancanza totale di parapetti su un ponteggio esteso);',
+      'NC-  inadempienze che espongono i lavoratori ad un rischio generico (mancanza totale recinzione di cantiere);',
+      'OSS  inadempienze la cui presenza non espone ad alcun rischio diretto (mancanza ricovero per attrezzi);'
+    ]
+    doc.setDrawColor(...ORANGE);doc.setLineWidth(0.5)
+    doc.setFillColor(255,245,240);doc.rect(L,y,W,26,'FD')
+    setFont('bold',7,ORANGE);doc.text(metodologia[0],L+2,y+4,{maxWidth:W-4})
+    setFont('normal',7,GREY)
+    doc.text(metodologia[1],L+2,y+11,{maxWidth:W-4})
+    doc.text(metodologia[2],L+2,y+16,{maxWidth:W-4})
+    doc.text(metodologia[3],L+2,y+21,{maxWidth:W-4})
+    y+=30
+
+    // ════════════════════════════════════════════════
+    // CHECKLIST COMPLETA – TUTTE LE VOCI
+    // ════════════════════════════════════════════════
+    // Header sezione
+    doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
+    setFont('bold',8,WHITE);doc.text('Verifiche effettuate',L+2,y+4.3)
+    y+=8
+
+    // Raggruppa per zona e prefisso
+    const vociByZona={}
+    ;(S.voci||[]).filter(vv=>!vv.is_nota).forEach(vv=>{
+      const z=vv.zona_osserv
+      if(!vociByZona[z])vociByZona[z]={}
+      const p=vv.prefisso||'_'
+      if(!vociByZona[z][p])vociByZona[z][p]=[]
+      vociByZona[z][p].push(vv)
+    })
+
+    for(const zona of Object.keys(vociByZona).map(Number).sort()){
+      const zonaLbl=(ZONE_LBL[zona]||String(zona)).toUpperCase()
+      const prefissi=vociByZona[zona]
+
+      // Verifica se la zona ha almeno un rilievo valorizzato
+      const zonaHasRows=Object.values(prefissi).some(voci=>
+        voci.some(vv=>{const r=chkMap[vv.codice]||{};return r.valore&&r.valore!=='NA'})
+      )
+      if(!zonaHasRows) continue
+
+      // Intestazione zona (sfondo grigio)
+      doc.autoTable({startY:y,
+        head:[[{content:zonaLbl,colSpan:3,styles:{halign:'left'}}]],
+        body:[],
+        styles:{fontSize:7.5,cellPadding:2},
+        headStyles:{fillColor:GREY,textColor:WHITE,fontStyle:'bold',fontSize:8},
+        columnStyles:{0:{cellWidth:W-70},1:{cellWidth:20,halign:'center'},2:{cellWidth:50}},
+        margin:{left:L,right:L},tableWidth:W,theme:'grid'
+      })
+      y=doc.lastAutoTable.finalY
+
+      for(const [pref,voci] of Object.entries(prefissi)){
+        const prefLbl=PREF_LBL[pref]||pref
+        // Solo voci con rilievo valorizzato (escludo n.v.)
+        const rows=voci.map(vv=>{
+          const r=chkMap[vv.codice]||{}
+          const val=r.valore&&r.valore!=='NA'?r.valore:null
+          if(!val) return null
+          return[vv.descrizione||'',val,r.nota||'']
+        }).filter(Boolean)
+
+        if(!rows.length) continue  // nessun rilievo in questo sottogruppo
+
+        doc.autoTable({startY:y,
+          head:[[{content:prefLbl,colSpan:3,styles:{halign:'left',fontStyle:'bold'}}]],
+          body:rows,
+          styles:{fontSize:7,cellPadding:1.5},
+          headStyles:{fillColor:[230,230,230],textColor:[50,50,50],fontStyle:'bold',fontSize:7},
+          columnStyles:{
+            0:{cellWidth:W-70},
+            1:{cellWidth:20,halign:'center'},
+            2:{cellWidth:50}
+          },
+          margin:{left:L,right:L},tableWidth:W,theme:'grid',
+          didParseCell:(d)=>{
+            if(d.section==='body'&&d.column.index===1){
+              const val=d.cell.raw
+              if(val==='NC+'){d.cell.styles.textColor=[200,30,30];d.cell.styles.fontStyle='bold'}
+              else if(val==='NC-'){d.cell.styles.textColor=[231,80,15];d.cell.styles.fontStyle='bold'}
+              else if(val==='OSS'){d.cell.styles.textColor=[160,120,0];d.cell.styles.fontStyle='bold'}
+              else if(val==='VER'){d.cell.styles.textColor=[39,174,96];d.cell.styles.fontStyle='bold'}
+            }
+          }
+        })
+        y=doc.lastAutoTable.finalY
+      }
+      y+=2
+    }
+
+    // NOTE: le Osservazioni del tecnico sono già incluse nella sezione Dati della visita
+    // Le Note per il mittente non vengono incluse nel verbale
+
+    // FOTO – griglia 2×2 (~70×70 mm per foto)
+    const FOTO_TIPI=['foto1','foto2','foto3','foto4']
+    const imgMap={}
+    for(const tipo of FOTO_TIPI){
+      if(S.foto[tipo]?.base64) imgMap[tipo]='data:image/jpeg;base64,'+S.foto[tipo].base64
+    }
+    const hasFoto=FOTO_TIPI.some(t=>imgMap[t])
+    if(hasFoto){
+      if(y>115){doc.addPage();y=15}
+      doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
+      setFont('bold',9,WHITE);doc.text('DOCUMENTAZIONE FOTOGRAFICA',L+2,y+4.5)
+      ln(10)
+      // Griglia 2×2 – celle 70×70 mm centrate nella pagina
+      const FW=70,FH=70,FGAP=12
+      const fx=L+(W-2*FW-FGAP)/2
+      const fPos=[[fx,y],[fx+FW+FGAP,y],[fx,y+FH+FGAP],[fx+FW+FGAP,y+FH+FGAP]]
+      // Legge larghezza e altezza dall'header JPEG (sincrono, nessun Image element)
+      const jpegSize=dataUri=>{
+        try{
+          const b64=dataUri.includes(',')?dataUri.split(',')[1]:dataUri
+          const bytes=Uint8Array.from(atob(b64.substring(0,6000)),c=>c.charCodeAt(0))
+          let j=2
+          while(j<bytes.length-9){
+            if(bytes[j]!==0xFF)break
+            const m=bytes[j+1]
+            const segLen=(bytes[j+2]<<8)|bytes[j+3]
+            if((m>=0xC0&&m<=0xC3)||(m>=0xC5&&m<=0xC7)||(m>=0xC9&&m<=0xCB)||(m>=0xCD&&m<=0xCF)){
+              return{w:(bytes[j+7]<<8)|bytes[j+8],h:(bytes[j+5]<<8)|bytes[j+6]}
+            }
+            j+=2+segLen
+          }
+        }catch(e){}
+        return{w:4,h:3}
+      }
+      for(let i=0;i<FOTO_TIPI.length;i++){
+        const uri=imgMap[FOTO_TIPI[i]]
+        if(!uri) continue
+        const[px,py]=fPos[i]
+        try{
+          const b64orig=uri.includes(',')?uri.split(',')[1]:uri
+          const b64pdf=await compressImageBase64(b64orig,800,0.7)
+          const pdfUri='data:image/jpeg;base64,'+b64pdf
+          const{w,h}=jpegSize(pdfUri)
+          const ratio=w/h
+          let iw,ih
+          if(ratio>=1){iw=FW;ih=FW/ratio}else{ih=FH;iw=FH*ratio}
+          const ox=(FW-iw)/2, oy=(FH-ih)/2
+          doc.addImage(pdfUri,'JPEG',px+ox,py+oy,iw,ih,undefined,'FAST')
+        }catch(e){/* formato non supportato */}
+      }
+      ln(2*FH+FGAP+10)
+    }
+
+    // FIRMA
+    if(y>255){doc.addPage();y=15}
+    y=Math.max(y,260)
+    hLine();ln(5)
+    setFont('normal',8,GREY)
+    doc.text(`Il Tecnico: ${tecNome||'–'}`,L,y)
+    doc.text('Firma: ___________________________',PW-L,y,{align:'right'})
+    ln(5)
+    setFont('normal',7,[180,180,180])
+    doc.text(`Generato il ${new Date().toLocaleString('it-IT')} – Formedil Padova CPT`,PW/2,y,{align:'center'})
+
+    // Salva PDF su Drive in background (non bloccante)
+    const _uploadPdfDrive=async(b64)=>{
+      try{
+        const{data:{session}}=await sb.auth.getSession()
+        const tkn=session?.access_token
+        const r=await fetch(`${SB_URL}/functions/v1/upload-pdf`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':`Bearer ${tkn}`,'apikey':SB_KEY},
+          body:JSON.stringify({pdf_base64:b64,nr_verbale:v.nr_verbale,data_visita:v.data_visita,visita_id:vid})
+        })
+        const d=await r.json()
+        if(d.ok)toast('PDF salvato su Drive ✓','ok')
+        else console.warn('upload-pdf:',d.error)
+      }catch(e){console.warn('upload-pdf:',e)}
+    }
+
+    if(output==='base64'){
+      const uri=doc.output('datauristring')
+      _uploadPdfDrive(uri.split(',')[1])
+      return uri
+    }
+    const pdfB64=doc.output('datauristring').split(',')[1]
+    doc.save(`verbale_${v.nr_verbale||vid}.pdf`)
+    toast('PDF generato','ok')
+    _uploadPdfDrive(pdfB64)
+  }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
+}
+
+// ── ESPOSIZIONE GLOBALE funzioni usate in onclick inline ──
+// (necessario perché lo script è type="module" e non ha scope globale)
+window.removeLav = removeLav
+window.deleteFoto = deleteFoto
+
+// ── AVVIO ──
+document.addEventListener('DOMContentLoaded', initAuth)
+</script>
+</body>
+</html>
+64)   // upload in background
+  }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
+}
+
+// ── ESPOSIZIONE GLOBALE funzioni usate in onclick inline ──
+// (necessario perché lo script è type="module" e non ha scope globale)
+window.removeLav = removeLav
+window.deleteFoto = deleteFoto
+
+// ── AVVIO ──
+document.addEventListener('DOMContentLoaded', initAuth)
+</script>
+</body>
+</html>
