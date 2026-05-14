@@ -792,6 +792,12 @@ tr:hover td{background:#fef9f7}
       <div class="field"><label>Tipo opera</label>
         <select id="mc-tip-ope"><option value="">–</option><option value="2">Civile</option><option value="1">Industriale</option><option value="3">Commerciale</option><option value="5">Stradale</option><option value="8">Scolastica</option><option value="16">Altro</option></select></div>
     </div>
+    <div class="row">
+      <div class="field"><label>Durata cantiere</label>
+        <select id="mc-durata"><option value="">–</option><option value="1">&lt; 30 giorni</option><option value="2">da 30 a 90 giorni</option><option value="3">da 3 a 6 mesi</option><option value="4">da 6 a 12 mesi</option><option value="5">&gt; 12 mesi</option></select></div>
+      <div class="field"><label>Importo lavori (€)</label>
+        <select id="mc-importo"><option value="">–</option><option value="1">fino a 250.000</option><option value="2">da 250.001 a 500.000</option><option value="3">da 500.001 a 1.000.000</option><option value="4">da 1.000.001 a 1.500.000</option><option value="5">da 1.500.001 a 2.500.000</option><option value="6">da 2.500.001 a 3.500.000</option><option value="7">da 3.500.001 a 5.000.000</option><option value="8">da 5.000.001 a 10.000.000</option><option value="11">non disponibile</option></select></div>
+    </div>
     <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma" maxlength="50"></div>
     <div class="modal-actions">
       <button class="btn-outline" id="btn-mc-cancel">Annulla</button>
@@ -1688,6 +1694,8 @@ function resetModalCantiere(){
   const com=$('mc-com');if(com)com.value=''
   const ti=$('mc-tip-int');if(ti)ti.value=''
   const to=$('mc-tip-ope');if(to)to.value=''
+  const du=$('mc-durata');if(du)du.value=''
+  const im=$('mc-importo');if(im)im.value=''
   const capEl=$('mc-cap');if(capEl){capEl.readOnly=false;capEl.style.background='#fff'}
 }
 $('btn-new-cant').onclick=()=>{resetModalCantiere();show('modal-cant')}
@@ -1695,7 +1703,7 @@ $('btn-mc-cancel').onclick=()=>hide('modal-cant')
 $('btn-mc-save').onclick=async()=>{
   const ind=vGet('mc-ind').trim();const civ=vGet('mc-civ').trim()
   if(!ind||!civ){toast('Indirizzo e civico obbligatori','warn');return}
-  const c={cantiere_id:uuid(),cantiere_indirizzo:ind,cantiere_civico:civ,comune_nome:vGet('mc-com').trim()||null,cantiere_cap:vGet('mc-cap').trim()||null,cantiere_tip_int:+vGet('mc-tip-int')||null,cantiere_tip_ope:+vGet('mc-tip-ope')||null,cantiere_etichetta:vGet('mc-etich').trim()||null,elimina:0}
+  const c={cantiere_id:uuid(),cantiere_indirizzo:ind,cantiere_civico:civ,comune_nome:vGet('mc-com').trim()||null,cantiere_cap:vGet('mc-cap').trim()||null,cantiere_tip_int:+vGet('mc-tip-int')||null,cantiere_tip_ope:+vGet('mc-tip-ope')||null,cantiere_durata:+vGet('mc-durata')||null,cantiere_importo:+vGet('mc-importo')||null,cantiere_etichetta:vGet('mc-etich').trim()||null,elimina:0}
   const{error}=await sb.from('cantieri').insert(c)
   if(error){toast('Errore: '+error.message,'err');return}
   vSet('f-cant-id',c.cantiere_id)
@@ -3119,79 +3127,67 @@ async function genPDF(vid, output='save'){
     const impLbl=IMP_LBL[cant.cantiere_importo]||'–'
     const durLbl=DUR_LBL[cant.cantiere_durata]||'–'
 
+    // Tabella cantiere: layout 4 colonne uniforme (label 40mm | val 50mm | label 40mm | val auto)
     doc.autoTable({startY:y,
       body:[
-        [{content:'INDIRIZZO',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:28}},
-         {content:cant.cantiere_indirizzo||'–',colSpan:2},
-         {content:'Numero',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:22}},
-         {content:cant.cantiere_civico||'–',cellWidth:20}],
-        [{content:'COMUNE',styles:{fontStyle:'bold',fillColor:LBL}},
-         {content:cant.comune_nome||'–'},
-         {content:'CAP',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:15}},
-         {content:cant.cantiere_cap||'–',cellWidth:20},
-         {content:'Tipo intervento',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:28}},
-         {content:'Importo',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:18}}],
-        // Row 3
-        [{content:'Codice CNCE',styles:{fontStyle:'bold',fillColor:LBL}},
-         {content:cant.cantiere_cnce||'–'},
-         {content:'Tipologia opera',styles:{fontStyle:'bold',fillColor:LBL}},
-         {content:tipOpe},
-         {content:'Durata',styles:{fontStyle:'bold',fillColor:LBL}},
-         {content:durLbl}],
-        [{content:'Totale lavoratori in cantiere',styles:{fontStyle:'bold',fillColor:LBL},colSpan:1},
-         {content:String(v.nr_lavoratori||0),cellWidth:20},
-         {content:'',colSpan:2},
-         {content:'di cui autonomi in cantiere',styles:{fontStyle:'bold',fillColor:LBL}},
-         {content:String(v.nr_ind||0)}]
+        [{content:'Indirizzo',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.cantiere_indirizzo||'–'},{content:'N° civico',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.cantiere_civico||'–'}],
+        [{content:'Comune',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.comune_nome||'–'},{content:'CAP',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.cantiere_cap||'–'}],
+        [{content:'Tipo intervento',styles:{fontStyle:'bold',fillColor:LBL}},{content:tipInt},{content:'Tipo opera',styles:{fontStyle:'bold',fillColor:LBL}},{content:tipOpe}],
+        [{content:'Importo lavori (€)',styles:{fontStyle:'bold',fillColor:LBL}},{content:impLbl},{content:'Durata cantiere',styles:{fontStyle:'bold',fillColor:LBL}},{content:durLbl}],
+        [{content:'Codice CNCE',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.cantiere_cnce||'–'},{content:'',colSpan:2}],
+        [{content:'N° imprese in cantiere',styles:{fontStyle:'bold',fillColor:LBL}},{content:String(v.nr_imp||1)},{content:'Totale lavoratori',styles:{fontStyle:'bold',fillColor:LBL}},{content:String(v.nr_lavoratori||0)}],
+        [{content:'di cui autonomi',styles:{fontStyle:'bold',fillColor:LBL}},{content:String(v.nr_ind||0)},{content:'',colSpan:2}]
       ],
       styles:{fontSize:7.5,cellPadding:1.8},
-      margin:{left:L,right:L},tableWidth:W,theme:'grid'
-    })
-    // Fix row 2 (tipo intervento / importo are missing values — add them properly below)
-    y=doc.lastAutoTable.finalY
-
-    // ── fix: righe tipo intervento e importo mancano i valori → li aggiungiamo come riga separata
-    // (il bug è che autoTable non accetta facilmente 6 colonne con dati misti)
-    // Override: ricreo la tabella cantiere in modo più semplice
-    // (già generata sopra — i valori tipInt e impLbl vanno inseriti)
-    // La riga 2 ha 6 celle ma tipInt e impLbl sono nelle posizioni 4 e 5 — autoTable le omette
-    // Risolvo con una tabella separata solo per quella riga
-    doc.autoTable({startY:y-0.1,
-      body:[[
-        {content:'Tipo intervento',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:38}},
-        {content:tipInt,cellWidth:45},
-        {content:'Importo lavori (€)',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:38}},
-        {content:impLbl}
-      ]],
-      styles:{fontSize:7.5,cellPadding:1.8},
+      columnStyles:{0:{cellWidth:40},1:{cellWidth:50},2:{cellWidth:40}},
       margin:{left:L,right:L},tableWidth:W,theme:'grid'
     })
     y=doc.lastAutoTable.finalY+3
 
-    // N° imprese
-    doc.autoTable({startY:y,
-      body:[[
-        {content:'N° imprese presenti in cantiere',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:70}},
-        {content:String(v.nr_imp||1),cellWidth:30},
-        {content:'N° ditte individuali',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:50}},
-        {content:String(v.nr_ind||0)}
-      ]],
-      styles:{fontSize:7.5,cellPadding:1.8},
-      margin:{left:L,right:L},tableWidth:W,theme:'grid'
-    })
-    y=doc.lastAutoTable.finalY+3
-
-    // Sezione visita (lavorazioni)
+    // Sezione visita (lavorazioni + IPC + note tecnico)
     doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
     setFont('bold',8,WHITE);doc.text('Dati della visita',L+2,y+4);y+=7
 
-    const lavText=lavs&&lavs.length?lavs.map(l=>l.lavorazione).filter(Boolean).join(','):'–'
+    const lavText=lavs&&lavs.length?lavs.map(l=>l.lavorazione).filter(Boolean).join(', '):'–'
     doc.autoTable({startY:y,
       body:[[{content:'Lavorazioni:',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:28}},{content:lavText}]],
       styles:{fontSize:7.5,cellPadding:1.8},
       margin:{left:L,right:L},tableWidth:W,theme:'grid'
     })
-    y=doc.lastAutoTable.finalY+4
+    y=doc.lastAutoTable.finalY+2
+
+    // IPC – Indice di Pericolosità del Cantiere
+    const _cntNCp=(chk||[]).filter(r=>r.valore==='NC+').length
+    const _cntNCn=(chk||[]).filter(r=>r.valore==='NC-').length
+    const _cntOSS=(chk||[]).filter(r=>r.valore==='OSS').length
+    const _cntVER=(chk||[]).filter(r=>r.valore==='VER').length
+    let ipcLabel,ipcBg,ipcTxt
+    if(_cntNCp>0){ipcLabel='ALTO';ipcBg=[200,30,30];ipcTxt=WHITE}
+    else if(_cntNCn>0){ipcLabel='MEDIO';ipcBg=[231,80,15];ipcTxt=WHITE}
+    else if(_cntOSS>0){ipcLabel='BASSO';ipcBg=[180,140,0];ipcTxt=WHITE}
+    else{ipcLabel='NESSUN RILIEVO';ipcBg=[39,174,96];ipcTxt=WHITE}
+    const ipcDetail=`NC+: ${_cntNCp}   NC-: ${_cntNCn}   OSS: ${_cntOSS}   VER: ${_cntVER}`
+    doc.autoTable({startY:y,
+      body:[[
+        {content:'IPC – Indice di Pericolosità del Cantiere',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:90}},
+        {content:ipcLabel,styles:{fontStyle:'bold',fillColor:ipcBg,textColor:ipcTxt,halign:'center',cellWidth:32}},
+        {content:ipcDetail,styles:{fontSize:7,fillColor:[248,248,248],halign:'center'}}
+      ]],
+      styles:{fontSize:8,cellPadding:2.5},
+      margin:{left:L,right:L},tableWidth:W,theme:'grid'
+    })
+    y=doc.lastAutoTable.finalY+2
+
+    // Note del tecnico (se presenti)
+    if(v.oss_tec){
+      doc.autoTable({startY:y,
+        body:[[{content:'Osservazioni del tecnico',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:42}},{content:v.oss_tec}]],
+        styles:{fontSize:7.5,cellPadding:1.8},
+        margin:{left:L,right:L},tableWidth:W,theme:'grid'
+      })
+      y=doc.lastAutoTable.finalY+2
+    }
+    y+=2
 
     // Box metodologia
     const metodologia=[
@@ -3231,24 +3227,34 @@ async function genPDF(vid, output='save'){
       const zonaLbl=(ZONE_LBL[zona]||String(zona)).toUpperCase()
       const prefissi=vociByZona[zona]
 
+      // Verifica se la zona ha almeno un rilievo valorizzato
+      const zonaHasRows=Object.values(prefissi).some(voci=>
+        voci.some(vv=>{const r=chkMap[vv.codice]||{};return r.valore&&r.valore!=='NA'})
+      )
+      if(!zonaHasRows) continue
+
       // Intestazione zona (sfondo grigio)
       doc.autoTable({startY:y,
         head:[[{content:zonaLbl,colSpan:3,styles:{halign:'left'}}]],
         body:[],
         styles:{fontSize:7.5,cellPadding:2},
         headStyles:{fillColor:GREY,textColor:WHITE,fontStyle:'bold',fontSize:8},
-        columnStyles:{0:{cellWidth:W-54},1:{cellWidth:18,halign:'center'},2:{cellWidth:36}},
+        columnStyles:{0:{cellWidth:W-70},1:{cellWidth:20,halign:'center'},2:{cellWidth:50}},
         margin:{left:L,right:L},tableWidth:W,theme:'grid'
       })
       y=doc.lastAutoTable.finalY
 
       for(const [pref,voci] of Object.entries(prefissi)){
         const prefLbl=PREF_LBL[pref]||pref
+        // Solo voci con rilievo valorizzato (escludo n.v.)
         const rows=voci.map(vv=>{
           const r=chkMap[vv.codice]||{}
-          const val=r.valore&&r.valore!=='NA'?r.valore:'n.v.'
+          const val=r.valore&&r.valore!=='NA'?r.valore:null
+          if(!val) return null
           return[vv.descrizione||'',val,r.nota||'']
-        })
+        }).filter(Boolean)
+
+        if(!rows.length) continue  // nessun rilievo in questo sottogruppo → salta
 
         doc.autoTable({startY:y,
           head:[[{content:prefLbl,colSpan:3,styles:{halign:'left',fontStyle:'bold'}}]],
@@ -3256,18 +3262,18 @@ async function genPDF(vid, output='save'){
           styles:{fontSize:7,cellPadding:1.5},
           headStyles:{fillColor:[230,230,230],textColor:[50,50,50],fontStyle:'bold',fontSize:7},
           columnStyles:{
-            0:{cellWidth:W-54},
-            1:{cellWidth:18,halign:'center'},
-            2:{cellWidth:36}
+            0:{cellWidth:W-70},
+            1:{cellWidth:20,halign:'center'},
+            2:{cellWidth:50}
           },
           margin:{left:L,right:L},tableWidth:W,theme:'grid',
           didParseCell:(d)=>{
             if(d.section==='body'&&d.column.index===1){
               const val=d.cell.raw
-              if(val==='NC+')d.cell.styles.textColor=ORANGE
-              else if(val==='NC-')d.cell.styles.textColor=[200,140,0]
-              else if(val==='OSS')d.cell.styles.textColor=[39,174,96]
-              else d.cell.styles.textColor=[180,180,180]  // n.v.
+              if(val==='NC+'){d.cell.styles.textColor=[200,30,30];d.cell.styles.fontStyle='bold'}
+              else if(val==='NC-'){d.cell.styles.textColor=[231,80,15];d.cell.styles.fontStyle='bold'}
+              else if(val==='OSS'){d.cell.styles.textColor=[160,120,0];d.cell.styles.fontStyle='bold'}
+              else if(val==='VER'){d.cell.styles.textColor=[39,174,96];d.cell.styles.fontStyle='bold'}
             }
           }
         })
@@ -3276,21 +3282,8 @@ async function genPDF(vid, output='save'){
       y+=2
     }
 
-    // ════════════════════════════════════════════════
-    // NOTE TECNICHE (se presenti)
-    // ════════════════════════════════════════════════
-    if(v.oss_tec||v.note_for_m){
-      doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
-      setFont('bold',8,WHITE);doc.text('NOTE',L+2,y+4);y+=7
-      ;[['Osservazioni tecniche',v.oss_tec],['Note per il mittente',v.note_for_m]].forEach(([lbl,val])=>{
-        if(!val)return
-        setFont('bold',7,GREY);doc.text(lbl+':',L,y);y+=4
-        setFont('normal',8,[30,30,30])
-        const split=doc.splitTextToSize(val,W-4)
-        doc.text(split,L+2,y);y+=split.length*4+3
-      })
-      y+=4
-    }
+    // NOTE: le Osservazioni del tecnico sono già incluse nella sezione Dati della visita
+    // Le Note per il mittente non vengono incluse nel verbale
 
     // FOTO – griglia 2×2 (~70×70 mm per foto)
     const FOTO_TIPI=['foto1','foto2','foto3','foto4']
