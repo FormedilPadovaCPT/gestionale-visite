@@ -209,6 +209,54 @@ tr:hover td{background:#fef9f7}
 </head>
 <body>
 
+<!-- ══ PANNELLO DIAGNOSTICA ERRORI (temporaneo) ══ -->
+<div id="diag-panel" style="display:none;position:fixed;bottom:0;left:0;right:0;max-height:38vh;overflow-y:auto;background:#1a1a1a;color:#f0f0f0;font:12px/1.4 monospace;z-index:99999;border-top:3px solid #e74c3c;padding:6px 10px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;position:sticky;top:0;background:#1a1a1a;padding:4px 0">
+    <span style="color:#e74c3c;font-weight:bold">&#128308; LOG ERRORI</span>
+    <span>
+      <button onclick="document.getElementById('diag-log').innerHTML=''" style="background:#555;color:#fff;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;margin-right:4px;font-size:11px">Pulisci</button>
+      <button onclick="document.getElementById('diag-panel').style.display='none'" style="background:#e74c3c;color:#fff;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:11px">Chiudi</button>
+    </span>
+  </div>
+  <div id="diag-log"></div>
+</div>
+<button onclick="var p=document.getElementById('diag-panel');p.style.display=p.style.display==='none'?'block':'none'" style="position:fixed;bottom:8px;right:8px;z-index:99998;background:#e74c3c;color:#fff;border:none;border-radius:50%;width:34px;height:34px;font-size:16px;cursor:pointer;opacity:0.75;box-shadow:0 2px 6px rgba(0,0,0,.4)" title="Mostra/nascondi log errori">&#128308;</button>
+<script>
+(function(){
+  function addLog(type,msg,color){
+    var dl=document.getElementById('diag-log');
+    if(!dl)return;
+    var ts=new Date().toTimeString().slice(0,8);
+    var div=document.createElement('div');
+    div.style.cssText='border-bottom:1px solid #333;padding:3px 2px;word-break:break-all;color:'+color;
+    div.textContent='['+ts+'] '+type+': '+msg;
+    dl.appendChild(div);
+    dl.scrollTop=9999;
+    document.getElementById('diag-panel').style.display='block';
+  }
+  var oe=console.error;
+  console.error=function(){
+    oe.apply(console,arguments);
+    var m=Array.from(arguments).map(function(a){
+      if(a instanceof Error)return a.message;
+      try{return typeof a==='object'?JSON.stringify(a):String(a);}catch(e){return String(a);}
+    }).join(' ');
+    addLog('ERR',m,'#ff6b6b');
+  };
+  var ow=console.warn;
+  console.warn=function(){
+    ow.apply(console,arguments);
+    var m=Array.from(arguments).map(function(a){try{return typeof a==='object'?JSON.stringify(a):String(a);}catch(e){return String(a);}}).join(' ');
+    addLog('WARN',m,'#ffd93d');
+  };
+  window.addEventListener('error',function(e){addLog('JS',e.message+' (riga '+e.lineno+')','#ff6b6b');});
+  window.addEventListener('unhandledrejection',function(e){
+    var m=e.reason instanceof Error?e.reason.message:String(e.reason);
+    addLog('PROMISE',m,'#ff9f43');
+  });
+})();
+</script>
+
 <div id="screen-loading">
   <div class="load-logo">FORMEDIL PADOVA<small>Caricamento…</small></div>
 </div>
