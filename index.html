@@ -3388,15 +3388,16 @@ async function genPDF(vid, output='save'){
           const val=r.valore&&r.valore!=='NA'?r.valore:null
           if(!val) continue
           const isViolazione=['OSS','NC+','NC-'].includes(val)
-          if(isViolazione){
-            console.warn('PDF-DIAG violazione:',vv.codice,'| val:',val,'| articolo:',vv.articolo,'| importo:',vv.importo_sanzione,'| keys:',Object.keys(vv).join(','))
-          }
           if(isViolazione&&vv.importo_sanzione) totalSanzione+=Number(vv.importo_sanzione)
-          // Mostra articolo di legge nella colonna descrizione (sotto il testo) per OSS/NC+/NC-
-          const descText=(isViolazione&&vv.articolo)
-            ?(vv.descrizione||'')+'\n'+vv.articolo
-            :(vv.descrizione||'')
-          rows.push([descText,val,r.nota||''])
+          rows.push([vv.descrizione||'', val, r.nota||''])
+          // Riga articolo di legge subito sotto la voce (colSpan 3) per OSS/NC+/NC-
+          if(isViolazione&&vv.articolo){
+            rows.push([{
+              content: vv.articolo,
+              colSpan:3,
+              styles:{fontSize:6.5,fontStyle:'italic',textColor:[160,90,20],fillColor:[255,248,240],cellPadding:{top:0,bottom:2,left:8,right:2}}
+            }])
+          }
         }
 
         if(!rows.length) continue  // nessun rilievo in questo sottogruppo → salta
