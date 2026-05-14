@@ -2822,7 +2822,7 @@ $('btn-ev-invia').onclick=async()=>{
     const{data:{session}}=await sb.auth.getSession()
     const token=session?.access_token
     const ctrl=new AbortController()
-    const tOut=setTimeout(()=>ctrl.abort(),90000)
+    const tOut=setTimeout(()=>ctrl.abort(),30000)
     let resp
     try{
       resp=await fetch(`${SB_URL}/functions/v1/send-verbale`,{
@@ -2851,11 +2851,12 @@ $('btn-ev-invia').onclick=async()=>{
     setTimeout(()=>hide('modal-email-verbale'), 2000)
 
   }catch(e){
+    const msg=e.name==='AbortError'?'Timeout: la funzione di invio non risponde (verificare che send-verbale sia deployata su Supabase)':e.message
     status.style.color='var(--danger)'
-    status.textContent='Errore: '+e.message
+    status.textContent='Errore: '+msg
     btn.disabled=false; btn.textContent='📤 Riprova'
-    toast('Errore invio: '+e.message,'err')
-    console.error('send-verbale:',e)
+    toast('Errore invio: '+msg,'err')
+    console.error('send-verbale:',e.name,msg)
   }
 }
 
@@ -3374,7 +3375,7 @@ async function genPDF(vid, output='save'){
         body:[],
         styles:{fontSize:7.5,cellPadding:2},
         headStyles:{fillColor:GREY,textColor:WHITE,fontStyle:'bold',fontSize:8},
-        columnStyles:{0:{cellWidth:W-70},1:{cellWidth:20,halign:'center'},2:{cellWidth:50}},
+        columnStyles:{0:{cellWidth:55},1:{cellWidth:12,halign:'center'},2:{cellWidth:W-67}},
         margin:{left:L,right:L},tableWidth:W,theme:'grid'
       })
       y=doc.lastAutoTable.finalY
