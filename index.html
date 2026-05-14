@@ -2782,6 +2782,13 @@ La presidenza del Formedil Padova – Area Sicurezza e Salute`
   if(testaEl&&!testaEl.value.trim()) testaEl.value=letteraImpresa
 
   window._evEmails=emails
+  // Ripristina pulsante Invia (potrebbe essere rimasto disabilitato da invio precedente)
+  const btnInvia=$('btn-ev-invia')
+  btnInvia.disabled=false
+  btnInvia.textContent='📤 Invia ora'
+  const evStatus=$('email-verbale-status')
+  evStatus.textContent=''
+  evStatus.style.color=''
   show('modal-email-verbale')
 }
 
@@ -3020,10 +3027,10 @@ async function genPDF(vid, output='save'){
   try{
     if(!vid){toast('ID visita mancante','err');_pdfInProgress=false;return}
     if(!window.jspdf?.jsPDF){toast('Libreria PDF non caricata — ricarica la pagina','err');_pdfInProgress=false;return}
-    // Forza ricarica voci se array vuoto o corrotto
-    if(!Array.isArray(S.voci)||!S.voci.length){
+    // Ricarica sempre voci dal DB per avere articolo/importo_sanzione aggiornati
+    {
       const{data:vd}=await sb.from('checklist_voci').select('*').order('ordine')
-      S.voci=vd||[]
+      if(vd?.length) S.voci=vd
     }
 
     const{data:v,error:eV}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*,committenti(*)),imprese(*)`).eq('visita_id',vid).single()
