@@ -1151,9 +1151,9 @@ function showScr(n){
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
   ;['dashboard','form','lista','cantieri','import'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
-  if(view==='dashboard')loadDash()
-  if(view==='lista')loadLista()
-  if(view==='cantieri')loadCantieri()
+  if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
+  if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
+  if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
 }
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
   b.onclick=()=>{if(b.dataset.view==='form')initForm();navTo(b.dataset.view)}
@@ -1301,8 +1301,8 @@ function updateZoneDots(){
 }
 
 // ── FORM NAV ──
-$('btn-prev').onclick=()=>{saveTabData();activateTab(S.tab-1)}
-$('btn-next').onclick=()=>{saveTabData();activateTab(S.tab+1)}
+$('btn-prev').onclick=()=>{saveTabData();const t=S.tab-1;activateTab(t);renderZoneTab(t)}
+$('btn-next').onclick=()=>{saveTabData();const t=S.tab+1;activateTab(t);renderZoneTab(t)}
 
 // ── INIT FORM ──
 async function initForm(snap=null){
@@ -3012,11 +3012,19 @@ async function exportSnapFromDB(vid){
 }
 
 // ── PDF ──
+let _pdfInProgress=false
 async function genPDF(vid, output='save'){
+  if(_pdfInProgress&&output==='save'){toast('PDF già in generazione, attendi…','warn');return}
+  _pdfInProgress=true
   toast('Generazione PDF…')
   try{
-    if(!vid){toast('ID visita mancante','err');return}
-    if(!window.jspdf?.jsPDF){toast('Libreria PDF non caricata — ricarica la pagina','err');return}
+    if(!vid){toast('ID visita mancante','err');_pdfInProgress=false;return}
+    if(!window.jspdf?.jsPDF){toast('Libreria PDF non caricata — ricarica la pagina','err');_pdfInProgress=false;return}
+    // Forza ricarica voci se array vuoto o corrotto
+    if(!Array.isArray(S.voci)||!S.voci.length){
+      const{data:vd}=await sb.from('checklist_voci').select('*').order('ordine')
+      S.voci=vd||[]
+    }
 
     const{data:v,error:eV}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*,committenti(*)),imprese(*)`).eq('visita_id',vid).single()
     if(eV)throw new Error('Errore caricamento visita: '+eV.message)
@@ -3026,10 +3034,8 @@ async function genPDF(vid, output='save'){
 
     if(!v){toast('Visita non trovata','err');return}
 
-    // Assicura che S.voci sia caricato
-    if(!S.voci||!S.voci.length){
-      const{data:vociDB}=await sb.from('checklist_voci').select('*').order('ordine')
-      S.voci=vociDB||[]
+    // S.voci già garantito caricato sopra (before try)
+    if(false){
     }
 
     const{jsPDF}=window.jspdf
@@ -3516,6 +3522,7 @@ async function genPDF(vid, output='save'){
     toast('PDF generato','ok')
     _uploadPdfDrive(pdfB64)   // upload in background
   }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
+  finally{_pdfInProgress=false}
 }
 
 // ── GESTIONE FIRME TECNICI (Supabase Storage) ──
