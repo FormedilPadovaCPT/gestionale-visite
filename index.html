@@ -3100,23 +3100,65 @@ async function genPDF(vid, output='save'){
     })
     y=doc.lastAutoTable.finalY+3
 
-    // Sezione impresa
-    doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
-    setFont('bold',8,WHITE);doc.text('Dati dell\'impresa',L+2,y+4);y+=7
-
+    // ── IMPRESE PRESENTI (tutte) ──
     const LBL=[220,230,242]
+    doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
+    setFont('bold',8,WHITE);doc.text('Imprese presenti in cantiere',L+2,y+4);y+=7
+
+    const impsRows=[]
+    ;(imps||[]).forEach((im,i)=>{
+      const nome=im.imprese?.impresa_nome||'–'
+      const ruolo=im.ruolo||'–'
+      const cf=im.imprese?.impresa_cf||'–'
+      const email=im.email_verbale||im.imprese?.impresa_email_ref||'–'
+      impsRows.push([
+        {content:`${i+1}. ${nome}`,styles:{fontStyle:'bold'}},
+        {content:ruolo,styles:{halign:'center'}},
+        {content:cf},
+        {content:email,styles:{fontSize:6.5}}
+      ])
+    })
+    if(!impsRows.length) impsRows.push([{content:'Nessuna impresa registrata',colSpan:4,styles:{halign:'center',textColor:[180,180,180]}}])
+
     doc.autoTable({startY:y,
-      body:[
-        [{content:'Nome',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:32}},{content:impNome||'–',colSpan:5,styles:{fontStyle:'bold'}}],
-        [{content:'Certificazioni impresa',styles:{fontStyle:'bold',fillColor:LBL}},{content:'',cellWidth:25},
-         {content:'Ruolo impresa',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:28}},{content:impRuolo||'–',cellWidth:25},
-         {content:'Codice fiscale',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:28}},{content:impCF||'–'}],
-        [{content:'Email resp. visita azienda',styles:{fontStyle:'bold',fillColor:LBL}},{content:impEmail||'',colSpan:5}]
-      ],
+      head:[[
+        {content:'Ragione sociale',styles:{fontStyle:'bold'}},
+        {content:'Ruolo',styles:{fontStyle:'bold',cellWidth:30,halign:'center'}},
+        {content:'Cod. fiscale',styles:{fontStyle:'bold',cellWidth:35}},
+        {content:'Email verbale',styles:{fontStyle:'bold',cellWidth:50}}
+      ]],
+      body:impsRows,
       styles:{fontSize:7.5,cellPadding:1.8},
+      headStyles:{fillColor:LBL,textColor:GREY,fontStyle:'bold',fontSize:7},
       margin:{left:L,right:L},tableWidth:W,theme:'grid'
     })
     y=doc.lastAutoTable.finalY+3
+
+    // ── FIGURE DI SISTEMA ──
+    const figureRows=[]
+    const _addFig=(ruolo,nome,email,tel)=>{if(!nome&&!email&&!tel)return;figureRows.push([ruolo,nome||'–',email||'–',tel||'–'])}
+    if(v.nom_ppre){_addFig('Persona presente',v.nom_ppre+(v.qual_ppre?' ('+v.qual_ppre+')':''),'',v.tel_ppre||'')}
+    _addFig('Resp. dei lavori',v.resp_lav,v.rl_email,v.rl_tel)
+    _addFig('CSP',v.csp,v.csp_email,v.csp_tel)
+    _addFig('CSE',v.cse,v.cse_email,v.cse_tel)
+
+    if(figureRows.length){
+      doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
+      setFont('bold',8,WHITE);doc.text('Figure di sistema',L+2,y+4);y+=7
+      doc.autoTable({startY:y,
+        head:[[
+          {content:'Ruolo',styles:{fontStyle:'bold',cellWidth:32}},
+          {content:'Nominativo',styles:{fontStyle:'bold',cellWidth:55}},
+          {content:'Email',styles:{fontStyle:'bold'}},
+          {content:'Tel.',styles:{fontStyle:'bold',cellWidth:28}}
+        ]],
+        body:figureRows,
+        styles:{fontSize:7.5,cellPadding:1.8},
+        headStyles:{fillColor:LBL,textColor:GREY,fontStyle:'bold',fontSize:7},
+        margin:{left:L,right:L},tableWidth:W,theme:'grid'
+      })
+      y=doc.lastAutoTable.finalY+3
+    }
 
     // Sezione cantiere
     doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
@@ -3628,6 +3670,49 @@ document.addEventListener('DOMContentLoaded', initAuth)
 </body>
 </html>
 64)   // upload in background
+  }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
+}
+
+// ── ESPOSIZIONE GLOBALE funzioni usate in onclick inline ──
+// (necessario perché lo script è type="module" e non ha scope globale)
+window.removeLav = removeLav
+window.deleteFoto = deleteFoto
+
+// ── AVVIO ──
+document.addEventListener('DOMContentLoaded', initAuth)
+</script>
+</body>
+</html>
+PW-L,y,{align:'right'})
+    ln(5)
+    setFont('normal',7,[180,180,180])
+    doc.text(`Generato il ${new Date().toLocaleString('it-IT')} – Formedil Padova CPT`,PW/2,y,{align:'center'})
+
+    // Salva PDF su Drive in background (non bloccante)
+    const _uploadPdfDrive=async(b64)=>{
+      try{
+        const{data:{session}}=await sb.auth.getSession()
+        const tkn=session?.access_token
+        const r=await fetch(`${SB_URL}/functions/v1/upload-pdf`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':`Bearer ${tkn}`,'apikey':SB_KEY},
+          body:JSON.stringify({pdf_base64:b64,nr_verbale:v.nr_verbale,data_visita:v.data_visita,visita_id:vid})
+        })
+        const d=await r.json()
+        if(d.ok)toast('PDF salvato su Drive ✓','ok')
+        else console.warn('upload-pdf:',d.error)
+      }catch(e){console.warn('upload-pdf:',e)}
+    }
+
+    if(output==='base64'){
+      const uri=doc.output('datauristring')
+      _uploadPdfDrive(uri.split(',')[1])   // upload in background
+      return uri
+    }
+    const pdfB64=doc.output('datauristring').split(',')[1]
+    doc.save(`verbale_${v.nr_verbale||vid}.pdf`)
+    toast('PDF generato','ok')
+    _uploadPdfDrive(pdfB64)   // upload in background
   }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
 }
 
