@@ -3292,10 +3292,10 @@ async function genPDF(vid, output='save'){
 
     // Testo IPC – riga di commento in base al livello di pericolosità
     const ipcMsg=ipcLabel==='ALTO'||ipcLabel==='MEDIO'
-      ?'Per quanto osservato in cantiere, si invita l'impresa ad attivare immediatamente le procedure atte ad eliminare i rischi riscontrati. Si precisa che l'attività di consulenza tecnica erogata non solleva l'Impresa dalle proprie responsabilità per il mancato adempimento delle prescrizioni di legge.'
+      ?"Per quanto osservato in cantiere, si invita l'impresa ad attivare immediatamente le procedure atte ad eliminare i rischi riscontrati. Si precisa che l'attività di consulenza tecnica erogata non solleva l'Impresa dalle proprie responsabilità per il mancato adempimento delle prescrizioni di legge."
       :ipcLabel==='BASSO'
-      ?'Vogliate tener conto delle osservazioni sopra riportate. Si invita l'impresa ad attivare le procedure atte ad eliminare i rischi riscontrati. Si precisa che l'attività di consulenza tecnica erogata non solleva l'Impresa dalle proprie responsabilità per il mancato adempimento delle prescrizioni di legge.'
-      :'Il cantiere risulta in buone condizioni di sicurezza.'
+      ?"Vogliate tener conto delle osservazioni sopra riportate. Si invita l'impresa ad attivare le procedure atte ad eliminare i rischi riscontrati. Si precisa che l'attività di consulenza tecnica erogata non solleva l'Impresa dalle proprie responsabilità per il mancato adempimento delle prescrizioni di legge."
+      :"Il cantiere risulta in buone condizioni di sicurezza." 
     doc.autoTable({startY:y,
       body:[[{content:ipcMsg}]],
       styles:{fontSize:7.5,cellPadding:2,fontStyle:'italic',textColor:[50,50,50],fillColor:[250,250,250]},
