@@ -2802,6 +2802,7 @@ $('btn-ev-copia').onclick=()=>{
 }
 $('btn-ev-invia').onclick=async()=>{
   const emails=window._evEmails||[]
+  console.warn('INVIA-DIAG emails:',emails.length,'| savedId:',S.savedId,'| fd.visita_id:',S.fd?.visita_id)
   if(!emails.length){toast('Nessun destinatario','warn');return}
   const vid=S.savedId||S.fd?.visita_id
   if(!vid){toast('Salva prima la visita','warn');return}
@@ -3387,6 +3388,9 @@ async function genPDF(vid, output='save'){
           const val=r.valore&&r.valore!=='NA'?r.valore:null
           if(!val) continue
           const isViolazione=['OSS','NC+','NC-'].includes(val)
+          if(isViolazione){
+            console.warn('PDF-DIAG violazione:',vv.codice,'| val:',val,'| articolo:',vv.articolo,'| importo:',vv.importo_sanzione,'| keys:',Object.keys(vv).join(','))
+          }
           if(isViolazione&&vv.importo_sanzione) totalSanzione+=Number(vv.importo_sanzione)
           // Mostra articolo di legge nella colonna descrizione (sotto il testo) per OSS/NC+/NC-
           const descText=(isViolazione&&vv.articolo)
