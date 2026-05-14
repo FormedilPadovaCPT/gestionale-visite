@@ -2802,7 +2802,6 @@ $('btn-ev-copia').onclick=()=>{
 }
 $('btn-ev-invia').onclick=async()=>{
   const emails=window._evEmails||[]
-  console.warn('INVIA-DIAG emails:',emails.length,'| savedId:',S.savedId,'| fd.visita_id:',S.fd?.visita_id)
   if(!emails.length){toast('Nessun destinatario','warn');return}
   const vid=S.savedId||S.fd?.visita_id
   if(!vid){toast('Salva prima la visita','warn');return}
@@ -2812,17 +2811,35 @@ $('btn-ev-invia').onclick=async()=>{
   btn.disabled=true; btn.textContent='⏳ Generazione PDF…'; status.textContent=''
 
   try{
-    // 1. Genera PDF come base64
-    const pdfBase64=await genPDF(vid,'base64')
-    if(!pdfBase64) throw new Error('Generazione PDF fallita')
-
-    btn.textContent='⏳ Invio in corso…'
-
-    // 2. Chiama la Edge Function (fetch diretto con timeout 90s)
     const{data:{session}}=await sb.auth.getSession()
     const token=session?.access_token
+
+    // 1. Genera PDF come base64
+    const pdfDataUri=await genPDF(vid,'base64')
+    if(!pdfDataUri) throw new Error('Generazione PDF fallita')
+    const pdfBase64=pdfDataUri.includes(',')?pdfDataUri.split(',')[1]:pdfDataUri
+
+    btn.textContent='⏳ Upload PDF su Drive…'
+
+    // 2. Carica PDF su Drive (await): il payload pesante va solo a upload-pdf, non a send-verbale
+    const upResp=await fetch(`${SB_URL}/functions/v1/upload-pdf`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`,'apikey':SB_KEY},
+      body:JSON.stringify({
+        pdf_base64: pdfBase64,
+        nr_verbale: vGet('f-verbale')||'',
+        data_visita: vGet('f-data')||'',
+        visita_id: vid
+      })
+    })
+    const upData=await upResp.json()
+    if(!upData.ok||!upData.drive_file_id) throw new Error('Upload Drive fallito: '+(upData.error||'risposta non valida'))
+
+    btn.textContent='⏳ Invio email…'
+
+    // 3. Chiama send-verbale passando solo driveFileId (niente PDF base64 → body piccolo)
     const ctrl=new AbortController()
-    const tOut=setTimeout(()=>ctrl.abort(),30000)
+    const tOut=setTimeout(()=>ctrl.abort(),60000)
     let resp
     try{
       resp=await fetch(`${SB_URL}/functions/v1/send-verbale`,{
@@ -2835,14 +2852,15 @@ $('btn-ev-invia').onclick=async()=>{
           nrVerbale: vGet('f-verbale')||'',
           cantiere: vGet('f-cant-search')||'',
           testoExtra: $('email-verbale-testo')?.value||'',
-          pdfBase64
+          driveFileId: upData.drive_file_id,
+          fileName: upData.file_name
         })
       })
     }finally{clearTimeout(tOut)}
     const data=await resp.json()
     if(!resp.ok||data?.error) throw new Error(data?.error||`HTTP ${resp.status}`)
 
-    // 3. Successo
+    // 4. Successo
     const nDest=emails.length
     status.style.color='var(--ok)'
     status.textContent=`✅ Inviato a ${nDest} destinatar${nDest===1?'io':'i'}`
@@ -2851,7 +2869,7 @@ $('btn-ev-invia').onclick=async()=>{
     setTimeout(()=>hide('modal-email-verbale'), 2000)
 
   }catch(e){
-    const msg=e.name==='AbortError'?'Timeout: la funzione di invio non risponde (verificare che send-verbale sia deployata su Supabase)':e.message
+    const msg=e.name==='AbortError'?'Timeout invio email: riprovare':e.message
     status.style.color='var(--danger)'
     status.textContent='Errore: '+msg
     btn.disabled=false; btn.textContent='📤 Riprova'
