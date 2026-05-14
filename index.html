@@ -3290,6 +3290,19 @@ async function genPDF(vid, output='save'){
     })
     y=doc.lastAutoTable.finalY+2
 
+    // Testo IPC – riga di commento in base al livello di pericolosità
+    const ipcMsg=ipcLabel==='ALTO'||ipcLabel==='MEDIO'
+      ?'Per quanto osservato in cantiere, si invita l'impresa ad attivare immediatamente le procedure atte ad eliminare i rischi riscontrati. Si precisa che l'attività di consulenza tecnica erogata non solleva l'Impresa dalle proprie responsabilità per il mancato adempimento delle prescrizioni di legge.'
+      :ipcLabel==='BASSO'
+      ?'Vogliate tener conto delle osservazioni sopra riportate. Si invita l'impresa ad attivare le procedure atte ad eliminare i rischi riscontrati. Si precisa che l'attività di consulenza tecnica erogata non solleva l'Impresa dalle proprie responsabilità per il mancato adempimento delle prescrizioni di legge.'
+      :'Il cantiere risulta in buone condizioni di sicurezza.'
+    doc.autoTable({startY:y,
+      body:[[{content:ipcMsg}]],
+      styles:{fontSize:7.5,cellPadding:2,fontStyle:'italic',textColor:[50,50,50],fillColor:[250,250,250]},
+      margin:{left:L,right:L},tableWidth:W,theme:'grid'
+    })
+    y=doc.lastAutoTable.finalY+2
+
     // Note del tecnico (se presenti) – sfondo arancione chiaro, bordo grigio spesso
     if(v.oss_tec){
       doc.autoTable({startY:y,
@@ -3335,6 +3348,8 @@ async function genPDF(vid, output='save'){
       vociByZona[z][p].push(vv)
     })
 
+    let totalSanzione=0  // accumula sanzioni per OSS/NC+/NC-
+
     for(const zona of Object.keys(vociByZona).map(Number).sort()){
       const zonaLbl=(ZONE_LBL[zona]||String(zona)).toUpperCase()
       const prefissi=vociByZona[zona]
@@ -3359,12 +3374,20 @@ async function genPDF(vid, output='save'){
       for(const [pref,voci] of Object.entries(prefissi)){
         const prefLbl=PREF_LBL[pref]||pref
         // Solo voci con rilievo valorizzato (escludo n.v.)
-        const rows=voci.map(vv=>{
+        const rows=[]
+        for(const vv of voci){
           const r=chkMap[vv.codice]||{}
           const val=r.valore&&r.valore!=='NA'?r.valore:null
-          if(!val) return null
-          return[vv.descrizione||'',val,r.nota||'']
-        }).filter(Boolean)
+          if(!val) continue
+          rows.push([vv.descrizione||'',val,r.nota||''])
+          const isViolazione=['OSS','NC+','NC-'].includes(val)
+          if(isViolazione){
+            if(vv.importo_sanzione) totalSanzione+=Number(vv.importo_sanzione)
+            if(vv.articolo){
+              rows.push([{content:vv.articolo,colSpan:3,styles:{fontStyle:'italic',fontSize:6,textColor:[120,100,80],fillColor:[255,252,248],cellPadding:{top:1,bottom:1.5,left:3,right:2}}}])
+            }
+          }
+        }
 
         if(!rows.length) continue  // nessun rilievo in questo sottogruppo → salta
 
@@ -3396,6 +3419,23 @@ async function genPDF(vid, output='save'){
 
     // NOTE: le Osservazioni del tecnico sono già incluse nella sezione Dati della visita
     // Le Note per il mittente non vengono incluse nel verbale
+
+    // RIQUADRO SANZIONI – solo se ci sono violazioni con importo
+    if(totalSanzione>0){
+      const fmtEur=(n)=>n.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})
+      const sanzRidotta=totalSanzione/4
+      doc.autoTable({startY:y,
+        body:[
+          [{content:'STIMA DELLE SANZIONI APPLICABILI',colSpan:2,styles:{fontStyle:'bold',fillColor:ORANGE,textColor:WHITE,fontSize:8,halign:'left'}}],
+          ['Sanzione massima potenziale pari a:',{content:'€ '+fmtEur(totalSanzione),styles:{fontStyle:'bold',halign:'right',textColor:[180,30,30]}}],
+          ['Sanzione ridotta di 1/4 pari a:',{content:'€ '+fmtEur(sanzRidotta),styles:{fontStyle:'bold',halign:'right',textColor:[180,80,30]}}]
+        ],
+        styles:{fontSize:7.5,cellPadding:2.5},
+        columnStyles:{0:{cellWidth:W-50},1:{cellWidth:50}},
+        margin:{left:L,right:L},tableWidth:W,theme:'grid'
+      })
+      y=doc.lastAutoTable.finalY+4
+    }
 
     // FOTO – griglia 2×2 (~70×70 mm per foto)
     const FOTO_TIPI=['foto1','foto2','foto3','foto4']
