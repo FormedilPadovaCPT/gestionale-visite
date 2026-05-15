@@ -3005,12 +3005,18 @@ $('btn-load-snap').onclick=async()=>{
       pendingSnap=null
       await initForm(snapToLoad)
       if(mantieni&&origNr){
+        // Mantieni numero originale → aggiorna la visita esistente (UPDATE)
         vSet('f-verbale',origNr)
         S.fd.nr_verbale=origNr
+      } else {
+        // Nuovo progressivo → scollega dall'identità originale per creare una nuova visita (INSERT)
+        S.savedId=null
+        S.fd.visita_id=null
+        // Il nuovo nr_verbale è già stato assegnato da initForm → non toccare f-verbale
       }
       hide('imp-preview')
       navTo('form')
-      toast(mantieni?`Verbale ${origNr} mantenuto`:'Nuovo progressivo assegnato','ok')
+      toast(mantieni?`Verbale ${origNr} mantenuto`:'Nuovo progressivo assegnato — visita originale conservata','ok')
     }catch(e){toast('Errore importazione: '+e.message,'err');console.error('Import error:',e)}
   }
 }
