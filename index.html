@@ -3585,19 +3585,47 @@ async function genPDF(vid, output='save'){
       if(S.foto[tipo]?.base64) imgMap[tipo]='data:image/jpeg;base64,'+S.foto[tipo].base64
     }
 
-    // 2. Per gli slot ancora vuoti, recupera base64 direttamente da Supabase (visite_foto)
-    //    Copre: rigenera PDF, invio da elenco, ricaricamento pagina
+    // 2. Per gli slot ancora vuoti: legge visite_foto (base64 se presente, altrimenti drive_file_id)
     const slotMancanti=FOTO_TIPI.filter(t=>!imgMap[t])
     if(slotMancanti.length){
       try{
         const{data:fotoRec}=await sb.from('visite_foto')
-          .select('tipo,base64')
+          .select('tipo,base64,drive_file_id')
           .eq('visita_id',vid)
           .in('tipo',slotMancanti)
-          .not('base64','is',null)
         if(fotoRec?.length){
+          // 2a. Slot con base64 già in DB
           for(const fr of fotoRec){
             if(fr.base64) imgMap[fr.tipo]='data:image/jpeg;base64,'+fr.base64
+          }
+          // 2b. Slot senza base64 ma con Drive file_id → scarica e cache in DB
+          const daScaricare=fotoRec.filter(fr=>!fr.base64&&fr.drive_file_id)
+          if(daScaricare.length){
+            const{data:{session}}=await sb.auth.getSession()
+            const token=session?.access_token
+            if(token){
+              for(const fr of daScaricare){
+                try{
+                  const dlRes=await fetch(`${SB_URL}/functions/v1/upload-foto`,{
+                    method:'POST',
+                    headers:{Authorization:`Bearer ${token}`,apikey:SB_KEY,'Content-Type':'application/json'},
+                    body:JSON.stringify({download:true,file_id:fr.drive_file_id})
+                  })
+                  if(dlRes.ok){
+                    const dlData=await dlRes.json()
+                    if(dlData.ok&&dlData.base64){
+                      imgMap[fr.tipo]='data:image/jpeg;base64,'+dlData.base64
+                      // Comprimi e salva in DB per evitare il download le prossime volte
+                      compressImageBase64(dlData.base64,800,0.65).then(b64s=>{
+                        sb.from('visite_foto').update({base64:b64s})
+                          .eq('visita_id',vid).eq('tipo',fr.tipo)
+                          .then(({error})=>{if(error)console.warn('cache b64:',error.message)})
+                      })
+                    }
+                  }
+                }catch(e2){console.warn('foto Drive download:',fr.tipo,e2.message)}
+              }
+            }
           }
         }
       }catch(e){console.warn('foto lookup:',e)}
