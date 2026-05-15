@@ -3598,9 +3598,12 @@ async function genPDF(vid, output='save'){
                 headers:{'Content-Type':'application/json','Authorization':`Bearer ${fTok}`,'apikey':SB_KEY},
                 body:JSON.stringify({download:true,file_id:fr.drive_file_id})
               })
-              const d=await r.json()
+              const txt=await r.text()
+              if(!r.ok){console.warn('foto download HTTP',r.status,fr.tipo,txt.slice(0,300));continue}
+              let d;try{d=JSON.parse(txt)}catch(_){console.warn('foto download JSON parse error',fr.tipo,txt.slice(0,300));continue}
               if(d.ok&&d.base64) imgMap[fr.tipo]='data:image/jpeg;base64,'+d.base64
-            }catch(e){console.warn('foto download:',fr.tipo,e)}
+              else console.warn('foto download risposta:',fr.tipo,d)
+            }catch(e){console.warn('foto download:',fr.tipo,e?.message||String(e))}
           }
         }
       }catch(e){console.warn('foto lookup:',e)}
