@@ -3572,25 +3572,24 @@ async function genPDF(vid, output='save'){
       if(S.foto[tipo]?.base64) imgMap[tipo]='data:image/jpeg;base64,'+S.foto[tipo].base64
     }
 
-    // 2. Per gli slot ancora vuoti: legge visite_foto (base64 se presente, altrimenti drive_file_id)
+    // 2. Per gli slot ancora vuoti: legge visite_foto e scarica da Drive
+    // Nota: base64 NON viene mai persistito in DB — si salva solo drive_file_id
     const slotMancanti=FOTO_TIPI.filter(t=>!imgMap[t])
     if(slotMancanti.length){
       try{
-        const{data:fotoRec}=await sb.from('visite_foto')
-          .select('tipo,base64,drive_file_id')
+        const{data:fotoRec,error:fotoErr}=await sb.from('visite_foto')
+          .select('tipo,drive_file_id')
           .eq('visita_id',vid)
           .in('tipo',slotMancanti)
-        if(fotoRec?.length){
-          // 2a. Slot con base64 già in DB
-          for(const fr of fotoRec){
-            if(fr.base64) imgMap[fr.tipo]='data:image/jpeg;base64,'+fr.base64
-          }
-          // 2b. Slot senza base64 ma con Drive file_id → scarica da Drive
-          const daScaricare=fotoRec.filter(fr=>!fr.base64&&fr.drive_file_id)
-          if(daScaricare.length){
-            const{data:{session}}=await sb.auth.getSession()
-            const token=session?.access_token
-            if(!token){console.warn('foto Drive: token assente');return}
+        if(fotoErr) console.warn('visite_foto select errore:',fotoErr.message)
+        // Tutti i record con drive_file_id devono essere scaricati da Drive
+        const daScaricare=(fotoRec||[]).filter(fr=>fr.drive_file_id)
+        if(daScaricare.length){
+          const{data:{session}}=await sb.auth.getSession()
+          const token=session?.access_token
+          if(!token){
+            console.warn('foto Drive: token sessione assente — foto saltate nel PDF')
+          } else {
             for(const fr of daScaricare){
               try{
                 const dlRes=await fetch(`${SB_URL}/functions/v1/upload-foto`,{
