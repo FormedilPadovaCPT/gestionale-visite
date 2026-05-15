@@ -3572,7 +3572,7 @@ async function genPDF(vid, output='save'){
       if(S.foto[tipo]?.base64) imgMap[tipo]='data:image/jpeg;base64,'+S.foto[tipo].base64
     }
 
-    // 2. Per gli slot ancora vuoti: legge visite_foto e scarica da Drive
+    // 2. Per gli slot ancora vuoti: raccoglie drive_file_id da DB o da S.foto in memoria
     // Nota: base64 NON viene mai persistito in DB — si salva solo drive_file_id
     const slotMancanti=FOTO_TIPI.filter(t=>!imgMap[t])
     if(slotMancanti.length){
@@ -3582,31 +3582,52 @@ async function genPDF(vid, output='save'){
           .eq('visita_id',vid)
           .in('tipo',slotMancanti)
         if(fotoErr) console.warn('visite_foto select errore:',fotoErr.message)
-        // Tutti i record con drive_file_id devono essere scaricati da Drive
-        const daScaricare=(fotoRec||[]).filter(fr=>fr.drive_file_id)
+
+        // Costruisce mappa tipo→file_id: prima dal DB, poi da S.foto in memoria come fallback
+        const fileIdMap={}
+        for(const fr of (fotoRec||[])){
+          if(fr.drive_file_id) fileIdMap[fr.tipo]=fr.drive_file_id
+        }
+        // Fallback: S.foto[tipo].fileId (caricato da loadFotoExisting ma non trovato in DB)
+        for(const tipo of slotMancanti){
+          if(!fileIdMap[tipo]&&S.foto[tipo]?.fileId) fileIdMap[tipo]=S.foto[tipo].fileId
+        }
+
+        const daScaricare=Object.entries(fileIdMap)  // [{tipo, file_id}]
         if(daScaricare.length){
           const{data:{session}}=await sb.auth.getSession()
           const token=session?.access_token
           if(!token){
             console.warn('foto Drive: token sessione assente — foto saltate nel PDF')
           } else {
-            for(const fr of daScaricare){
+            toast('Recupero foto da Drive…')
+            for(const [tipo,fileId] of daScaricare){
               try{
-                const dlRes=await fetch(`${SB_URL}/functions/v1/upload-foto`,{
-                  method:'POST',
-                  headers:{Authorization:`Bearer ${token}`,apikey:SB_KEY,'Content-Type':'application/json'},
-                  body:JSON.stringify({download:true,file_id:fr.drive_file_id})
-                })
+                // Timeout 12 s per foto: evita blocco infinito se Edge Function è lenta
+                const ctrl=new AbortController()
+                const tId=setTimeout(()=>ctrl.abort(),12000)
+                let dlRes
+                try{
+                  dlRes=await fetch(`${SB_URL}/functions/v1/upload-foto`,{
+                    method:'POST',
+                    signal:ctrl.signal,
+                    headers:{Authorization:`Bearer ${token}`,apikey:SB_KEY,'Content-Type':'application/json'},
+                    body:JSON.stringify({download:true,file_id:fileId})
+                  })
+                }finally{clearTimeout(tId)}
                 const dlData=await dlRes.json()
                 if(!dlRes.ok||dlData.error){
-                  console.warn('foto Drive download ERRORE:',fr.tipo,'HTTP',dlRes.status,dlData.error||'')
+                  console.warn('foto Drive download ERRORE:',tipo,'HTTP',dlRes.status,dlData.error||'')
                 } else if(dlData.ok&&dlData.base64){
-                  imgMap[fr.tipo]='data:image/jpeg;base64,'+dlData.base64
-                  console.log('foto Drive download OK:',fr.tipo, Math.round(dlData.base64.length/1024)+'KB')
+                  imgMap[tipo]='data:image/jpeg;base64,'+dlData.base64
+                  console.log('foto Drive download OK:',tipo, Math.round(dlData.base64.length/1024)+'KB')
                 } else {
-                  console.warn('foto Drive download risposta inattesa:',fr.tipo,dlData)
+                  console.warn('foto Drive download risposta inattesa:',tipo,dlData)
                 }
-              }catch(e2){console.warn('foto Drive download eccezione:',fr.tipo,e2.message)}
+              }catch(e2){
+                if(e2.name==='AbortError') console.warn('foto Drive download TIMEOUT:',tipo)
+                else console.warn('foto Drive download eccezione:',tipo,e2.message)
+              }
             }
           }
         }
