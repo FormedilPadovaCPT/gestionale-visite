@@ -2632,12 +2632,14 @@ function vtRow(v){
     <td><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span></td>
     <td><div class="tbl-actions">
       <button class="btn-primary btn-sm" data-act="pdf" data-id="${v.visita_id}">PDF</button>
+      <button class="btn-outline btn-sm" data-act="email" data-id="${v.visita_id}" title="Invia verbale via email">📧</button>
       <button class="btn-outline btn-sm" data-act="snap" data-id="${v.visita_id}">📤</button>
     </div></td>
   </tr>`
 }
 function bindRowActions(){
   document.querySelectorAll('[data-act="pdf"]').forEach(b=>b.onclick=()=>genPDF(b.dataset.id))
+  document.querySelectorAll('[data-act="email"]').forEach(b=>b.onclick=()=>inviEmailVerbaleFromList(b.dataset.id))
   document.querySelectorAll('[data-act="snap"]').forEach(b=>b.onclick=()=>exportSnapFromDB(b.dataset.id))
 }
 $('btn-pdf').onclick=()=>{
@@ -2692,8 +2694,86 @@ $('btn-cerca-cant').onclick=()=>loadCantieri()
 $('q-cant').onkeydown=e=>{if(e.key==='Enter')loadCantieri()}
 $('btn-nuovo-cant-lista').onclick=()=>{resetModalCantiere();show('modal-cant')}
 
+// ── EMAIL VERBALE DA ELENCO ──
+async function inviEmailVerbaleFromList(vid){
+  toast('Caricamento dati visita…')
+  const{data:v,error}=await sb.from('visite').select(`
+    visita_id,nr_verbale,data_visita,
+    comm_nome,comm_cog,comm_rag_soc,comm_tipo_sogg,comm_email,
+    resp_lav,rl_email,
+    csp,csp_email,
+    cse,cse_email,
+    cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome)
+  `).eq('visita_id',vid).single()
+  if(error||!v){toast('Visita non trovata','err');return}
+  const{data:impRows}=await sb.from('visite_imprese_presenti').select('email_verbale,imprese(impresa_nome,impresa_email_ref)').eq('visita_id',vid).order('ordine')
+
+  const emails=[]
+  // Committente
+  const commEmail=v.comm_email?.trim()
+  if(commEmail){
+    const isPG=v.comm_tipo_sogg==='PG'
+    const commNome=isPG?(v.comm_rag_soc||'Committente'):[v.comm_nome,v.comm_cog].filter(Boolean).join(' ')||'Committente'
+    emails.push({ruolo:'Committente',nome:commNome,email:commEmail})
+  }
+  if(v.rl_email?.trim())emails.push({ruolo:'RL',nome:v.resp_lav||'RL',email:v.rl_email.trim()})
+  if(v.csp_email?.trim())emails.push({ruolo:'CSP',nome:v.csp||'CSP',email:v.csp_email.trim()})
+  if(v.cse_email?.trim())emails.push({ruolo:'CSE',nome:v.cse||'CSE',email:v.cse_email.trim()})
+  ;(impRows||[]).forEach((im,idx)=>{
+    const ev=(im.email_verbale||im.imprese?.impresa_email_ref||'').trim()
+    if(ev)emails.push({ruolo:'Impresa',nome:im.imprese?.impresa_nome||`Impresa ${idx+1}`,email:ev})
+  })
+
+  if(!emails.length){toast('Nessun indirizzo email presente per questa visita','warn');return}
+
+  // Render lista destinatari
+  $('email-verbale-list').innerHTML=emails.map(e=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #eee;font-size:13px">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--grey);min-width:72px;letter-spacing:.4px">${e.ruolo}</span>
+      <span style="flex:1;color:#333">${e.nome}</span>
+      <span style="color:var(--orange);font-size:12px">${e.email}</span>
+    </div>`).join('')
+
+  // Oggetto
+  const cant=v.cantieri?.cantiere_etichetta||[v.cantieri?.cantiere_indirizzo,v.cantieri?.cantiere_civico,v.cantieri?.comune_nome].filter(Boolean).join(', ')||''
+  $('email-verbale-oggetto').value=`Verbale sopralluogo${v.nr_verbale?' n° '+v.nr_verbale:''}${cant?' – '+cant:''}`
+
+  // Testo lettera standard
+  const _gg=['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato']
+  const _mm=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre']
+  let dataLegg=''
+  if(v.data_visita){const d=new Date(v.data_visita+'T00:00:00');if(!isNaN(d))dataLegg=`${_gg[d.getDay()]} ${d.getDate()} ${_mm[d.getMonth()]} ${d.getFullYear()}`}
+  const impNome=(impRows&&impRows.length?impRows[0].imprese?.impresa_nome:'')||''
+  const testaEl=$('email-verbale-testo')
+  if(testaEl)testaEl.value=
+`Spett.le impresa${impNome?'\n'+impNome:''}
+
+Oggetto: Prevenzione Infortuni – Cantiere ${cant?'di '+cant:''}
+
+${dataLegg?'Il giorno '+dataLegg+' è':'È'} passato nel vostro cantiere in oggetto, per fornirvi utili consigli in materia di prevenzione infortuni, uno dei nostri tecnici.
+
+Egli si è soffermato ad illustrare al VS personale in cantiere le più importanti norme che devono essere tenute presenti per garantire la sicurezza durante le varie fasi lavorative, con particolare riferimento a quelle in corso.
+
+In base a quanto previsto dalle norme che regolano il funzionamento dello scrivente Comitato Paritetico Territoriale potrà essere effettuata, entro breve termine, una successiva visita per constatare che i consigli forniti siano stati correttamente attuati.
+
+Per migliorare la conoscenza della normativa in materia di salute e sicurezza sul lavoro, in allegato troverà il verbale del sopralluogo effettuato.
+
+Distinti saluti.
+
+La presidenza del Formedil Padova – Area Sicurezza e Salute`
+
+  window._evEmails=emails
+  window._evContext={vid,nr_verbale:v.nr_verbale||'',data_visita:v.data_visita||'',cantiere:cant}
+  const btnInvia=$('btn-ev-invia')
+  btnInvia.disabled=false; btnInvia.textContent='📤 Invia ora'
+  const evStatus=$('email-verbale-status')
+  evStatus.textContent=''; evStatus.style.color=''
+  show('modal-email-verbale')
+}
+
 // ── EMAIL VERBALE ──
 function inviEmailVerbale(){
+  window._evContext=null
   const emails=[]
   // Committente
   const isPG=$('comm-radio-pg')?.checked
@@ -2803,7 +2883,7 @@ $('btn-ev-copia').onclick=()=>{
 $('btn-ev-invia').onclick=async()=>{
   const emails=window._evEmails||[]
   if(!emails.length){toast('Nessun destinatario','warn');return}
-  const vid=S.savedId||S.fd?.visita_id
+  const vid=S.savedId||S.fd?.visita_id||window._evContext?.vid
   if(!vid){toast('Salva prima la visita','warn');return}
 
   const btn=$('btn-ev-invia')
@@ -2827,8 +2907,8 @@ $('btn-ev-invia').onclick=async()=>{
       headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`,'apikey':SB_KEY},
       body:JSON.stringify({
         pdf_base64: pdfBase64,
-        nr_verbale: vGet('f-verbale')||'',
-        data_visita: vGet('f-data')||'',
+        nr_verbale: vGet('f-verbale')||window._evContext?.nr_verbale||'',
+        data_visita: vGet('f-data')||window._evContext?.data_visita||'',
         visita_id: vid
       })
     })
@@ -2849,8 +2929,8 @@ $('btn-ev-invia').onclick=async()=>{
         body:JSON.stringify({
           to: emails.map(e=>e.email),
           subject: $('email-verbale-oggetto')?.value||'',
-          nrVerbale: vGet('f-verbale')||'',
-          cantiere: vGet('f-cant-search')||'',
+          nrVerbale: vGet('f-verbale')||window._evContext?.nr_verbale||'',
+          cantiere: vGet('f-cant-search')||window._evContext?.cantiere||'',
           testoExtra: $('email-verbale-testo')?.value||'',
           driveFileId: upData.drive_file_id,
           fileName: upData.file_name
