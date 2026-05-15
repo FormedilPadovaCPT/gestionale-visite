@@ -2901,17 +2901,23 @@ $('btn-ev-invia').onclick=async()=>{
 
     btn.textContent='⏳ Upload PDF su Drive…'
 
-    // 2. Carica PDF su Drive (await): il payload pesante va solo a upload-pdf, non a send-verbale
-    const upResp=await fetch(`${SB_URL}/functions/v1/upload-pdf`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`,'apikey':SB_KEY},
-      body:JSON.stringify({
-        pdf_base64: pdfBase64,
-        nr_verbale: vGet('f-verbale')||window._evContext?.nr_verbale||'',
-        data_visita: vGet('f-data')||window._evContext?.data_visita||'',
-        visita_id: vid
+    // 2. Carica PDF su Drive — timeout 90s per evitare blocchi silenziosi
+    const upCtrl=new AbortController()
+    const upTout=setTimeout(()=>upCtrl.abort(),90000)
+    let upResp
+    try{
+      upResp=await fetch(`${SB_URL}/functions/v1/upload-pdf`,{
+        method:'POST',
+        signal:upCtrl.signal,
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`,'apikey':SB_KEY},
+        body:JSON.stringify({
+          pdf_base64: pdfBase64,
+          nr_verbale: vGet('f-verbale')||window._evContext?.nr_verbale||'',
+          data_visita: vGet('f-data')||window._evContext?.data_visita||'',
+          visita_id: vid
+        })
       })
-    })
+    }finally{clearTimeout(upTout)}
     const upData=await upResp.json()
     if(!upData.ok||!upData.drive_file_id) throw new Error('Upload Drive fallito: '+(upData.error||'risposta non valida'))
 
@@ -3679,9 +3685,9 @@ async function genPDF(vid, output='save'){
     }
 
     if(output==='base64'){
-      const uri=doc.output('datauristring')
-      _uploadPdfDrive(uri.split(',')[1])   // upload in background
-      return uri
+      // NON chiamare _uploadPdfDrive qui: il gestore send-verbale lo gestisce
+      // esplicitamente; un doppio upload concorrente blocca la Edge Function
+      return doc.output('datauristring')
     }
     const pdfB64=doc.output('datauristring').split(',')[1]
     doc.save(`verbale_${v.nr_verbale||vid}.pdf`)
