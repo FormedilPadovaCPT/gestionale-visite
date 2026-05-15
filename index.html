@@ -2694,7 +2694,7 @@ async function inviEmailVerbaleFromList(vid){
     cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome)
   `).eq('visita_id',vid).single()
   if(error||!v){toast('Visita non trovata','err');return}
-  const{data:impRows}=await sb.from('visite_imprese_presenti').select('email_verbale,imprese(impresa_nome,impresa_email_ref)').eq('visita_id',vid).order('ordine')
+  const{data:impRows}=await sb.from('visite_imprese_presenti').select('imprese(impresa_nome,impresa_email_ref)').eq('visita_id',vid).order('ordine')
 
   const emails=[]
   // Committente
@@ -2708,7 +2708,7 @@ async function inviEmailVerbaleFromList(vid){
   if(v.csp_email?.trim())emails.push({ruolo:'CSP',nome:v.csp||'CSP',email:v.csp_email.trim()})
   if(v.cse_email?.trim())emails.push({ruolo:'CSE',nome:v.cse||'CSE',email:v.cse_email.trim()})
   ;(impRows||[]).forEach((im,idx)=>{
-    const ev=(im.email_verbale||im.imprese?.impresa_email_ref||'').trim()
+    const ev=(im.imprese?.impresa_email_ref||'').trim()
     if(ev)emails.push({ruolo:'Impresa',nome:im.imprese?.impresa_nome||`Impresa ${idx+1}`,email:ev})
   })
 
@@ -3287,7 +3287,7 @@ async function genPDF(vid, output='save'){
       const nome=im.imprese?.impresa_nome||'–'
       const ruolo=im.ruolo||'–'
       const cf=im.imprese?.impresa_cf||'–'
-      const email=im.email_verbale||im.imprese?.impresa_email_ref||'–'
+      const email=im.imprese?.impresa_email_ref||'–'
       impsRows.push([
         {content:`${i+1}. ${nome}`,styles:{fontStyle:'bold'}},
         {content:ruolo,styles:{halign:'center'}},
