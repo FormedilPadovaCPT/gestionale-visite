@@ -3572,61 +3572,70 @@ async function genPDF(vid, output='save'){
       if(S.foto[tipo]?.base64) imgMap[tipo]='data:image/jpeg;base64,'+S.foto[tipo].base64
     }
 
-    // 2. Per gli slot ancora vuoti: raccoglie drive_file_id da DB o da S.foto in memoria
-    // Nota: base64 NON viene mai persistito in DB — si salva solo drive_file_id
+    // 2. Per gli slot ancora vuoti: recupera metadati foto da DB + S.foto in memoria
     const slotMancanti=FOTO_TIPI.filter(t=>!imgMap[t])
     if(slotMancanti.length){
       try{
+        // Query DB — seleziona anche thumb_url per download diretto (no Edge Function)
         const{data:fotoRec,error:fotoErr}=await sb.from('visite_foto')
-          .select('tipo,drive_file_id')
+          .select('tipo,drive_file_id,thumb_url')
           .eq('visita_id',vid)
           .in('tipo',slotMancanti)
         if(fotoErr) console.warn('visite_foto select errore:',fotoErr.message)
 
-        // Costruisce mappa tipo→file_id: prima dal DB, poi da S.foto in memoria come fallback
-        const fileIdMap={}
+        // Unisce metadati DB + S.foto in memoria (visitata aperta o caricata da loadFotoExisting)
+        const fotoMeta={}
         for(const fr of (fotoRec||[])){
-          if(fr.drive_file_id) fileIdMap[fr.tipo]=fr.drive_file_id
+          fotoMeta[fr.tipo]={fileId:fr.drive_file_id,thumb:fr.thumb_url}
         }
-        // Fallback: S.foto[tipo].fileId (caricato da loadFotoExisting ma non trovato in DB)
         for(const tipo of slotMancanti){
-          if(!fileIdMap[tipo]&&S.foto[tipo]?.fileId) fileIdMap[tipo]=S.foto[tipo].fileId
+          if(!fotoMeta[tipo]&&(S.foto[tipo]?.thumb||S.foto[tipo]?.fileId)){
+            fotoMeta[tipo]={fileId:S.foto[tipo].fileId,thumb:S.foto[tipo].thumb}
+          }
         }
 
-        const daScaricare=Object.entries(fileIdMap)  // [{tipo, file_id}]
-        if(daScaricare.length){
-          const{data:{session}}=await sb.auth.getSession()
-          const token=session?.access_token
-          if(!token){
-            console.warn('foto Drive: token sessione assente — foto saltate nel PDF')
-          } else {
-            toast('Recupero foto da Drive…')
-            for(const [tipo,fileId] of daScaricare){
+        const voci=Object.entries(fotoMeta)
+        if(voci.length){
+          toast('Recupero foto da Drive…')
+          for(const [tipo,meta] of voci){
+            // ── Tentativo 1: thumb_url pubblico, fetch diretto dal browser (veloce) ──
+            if(meta.thumb){
               try{
-                // Timeout 12 s per foto: evita blocco infinito se Edge Function è lenta
-                const ctrl=new AbortController()
-                const tId=setTimeout(()=>ctrl.abort(),12000)
-                let dlRes
-                try{
-                  dlRes=await fetch(`${SB_URL}/functions/v1/upload-foto`,{
-                    method:'POST',
-                    signal:ctrl.signal,
-                    headers:{Authorization:`Bearer ${token}`,apikey:SB_KEY,'Content-Type':'application/json'},
-                    body:JSON.stringify({download:true,file_id:fileId})
-                  })
-                }finally{clearTimeout(tId)}
-                const dlData=await dlRes.json()
-                if(!dlRes.ok||dlData.error){
-                  console.warn('foto Drive download ERRORE:',tipo,'HTTP',dlRes.status,dlData.error||'')
-                } else if(dlData.ok&&dlData.base64){
-                  imgMap[tipo]='data:image/jpeg;base64,'+dlData.base64
-                  console.log('foto Drive download OK:',tipo, Math.round(dlData.base64.length/1024)+'KB')
-                } else {
-                  console.warn('foto Drive download risposta inattesa:',tipo,dlData)
+                const b64=await fetchImageBase64(meta.thumb)
+                if(b64){
+                  imgMap[tipo]='data:image/jpeg;base64,'+b64
+                  console.log('foto thumb OK:',tipo)
+                  continue
                 }
-              }catch(e2){
-                if(e2.name==='AbortError') console.warn('foto Drive download TIMEOUT:',tipo)
-                else console.warn('foto Drive download eccezione:',tipo,e2.message)
+              }catch(e2){console.warn('foto thumb errore:',tipo,e2.message)}
+            }
+            // ── Tentativo 2: download via Edge Function (con timeout 12 s) ──
+            if(meta.fileId){
+              const{data:{session}}=await sb.auth.getSession()
+              const token=session?.access_token
+              if(token){
+                try{
+                  const ctrl=new AbortController()
+                  const tId=setTimeout(()=>ctrl.abort(),12000)
+                  let dlRes
+                  try{
+                    dlRes=await fetch(`${SB_URL}/functions/v1/upload-foto`,{
+                      method:'POST',signal:ctrl.signal,
+                      headers:{Authorization:`Bearer ${token}`,apikey:SB_KEY,'Content-Type':'application/json'},
+                      body:JSON.stringify({download:true,file_id:meta.fileId})
+                    })
+                  }finally{clearTimeout(tId)}
+                  const dlData=await dlRes.json()
+                  if(dlData.ok&&dlData.base64){
+                    imgMap[tipo]='data:image/jpeg;base64,'+dlData.base64
+                    console.log('foto Edge Function OK:',tipo)
+                  } else {
+                    console.warn('foto Edge Function ERRORE:',tipo,dlData.error||dlRes.status)
+                  }
+                }catch(e2){
+                  if(e2.name==='AbortError') console.warn('foto Edge Function TIMEOUT:',tipo)
+                  else console.warn('foto Edge Function errore:',tipo,e2.message)
+                }
               }
             }
           }
