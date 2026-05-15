@@ -2484,21 +2484,19 @@ async function uploadSingolaFoto(tipo){
     })
     if(bar)bar.style.width='80%'
     const data=await res.json()
-    // Salva sempre su Supabase (base64 inclusa per PDF – indipendente da Drive)
     const driveOk=res.ok&&!data.error
     if(!driveOk) throw new Error(data.error||'Errore upload Drive')
-    // Salva metadati + base64 compressa su Supabase (per rigenerare PDF senza Edge Function)
+    // Salva solo metadati Drive su Supabase (no base64)
     const{error:uErr}=await sb.from('visite_foto').upsert({
       visita_id:vid, tipo,
       drive_file_id:data.drive_file_id,
       drive_url:data.drive_url||null,
       thumb_url:data.thumb_url||null,
       nome_file:fo.nome,
-      dimensione_kb:fo.sizeKb||null,
-      base64:fo.base64||null
+      dimensione_kb:fo.sizeKb||null
     },{onConflict:'visita_id,tipo'})
     if(uErr) console.warn('visite_foto upsert:',uErr.message)
-    // Aggiorna stato locale — mantieni base64 in memoria per generazione PDF nella sessione corrente
+    // Aggiorna stato locale — mantieni base64 in memoria per la sessione corrente
     S.foto[tipo]={...fo, url:data.drive_url, thumb:data.thumb_url, fileId:data.drive_file_id}
     if(bar)bar.style.width='100%'
     setTimeout(()=>{if(prog)prog.style.display='none'},600)
@@ -2506,18 +2504,7 @@ async function uploadSingolaFoto(tipo){
     toast(`${tipo} caricata su Drive ✓`,'ok')
   }catch(e){
     if(prog)prog.style.display='none'
-    // Salva comunque la base64 su Supabase anche se Drive fallisce
-    const vid2=S.savedId||S.fd.visita_id
-    if(vid2&&fo?.base64){
-      try{
-        await sb.from('visite_foto').upsert({
-          visita_id:vid2, tipo, nome_file:fo.nome, dimensione_kb:fo.sizeKb||null
-        },{onConflict:'visita_id,tipo'})
-      }catch(_){}
-      toast('Errore Drive: '+e.message+' – foto salvata localmente','warn')
-    } else {
-      toast('Errore caricamento foto: '+e.message,'err')
-    }
+    toast('Errore caricamento foto: '+e.message,'err')
   }
 }
 
@@ -2558,7 +2545,7 @@ async function loadFotoExisting(vid){
   const {data}=await sb.from('visite_foto').select('*').eq('visita_id',vid)
   if(!data?.length)return
   for(const r of data){
-    S.foto[r.tipo]={url:r.drive_url, thumb:r.thumb_url, fileId:r.drive_file_id, nome:r.nome_file, sizeKb:r.dimensione_kb, base64:r.base64||null}
+    S.foto[r.tipo]={url:r.drive_url, thumb:r.thumb_url, fileId:r.drive_file_id, nome:r.nome_file, sizeKb:r.dimensione_kb}
   }
 }
 
@@ -3615,12 +3602,6 @@ async function genPDF(vid, output='save'){
                     const dlData=await dlRes.json()
                     if(dlData.ok&&dlData.base64){
                       imgMap[fr.tipo]='data:image/jpeg;base64,'+dlData.base64
-                      // Comprimi e salva in DB per evitare il download le prossime volte
-                      compressImageBase64(dlData.base64,800,0.65).then(b64s=>{
-                        sb.from('visite_foto').update({base64:b64s})
-                          .eq('visita_id',vid).eq('tipo',fr.tipo)
-                          .then(({error})=>{if(error)console.warn('cache b64:',error.message)})
-                      })
                     }
                   }
                 }catch(e2){console.warn('foto Drive download:',fr.tipo,e2.message)}
