@@ -3585,27 +3585,29 @@ async function genPDF(vid, output='save'){
           for(const fr of fotoRec){
             if(fr.base64) imgMap[fr.tipo]='data:image/jpeg;base64,'+fr.base64
           }
-          // 2b. Slot senza base64 ma con Drive file_id → scarica e cache in DB
+          // 2b. Slot senza base64 ma con Drive file_id → scarica da Drive
           const daScaricare=fotoRec.filter(fr=>!fr.base64&&fr.drive_file_id)
           if(daScaricare.length){
             const{data:{session}}=await sb.auth.getSession()
             const token=session?.access_token
-            if(token){
-              for(const fr of daScaricare){
-                try{
-                  const dlRes=await fetch(`${SB_URL}/functions/v1/upload-foto`,{
-                    method:'POST',
-                    headers:{Authorization:`Bearer ${token}`,apikey:SB_KEY,'Content-Type':'application/json'},
-                    body:JSON.stringify({download:true,file_id:fr.drive_file_id})
-                  })
-                  if(dlRes.ok){
-                    const dlData=await dlRes.json()
-                    if(dlData.ok&&dlData.base64){
-                      imgMap[fr.tipo]='data:image/jpeg;base64,'+dlData.base64
-                    }
-                  }
-                }catch(e2){console.warn('foto Drive download:',fr.tipo,e2.message)}
-              }
+            if(!token){console.warn('foto Drive: token assente');return}
+            for(const fr of daScaricare){
+              try{
+                const dlRes=await fetch(`${SB_URL}/functions/v1/upload-foto`,{
+                  method:'POST',
+                  headers:{Authorization:`Bearer ${token}`,apikey:SB_KEY,'Content-Type':'application/json'},
+                  body:JSON.stringify({download:true,file_id:fr.drive_file_id})
+                })
+                const dlData=await dlRes.json()
+                if(!dlRes.ok||dlData.error){
+                  console.warn('foto Drive download ERRORE:',fr.tipo,'HTTP',dlRes.status,dlData.error||'')
+                } else if(dlData.ok&&dlData.base64){
+                  imgMap[fr.tipo]='data:image/jpeg;base64,'+dlData.base64
+                  console.log('foto Drive download OK:',fr.tipo, Math.round(dlData.base64.length/1024)+'KB')
+                } else {
+                  console.warn('foto Drive download risposta inattesa:',fr.tipo,dlData)
+                }
+              }catch(e2){console.warn('foto Drive download eccezione:',fr.tipo,e2.message)}
             }
           }
         }
