@@ -2487,14 +2487,15 @@ async function uploadSingolaFoto(tipo){
     // Salva sempre su Supabase (base64 inclusa per PDF – indipendente da Drive)
     const driveOk=res.ok&&!data.error
     if(!driveOk) throw new Error(data.error||'Errore upload Drive')
-    // Su Supabase salviamo solo metadati (no base64 — le foto risiedono esclusivamente su Drive)
+    // Salva metadati + base64 compressa su Supabase (per rigenerare PDF senza Edge Function)
     const{error:uErr}=await sb.from('visite_foto').upsert({
       visita_id:vid, tipo,
       drive_file_id:data.drive_file_id,
       drive_url:data.drive_url||null,
       thumb_url:data.thumb_url||null,
       nome_file:fo.nome,
-      dimensione_kb:fo.sizeKb||null
+      dimensione_kb:fo.sizeKb||null,
+      base64:fo.base64||null
     },{onConflict:'visita_id,tipo'})
     if(uErr) console.warn('visite_foto upsert:',uErr.message)
     // Aggiorna stato locale — mantieni base64 in memoria per generazione PDF nella sessione corrente
@@ -2557,7 +2558,7 @@ async function loadFotoExisting(vid){
   const {data}=await sb.from('visite_foto').select('*').eq('visita_id',vid)
   if(!data?.length)return
   for(const r of data){
-    S.foto[r.tipo]={url:r.drive_url, thumb:r.thumb_url, fileId:r.drive_file_id, nome:r.nome_file, sizeKb:r.dimensione_kb}
+    S.foto[r.tipo]={url:r.drive_url, thumb:r.thumb_url, fileId:r.drive_file_id, nome:r.nome_file, sizeKb:r.dimensione_kb, base64:r.base64||null}
   }
 }
 
@@ -3584,32 +3585,19 @@ async function genPDF(vid, output='save'){
       if(S.foto[tipo]?.base64) imgMap[tipo]='data:image/jpeg;base64,'+S.foto[tipo].base64
     }
 
-    // 2. Per gli slot ancora vuoti, interroga visite_foto e scarica da Drive
-    //    (copre il caso di rigenera PDF, invio da elenco, o ricaricamento pagina)
+    // 2. Per gli slot ancora vuoti, recupera base64 direttamente da Supabase (visite_foto)
+    //    Copre: rigenera PDF, invio da elenco, ricaricamento pagina
     const slotMancanti=FOTO_TIPI.filter(t=>!imgMap[t])
     if(slotMancanti.length){
       try{
         const{data:fotoRec}=await sb.from('visite_foto')
-          .select('tipo,drive_file_id')
+          .select('tipo,base64')
           .eq('visita_id',vid)
           .in('tipo',slotMancanti)
-          .not('drive_file_id','is',null)
+          .not('base64','is',null)
         if(fotoRec?.length){
-          const{data:{session:fSess}}=await sb.auth.getSession()
-          const fTok=fSess?.access_token
           for(const fr of fotoRec){
-            try{
-              const r=await fetch(`${SB_URL}/functions/v1/upload-foto`,{
-                method:'POST',
-                headers:{'Content-Type':'application/json','Authorization':`Bearer ${fTok}`,'apikey':SB_KEY},
-                body:JSON.stringify({download:true,file_id:fr.drive_file_id})
-              })
-              const txt=await r.text()
-              if(!r.ok){console.warn('foto download HTTP',r.status,fr.tipo,txt.slice(0,300));continue}
-              let d;try{d=JSON.parse(txt)}catch(_){console.warn('foto download JSON parse error',fr.tipo,txt.slice(0,300));continue}
-              if(d.ok&&d.base64) imgMap[fr.tipo]='data:image/jpeg;base64,'+d.base64
-              else console.warn('foto download risposta:',fr.tipo,d)
-            }catch(e){console.warn('foto download:',fr.tipo,e?.message||String(e))}
+            if(fr.base64) imgMap[fr.tipo]='data:image/jpeg;base64,'+fr.base64
           }
         }
       }catch(e){console.warn('foto lookup:',e)}
