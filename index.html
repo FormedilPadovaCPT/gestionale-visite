@@ -1587,6 +1587,8 @@ setupAC('f-cant-search','cant-list', async q=>{
     vSet('f-cod-uni',item.extra.nodo_id||'')
     vSet('f-acc-cant2',item.extra.acc_cant||'')
     S.fd.comune_nome=item.extra.comune_nome||''
+    S.fd.cantiere_indirizzo=item.extra.cantiere_indirizzo||''
+    S.fd.cantiere_civico=item.extra.cantiere_civico||''
   }
 })
 
@@ -2725,53 +2727,60 @@ async function inviEmailVerbaleFromList(vid){
       <span style="color:var(--orange);font-size:12px">${e.email}</span>
     </div>`).join('')
 
-  // Oggetto
-  const cant=v.cantieri?.cantiere_etichetta||[v.cantieri?.cantiere_indirizzo,v.cantieri?.cantiere_civico,v.cantieri?.comune_nome].filter(Boolean).join(', ')||''
-  {
-    const _comuneOgg=v.cantieri?.comune_nome||''
-    const _nrOgg=v.nr_verbale||''
-    const _impOgg=(impRows&&impRows.length?impRows[0].imprese?.impresa_nome:'')||''
-    const _tecOgg=[v.tecnici?.tecnico_nome,v.tecnici?.tecnico_cognome].filter(Boolean).join(' ')
-    const _dataOggParts=v.data_visita?new Date(v.data_visita+'T00:00:00'):null
-    const _dataOgg=_dataOggParts&&!isNaN(_dataOggParts)?`${String(_dataOggParts.getDate()).padStart(2,'0')} ${String(_dataOggParts.getMonth()+1).padStart(2,'0')} ${_dataOggParts.getFullYear()}`:''
-    $('email-verbale-oggetto').value=['Cantiere di '+_comuneOgg,_nrOgg,_impOgg,_tecOgg,_dataOgg].filter(Boolean).join(' – ')
-  }
+  // Dati strutturati per oggetto, corpo e _evContext
+  const _eInd=[v.cantieri?.cantiere_indirizzo,v.cantieri?.cantiere_civico].filter(Boolean).join(' ')
+  const _eCom=v.cantieri?.comune_nome||''
+  const _eNr=v.nr_verbale||''
+  const _eImp=(impRows&&impRows.length?impRows[0].imprese?.impresa_nome:'')||''
+  const _eTec=[v.tecnici?.tecnico_nome,v.tecnici?.tecnico_cognome].filter(Boolean).join(' ')
+  const _eDp=v.data_visita?new Date(v.data_visita+'T00:00:00'):null
+  const _eData=_eDp&&!isNaN(_eDp)?`${String(_eDp.getDate()).padStart(2,'0')}/${String(_eDp.getMonth()+1).padStart(2,'0')}/${_eDp.getFullYear()}`:''
+  const cant=v.cantieri?.cantiere_etichetta||_eInd||''
 
-  // Testo lettera standard
-  const _gg=['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato']
-  const _mm=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre']
-  let dataLegg=''
-  if(v.data_visita){const d=new Date(v.data_visita+'T00:00:00');if(!isNaN(d))dataLegg=`${_gg[d.getDay()]} ${d.getDate()} ${_mm[d.getMonth()]} ${d.getFullYear()}`}
-  const impNome=(impRows&&impRows.length?impRows[0].imprese?.impresa_nome:'')||''
+  // Oggetto
+  $('email-verbale-oggetto').value=[`Cantiere di ${_eInd} ${_eNr}`.trim(),_eImp,_eCom,_eTec,_eData].filter(Boolean).join(' - ')
+
+  // Testo lettera (preview nel textarea – il vero HTML è costruito dalla Edge Function)
   const testaEl=$('email-verbale-testo')
   if(testaEl)testaEl.value=
-`Spett.le impresa${impNome?'\n'+impNome:''}
+`Spett.le impresa${_eImp?'\n'+_eImp:''}
 
-Oggetto: Prevenzione Infortuni – Cantiere ${cant?'di '+cant:''}
+Prevenzione Infortuni
 
-${dataLegg?'Il giorno '+dataLegg+' è':'È'} passato nel vostro cantiere in oggetto, per fornirvi utili consigli in materia di prevenzione infortuni, uno dei nostri tecnici.
+Alla cortese attenzione del
+Responsabile del Servizio di Prevenzione e Protezione
+e/o del
+Coordinatore per la Sicurezza
 
-Egli si è soffermato ad illustrare al VS personale in cantiere le più importanti norme che devono essere tenute presenti per garantire la sicurezza durante le varie fasi lavorative, con particolare riferimento a quelle in corso.
+Cantiere di ${_eCom||_eInd}
 
-In base a quanto previsto dalle norme che regolano il funzionamento dello scrivente Comitato Paritetico Territoriale potrà essere effettuata, entro breve termine, una successiva visita per constatare che i consigli forniti siano stati correttamente attuati.
+${_eData?'Il giorno '+_eData+' è':'È'} passato nel vostro cantiere in oggetto, per fornirvi utili consigli in materia di prevenzione infortuni, uno dei nostri tecnici${_eTec?', '+_eTec:''}.
 
-Per migliorare la conoscenza della normativa in materia di salute e sicurezza sul lavoro, in allegato troverà il verbale del sopralluogo effettuato.
+Egli si è soffermato ad illustrare al Vostro personale in cantiere le più importanti norme che devono essere tenute presenti per garantire la sicurezza durante le varie fasi lavorative, con particolare riferimento a quelle in corso.
 
-Distinti saluti.
+In base a quanto previsto dalle norme che regolano il funzionamento dello scrivente Comitato Paritetico Territoriale, potrà essere effettuata entro breve termine una successiva visita, per constatare che i consigli forniti siano stati correttamente attuati.
+
+Vi trasmettiamo in allegato il rapporto di visita redatto dal nostro Tecnico in cantiere.
+
+Evidenziamo che la consulenza che è stata resa alla Vostra impresa è per Voi totalmente gratuita, grazie al contributo versato da imprese e lavoratori iscritti a C.E.I.V. (Cassa Edile di Mutualità e Assistenza Interprovinciale del Veneto - www.ceiv.eu).
+
+L'iscrizione a C.E.I.V. offre molti altri vantaggi, come ad esempio la possibilità di accedere alla formazione obbligatoria ex D.Lgs 81/2008, che Formedil Padova offre a tariffe agevolate. (vai al calendario corsi: www.formedilpadova.it/corsi-sicurezza/).
+
+Rimanendo a disposizione per ogni eventuale chiarimento porgiamo distinti saluti.
 
 Renato Squizzato
 Area Sicurezza e Salute | FORMEDIL PADOVA
-Via Basilicata 10
-35127 Padova (PD)
+Via Basilicata 10 – 35127 Padova (PD)
 email: cpt@formedilpadova.it
 Tel. 049 - 761168 (int.4)
 URL: www.formedilpadova.it
+CPT: https://cptpd.jimdofree.com
 Organismo Accreditato Regione Veneto per la formazione L.R. n. 19 del 09.08.02 cod. AO119 per i servizi al lavoro codice L236
-
 Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle persone fisiche con riguardo al trattamento dei dati personali, la presente e-mail è destinata unicamente alle persone sopra indicate e le informazioni in essa contenute sono da considerarsi strettamente riservate. Se avete ricevuto questo messaggio per errore, siete pregati di rispedirlo al mittente, distruggendo qualunque copia in Vostro possesso, grazie.`
 
   window._evEmails=emails
-  window._evContext={vid,nr_verbale:v.nr_verbale||'',data_visita:v.data_visita||'',cantiere:cant}
+  window._evContext={vid,nr_verbale:_eNr,data_visita:v.data_visita||'',cantiere:cant,
+    impresa:_eImp,tecnico:_eTec,comune:_eCom,cantIndirizzo:_eInd,dataVisita:_eData}
   const btnInvia=$('btn-ev-invia')
   btnInvia.disabled=false; btnInvia.textContent='📤 Invia ora'
   const evStatus=$('email-verbale-status')
@@ -2825,68 +2834,62 @@ function inviEmailVerbale(){
       <span style="color:var(--orange);font-size:12px">${e.email}</span>
     </div>`).join('')
 
-  // Oggetto predefinito
+  // Dati strutturati per oggetto, corpo e _evContext
   const nrVerb=vGet('f-verbale')||''
   const cant=vGet('f-cant-search')||''
-  {
-    const _comuneF=S.fd?.comune_nome||''
-    const _impF=(S.imprese&&S.imprese.length?S.imprese[0]?.impresa_nome:'')||''
-    const _tecF=S.tecnico?`${S.tecnico.tecnico_nome||''} ${S.tecnico.tecnico_cognome||''}`.trim():''
-    const _dsF=vGet('f-data')||''
-    let _dataF=''
-    if(_dsF){const _d=new Date(_dsF+'T00:00:00');if(!isNaN(_d))_dataF=`${String(_d.getDate()).padStart(2,'0')} ${String(_d.getMonth()+1).padStart(2,'0')} ${_d.getFullYear()}`}
-    $('email-verbale-oggetto').value=['Cantiere di '+_comuneF,nrVerb,_impF,_tecF,_dataF].filter(Boolean).join(' – ')
-  }
+  const _fInd=[S.fd?.cantiere_indirizzo,S.fd?.cantiere_civico].filter(Boolean).join(' ')
+  const _fCom=S.fd?.comune_nome||''
+  const _fImp=(S.imprese&&S.imprese.length?S.imprese[0]?.impresa_nome:'')||''
+  const _fTec=S.tecnico?`${S.tecnico.tecnico_nome||''} ${S.tecnico.tecnico_cognome||''}`.trim():''
+  const _fDsRaw=vGet('f-data')||''
+  let _fData=''
+  if(_fDsRaw){const _fd=new Date(_fDsRaw+'T00:00:00');if(!isNaN(_fd))_fData=`${String(_fd.getDate()).padStart(2,'0')}/${String(_fd.getMonth()+1).padStart(2,'0')}/${_fd.getFullYear()}`}
 
-  // ── LETTERA STANDARD IMPRESA PRINCIPALE ──
-  // Costruisce il testo della comunicazione (analoga alla lettera pag.1 del verbale Osservatorio)
-  const _giorni=['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato']
-  const _mesi=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre']
-  const dataStr=vGet('f-data')||''
-  let dataLeggibile=''
-  if(dataStr){
-    const d=new Date(dataStr+'T00:00:00')
-    if(!isNaN(d)){
-      dataLeggibile=`${_giorni[d.getDay()]} ${d.getDate()} ${_mesi[d.getMonth()]} ${d.getFullYear()}`
-    }
-  }
-  // Tecnico
-  const tecNomeLett=S.tecnico?`${S.tecnico.tecnico_nome||''} ${S.tecnico.tecnico_cognome||''}`.trim():''
-  // Impresa principale (primo elemento di S.imprese, oppure impresa della visita)
-  const impPrinc=S.imprese&&S.imprese.length?S.imprese[0]:null
-  const impNomeLett=impPrinc?.impresa_nome||''
-  // Cantiere: usa il dettaglio (es. "Via Abano nn – Selvazzano Dentro")
-  const cantDettaglio=($('cant-detail')?.textContent||cant||'').trim()
+  // Oggetto
+  $('email-verbale-oggetto').value=[`Cantiere di ${_fInd} ${nrVerb}`.trim(),_fImp,_fCom,_fTec,_fData].filter(Boolean).join(' - ')
 
+  // Testo lettera (preview nel textarea)
   const letteraImpresa=
-`Spett.le impresa${impNomeLett?'\n'+impNomeLett:''}
+`Spett.le impresa${_fImp?'\n'+_fImp:''}
 
-Oggetto: Prevenzione Infortuni – Cantiere ${cantDettaglio?'di '+cantDettaglio:''}
+Prevenzione Infortuni
 
-${dataLeggibile?'Il giorno '+dataLeggibile+' è':'È'} passato nel vostro cantiere in oggetto, per fornirvi utili consigli in materia di prevenzione infortuni, uno dei nostri tecnici${tecNomeLett?', '+tecNomeLett:''}.
+Alla cortese attenzione del
+Responsabile del Servizio di Prevenzione e Protezione
+e/o del
+Coordinatore per la Sicurezza
 
-Egli si è soffermato ad illustrare al VS personale in cantiere le più importanti norme che devono essere tenute presenti per garantire la sicurezza durante le varie fasi lavorative, con particolare riferimento a quelle in corso.
+Cantiere di ${_fCom||_fInd}
 
-In base a quanto previsto dalle norme che regolano il funzionamento dello scrivente Comitato Paritetico Territoriale potrà essere effettuata, entro breve termine, una successiva visita per constatare che i consigli forniti siano stati correttamente attuati.
+${_fData?'Il giorno '+_fData+' è':'È'} passato nel vostro cantiere in oggetto, per fornirvi utili consigli in materia di prevenzione infortuni, uno dei nostri tecnici${_fTec?', '+_fTec:''}.
 
-Per migliorare la conoscenza della normativa in materia di salute e sicurezza sul lavoro, in allegato troverà il verbale del sopralluogo effettuato.
+Egli si è soffermato ad illustrare al Vostro personale in cantiere le più importanti norme che devono essere tenute presenti per garantire la sicurezza durante le varie fasi lavorative, con particolare riferimento a quelle in corso.
 
-Distinti saluti.
+In base a quanto previsto dalle norme che regolano il funzionamento dello scrivente Comitato Paritetico Territoriale, potrà essere effettuata entro breve termine una successiva visita, per constatare che i consigli forniti siano stati correttamente attuati.
+
+Vi trasmettiamo in allegato il rapporto di visita redatto dal nostro Tecnico in cantiere.
+
+Evidenziamo che la consulenza che è stata resa alla Vostra impresa è per Voi totalmente gratuita, grazie al contributo versato da imprese e lavoratori iscritti a C.E.I.V. (Cassa Edile di Mutualità e Assistenza Interprovinciale del Veneto - www.ceiv.eu).
+
+L'iscrizione a C.E.I.V. offre molti altri vantaggi, come ad esempio la possibilità di accedere alla formazione obbligatoria ex D.Lgs 81/2008, che Formedil Padova offre a tariffe agevolate. (vai al calendario corsi: www.formedilpadova.it/corsi-sicurezza/).
+
+Rimanendo a disposizione per ogni eventuale chiarimento porgiamo distinti saluti.
 
 Renato Squizzato
 Area Sicurezza e Salute | FORMEDIL PADOVA
-Via Basilicata 10
-35127 Padova (PD)
+Via Basilicata 10 – 35127 Padova (PD)
 email: cpt@formedilpadova.it
 Tel. 049 - 761168 (int.4)
 URL: www.formedilpadova.it
+CPT: https://cptpd.jimdofree.com
 Organismo Accreditato Regione Veneto per la formazione L.R. n. 19 del 09.08.02 cod. AO119 per i servizi al lavoro codice L236
-
 Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle persone fisiche con riguardo al trattamento dei dati personali, la presente e-mail è destinata unicamente alle persone sopra indicate e le informazioni in essa contenute sono da considerarsi strettamente riservate. Se avete ricevuto questo messaggio per errore, siete pregati di rispedirlo al mittente, distruggendo qualunque copia in Vostro possesso, grazie.`
 
   const testaEl=$('email-verbale-testo')
   if(testaEl&&!testaEl.value.trim()) testaEl.value=letteraImpresa
 
+  window._evContext={vid:S.savedId||S.fd?.visita_id||null,nr_verbale:nrVerb,data_visita:_fDsRaw,cantiere:cant,
+    impresa:_fImp,tecnico:_fTec,comune:_fCom,cantIndirizzo:_fInd,dataVisita:_fData}
   window._evEmails=emails
   // Ripristina pulsante Invia (potrebbe essere rimasto disabilitato da invio precedente)
   const btnInvia=$('btn-ev-invia')
@@ -2961,9 +2964,13 @@ $('btn-ev-invia').onclick=async()=>{
         body:JSON.stringify({
           to: emails.map(e=>e.email),
           subject: $('email-verbale-oggetto')?.value||'',
-          nrVerbale: vGet('f-verbale')||window._evContext?.nr_verbale||'',
-          cantiere: vGet('f-cant-search')||window._evContext?.cantiere||'',
-          testoExtra: $('email-verbale-testo')?.value||'',
+          nrVerbale: window._evContext?.nr_verbale||vGet('f-verbale')||'',
+          cantiere: window._evContext?.cantiere||vGet('f-cant-search')||'',
+          impresa: window._evContext?.impresa||'',
+          tecnico: window._evContext?.tecnico||'',
+          comune: window._evContext?.comune||'',
+          cantIndirizzo: window._evContext?.cantIndirizzo||'',
+          dataVisita: window._evContext?.dataVisita||'',
           driveFileId: upData.drive_file_id,
           fileName: upData.file_name
         })
