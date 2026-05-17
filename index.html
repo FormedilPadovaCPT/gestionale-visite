@@ -1586,6 +1586,7 @@ setupAC('f-cant-search','cant-list', async q=>{
     vSet('f-cnce',item.extra.cantiere_cnce||'')
     vSet('f-cod-uni',item.extra.nodo_id||'')
     vSet('f-acc-cant2',item.extra.acc_cant||'')
+    S.fd.comune_nome=item.extra.comune_nome||''
   }
 })
 
@@ -2691,7 +2692,8 @@ async function inviEmailVerbaleFromList(vid){
     resp_lav,rl_email,
     csp,csp_email,
     cse,cse_email,
-    cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome)
+    cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome),
+    tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome)
   `).eq('visita_id',vid).single()
   if(error||!v){toast('Visita non trovata','err');return}
   const{data:impRows}=await sb.from('visite_imprese_presenti').select('imprese(impresa_nome,impresa_email_ref)').eq('visita_id',vid).order('ordine')
@@ -2711,6 +2713,7 @@ async function inviEmailVerbaleFromList(vid){
     const ev=(im.imprese?.impresa_email_ref||'').trim()
     if(ev)emails.push({ruolo:'Impresa',nome:im.imprese?.impresa_nome||`Impresa ${idx+1}`,email:ev})
   })
+  emails.push({ruolo:'CPT',nome:'Formedil Padova – Area Sicurezza',email:'cpt@formedilpadova.it'})
 
   if(!emails.length){toast('Nessun indirizzo email presente per questa visita','warn');return}
 
@@ -2724,7 +2727,15 @@ async function inviEmailVerbaleFromList(vid){
 
   // Oggetto
   const cant=v.cantieri?.cantiere_etichetta||[v.cantieri?.cantiere_indirizzo,v.cantieri?.cantiere_civico,v.cantieri?.comune_nome].filter(Boolean).join(', ')||''
-  $('email-verbale-oggetto').value=`Verbale sopralluogo${v.nr_verbale?' n° '+v.nr_verbale:''}${cant?' – '+cant:''}`
+  {
+    const _comuneOgg=v.cantieri?.comune_nome||''
+    const _nrOgg=v.nr_verbale||''
+    const _impOgg=(impRows&&impRows.length?impRows[0].imprese?.impresa_nome:'')||''
+    const _tecOgg=[v.tecnici?.tecnico_nome,v.tecnici?.tecnico_cognome].filter(Boolean).join(' ')
+    const _dataOggParts=v.data_visita?new Date(v.data_visita+'T00:00:00'):null
+    const _dataOgg=_dataOggParts&&!isNaN(_dataOggParts)?`${String(_dataOggParts.getDate()).padStart(2,'0')} ${String(_dataOggParts.getMonth()+1).padStart(2,'0')} ${_dataOggParts.getFullYear()}`:''
+    $('email-verbale-oggetto').value=['Cantiere di '+_comuneOgg,_nrOgg,_impOgg,_tecOgg,_dataOgg].filter(Boolean).join(' – ')
+  }
 
   // Testo lettera standard
   const _gg=['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato']
@@ -2793,6 +2804,7 @@ function inviEmailVerbale(){
     const ev=(im.email_verbale||vGet(`im-email_verbale-${idx}`)||'').trim()
     if(ev) emails.push({ruolo:'Impresa',nome:im.impresa_nome||`Impresa ${idx+1}`,email:ev})
   })
+  emails.push({ruolo:'CPT',nome:'Formedil Padova – Area Sicurezza',email:'cpt@formedilpadova.it'})
 
   if(!emails.length){toast('Nessun indirizzo email presente tra le figure della visita','warn');return}
 
@@ -2807,7 +2819,15 @@ function inviEmailVerbale(){
   // Oggetto predefinito
   const nrVerb=vGet('f-verbale')||''
   const cant=vGet('f-cant-search')||''
-  $('email-verbale-oggetto').value=`Verbale sopralluogo${nrVerb?' n° '+nrVerb:''}${cant?' – '+cant:''}`
+  {
+    const _comuneF=S.fd?.comune_nome||''
+    const _impF=(S.imprese&&S.imprese.length?S.imprese[0]?.impresa_nome:'')||''
+    const _tecF=S.tecnico?`${S.tecnico.tecnico_nome||''} ${S.tecnico.tecnico_cognome||''}`.trim():''
+    const _dsF=vGet('f-data')||''
+    let _dataF=''
+    if(_dsF){const _d=new Date(_dsF+'T00:00:00');if(!isNaN(_d))_dataF=`${String(_d.getDate()).padStart(2,'0')} ${String(_d.getMonth()+1).padStart(2,'0')} ${_d.getFullYear()}`}
+    $('email-verbale-oggetto').value=['Cantiere di '+_comuneF,nrVerb,_impF,_tecF,_dataF].filter(Boolean).join(' – ')
+  }
 
   // ── LETTERA STANDARD IMPRESA PRINCIPALE ──
   // Costruisce il testo della comunicazione (analoga alla lettera pag.1 del verbale Osservatorio)
@@ -3760,7 +3780,13 @@ async function genPDF(vid, output='save'){
       return doc.output('datauristring')
     }
     const pdfB64=doc.output('datauristring').split(',')[1]
-    doc.save(`verbale_${v.nr_verbale||vid}.pdf`)
+    const _slugPdf=s=>(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'_').trim()
+    const _primaImpPdf=imps&&imps.length?imps[0].imprese?.impresa_nome||'':''
+    const _tecPdf=[v.tecnici?.tecnico_nome,v.tecnici?.tecnico_cognome].filter(Boolean).join('_')
+    const _dPdf=v.data_visita?new Date(v.data_visita+'T00:00:00'):null
+    const _dataFPdf=_dPdf&&!isNaN(_dPdf)?`${String(_dPdf.getDate()).padStart(2,'0')} ${String(_dPdf.getMonth()+1).padStart(2,'0')} ${_dPdf.getFullYear()}`:''
+    const _pdfName=`Verbale_${_slugPdf(v.nr_verbale||vid)}_${_slugPdf(_primaImpPdf)}_${_slugPdf(_tecPdf)}_${_dataFPdf}.pdf`
+    doc.save(_pdfName)
     toast('PDF generato','ok')
     _uploadPdfDrive(pdfB64)   // upload in background
   }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
