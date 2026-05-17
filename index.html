@@ -2759,7 +2759,16 @@ Per migliorare la conoscenza della normativa in materia di salute e sicurezza su
 
 Distinti saluti.
 
-La presidenza del Formedil Padova – Area Sicurezza e Salute`
+Renato Squizzato
+Area Sicurezza e Salute | FORMEDIL PADOVA
+Via Basilicata 10
+35127 Padova (PD)
+email: cpt@formedilpadova.it
+Tel. 049 - 761168 (int.4)
+URL: www.formedilpadova.it
+Organismo Accreditato Regione Veneto per la formazione L.R. n. 19 del 09.08.02 cod. AO119 per i servizi al lavoro codice L236
+
+Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle persone fisiche con riguardo al trattamento dei dati personali, la presente e-mail è destinata unicamente alle persone sopra indicate e le informazioni in essa contenute sono da considerarsi strettamente riservate. Se avete ricevuto questo messaggio per errore, siete pregati di rispedirlo al mittente, distruggendo qualunque copia in Vostro possesso, grazie.`
 
   window._evEmails=emails
   window._evContext={vid,nr_verbale:v.nr_verbale||'',data_visita:v.data_visita||'',cantiere:cant}
@@ -2864,7 +2873,16 @@ Per migliorare la conoscenza della normativa in materia di salute e sicurezza su
 
 Distinti saluti.
 
-La presidenza del Formedil Padova – Area Sicurezza e Salute`
+Renato Squizzato
+Area Sicurezza e Salute | FORMEDIL PADOVA
+Via Basilicata 10
+35127 Padova (PD)
+email: cpt@formedilpadova.it
+Tel. 049 - 761168 (int.4)
+URL: www.formedilpadova.it
+Organismo Accreditato Regione Veneto per la formazione L.R. n. 19 del 09.08.02 cod. AO119 per i servizi al lavoro codice L236
+
+Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle persone fisiche con riguardo al trattamento dei dati personali, la presente e-mail è destinata unicamente alle persone sopra indicate e le informazioni in essa contenute sono da considerarsi strettamente riservate. Se avete ricevuto questo messaggio per errore, siete pregati di rispedirlo al mittente, distruggendo qualunque copia in Vostro possesso, grazie.`
 
   const testaEl=$('email-verbale-testo')
   if(testaEl&&!testaEl.value.trim()) testaEl.value=letteraImpresa
@@ -3267,9 +3285,38 @@ async function genPDF(vid, output='save'){
     const bodyLines=doc.splitTextToSize(corpo,W)
     doc.text(bodyLines,L,y);y+=bodyLines.length*5+14
 
-    setFont('normal',10,[40,40,40]);doc.text('Distinti saluti.',L+10,y);y+=14
-    setFont('italic',9,GREY)
-    doc.text('La presidenza del Scuola Edile CPT – Centro per la formazione e la sicurezza edile di Padova',L,y)
+    setFont('normal',10,[40,40,40]);doc.text('Distinti saluti.',L+10,y);y+=10
+
+    // ── QR CODE a destra + firma a sinistra ──
+    const qrSize=32, qrX=PW-L-qrSize, qrY=y
+    try{
+      const _qrResp=await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=320x320&color=e7500f&bgcolor=ffffff&data=${encodeURIComponent('https://formedilpadovacpt.github.io/servizi/#')}`)
+      if(_qrResp.ok){
+        const _qrBlob=await _qrResp.blob()
+        const _qrB64=await new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(_qrBlob)})
+        doc.addImage(_qrB64,'PNG',qrX,qrY,qrSize,qrSize)
+        setFont('bold',5,ORANGE);doc.text('FORMEDIL PADOVA · CPT',qrX+qrSize/2,qrY+qrSize+3,{align:'center'})
+        setFont('normal',4.5,GREY);doc.text('I NOSTRI SERVIZI',qrX+qrSize/2,qrY+qrSize+6.5,{align:'center'})
+        setFont('normal',3.8,[150,150,150]);doc.text('formedilpadovacpt.github.io/servizi/#',qrX+qrSize/2,qrY+qrSize+9.5,{align:'center'})
+      }
+    }catch(_eQR){console.warn('QR fetch non riuscito',_eQR)}
+
+    // Firma testuale a sinistra
+    const _firmaW=qrX-L-5
+    setFont('bold',8,[40,40,40]);doc.text('Renato Squizzato',L,y+4)
+    setFont('bold',7,ORANGE);doc.text('Area Sicurezza e Salute | FORMEDIL PADOVA',L,y+9)
+    setFont('normal',7,GREY)
+    doc.text('Via Basilicata 10 – 35127 Padova (PD)',L,y+14,{maxWidth:_firmaW})
+    doc.text('email: cpt@formedilpadova.it   Tel. 049 - 761168 (int.4)',L,y+18.5,{maxWidth:_firmaW})
+    doc.text('www.formedilpadova.it',L,y+23,{maxWidth:_firmaW})
+    setFont('normal',6,[130,130,130])
+    doc.text('Organismo Accreditato Regione Veneto per la formazione – L.R. n. 19/02 cod. AO119 – per i servizi al lavoro cod. L236',L,y+28,{maxWidth:_firmaW})
+
+    // Disclaimer GDPR
+    y=qrY+qrSize+14
+    setFont('italic',5.5,[150,150,150])
+    const _privTxt='Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle persone fisiche con riguardo al trattamento dei dati personali, la presente comunicazione è destinata unicamente alle persone sopra indicate e le informazioni in essa contenute sono da considerarsi strettamente riservate. Se avete ricevuto questo messaggio per errore, siete pregati di rispedirlo al mittente, distruggendo qualunque copia in Vostro possesso, grazie.'
+    doc.text(doc.splitTextToSize(_privTxt,W),L,y)
 
     // ════════════════════════════════════════════════
     // PAGINA 2 – DATI VISITA + CHECKLIST
