@@ -26,6 +26,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .btn-success{background:var(--ok);color:#fff}
 .btn-danger{background:var(--danger);color:#fff}
 .btn-outline{background:transparent;border:2px solid var(--orange);color:var(--orange)}
+.btn-warn{background:var(--warn);color:#fff}
 .btn-sm{padding:5px 11px;font-size:12px}
 .btn-icon{background:none;padding:4px 8px;font-size:16px;border:none}
 label{display:block;font-weight:600;margin-bottom:4px;color:var(--grey);font-size:12px;text-transform:uppercase;letter-spacing:.4px}
@@ -2616,12 +2617,14 @@ $('q-search').onkeydown=e=>{if(e.key==='Enter')loadLista()}
 function vtRow(v){
   const cant=v.cantieri?.cantiere_etichetta||v.cantieri?.cantiere_indirizzo||'-'
   const ipc=v.ipc||'NR'
+  const isBozza=(v.stato||'bozza')==='bozza'
   return`<tr>
     <td>${v.nr_verbale||'-'}</td><td>${fmtDate(v.data_visita)}</td>
     <td>${cant}</td><td>${v.imprese?.impresa_nome||'-'}</td>
     <td><span class="badge ${ipcCls(ipc)}">${ipc}</span></td>
     <td><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span></td>
     <td><div class="tbl-actions">
+      ${isBozza?`<button class="btn-warn btn-sm" data-act="riapri" data-id="${v.visita_id}" title="Riapri bozza per completarla e renderla definitiva">✏️ Riapri</button>`:''}
       <button class="btn-primary btn-sm" data-act="pdf" data-id="${v.visita_id}">PDF</button>
       <button class="btn-outline btn-sm" data-act="email" data-id="${v.visita_id}" title="Invia verbale via email">📧</button>
       <button class="btn-outline btn-sm" data-act="snap" data-id="${v.visita_id}">📤</button>
@@ -2629,6 +2632,7 @@ function vtRow(v){
   </tr>`
 }
 function bindRowActions(){
+  document.querySelectorAll('[data-act="riapri"]').forEach(b=>b.onclick=()=>riapriBozza(b.dataset.id))
   document.querySelectorAll('[data-act="pdf"]').forEach(b=>b.onclick=()=>genPDF(b.dataset.id))
   document.querySelectorAll('[data-act="email"]').forEach(b=>b.onclick=()=>inviEmailVerbaleFromList(b.dataset.id))
   document.querySelectorAll('[data-act="snap"]').forEach(b=>b.onclick=()=>exportSnapFromDB(b.dataset.id))
@@ -3056,6 +3060,72 @@ $('btn-load-snap').onclick=async()=>{
 $('btn-verb-mantieni').onclick=()=>S._verbCb?.(true)
 $('btn-verb-nuovo').onclick=()=>S._verbCb?.(false)
 $('btn-cancel-imp').onclick=()=>{pendingSnap=null;hide('imp-preview')}
+
+// ── RIAPRI BOZZA ──
+async function riapriBozza(vid){
+  toast('Caricamento bozza…')
+  try{
+    let snap=null
+    // 1) Prova prima lo snapshot salvato in visite_snapshot
+    const{data:snapRow}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).maybeSingle()
+    if(snapRow?.snapshot){
+      snap=snapRow.snapshot
+    }else{
+      // 2) Ricostruisce lo snapshot dai dati del DB (stessa logica di exportSnapFromDB)
+      const{data:v}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*)`).eq('visita_id',vid).single()
+      if(!v){toast('Visita non trovata','err');return}
+      const{data:chkRows}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
+      const{data:lavRows}=await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid)
+      const{data:impRows}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva)').eq('visita_id',vid).order('ordine')
+      const checklist={},note_checklist={}
+      ;(chkRows||[]).forEach(r=>{
+        if(r.valore&&r.valore!=='NA')checklist[r.codice]=r.valore
+        if(r.nota)note_checklist[r.codice]=r.nota
+      })
+      const imprese=(impRows||[]).map((im,i)=>({
+        impresa_id:im.impresa_id||'',impresa_nome:im.imprese?.impresa_nome||'',
+        piva:im.imprese?.piva||'',cf_imp:im.imprese?.impresa_cf||'',
+        att:im.att||'',is_principale:i===0
+      }))
+      const cant=v.cantieri||{}
+      snap={
+        visita_id:vid,
+        nr_verbale_origine:v.nr_verbale||'',
+        data_visita:v.data_visita||null,ora_visita:v.ora_visita||null,ora_fine:v.ora_fine||null,
+        tipo_accesso:v.tipo_accesso||null,acc_cant:v.acc_cant||null,
+        rlst_sn:v.rlst_sn,stage_vis:v.stage_vis,nom_stage:v.nom_stage||null,
+        nom_ppre:v.nom_ppre||null,qual_ppre:v.qual_ppre||null,tel_ppre:v.tel_ppre||null,
+        tecnico_id:v.tecnico_id||null,
+        tecnico_email:v.tecnici?.email||null,
+        tec_display:v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():null,
+        cantiere_id:v.cantiere_id||null,
+        cantiere_label:cant.cantiere_etichetta||`${cant.cantiere_indirizzo||''} ${cant.cantiere_civico||''}`.trim(),
+        cantiere_detail:'',prot_int:cant.prot_int||null,cnce:cant.cantiere_cnce||null,
+        comm_tipo_sogg:v.comm_tipo_sogg||'PF',comm_tipo:v.comm_tipo||null,
+        comm_titolo:v.comm_titolo||null,comm_nome:v.comm_nome||null,comm_cog:v.comm_cog||null,
+        comm_cf:v.comm_cf||null,comm_email:v.comm_email||null,comm_tel:v.comm_tel||null,
+        comm_rag_soc:v.comm_rag_soc||null,comm_piva:v.comm_piva||null,
+        coord:v.coord||false,
+        rl_nome:v.resp_lav||null,rl_email:v.rl_email||null,rl_tel:v.rl_tel||null,
+        csp_nome:v.csp||null,csp_email:v.csp_email||null,csp_tel:v.csp_tel||null,
+        cse_nome:v.cse||null,cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
+        nr_imp:v.nr_imp||0,nr_ind:v.nr_ind||0,
+        nr_lavoratori:v.nr_lavoratori||0,nr_lavoratori_stranieri:v.nr_lavoratori_stranieri||0,
+        importo:v.importo||null,costi:v.costi||null,stato_lav:v.stato_lav||null,
+        imprese,checklist,note_checklist,
+        lavorazioni:(lavRows||[]).map(l=>({genere:l.genere,fase:l.fase,lavorazione:l.lavorazione})),
+        oss_tec:v.oss_tec||null,oss_int:v.oss_tec_int||null,
+        note_for_sn:v.note_for_sn||false,note_for_m:v.note_for_m||null,
+        segnalazione:v.segnalazione||false,data_ritorno:v.data_ritorno||null,
+        exported_at:new Date().toISOString(),_rebuilt_from_db:true
+      }
+    }
+    // 3) Carica nel form — il visita_id nel snap garantisce UPDATE invece di INSERT
+    await initForm(snap)
+    navTo('form')
+    toast(`Bozza ${snap.nr_verbale_origine||''} riaperta — completa e salva come Definitivo`,'ok')
+  }catch(e){toast('Errore apertura bozza: '+e.message,'err');console.error(e)}
+}
 
 // ── EXPORT SNAP FROM DB ──
 async function exportSnapFromDB(vid){
