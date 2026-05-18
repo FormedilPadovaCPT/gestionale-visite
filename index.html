@@ -4506,7 +4506,7 @@ const TIP_INT_LABELS={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Am
 const TIP_OPE_LABELS={1:'Industriale',2:'Civile',3:'Commerciale',4:'Agricola',5:'Stradale',6:'Idraulica',7:'Gallerie',8:'Scolastica',9:'Ospedaliera',10:'Sportiva',11:'Ricettiva',12:'Residenziale',13:'Pubbl. utilità',14:'Bonifiche',15:'Impianti',16:'Altro',17:'Infrastrutture'}
 const DURATA_LABELS={1:'< 30 giorni',2:'30–90 giorni',3:'3–6 mesi',4:'6–12 mesi',5:'> 12 mesi',6:'N/D',7:'Indefinita',8:'Pluriennale'}
 const TIPO_ACC_LABELS={1:'Su segnalazione',2:'Su richiesta',3:'Protocolli di intesa',4:'RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT'}
-const MACROAREE_NOMI={'01':'Impianti di cantiere','02':'Protezione luoghi di lavoro','03':'Apparecchi di sollevamento','04':'Attrezzature di lavoro','05':'Macchine da cantiere','06':'Opere provvisionali','07':'DPI','08':'Documentazione','09':'Nomine','10':'Formazione'}
+// MACROAREE_NOMI rimosso: si usa ZONE_LBL (già in scope) + lookup dinamico da checklist_voci
 const RPT_PALETTE=['#e7500f','#95C22F','#565c66','#3498db','#9b59b6','#e67e22','#1abc9c','#e74c3c','#f39c12','#2980b9']
 
 // ── Canvas helpers ──────────────────────────────────────────────────
@@ -4621,18 +4621,21 @@ function rptMonthly({data,year,w=580,h=155}){
   return canvas.toDataURL()
 }
 
-// Checklist aggregation per macro area (prefix = first 2 chars of codice)
-function rptAggregateMacro(chkAll){
+// Checklist aggregation per macro area
+// prefToZone: { 'IMP': 1, 'SOL': 3, 'ASU': 4, ... } costruito da checklist_voci
+function rptAggregateMacro(chkAll, prefToZone){
+  // Inizializza tutte e 10 le zone
   const res={}
-  Object.keys(MACROAREE_NOMI).forEach(k=>{res[k]={ncp:0,ncm:0,oss:0,ver:0}})
+  for(let z=1;z<=10;z++) res[z]={ncp:0,ncm:0,oss:0,ver:0}
   ;(chkAll||[]).forEach(({codice,valore})=>{
-    if(!codice||codice.length<2)return
-    const pref=codice.substring(0,2)
-    if(!res[pref])return
-    if(valore==='NC+')res[pref].ncp++
-    else if(valore==='NC-')res[pref].ncm++
-    else if(valore==='OSS')res[pref].oss++
-    else if(valore==='VER')res[pref].ver++
+    if(!codice||codice.length<3)return
+    const pref=codice.substring(0,3).toUpperCase()
+    const zona=prefToZone[pref]
+    if(!zona)return
+    if(valore==='NC+')res[zona].ncp++
+    else if(valore==='NC-')res[zona].ncm++
+    else if(valore==='OSS')res[zona].oss++
+    else if(valore==='VER')res[zona].ver++
   })
   return res
 }
@@ -4670,7 +4673,18 @@ async function admGeneraReport(){
     if(e1)throw e1
     if(!visite||!visite.length){toast('Nessuna visita nel periodo selezionato','warn');return}
 
-    // ── 2. Checklist items per tutte le visite ──
+    // ── 2. Mapping codice-prefix → zona_osserv da checklist_voci ──
+    // Le prime 3 lettere del codice identificano la macro area (IMP, SOL, ASU, ...)
+    const{data:voceRows}=await sb.from('checklist_voci').select('codice,zona_osserv')
+    const prefToZone={}
+    ;(voceRows||[]).forEach(v=>{
+      if(v.codice&&v.zona_osserv){
+        const pref=v.codice.substring(0,3).toUpperCase()
+        if(!prefToZone[pref])prefToZone[pref]=v.zona_osserv
+      }
+    })
+
+    // ── 3. Checklist items per tutte le visite ──
     const visitaIds=visite.map(v=>v.visita_id)
     const chkAll=[]
     for(let i=0;i<visitaIds.length;i+=200){
@@ -4679,7 +4693,7 @@ async function admGeneraReport(){
       if(batch)chkAll.push(...batch)
     }
 
-    // ── 3. Aggregazioni ──
+    // ── 4. Aggregazioni ──
     const nV=visite.length
     const nAlto=visite.filter(v=>v.ipc==='ALTO').length
     const nMedio=visite.filter(v=>v.ipc==='MEDIO').length
@@ -4724,14 +4738,14 @@ async function admGeneraReport(){
     visite.forEach(v=>{const q=(v.qual_ppre||'').trim()||'Non indicata';qualMap[q]=(qualMap[q]||0)+1})
     const qualList=Object.entries(qualMap).sort((a,b)=>b[1]-a[1]).slice(0,10)
 
-    // Macro aree
-    const macroData=rptAggregateMacro(chkAll)
+    // Macro aree (lookup dinamico: prime 3 lettere codice → zona 1-10)
+    const macroData=rptAggregateMacro(chkAll,prefToZone)
 
     // Formatter date
     const fmtD=d=>{if(!d)return'–';const[y,mm,dd]=d.split('-');return`${dd}/${mm}/${y}`}
     const dalFmt=fmtD(dal),alFmt=fmtD(al)
 
-    // ── 4. PDF ──
+    // ── 5. PDF ──
     const{jsPDF}=window.jspdf
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
     const M=12,CW=210-M*2,half=CW/2
@@ -4882,22 +4896,24 @@ async function admGeneraReport(){
     doc.addPage()
     rptPageHeader(doc,'ANALISI PER MACRO AREE DELLA CHECKLIST',dalFmt,alFmt)
     y=28
-    const maKeys=Object.keys(MACROAREE_NOMI)
+    // Zone 1-10: usa ZONE_LBL già definito nel modulo
     const colW=half,rowH=50
-    maKeys.forEach((key,i)=>{
+    for(let i=0;i<10;i++){
+      const zona=i+1
       const col=i%2,row=Math.floor(i/2)
       const x=M+col*colW
       const cy2=y+row*rowH
-      const d=macroData[key]||{ncp:0,ncm:0,oss:0,ver:0}
+      const d=macroData[zona]||{ncp:0,ncm:0,oss:0,ver:0}
+      const nTot=d.ncp+d.ncm+d.oss+d.ver
       const chartImg=rptDonut({
         data:[d.ncp,d.ncm,d.oss,d.ver],
         labels:['NC+','NC-','OSS','VER'],
         colors:['#c0392b','#e67e22','#3498db','#2ecc71'],
-        title:`${key} – ${MACROAREE_NOMI[key]}`,
+        title:`${zona}. ${ZONE_LBL[zona]||'Zona '+zona}`,
         w:380,h:240
       })
       addImg(chartImg,x,cy2,colW-2,rowH-2)
-    })
+    }
 
     footer(3)
 
