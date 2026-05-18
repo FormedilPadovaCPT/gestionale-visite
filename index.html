@@ -2795,7 +2795,7 @@ $('btn-nuovo-cant-lista').onclick=()=>{resetModalCantiere();show('modal-cant')}
 async function inviEmailVerbaleFromList(vid){
   toast('Caricamento dati visita…')
   const{data:v,error}=await sb.from('visite').select(`
-    visita_id,nr_verbale,data_visita,
+    visita_id,nr_verbale,data_visita,tecnico2_id,
     comm_nome,comm_cog,comm_rag_soc,comm_tipo_sogg,comm_email,
     resp_lav,rl_email,
     csp,csp_email,
@@ -2805,6 +2805,12 @@ async function inviEmailVerbaleFromList(vid){
   `).eq('visita_id',vid).single()
   if(error||!v){toast('Visita non trovata','err');return}
   const{data:impRows}=await sb.from('visite_imprese_presenti').select('imprese(impresa_nome,impresa_email_ref)').eq('visita_id',vid).order('ordine')
+  // Secondo tecnico (se presente)
+  let _eTec2=''
+  if(v.tecnico2_id){
+    const{data:t2}=await sb.from('tecnici').select('tecnico_nome,tecnico_cognome').eq('tecnico_id',v.tecnico2_id).maybeSingle()
+    if(t2)_eTec2=`${t2.tecnico_nome||''} ${t2.tecnico_cognome||''}`.trim()
+  }
 
   const emails=[]
   // Committente
@@ -2838,7 +2844,8 @@ async function inviEmailVerbaleFromList(vid){
   const _eCom=v.cantieri?.comune_nome||''
   const _eNr=v.nr_verbale||''
   const _eImp=(impRows&&impRows.length?impRows[0].imprese?.impresa_nome:'')||''
-  const _eTec=[v.tecnici?.tecnico_nome,v.tecnici?.tecnico_cognome].filter(Boolean).join(' ')
+  const _eTec1=[v.tecnici?.tecnico_nome,v.tecnici?.tecnico_cognome].filter(Boolean).join(' ')
+  const _eTec=[_eTec1,_eTec2].filter(Boolean).join(' e ')
   const _eDp=v.data_visita?new Date(v.data_visita+'T00:00:00'):null
   const _eData=_eDp&&!isNaN(_eDp)?`${String(_eDp.getDate()).padStart(2,'0')}/${String(_eDp.getMonth()+1).padStart(2,'0')}/${_eDp.getFullYear()}`:''
   const cant=v.cantieri?.cantiere_etichetta||_eInd||''
@@ -2886,7 +2893,7 @@ Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle per
 
   window._evEmails=emails
   window._evContext={vid,nr_verbale:_eNr,data_visita:v.data_visita||'',cantiere:cant,
-    impresa:_eImp,tecnico:_eTec,comune:_eCom,cantIndirizzo:_eInd,dataVisita:_eData}
+    impresa:_eImp,tecnico:_eTec1,tecnico2:_eTec2,comune:_eCom,cantIndirizzo:_eInd,dataVisita:_eData}
   const btnInvia=$('btn-ev-invia')
   btnInvia.disabled=false; btnInvia.textContent='📤 Invia ora'
   const evStatus=$('email-verbale-status')
@@ -2946,7 +2953,9 @@ function inviEmailVerbale(){
   const _fInd=[S.fd?.cantiere_indirizzo,S.fd?.cantiere_civico].filter(Boolean).join(' ')
   const _fCom=S.fd?.comune_nome||''
   const _fImp=(S.imprese&&S.imprese.length?S.imprese[0]?.impresa_nome:'')||''
-  const _fTec=S.tecnico?`${S.tecnico.tecnico_nome||''} ${S.tecnico.tecnico_cognome||''}`.trim():''
+  const _fTec1=vGet('f-tec-display')||''
+  const _fTec2=vGet('f-tec2-display')||''
+  const _fTec=[_fTec1,_fTec2].filter(Boolean).join(' e ')
   const _fDsRaw=vGet('f-data')||''
   let _fData=''
   if(_fDsRaw){const _fd=new Date(_fDsRaw+'T00:00:00');if(!isNaN(_fd))_fData=`${String(_fd.getDate()).padStart(2,'0')}/${String(_fd.getMonth()+1).padStart(2,'0')}/${_fd.getFullYear()}`}
@@ -2995,7 +3004,7 @@ Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle per
   if(testaEl&&!testaEl.value.trim()) testaEl.value=letteraImpresa
 
   window._evContext={vid:S.savedId||S.fd?.visita_id||null,nr_verbale:nrVerb,data_visita:_fDsRaw,cantiere:cant,
-    impresa:_fImp,tecnico:_fTec,comune:_fCom,cantIndirizzo:_fInd,dataVisita:_fData}
+    impresa:_fImp,tecnico:_fTec1,tecnico2:_fTec2,comune:_fCom,cantIndirizzo:_fInd,dataVisita:_fData}
   window._evEmails=emails
   // Ripristina pulsante Invia (potrebbe essere rimasto disabilitato da invio precedente)
   const btnInvia=$('btn-ev-invia')
@@ -3074,6 +3083,7 @@ $('btn-ev-invia').onclick=async()=>{
           cantiere: window._evContext?.cantiere||vGet('f-cant-search')||'',
           impresa: window._evContext?.impresa||'',
           tecnico: window._evContext?.tecnico||'',
+          tecnico2: window._evContext?.tecnico2||'',
           comune: window._evContext?.comune||'',
           cantIndirizzo: window._evContext?.cantIndirizzo||'',
           dataVisita: window._evContext?.dataVisita||'',
