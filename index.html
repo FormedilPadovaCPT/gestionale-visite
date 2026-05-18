@@ -4539,6 +4539,26 @@ const TIPO_ACC_LABELS={1:'Su segnalazione',2:'Su richiesta',3:'Protocolli di int
 // MACROAREE_NOMI rimosso: si usa ZONE_LBL (già in scope) + lookup dinamico da checklist_voci
 const RPT_PALETTE=['#e7500f','#95C22F','#565c66','#3498db','#9b59b6','#e67e22','#1abc9c','#e74c3c','#f39c12','#2980b9']
 
+// Colori standard checklist (usati in tutti i grafici NC+/NC-/OSS/VER/NA)
+const CHK_COLORS={
+  ncp:'#d50000',  // NC+  rosso vivo
+  ncm:'#e7500f',  // NC-  arancio Formedil
+  oss:'#c8a000',  // OSS  giallo ocra
+  ver:'#95C22F',  // VER  verde Formedil
+  na :'#565c66'   // NA   grigio Formedil
+}
+
+// Colori Cassa Edile / CEIV (C.E.I.V. ha sempre rgb 59,51,101)
+const CEIV_COLOR_MAP={
+  'C.E.I.V.'          :'#3b3365',
+  'EDILCASSA VENETO'  :'#e7500f',
+  'CASSA EDILE BELLUNO':'#3498db',
+  'CASSA EDILE VENEZIA':'#2ecc71',
+  'CASSA EDILE VICENZA':'#9b59b6',
+  'ALTRO'             :'#f39c12',
+  'Non iscritto'      :'#565c66'
+}
+
 // ── Canvas helpers ──────────────────────────────────────────────────
 
 function _mkCanvas(w,h){
@@ -4551,7 +4571,7 @@ function _mkCanvas(w,h){
 
 // Donut chart → dataURL
 // Canvas 380×240, donut cy=100 r=72 ri=40, legend 2-col below
-function rptDonut({data,labels,colors,title,w=380,h=240}){
+function rptDonut({data,labels,colors,title,w=380,h=240,maxLbl=19}){
   const{canvas,ctx}=_mkCanvas(w,h)
   const total=data.reduce((s,v)=>s+(v||0),0)
   // Title (wrap if needed)
@@ -4593,7 +4613,7 @@ function rptDonut({data,labels,colors,title,w=380,h=240}){
     ctx.fillStyle=colors&&colors[i]?colors[i]:RPT_PALETTE[i%RPT_PALETTE.length]
     ctx.fillRect(lx,ly,10,10)
     const pct=Math.round((v/total)*100)
-    const lbl=((labels&&labels[i])||'').substring(0,17)
+    const lbl=((labels&&labels[i])||'').substring(0,maxLbl)
     ctx.fillStyle='#333333';ctx.font='9.5px Arial';ctx.textAlign='left'
     ctx.fillText(`${lbl}: ${v} (${pct}%)`,lx+13,ly+9)
   })
@@ -4723,7 +4743,23 @@ async function admGeneraReport(){
       if(batch)chkAll.push(...batch)
     }
 
-    // ── 4. Aggregazioni ──
+    // ── 4. Imprese nel periodo → iscrizione Cassa Edile / CEIV ──
+    // Conta imprese uniche per valore di cassa_edile
+    const ceivImpSet=new Set()
+    const ceivMap={}
+    for(let i=0;i<visitaIds.length;i+=200){
+      const{data:vipBatch}=await sb.from('visite_imprese_presenti')
+        .select('impresa_id,imprese(cassa_edile)')
+        .in('visita_id',visitaIds.slice(i,i+200))
+      ;(vipBatch||[]).forEach(r=>{
+        if(!r.impresa_id||ceivImpSet.has(r.impresa_id))return
+        ceivImpSet.add(r.impresa_id)
+        const ce=(r.imprese?.cassa_edile||'').trim()||'Non iscritto'
+        ceivMap[ce]=(ceivMap[ce]||0)+1
+      })
+    }
+
+    // ── 5. Aggregazioni ──
     const nV=visite.length
     const nAlto=visite.filter(v=>v.ipc==='ALTO').length
     const nMedio=visite.filter(v=>v.ipc==='MEDIO').length
@@ -4775,7 +4811,7 @@ async function admGeneraReport(){
     const fmtD=d=>{if(!d)return'–';const[y,mm,dd]=d.split('-');return`${dd}/${mm}/${y}`}
     const dalFmt=fmtD(dal),alFmt=fmtD(al)
 
-    // ── 5. PDF ──
+    // ── 6. PDF ──
     const{jsPDF}=window.jspdf
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
     const M=12,CW=210-M*2,half=CW/2
@@ -4889,6 +4925,24 @@ async function admGeneraReport(){
     }
     y+=52
 
+    // Grafico CEIV / Cassa Edile (donut sinistra) + box totale imprese (destra)
+    if(Object.keys(ceivMap).length){
+      const ceivEntries=Object.entries(ceivMap).sort((a,b)=>{
+        if(a[0]==='Non iscritto')return 1
+        if(b[0]==='Non iscritto')return -1
+        return b[1]-a[1]
+      })
+      const ceivImg=rptDonut({
+        data:ceivEntries.map(([,n])=>n),
+        labels:ceivEntries.map(([k])=>k),
+        colors:ceivEntries.map(([k])=>CEIV_COLOR_MAP[k]||'#999999'),
+        title:'Iscrizione Cassa Edile / CEIV  (imprese uniche nel periodo)',
+        w:760,h:240,maxLbl:24
+      })
+      addImg(ceivImg,M,y,CW,50)
+      y+=54
+    }
+
     // Persona presente (tabella sinistra) + Comuni (tabella destra)
     doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(86,92,102)
     doc.text('Figura presente al sopralluogo',M+half/2,y,{align:'center'})
@@ -4938,7 +4992,7 @@ async function admGeneraReport(){
       const chartImg=rptDonut({
         data:[d.ncp,d.ncm,d.oss,d.ver],
         labels:['NC+','NC-','OSS','VER'],
-        colors:['#c0392b','#e67e22','#3498db','#2ecc71'],
+        colors:[CHK_COLORS.ncp,CHK_COLORS.ncm,CHK_COLORS.oss,CHK_COLORS.ver],
         title:`${zona}. ${ZONE_LBL[zona]||'Zona '+zona}`,
         w:380,h:240
       })
