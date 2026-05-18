@@ -4476,6 +4476,10 @@ function downloadXSD(key){
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)
   toast('Download avviato: '+f.nome,'ok')
 }
+
+// Esponi al global scope (necessario per onclick inline in moduli ES)
+window.admLoadStats = admLoadStats
+window.downloadXSD  = downloadXSD
 </script>
 <!-- MODAL FIRME TECNICI -->
 <div id="modal-firme" class="modal-overlay hidden" style="z-index:9999">
