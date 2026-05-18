@@ -882,6 +882,13 @@ tr:hover td{background:#fef9f7}
           </div>
         </div>
 
+        <!-- Report PDF -->
+        <div class="adm-section">
+          <div class="adm-section-title">📄 Report statistico</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:10px">Genera un report PDF con statistiche aggregate per il periodo selezionato: distribuzione IPC, tipologie, macro aree della checklist e distribuzione territoriale.</p>
+          <button class="btn-primary" onclick="admGeneraReport()" style="background:#95C22F;border-color:#7aa527">📄 Genera Report PDF</button>
+        </div>
+
         <!-- Download file XSD -->
         <div class="adm-section">
           <div class="adm-section-title">Schema XSD – Osservatorio visite</div>
@@ -4490,6 +4497,422 @@ function downloadXSD(key){
 // Esponi al global scope (necessario per onclick inline in moduli ES)
 window.admLoadStats = admLoadStats
 window.downloadXSD  = downloadXSD
+
+// ══════════════════════════════════════════════════════════════════
+// REPORT PDF COORDINATORE
+// ══════════════════════════════════════════════════════════════════
+
+const TIP_INT_LABELS={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',6:'Ripristino',7:'Restauro',8:'Manutenzione'}
+const TIP_OPE_LABELS={1:'Industriale',2:'Civile',3:'Commerciale',4:'Agricola',5:'Stradale',6:'Idraulica',7:'Gallerie',8:'Scolastica',9:'Ospedaliera',10:'Sportiva',11:'Ricettiva',12:'Residenziale',13:'Pubbl. utilità',14:'Bonifiche',15:'Impianti',16:'Altro',17:'Infrastrutture'}
+const DURATA_LABELS={1:'< 30 giorni',2:'30–90 giorni',3:'3–6 mesi',4:'6–12 mesi',5:'> 12 mesi',6:'N/D',7:'Indefinita',8:'Pluriennale'}
+const TIPO_ACC_LABELS={1:'Su segnalazione',2:'Su richiesta',3:'Protocolli di intesa',4:'RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT'}
+const MACROAREE_NOMI={'01':'Impianti di cantiere','02':'Protezione luoghi di lavoro','03':'Apparecchi di sollevamento','04':'Attrezzature di lavoro','05':'Macchine da cantiere','06':'Opere provvisionali','07':'DPI','08':'Documentazione','09':'Nomine','10':'Formazione'}
+const RPT_PALETTE=['#e7500f','#95C22F','#565c66','#3498db','#9b59b6','#e67e22','#1abc9c','#e74c3c','#f39c12','#2980b9']
+
+// ── Canvas helpers ──────────────────────────────────────────────────
+
+function _mkCanvas(w,h){
+  const c=document.createElement('canvas')
+  c.width=w;c.height=h
+  const ctx=c.getContext('2d')
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h)
+  return{canvas:c,ctx}
+}
+
+// Donut chart → dataURL
+// Canvas 380×240, donut cy=100 r=72 ri=40, legend 2-col below
+function rptDonut({data,labels,colors,title,w=380,h=240}){
+  const{canvas,ctx}=_mkCanvas(w,h)
+  const total=data.reduce((s,v)=>s+(v||0),0)
+  // Title (wrap if needed)
+  ctx.fillStyle='#333333';ctx.font='bold 11px Arial';ctx.textAlign='center'
+  const maxW=w-16
+  let titleY=14
+  if(ctx.measureText(title||'').width>maxW){
+    const mid=Math.ceil((title||'').length/2)
+    const l1=(title||'').substring(0,mid).trimEnd()
+    const l2=(title||'').substring(mid).trimStart()
+    ctx.fillText(l1,w/2,titleY);titleY+=13
+    ctx.fillText(l2,w/2,titleY);titleY+=6
+  }else{
+    ctx.fillText(title||'',w/2,titleY);titleY+=6
+  }
+  if(!total){
+    ctx.fillStyle='#aaaaaa';ctx.font='11px Arial';ctx.textAlign='center'
+    ctx.fillText('Nessun dato',w/2,120);return canvas.toDataURL()
+  }
+  const cx=w/2,cy=titleY+72,r=70,ri=40
+  let ang=-Math.PI/2
+  data.forEach((v,i)=>{
+    if(!v)return
+    const sl=(v/total)*Math.PI*2
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,ang,ang+sl)
+    ctx.fillStyle=colors&&colors[i]?colors[i]:RPT_PALETTE[i%RPT_PALETTE.length]
+    ctx.fill();ang+=sl
+  })
+  ctx.beginPath();ctx.arc(cx,cy,ri,0,Math.PI*2);ctx.fillStyle='#ffffff';ctx.fill()
+  ctx.fillStyle='#333333';ctx.font='bold 15px Arial';ctx.textAlign='center'
+  ctx.fillText(total,cx,cy+6)
+  // Legend – 2 items per row
+  const legTop=cy+r+10
+  const legColW=w/2
+  data.forEach((v,i)=>{
+    if(v===0&&data.length>4)return
+    const col=i%2,row=Math.floor(i/2)
+    const lx=col*legColW+8,ly=legTop+row*18
+    ctx.fillStyle=colors&&colors[i]?colors[i]:RPT_PALETTE[i%RPT_PALETTE.length]
+    ctx.fillRect(lx,ly,10,10)
+    const pct=Math.round((v/total)*100)
+    const lbl=((labels&&labels[i])||'').substring(0,17)
+    ctx.fillStyle='#333333';ctx.font='9.5px Arial';ctx.textAlign='left'
+    ctx.fillText(`${lbl}: ${v} (${pct}%)`,lx+13,ly+9)
+  })
+  return canvas.toDataURL()
+}
+
+// Horizontal bar chart → dataURL
+function rptBar({data,labels,colors,title,w=460,h}){
+  const n=data.length||1
+  const barH=20,gap=5,padT=22,padB=6,padL=128,padR=30
+  const autoH=padT+n*(barH+gap)+padB
+  const ch=h||Math.max(80,Math.min(autoH,280))
+  const{canvas,ctx}=_mkCanvas(w,ch)
+  const maxV=Math.max(...data.map(v=>v||0),1)
+  ctx.fillStyle='#333333';ctx.font='bold 11px Arial';ctx.textAlign='center'
+  ctx.fillText(title||'',w/2,14)
+  const bw=w-padL-padR
+  data.forEach((v,i)=>{
+    const y=padT+i*(barH+gap)
+    const bLen=bw*((v||0)/maxV)
+    ctx.fillStyle=colors&&colors[i]?colors[i]:RPT_PALETTE[i%RPT_PALETTE.length]
+    if(bLen>0)ctx.fillRect(padL,y,bLen,barH)
+    ctx.fillStyle='#444444';ctx.font='10px Arial';ctx.textAlign='right'
+    ctx.fillText(((labels&&labels[i])||'').substring(0,22),padL-5,y+barH/2+4)
+    if(v){
+      ctx.fillStyle='#222222';ctx.font='bold 9.5px Arial';ctx.textAlign='left'
+      ctx.fillText(v,padL+bLen+3,y+barH/2+4)
+    }
+  })
+  return canvas.toDataURL()
+}
+
+// Monthly vertical bar chart → dataURL
+function rptMonthly({data,year,w=580,h=155}){
+  const{canvas,ctx}=_mkCanvas(w,h)
+  const months=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
+  const maxV=Math.max(...data,1)
+  const padL=22,padR=8,padT=22,padB=26
+  const bw=(w-padL-padR)/12
+  ctx.fillStyle='#333333';ctx.font='bold 11px Arial';ctx.textAlign='center'
+  ctx.fillText(`Andamento mensile ${year}`,w/2,14)
+  data.forEach((v,i)=>{
+    const x=padL+i*bw+bw*0.15
+    const barW=bw*0.7
+    const barHpx=(h-padT-padB)*(v/maxV)||0
+    const y=h-padB-barHpx
+    if(v>0){
+      ctx.fillStyle='#e7500f';ctx.fillRect(x,y,barW,barHpx)
+      ctx.fillStyle='#333333';ctx.font='8.5px Arial';ctx.textAlign='center'
+      ctx.fillText(v,x+barW/2,y-2)
+    }
+    ctx.fillStyle='#555555';ctx.font='9px Arial';ctx.textAlign='center'
+    ctx.fillText(months[i],x+barW/2,h-padB+11)
+  })
+  return canvas.toDataURL()
+}
+
+// Checklist aggregation per macro area (prefix = first 2 chars of codice)
+function rptAggregateMacro(chkAll){
+  const res={}
+  Object.keys(MACROAREE_NOMI).forEach(k=>{res[k]={ncp:0,ncm:0,oss:0,ver:0}})
+  ;(chkAll||[]).forEach(({codice,valore})=>{
+    if(!codice||codice.length<2)return
+    const pref=codice.substring(0,2)
+    if(!res[pref])return
+    if(valore==='NC+')res[pref].ncp++
+    else if(valore==='NC-')res[pref].ncm++
+    else if(valore==='OSS')res[pref].oss++
+    else if(valore==='VER')res[pref].ver++
+  })
+  return res
+}
+
+// jsPDF page header (orange strip + title)
+function rptPageHeader(doc,title,dalFmt,alFmt){
+  doc.setFillColor(231,80,15);doc.rect(0,0,210,15,'F')
+  doc.setTextColor(255,255,255);doc.setFontSize(8);doc.setFont('helvetica','bold')
+  doc.text('FORMEDIL PADOVA – Area Sicurezza e Salute',6,9.5)
+  doc.text(`Periodo: ${dalFmt} – ${alFmt}`,204,9.5,{align:'right'})
+  doc.setTextColor(40,40,40);doc.setFontSize(13);doc.setFont('helvetica','bold')
+  doc.text(title,105,23,{align:'center'})
+  doc.setFont('helvetica','normal')
+}
+
+// ── Funzione principale ────────────────────────────────────────────
+
+async function admGeneraReport(){
+  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
+  const dal=($('adm-dal')?.value)||''
+  const al=($('adm-al')?.value)||''
+  if(!dal||!al){toast('Seleziona entrambe le date prima di generare il report','err');return}
+  toast('Elaborazione report in corso…','ok')
+  try{
+
+    // ── 1. Visite nel periodo ──
+    const{data:visite,error:e1}=await sb.from('visite')
+      .select([
+        'visita_id','data_visita','ipc','tipo_accesso','rlst_sn',
+        'nom_ppre','qual_ppre','cantiere_id','tecnico_id','tecnico2_id',
+        'tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome)',
+        'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_durata,comune_nome)'
+      ].join(','))
+      .gte('data_visita',dal).lte('data_visita',al).eq('elimina',0)
+    if(e1)throw e1
+    if(!visite||!visite.length){toast('Nessuna visita nel periodo selezionato','warn');return}
+
+    // ── 2. Checklist items per tutte le visite ──
+    const visitaIds=visite.map(v=>v.visita_id)
+    const chkAll=[]
+    for(let i=0;i<visitaIds.length;i+=200){
+      const{data:batch}=await sb.from('visite_checklist')
+        .select('codice,valore').in('visita_id',visitaIds.slice(i,i+200)).neq('valore','NA')
+      if(batch)chkAll.push(...batch)
+    }
+
+    // ── 3. Aggregazioni ──
+    const nV=visite.length
+    const nAlto=visite.filter(v=>v.ipc==='ALTO').length
+    const nMedio=visite.filter(v=>v.ipc==='MEDIO').length
+    const nBasso=visite.filter(v=>v.ipc==='BASSO').length
+    const nNR=visite.filter(v=>!v.ipc||v.ipc==='NR').length
+    const nCant=new Set(visite.map(v=>v.cantiere_id).filter(Boolean)).size
+    const nRlst=visite.filter(v=>v.rlst_sn).length
+
+    // Tecnici (per nome, incluso tecnico principale)
+    const tecMap={}
+    visite.forEach(v=>{
+      const n=[v.tecnici?.tecnico_nome,v.tecnici?.tecnico_cognome].filter(Boolean).join(' ')
+      if(v.tecnico_id&&n){if(!tecMap[v.tecnico_id])tecMap[v.tecnico_id]={nome:n,cnt:0};tecMap[v.tecnico_id].cnt++}
+    })
+    const nTec=Object.keys(tecMap).length
+    const tecList=Object.values(tecMap).sort((a,b)=>b.cnt-a.cnt).slice(0,8)
+
+    // Mensile
+    const reportYear=dal.substring(0,4)
+    const monthly=Array(12).fill(0)
+    visite.forEach(v=>{if(v.data_visita){const m=parseInt(v.data_visita.split('-')[1])-1;if(m>=0&&m<12)monthly[m]++}})
+
+    // Tipo accesso
+    const accMap={}
+    visite.forEach(v=>{const k=+(v.tipo_accesso||0);if(k)accMap[k]=(accMap[k]||0)+1})
+
+    // Tipo intervento / opera / durata (da cantieri join)
+    const tipIntMap={},tipOpeMap={},durataMap={}
+    visite.forEach(v=>{
+      const ti=v.cantieri?.cantiere_tip_int;if(ti)tipIntMap[ti]=(tipIntMap[ti]||0)+1
+      const to=v.cantieri?.cantiere_tip_ope;if(to)tipOpeMap[to]=(tipOpeMap[to]||0)+1
+      const du=v.cantieri?.cantiere_durata;if(du)durataMap[du]=(durataMap[du]||0)+1
+    })
+
+    // Comuni (top 12)
+    const comMap={}
+    visite.forEach(v=>{const c=v.cantieri?.comune_nome;if(c)comMap[c]=(comMap[c]||0)+1})
+    const comTop=Object.entries(comMap).sort((a,b)=>b[1]-a[1]).slice(0,12)
+
+    // Qualifica persona presente
+    const qualMap={}
+    visite.forEach(v=>{const q=(v.qual_ppre||'').trim()||'Non indicata';qualMap[q]=(qualMap[q]||0)+1})
+    const qualList=Object.entries(qualMap).sort((a,b)=>b[1]-a[1]).slice(0,10)
+
+    // Macro aree
+    const macroData=rptAggregateMacro(chkAll)
+
+    // Formatter date
+    const fmtD=d=>{if(!d)return'–';const[y,mm,dd]=d.split('-');return`${dd}/${mm}/${y}`}
+    const dalFmt=fmtD(dal),alFmt=fmtD(al)
+
+    // ── 4. PDF ──
+    const{jsPDF}=window.jspdf
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
+    const M=12,CW=210-M*2,half=CW/2
+
+    // helper add image proportional
+    const addImg=(img,x,y,w,h)=>doc.addImage(img,'PNG',x,y,w,h)
+
+    // helper page footer
+    const footer=(pg)=>{
+      doc.setDrawColor(231,80,15);doc.setLineWidth(0.3)
+      doc.line(M,290,210-M,290)
+      doc.setFontSize(7);doc.setTextColor(160,160,160);doc.setFont('helvetica','normal')
+      doc.text('Formedil Padova – Area Sicurezza e Salute – uso interno',105,293.5,{align:'center'})
+      doc.text(`${pg}`,204,293.5)
+    }
+
+    // ════ PAGINA 1 – KPI + Andamento + IPC + Tipo accesso + Tecnici ════
+    rptPageHeader(doc,'RAPPORTO VISITE IN CANTIERE',dalFmt,alFmt)
+    let y=28
+
+    // KPI strip
+    const kpis=[
+      {v:nV,l:'Visite tot.',c:[231,80,15]},
+      {v:nCant,l:'Cantieri',c:[86,92,102]},
+      {v:nTec,l:'Tecnici',c:[149,194,47]},
+      {v:nAlto,l:'IPC Alto',c:[192,57,43]},
+      {v:nMedio,l:'IPC Medio',c:[230,126,34]},
+      {v:nBasso,l:'IPC Basso',c:[39,174,96]}
+    ]
+    const kw=CW/kpis.length
+    kpis.forEach((k,i)=>{
+      const kx=M+i*kw
+      doc.setFillColor(...k.c);doc.roundedRect(kx+0.5,y,kw-1,17,2,2,'F')
+      doc.setTextColor(255,255,255)
+      doc.setFontSize(15);doc.setFont('helvetica','bold')
+      doc.text(String(k.v),kx+kw/2,y+10,{align:'center'})
+      doc.setFontSize(7);doc.setFont('helvetica','normal')
+      doc.text(k.l,kx+kw/2,y+15,{align:'center'})
+    })
+    doc.setTextColor(40,40,40)
+    y+=21
+
+    // Andamento mensile (full width)
+    const monthImg=rptMonthly({data:monthly,year:reportYear,w:600,h:155})
+    addImg(monthImg,M,y,CW,40);y+=44
+
+    // IPC donut + Tipo accesso donut  (half + half)
+    const ipcImg=rptDonut({
+      data:[nAlto,nMedio,nBasso,nNR],
+      labels:['Alto','Medio','Basso','NR'],
+      colors:['#c0392b','#e67e22','#27ae60','#95a5a6'],
+      title:'Distribuzione IPC',w:380,h:240
+    })
+    addImg(ipcImg,M,y,half-2,60)
+
+    const accKeys=Object.keys(TIPO_ACC_LABELS).map(Number).filter(k=>accMap[k])
+    const accImg=rptDonut({
+      data:accKeys.map(k=>accMap[k]||0),
+      labels:accKeys.map(k=>TIPO_ACC_LABELS[k]),
+      colors:RPT_PALETTE,
+      title:'Tipologia accesso',w:380,h:240
+    })
+    addImg(accImg,M+half+2,y,half-2,60);y+=64
+
+    // Tecnici bar + RLST box (half + half)
+    if(tecList.length){
+      const tecImg=rptBar({
+        data:tecList.map(t=>t.cnt),
+        labels:tecList.map(t=>t.nome),
+        colors:RPT_PALETTE,
+        title:'Visite per tecnico',w:460,h:180
+      })
+      addImg(tecImg,M,y,half-2,45)
+    }
+    // RLST box
+    const rlstPct=nV?Math.round(nRlst/nV*100):0
+    doc.setFillColor(245,248,241);doc.roundedRect(M+half+2,y,half-2,45,3,3,'F')
+    doc.setDrawColor(149,194,47);doc.setLineWidth(0.5);doc.roundedRect(M+half+2,y,half-2,45,3,3,'S')
+    doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(86,92,102)
+    doc.text('Affiancamento RLST',M+half+2+half/2,y+10,{align:'center'})
+    doc.setFontSize(24);doc.setTextColor(149,194,47)
+    doc.text(`${rlstPct}%`,M+half+2+half/2,y+28,{align:'center'})
+    doc.setFontSize(8.5);doc.setTextColor(86,92,102)
+    doc.text(`${nRlst} visit${nRlst===1?'a':'e'} su ${nV}`,M+half+2+half/2,y+38,{align:'center'})
+
+    footer(1)
+
+    // ════ PAGINA 2 – Tipologie + Territorio ════
+    doc.addPage()
+    rptPageHeader(doc,'TIPOLOGIE E DISTRIBUZIONE TERRITORIALE',dalFmt,alFmt)
+    y=28
+
+    // Tipo intervento + Durata (half + half)
+    const tiKeys=Object.keys(tipIntMap).map(Number).sort((a,b)=>tipIntMap[b]-tipIntMap[a])
+    if(tiKeys.length){
+      const tiImg=rptBar({data:tiKeys.map(k=>tipIntMap[k]),labels:tiKeys.map(k=>TIP_INT_LABELS[k]||`Tipo ${k}`),colors:RPT_PALETTE,title:'Tipologia intervento',w:460,h:180})
+      addImg(tiImg,M,y,half-2,48)
+    }
+    const duKeys=Object.keys(durataMap).map(Number).sort()
+    if(duKeys.length){
+      const duImg=rptBar({data:duKeys.map(k=>durataMap[k]),labels:duKeys.map(k=>DURATA_LABELS[k]||`Durata ${k}`),colors:RPT_PALETTE,title:'Durata cantiere',w:460,h:180})
+      addImg(duImg,M+half+2,y,half-2,48)
+    }
+    y+=52
+
+    // Tipo opera (full width)
+    const toKeys=Object.keys(tipOpeMap).map(Number).sort((a,b)=>tipOpeMap[b]-tipOpeMap[a])
+    if(toKeys.length){
+      const toImg=rptBar({data:toKeys.map(k=>tipOpeMap[k]),labels:toKeys.map(k=>TIP_OPE_LABELS[k]||`Op. ${k}`),colors:RPT_PALETTE,title:'Tipologia opera',w:600,h:180})
+      addImg(toImg,M,y,CW,48)
+    }
+    y+=52
+
+    // Persona presente (tabella sinistra) + Comuni (tabella destra)
+    doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(86,92,102)
+    doc.text('Figura presente al sopralluogo',M+half/2,y,{align:'center'})
+    doc.text('Distribuzione per Comune',M+half+2+half/2,y,{align:'center'})
+    y+=3
+
+    doc.autoTable({
+      startY:y,
+      head:[['Qualifica','N.','%']],
+      body:qualList.map(([q,n])=>[q,n,nV?`${Math.round(n/nV*100)}%`:'–']),
+      styles:{fontSize:8,cellPadding:1.8},
+      headStyles:{fillColor:[231,80,15],textColor:255,fontStyle:'bold',fontSize:8},
+      alternateRowStyles:{fillColor:[250,250,250]},
+      columnStyles:{1:{halign:'center',cellWidth:10},2:{halign:'center',cellWidth:10}},
+      margin:{left:M,right:M+half+4},
+      tableWidth:half-4
+    })
+    const y2left=doc.lastAutoTable.finalY
+
+    doc.autoTable({
+      startY:y,
+      head:[['Comune','Visite']],
+      body:comTop.map(([c,n])=>[c,n]),
+      styles:{fontSize:8,cellPadding:1.8},
+      headStyles:{fillColor:[149,194,47],textColor:255,fontStyle:'bold',fontSize:8},
+      alternateRowStyles:{fillColor:[250,250,250]},
+      columnStyles:{1:{halign:'center',cellWidth:14}},
+      margin:{left:M+half+4,right:M},
+      tableWidth:half-4
+    })
+
+    footer(2)
+
+    // ════ PAGINA 3 – Analisi macro aree ════
+    doc.addPage()
+    rptPageHeader(doc,'ANALISI PER MACRO AREE DELLA CHECKLIST',dalFmt,alFmt)
+    y=28
+    const maKeys=Object.keys(MACROAREE_NOMI)
+    const colW=half,rowH=50
+    maKeys.forEach((key,i)=>{
+      const col=i%2,row=Math.floor(i/2)
+      const x=M+col*colW
+      const cy2=y+row*rowH
+      const d=macroData[key]||{ncp:0,ncm:0,oss:0,ver:0}
+      const chartImg=rptDonut({
+        data:[d.ncp,d.ncm,d.oss,d.ver],
+        labels:['NC+','NC-','OSS','VER'],
+        colors:['#c0392b','#e67e22','#3498db','#2ecc71'],
+        title:`${key} – ${MACROAREE_NOMI[key]}`,
+        w:380,h:240
+      })
+      addImg(chartImg,x,cy2,colW-2,rowH-2)
+    })
+
+    footer(3)
+
+    // ── Salva ──
+    const fname=`Report_Visite_${dal}_${al}.pdf`
+    doc.save(fname)
+    toast(`Report PDF generato: ${fname}`,'ok')
+
+  }catch(e){
+    console.error('admGeneraReport:',e)
+    toast('Errore generazione report: '+(e.message||e),'err')
+  }
+}
+
+window.admGeneraReport = admGeneraReport
 </script>
 <!-- MODAL FIRME TECNICI -->
 <div id="modal-firme" class="modal-overlay hidden" style="z-index:9999">
