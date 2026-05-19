@@ -542,6 +542,7 @@ tr:hover td{background:#fef9f7}
             </div>
             <input type="hidden" id="f-cant-id">
             <div id="cant-detail" style="font-size:12px;color:var(--grey);margin-top:5px"></div>
+            <div id="cant-info-card" class="hidden" style="margin-top:10px;padding:10px 14px;background:#f8f8f8;border-radius:8px;border-left:3px solid var(--orange);font-size:12px;line-height:1.8;color:#333"></div>
           </div>
           <button class="btn-outline btn-sm" id="btn-new-cant">+ Nuovo cantiere</button>
           <div class="row" style="margin-top:12px">
@@ -1451,6 +1452,7 @@ async function initForm(snap=null){
     'f-nr-imp','f-nr-ind','f-nr-lav','f-nr-lav-str','f-costi','f-stato-lav','f-note-lav',
     'f-oss-tec','f-oss-int','f-note-for-m','f-data-ritorno','cant-detail']
   clearIds.forEach(id=>{const el=$(id);if(el)el.value=''})
+  hideCantCard()
   ;['f-qual-ppre','f-tec-select','f-tec2-select'].forEach(id=>{const el=$(id);if(el)el.selectedIndex=0})
   ;['f-tec2-display','f-tec2-id','f-tec2-email'].forEach(id=>vSet(id,''))
   // reset stage toggle a No
@@ -1689,9 +1691,40 @@ $('btn-add-imp').onclick=()=>{
   renderImpreseAccordion()
 }
 
+// ── SCHEDA DETTAGLIO CANTIERE ──
+const IMP_LBL={1:'fino a 250.000 €',2:'250.001 – 500.000 €',3:'500.001 – 1.000.000 €',4:'1.000.001 – 1.500.000 €',5:'1.500.001 – 2.500.000 €',6:'2.500.001 – 3.500.000 €',7:'3.500.001 – 5.000.000 €',8:'5.000.001 – 10.000.000 €',11:'non disponibile'}
+function renderCantCard(c){
+  const card=$('cant-info-card')
+  if(!card)return
+  const row=(label,val)=>val?`<div><b style="color:#565c66;min-width:130px;display:inline-block">${label}</b> ${val}</div>`:''
+  const tipInt=c.cantiere_tip_int?(TIP_INT_LABELS?.[c.cantiere_tip_int]||c.cantiere_tip_int):null
+  const tipOpe=c.cantiere_tip_ope?(TIP_OPE_LABELS?.[c.cantiere_tip_ope]||c.cantiere_tip_ope):null
+  const tipOpeFull=tipOpe+(c.cantiere_tip_ope_altro?' — '+c.cantiere_tip_ope_altro:'')
+  const durata=c.cantiere_durata?(DURATA_LABELS?.[c.cantiere_durata]||c.cantiere_durata):null
+  const importo=c.cantiere_importo?IMP_LBL[c.cantiere_importo]:null
+  const indirizzo=[c.cantiere_indirizzo,c.cantiere_civico].filter(Boolean).join(' ')
+  const luogo=[c.comune_nome,c.cantiere_cap,c.cantiere_comune_cod?'(ISTAT: '+c.cantiere_comune_cod+')':null].filter(Boolean).join(' ')
+  const dataUlt=c.data_ult?c.data_ult.split('T')[0]:null
+  card.innerHTML=`
+    <div style="font-weight:600;color:var(--orange);margin-bottom:6px;font-size:13px">📋 Dettaglio cantiere</div>
+    ${row('Indirizzo',indirizzo)}
+    ${row('Comune/CAP',luogo)}
+    ${row('Tipo intervento',tipInt)}
+    ${row('Tipo opera',tipOpe?tipOpeFull:null)}
+    ${row('Importo lavori',importo)}
+    ${row('Durata',durata)}
+    ${row('Codice CNCE',c.cantiere_cnce)}
+    ${row('Cod. univoco',c.nodo_id)}
+    ${row('Data ult. lavori',dataUlt)}
+    ${row('Etichetta',c.cantiere_etichetta)}
+  `.trim()
+  card.classList.remove('hidden')
+}
+function hideCantCard(){const card=$('cant-info-card');if(card){card.innerHTML='';card.classList.add('hidden')}}
+
 // ── AUTOCOMPLETE CANTIERE ──
 setupAC('f-cant-search','cant-list', async q=>{
-  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult').eq('elimina',0).order('cantiere_indirizzo').limit(20)
+  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_cap,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id').eq('elimina',0).order('cantiere_indirizzo').limit(20)
   if(q)qb=qb.or(`cantiere_indirizzo.ilike.%${q}%,cantiere_etichetta.ilike.%${q}%,comune_nome.ilike.%${q}%`)
   const{data}=await qb
   return(data||[]).map(c=>({id:c.cantiere_id,label:c.cantiere_etichetta||`${c.cantiere_indirizzo} ${c.cantiere_civico}`,detail:`${c.cantiere_indirizzo} ${c.cantiere_civico}${c.comune_nome?' – '+c.comune_nome:''}`,extra:c}))
@@ -1708,6 +1741,7 @@ setupAC('f-cant-search','cant-list', async q=>{
     S.fd.comune_nome=item.extra.comune_nome||''
     S.fd.cantiere_indirizzo=item.extra.cantiere_indirizzo||''
     S.fd.cantiere_civico=item.extra.cantiere_civico||''
+    renderCantCard(item.extra)
   }
 })
 
@@ -1877,7 +1911,7 @@ function resetModalCantiere(){
   const capEl=$('mc-cap');if(capEl){capEl.readOnly=false;capEl.style.background='#fff'}
   const wrap=$('mc-tip-ope-altro-wrap');if(wrap)wrap.classList.add('hidden')
 }
-$('btn-new-cant').onclick=()=>{resetModalCantiere();show('modal-cant')}
+$('btn-new-cant').onclick=()=>{hideCantCard();resetModalCantiere();show('modal-cant')}
 $('btn-mc-cancel').onclick=()=>hide('modal-cant')
 $('btn-mc-save').onclick=async()=>{
   const ind=vGet('mc-ind').trim();const civ=vGet('mc-civ').trim()
@@ -1910,6 +1944,7 @@ $('btn-mc-save').onclick=async()=>{
   vSet('f-cnce',c.cantiere_cnce||'')
   vSet('f-cod-uni',c.nodo_id||'')
   vSet('f-data-ult',c.data_ult||'')
+  renderCantCard(c)
   hide('modal-cant')
   toast('Cantiere creato','ok')
   // Aggiorna la lista cantieri se è visibile
@@ -2870,15 +2905,24 @@ async function loadCantieri(q=''){
   }).join('')
   // Click "+ Visita": apre nuova visita precompilando il cantiere
   tbody.querySelectorAll('[data-cant-id]').forEach(btn=>{
-    btn.onclick=()=>{
+    btn.onclick=async()=>{
       initForm()
       navTo('form')
-      // Precompila cantiere
-      setTimeout(()=>{
+      // Precompila cantiere e mostra scheda dettaglio
+      setTimeout(async()=>{
         vSet('f-cant-id',btn.dataset.cantId)
         vSet('f-cant-search',btn.dataset.cantLabel)
         const det=$('cant-detail');if(det)det.textContent=btn.dataset.cantDetail
         S.fd.cantiere_id=btn.dataset.cantId
+        // Carica dettaglio completo per la scheda
+        const{data:cd}=await sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_cap,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id').eq('cantiere_id',btn.dataset.cantId).single()
+        if(cd){
+          vSet('f-prot-int',cd.prot_int||'')
+          vSet('f-cnce',cd.cantiere_cnce||'')
+          vSet('f-cod-uni',cd.nodo_id||'')
+          vSet('f-data-ult',cd.data_ult||'')
+          renderCantCard(cd)
+        }
       },100)
     }
   })
