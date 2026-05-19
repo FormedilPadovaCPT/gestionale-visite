@@ -372,7 +372,7 @@ tr:hover td{background:#fef9f7}
     <!-- DASHBOARD -->
     <section id="view-dashboard">
       <div class="stats-grid">
-        <div class="stat-card"><div class="num" id="s-tot">–</div><div class="lbl">Visite anno</div></div>
+        <div class="stat-card"><div class="num" id="s-tot">–</div><div class="lbl">Visite anno edile</div></div>
         <div class="stat-card"><div class="num" id="s-alto" style="color:var(--danger)">–</div><div class="lbl">IPC Alto</div></div>
         <div class="stat-card"><div class="num" id="s-medio" style="color:var(--warn)">–</div><div class="lbl">IPC Medio</div></div>
         <div class="stat-card"><div class="num" id="s-basso" style="color:var(--ok)">–</div><div class="lbl">IPC Basso/NR</div></div>
@@ -2817,16 +2817,23 @@ function buildRiepilogo(){
   $('rp-zone').innerHTML=zoneHtml||'<p style="color:#aaa;font-size:13px">Nessun rilievo registrato</p>'
 }
 
+// ── ANNO EDILE: 1 ott → 30 set ──
+function annoEdile(){
+  const now=new Date();const m=now.getMonth()+1;const yr=now.getFullYear()
+  const start=m>=10?yr:yr-1
+  return{da:`${start}-10-01`,a:`${start+1}-09-30`,label:`${start}/${start+1}`}
+}
+
 // ── DASHBOARD ──
 async function loadDash(){
-  const yr=new Date().getFullYear()
-  const{data}=await sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).gte('data_visita',`${yr}-01-01`).lte('data_visita',`${yr}-12-31`).eq('elimina',0).order('nr_verbale',{ascending:false}).limit(50)
+  const ae=annoEdile()
+  const{data}=await sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).gte('data_visita',ae.da).lte('data_visita',ae.a).eq('elimina',0).order('nr_verbale',{ascending:false})
   const vs=data||[]
   $('s-tot').textContent=vs.length
   $('s-alto').textContent=vs.filter(v=>v.ipc==='ALTO').length
   $('s-medio').textContent=vs.filter(v=>v.ipc==='MEDIO').length
   $('s-basso').textContent=vs.filter(v=>v.ipc==='BASSO'||v.ipc==='NR'||!v.ipc).length
-  $('tbody-dash').innerHTML=vs.slice(0,10).map(v=>vtRow(v)).join('')||'<tr><td colspan="7" style="text-align:center;color:#aaa;padding:18px">Nessuna visita quest\'anno</td></tr>'
+  $('tbody-dash').innerHTML=vs.slice(0,10).map(v=>vtRow(v)).join('')||`<tr><td colspan="7" style="text-align:center;color:#aaa;padding:18px">Nessuna visita nell\'anno edile ${ae.label}</td></tr>`
   bindRowActions()
 }
 
@@ -2834,7 +2841,7 @@ async function loadDash(){
 async function loadLista(){
   const q=vGet('q-search').trim()
   const fi=vGet('q-ipc');const fs=vGet('q-stato')
-  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).eq('elimina',0).order('nr_verbale',{ascending:false}).limit(200)
+  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).eq('elimina',0).order('nr_verbale',{ascending:false}).limit(2000)
   if(fi)qb=qb.eq('ipc',fi)
   if(fs)qb=qb.eq('stato',fs)
   const{data}=await qb
