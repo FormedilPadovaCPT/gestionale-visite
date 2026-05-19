@@ -939,6 +939,7 @@ tr:hover td{background:#fef9f7}
     <div class="row">
       <div class="field"><label>Comune *</label><select id="mc-com"><option value="">– Seleziona comune –</option></select></div>
       <div class="field"><label>CAP <span style="font-weight:400;font-size:11px;color:#aaa">(auto)</span></label><input type="text" id="mc-cap" maxlength="5" readonly style="background:#f8f8f8" placeholder="si compila da Comune"></div>
+      <div class="field"><label>Cod. ISTAT <span style="font-weight:400;font-size:11px;color:#aaa">(per XML, 6 cifre)</span></label><input type="text" id="mc-comune-cod" maxlength="6" placeholder="es. 028001" style="font-family:monospace"></div>
     </div>
     <div class="row">
       <div class="field"><label>Tipo intervento</label>
@@ -946,6 +947,7 @@ tr:hover td{background:#fef9f7}
       <div class="field"><label>Tipo opera</label>
         <select id="mc-tip-ope"><option value="">–</option><option value="2">Civile</option><option value="1">Industriale</option><option value="3">Commerciale</option><option value="5">Stradale</option><option value="8">Scolastica</option><option value="16">Altro</option></select></div>
     </div>
+    <div class="field hidden" id="mc-tip-ope-altro-wrap"><label>Specificare tipo opera</label><input type="text" id="mc-tip-ope-altro" maxlength="128" placeholder="Descrivere il tipo di opera..."></div>
     <div class="row">
       <div class="field"><label>Durata cantiere</label>
         <select id="mc-durata"><option value="">–</option><option value="1">&lt; 30 giorni</option><option value="2">da 30 a 90 giorni</option><option value="3">da 3 a 6 mesi</option><option value="4">da 6 a 12 mesi</option><option value="5">&gt; 12 mesi</option></select></div>
@@ -1866,13 +1868,14 @@ $('btn-mi-save').onclick=async()=>{
 
 // ── MODAL CANTIERE ──
 function resetModalCantiere(){
-  ;['mc-ind','mc-civ','mc-etich','mc-cap','mc-cnce','mc-cod-uni','mc-data-ult'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  ;['mc-ind','mc-civ','mc-etich','mc-cap','mc-cnce','mc-cod-uni','mc-data-ult','mc-comune-cod','mc-tip-ope-altro'].forEach(id=>{const el=$(id);if(el)el.value=''})
   const com=$('mc-com');if(com)com.value=''
   const ti=$('mc-tip-int');if(ti)ti.value=''
   const to=$('mc-tip-ope');if(to)to.value=''
   const du=$('mc-durata');if(du)du.value=''
   const im=$('mc-importo');if(im)im.value=''
   const capEl=$('mc-cap');if(capEl){capEl.readOnly=false;capEl.style.background='#fff'}
+  const wrap=$('mc-tip-ope-altro-wrap');if(wrap)wrap.classList.add('hidden')
 }
 $('btn-new-cant').onclick=()=>{resetModalCantiere();show('modal-cant')}
 $('btn-mc-cancel').onclick=()=>hide('modal-cant')
@@ -1893,6 +1896,8 @@ $('btn-mc-save').onclick=async()=>{
     cantiere_cnce:vGet('mc-cnce').trim()||null,
     nodo_id:vGet('mc-cod-uni').trim()||null,
     data_ult:vGet('mc-data-ult')||null,
+    cantiere_comune_cod:vGet('mc-comune-cod').trim()||null,
+    cantiere_tip_ope_altro:vGet('mc-tip-ope-altro').trim()||null,
     elimina:0
   }
   const{error}=await sb.from('cantieri').insert(c)
@@ -2045,6 +2050,16 @@ async function saveVisita(stato){
     }
     S.savedId=vid
     S.fd.visita_id=vid
+
+    // Aggiorna cantiere con prot_int e cantiere_committente_id (non sono in vistaRow)
+    if(cant_id){
+      const cantUpdate={}
+      const pi=vGet('f-prot-int');if(pi)cantUpdate.prot_int=pi
+      const ci=vGet('f-comm-id');if(ci)cantUpdate.cantiere_committente_id=ci
+      if(Object.keys(cantUpdate).length){
+        await sb.from('cantieri').update(cantUpdate).eq('cantiere_id',cant_id)
+      }
+    }
 
     // Checklist (save non-NA + note)
     // Merge valore e nota nello stesso record per evitare duplicati su (visita_id, codice)
@@ -2428,14 +2443,57 @@ const CAP_PD={
   'Vo\'':'35030'
 }
 
+// Codici ISTAT comuni provincia di Padova (fonte: ISTAT)
+const ISTAT_PD={
+  'Abano Terme':'028001','Agna':'028002','Albignasego':'028003','Anguillara Veneta':'028004',
+  'Arquà Petrarca':'028005','Arre':'028007','Arzergrande':'028008','Bagnoli di Sopra':'028009',
+  'Baone':'028010','Barbona':'028011','Battaglia Terme':'028012','Boara Pisani':'028013',
+  'Borgoricco':'028014','Bovolenta':'028015','Brugine':'028016','Cadoneghe':'028017',
+  'Campodarsego':'028018','Campodoro':'028019','Camposampiero':'028020','Campo San Martino':'028021',
+  'Candiana':'028022','Carceri':'028023','Cartura':'028024','Casale di Scodosia':'028025',
+  'Casalserugo':'028026','Castelbaldo':'028027','Cervarese Santa Croce':'028028',
+  'Chioggia':'027004','Cittadella':'028029','Codevigo':'028030','Conselve':'028031',
+  'Correzzola':'028032','Curtarolo':'028033','Due Carrare':'028034','Este':'028037',
+  'Fontaniva':'028038','Galliera Veneta':'028039','Galzignano Terme':'028040','Gazzo':'028041',
+  'Granze':'028042','Legnaro':'028046','Limena':'028047','Loreggia':'028049',
+  'Lozzo Atestino':'028050','Masi':'028053','Massanzago':'028054',
+  'Megliadino San Fidenzio':'028057','Megliadino San Vitale':'028058','Merlara':'028059',
+  'Mestrino':'028060','Monselice':'028061','Montagnana':'028062','Montegrotto Terme':'028063',
+  'Motta':'028065','Noventa Padovana':'028066','Ospedaletto Euganeo':'028067','Padova':'028060',
+  'Pernumia':'028069','Piacenza d\'Adige':'028070','Piazzola sul Brenta':'028071',
+  'Piombino Dese':'028072','Piove di Sacco':'028073','Polverara':'028074','Ponso':'028075',
+  'Pontelongo':'028076','Ponte San Nicolò':'028077','Pozzonovo':'028078','Rovolon':'028080',
+  'Rubano':'028081','Saccolongo':'028082','San Giorgio delle Pertiche':'028083',
+  'San Giorgio in Bosco':'028084','San Martino di Lupari':'028085','San Pietro in Gu':'028086',
+  'San Pietro Viminario':'028087','Sant\'Angelo di Piove di Sacco':'028088',
+  'Sant\'Elena':'028089','Sant\'Urbano':'028090','Saonara':'028091',
+  'Selvazzano Dentro':'028092','Solesino':'028093','Stanghella':'028094','Teolo':'028095',
+  'Terrassa Padovana':'028096','Tombolo':'028097','Trebaseleghe':'028099','Tribano':'028100',
+  'Urbana':'028101','Veggiano':'028102','Vescovana':'028103','Vighizzolo d\'Este':'028104',
+  'Vigodarzere':'028105','Vigonovo':'028106','Vigonza':'028107','Villa del Conte':'028108',
+  'Villa Estense':'028109','Villafranca Padovana':'028110','Villanova di Camposampiero':'028111',
+  'Vo\'':'028112'
+}
 function populateComuniSelect(){
   const sel=$('mc-com'); if(!sel)return
   COMUNI_PD.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o) })
-  // CAP auto-fill
+  // CAP e codice ISTAT auto-fill
   sel.onchange=()=>{
     const cap=CAP_PD[sel.value]||''
     const capEl=$('mc-cap')
     if(capEl){capEl.value=cap;capEl.readOnly=!!cap;capEl.style.background=cap?'#f8f8f8':'#fff'}
+    const istat=ISTAT_PD[sel.value]||''
+    const codEl=$('mc-comune-cod')
+    if(codEl&&!codEl.value){codEl.value=istat}// non sovrascrive se già compilato a mano
+  }
+  // Mostra/nascondi campo "Altro tipo opera"
+  const tipOpe=$('mc-tip-ope')
+  if(tipOpe){
+    tipOpe.onchange=()=>{
+      const wrap=$('mc-tip-ope-altro-wrap')
+      if(wrap)wrap.classList.toggle('hidden', tipOpe.value!=='16')
+      if(tipOpe.value!=='16'){const el=$('mc-tip-ope-altro');if(el)el.value=''}
+    }
   }
 }
 
