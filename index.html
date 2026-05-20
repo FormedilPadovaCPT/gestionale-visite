@@ -1634,8 +1634,7 @@ function renderImpreseAccordion(){
       ;['mi-piva','mi-cf','mi-ind','mi-com','mi-email','mi-tel','mi-badge','mi-pat','mi-ceiv'].forEach(id=>{const el=$(id);if(el)el.value=''})
       ;[1,2,3,4,5].forEach(c=>{const el=$(`mi-cert-${c}`);if(el)el.checked=false})
       const stageNo=document.querySelector('input[name="mi-stage"][value="no"]');if(stageNo)stageNo.checked=true
-      // Popola datalist comuni modal
-      const miDl=$('mi-comuni-dl');if(miDl&&!miDl.children.length)COMUNI_PD.forEach(c=>{const o=document.createElement('option');o.value=c;miDl.appendChild(o)})
+      // datalist comuni imprese: popolato dinamicamente via oninput (tutti i comuni d'Italia)
       show('modal-imp')
     }
   })
@@ -2545,6 +2544,33 @@ const ISTAT_PD={
   'Villa Estense':'028109','Villafranca Padovana':'028110','Villanova di Camposampiero':'028111',
   'Vo\'':'028112'
 }
+// ── COMUNI ITALIA (caricamento lazy da dataset ISTAT pubblico) ─────────────────
+let _comuniIT=null
+async function loadComuniIT(){
+  if(_comuniIT)return _comuniIT
+  try{
+    const r=await fetch('https://raw.githubusercontent.com/matteocontrini/comuni-json/master/comuni.json')
+    const data=await r.json()
+    _comuniIT=data.map(c=>c.nome).sort((a,b)=>a.localeCompare(b,'it'))
+  }catch(e){_comuniIT=[]}
+  return _comuniIT
+}
+// Listener input per comune imprese (tutti i comuni d'Italia)
+document.addEventListener('DOMContentLoaded',()=>{
+  const miCom=$('mi-com')
+  if(miCom){
+    miCom.addEventListener('input',async function(){
+      const q=this.value.trim().toLowerCase()
+      const dl=$('mi-comuni-dl');if(!dl)return
+      if(q.length<2){dl.innerHTML='';return}
+      const lista=await loadComuniIT()
+      const matches=lista.filter(c=>c.toLowerCase().startsWith(q)).slice(0,60)
+      dl.innerHTML=''
+      matches.forEach(c=>{const o=document.createElement('option');o.value=c;dl.appendChild(o)})
+    })
+  }
+})
+
 function populateComuniSelect(){
   const sel=$('mc-com'); if(!sel)return
   COMUNI_PD.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o) })
