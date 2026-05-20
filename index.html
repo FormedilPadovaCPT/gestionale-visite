@@ -6,6 +6,7 @@
 <title>Gestionale Visite – Formedil Padova · v2025-05-14</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --orange:#E7500F;--grey:#565C66;--green:#95C22F;--white:#fff;
@@ -888,6 +889,41 @@ tr:hover td{background:#fef9f7}
           <div class="adm-section-title">📄 Report statistico</div>
           <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:10px">Genera un report PDF con statistiche aggregate per il periodo selezionato: distribuzione IPC, tipologie, macro aree della checklist e distribuzione territoriale.</p>
           <button class="btn-primary" onclick="admGeneraReport()" style="background:#95C22F;border-color:#7aa527">📄 Genera Report PDF</button>
+        </div>
+
+        <!-- ── EXCEL EXPORT / IMPORT ── -->
+        <div class="adm-section">
+          <div class="adm-section-title">📊 Excel – Esporta / Importa visita</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:12px">Esporta una visita in formato .xlsx con tutti i campi compilati (4 fogli: Visita, Imprese, Lavorazioni, Checklist), oppure importa un file Excel esportato in precedenza per creare una nuova visita.</p>
+
+          <!-- Export -->
+          <div style="margin-bottom:14px">
+            <label style="color:rgba(255,255,255,.7);font-size:11px;letter-spacing:.4px;font-weight:600;margin-bottom:6px;display:block">ESPORTA VISITA IN EXCEL</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+              <div style="flex:1;min-width:160px">
+                <input type="text" id="adm-excel-verbale" placeholder="N° verbale (es. CPT/2026/0001)" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff" oninput="this.style.color='#fff'">
+              </div>
+              <button class="btn-primary" id="btn-adm-excel-exp" style="background:#27ae60;flex-shrink:0">📊 Esporta Excel</button>
+            </div>
+            <p id="adm-excel-exp-msg" style="font-size:11px;color:rgba(255,255,255,.4);margin-top:5px;display:none"></p>
+          </div>
+
+          <!-- Import -->
+          <div>
+            <label style="color:rgba(255,255,255,.7);font-size:11px;letter-spacing:.4px;font-weight:600;margin-bottom:6px;display:block">IMPORTA VISITA DA EXCEL</label>
+            <div class="drop-zone" id="adm-drop-xlsx" style="background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.5)">
+              <p style="font-size:14px">📂 Trascina qui il file .xlsx</p>
+              <small>oppure clicca per selezionare</small>
+              <input type="file" id="adm-file-xlsx" accept=".xlsx" style="display:none">
+            </div>
+            <div id="adm-xlsx-preview" style="display:none;margin-top:10px;background:rgba(255,255,255,.08);border-radius:8px;padding:12px">
+              <div id="adm-xlsx-info" style="font-size:13px;color:rgba(255,255,255,.8);line-height:1.8;margin-bottom:10px"></div>
+              <div style="display:flex;gap:8px">
+                <button class="btn-primary" id="btn-adm-load-xlsx">Apri nel form</button>
+                <button class="btn-outline" id="btn-adm-cancel-xlsx" style="border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.6)">Annulla</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Download file XSD -->
@@ -5123,6 +5159,315 @@ async function admGeneraReport(){
 }
 
 window.admGeneraReport = admGeneraReport
+
+// ══════════════════════════════════════════════════════════════
+// ── EXPORT / IMPORT EXCEL ─────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+
+// Mappa campi snap → etichetta leggibile per il foglio VISITA
+const EXCEL_FIELDS_VISITA=[
+  ['nr_verbale_origine','N° Verbale'],
+  ['data_visita','Data sopralluogo'],
+  ['ora_visita','Ora inizio'],
+  ['ora_fine','Ora fine'],
+  ['tipo_accesso','Tipologia accesso'],
+  ['acc_cant','Accesso n°'],
+  ['rlst_sn','Aff. RLST (1=sì, 0=no)'],
+  ['stage_vis','Visita stage (1=sì, 0=no)'],
+  ['nom_stage','Nominativo stagista'],
+  ['tec_display','Tecnico responsabile'],
+  ['tecnico_email','Email tecnico'],
+  ['tec2_display','Secondo tecnico'],
+  ['tecnico2_email','Email secondo tecnico'],
+  ['ppre_titolo','Persona presente - Titolo'],
+  ['ppre_nome','Persona presente - Nome'],
+  ['ppre_cog','Persona presente - Cognome'],
+  ['qual_ppre','Persona presente - Qualifica'],
+  ['tel_ppre','Persona presente - Telefono'],
+  ['cantiere_label','Cantiere'],
+  ['prot_int','Protocollo interno'],
+  ['cnce','Codice CNCE'],
+  ['cod_uni','Codice univoco'],
+  ['data_ult','Data prevista ultimazione lavori'],
+  ['comm_tipo_sogg','Committente - Tipo (PF/PG)'],
+  ['comm_tipo','Committente - Tipo pubblico/privato'],
+  ['comm_titolo','Committente - Titolo'],
+  ['comm_nome','Committente - Nome'],
+  ['comm_cog','Committente - Cognome'],
+  ['comm_cf','Committente - Codice fiscale (PF)'],
+  ['comm_email','Committente - Email (PF)'],
+  ['comm_tel','Committente - Telefono (PF)'],
+  ['comm_rag_soc','Committente - Ragione sociale'],
+  ['comm_piva','Committente - Partita IVA'],
+  ['comm_cf_pg','Committente - Codice fiscale (PG)'],
+  ['comm_email_pg','Committente - Email (PG)'],
+  ['comm_tel_pg','Committente - Telefono (PG)'],
+  ['coord','Presenza coordinamento (1=sì)'],
+  ['rl_titolo','RL - Titolo'],
+  ['rl_nome','RL - Nome'],
+  ['rl_cog','RL - Cognome'],
+  ['rl_email','RL - Email'],
+  ['rl_tel','RL - Telefono'],
+  ['csp_titolo','CSP - Titolo'],
+  ['csp_nome','CSP - Nome'],
+  ['csp_cog','CSP - Cognome'],
+  ['csp_email','CSP - Email'],
+  ['csp_tel','CSP - Telefono'],
+  ['cse_titolo','CSE - Titolo'],
+  ['cse_nome','CSE - Nome'],
+  ['cse_cog','CSE - Cognome'],
+  ['cse_email','CSE - Email'],
+  ['cse_tel','CSE - Telefono'],
+  ['nr_imp','N° imprese presenti'],
+  ['nr_ind','N° ditte individuali'],
+  ['nr_lavoratori','N° lavoratori rilevati'],
+  ['nr_lavoratori_stranieri','di cui stranieri'],
+  ['importo','Importo lavori'],
+  ['costi','Costi della sicurezza'],
+  ['stato_lav','Stato lavori'],
+  ['note_lav','Note lavorazioni'],
+  ['oss_tec','Osservazioni tecnico'],
+  ['oss_int','Osservazioni interne'],
+  ['note_for_sn','Formazione mancante (1=sì)'],
+  ['note_for_m','Note formazione mancante'],
+  ['segnalazione','Segnalazione SISAL/ITL (1=sì)'],
+  ['data_ritorno','Data visita successiva'],
+  ['privacy','Privacy acquisita (1=sì)'],
+  ['exported_at','Esportato il'],
+]
+
+function exportToExcel(snap){
+  if(!window.XLSX){toast('Libreria Excel non caricata','err');return}
+  const wb=XLSX.utils.book_new()
+
+  // ── Foglio 1: VISITA ──────────────────────────────────────────────────────
+  const visitaRows=[['CAMPO','VALORE']]
+  EXCEL_FIELDS_VISITA.forEach(([key,lbl])=>{
+    const v=snap[key]
+    if(v!==null&&v!==undefined&&v!=='')
+      visitaRows.push([lbl, typeof v==='boolean'?(v?'1':'0'):String(v)])
+  })
+  const wsVisita=XLSX.utils.aoa_to_sheet(visitaRows)
+  wsVisita['!cols']=[{wch:38},{wch:55}]
+  XLSX.utils.book_append_sheet(wb,wsVisita,'VISITA')
+
+  // ── Foglio 2: IMPRESE ─────────────────────────────────────────────────────
+  const impHdr=['Principale','Ragione sociale','P.IVA','Codice fiscale','Indirizzo','Comune',
+    'Attività','Capo cantiere nome','Capo cantiere cognome','Badge','Patente a crediti',
+    'Note FASILAV','Tipo impresa','CEIV','Stage','Certificazioni']
+  const impRows=[impHdr]
+  ;(snap.imprese||[]).forEach(im=>{
+    impRows.push([
+      im.is_principale?'SÌ':'',
+      im.impresa_nome||'',
+      im.piva||'',
+      im.cf_imp||'',
+      im.ind_imp||'',
+      im.com_imp||'',
+      im.att||'',
+      im.capo_nome||'',
+      im.capo_cog||'',
+      im.badge||'',
+      im.pat||'',
+      im.note_fasilav||'',
+      im.tipo_imp||'',
+      im.ceiv||'',
+      im.stage_imp||'',
+      Array.isArray(im.certif)?im.certif.join(', '):(im.certif||''),
+    ])
+  })
+  const wsImp=XLSX.utils.aoa_to_sheet(impRows.length>1?impRows:[impHdr])
+  wsImp['!cols']=impHdr.map((_,i)=>({wch:i===1?32:i===15?30:18}))
+  XLSX.utils.book_append_sheet(wb,wsImp,'IMPRESE')
+
+  // ── Foglio 3: LAVORAZIONI ─────────────────────────────────────────────────
+  const lavHdr=['Genere','Fase','Lavorazione specifica']
+  const lavRows=[lavHdr]
+  ;(snap.lavorazioni||[]).forEach(l=>lavRows.push([l.genere||'',l.fase||'',l.lavorazione||'']))
+  const wsLav=XLSX.utils.aoa_to_sheet(lavRows)
+  wsLav['!cols']=[{wch:25},{wch:25},{wch:35}]
+  XLSX.utils.book_append_sheet(wb,wsLav,'LAVORAZIONI')
+
+  // ── Foglio 4: CHECKLIST ───────────────────────────────────────────────────
+  const chkHdr=['Codice','Zona','Descrizione voce','Valore (NA/VER/NC-/NC+/OSS)','Nota']
+  const chkRows=[chkHdr]
+  const chk=snap.checklist||{}
+  const note=snap.note_checklist||{}
+  // Raccoglie tutte le voci dalla struttura S.byZona se disponibile
+  const allCodes=new Set([...Object.keys(chk),...Object.keys(note)])
+  // Arricchisce con descrizione dalla struttura locale se disponibile
+  const voceMap={}
+  if(S?.byZona){
+    Object.entries(S.byZona).forEach(([z,voci])=>{
+      voci.forEach(v=>{if(v.codice)voceMap[v.codice]={zona:ZONE_LBL?.[z]||`Zona ${z}`,descr:v.testo||v.descrizione||''}})
+    })
+  }
+  // Prima le voci con risposta, nell'ordine della struttura (byZona)
+  const orderedCodes=[]
+  if(S?.byZona){
+    Object.values(S.byZona).forEach(voci=>voci.forEach(v=>{if(v.codice&&allCodes.has(v.codice))orderedCodes.push(v.codice)}))
+  }
+  // Aggiungi eventuali codici non in byZona
+  allCodes.forEach(c=>{if(!orderedCodes.includes(c))orderedCodes.push(c)})
+  orderedCodes.forEach(codice=>{
+    const val=chk[codice]||'NA'
+    const n=note[codice]||''
+    if(val==='NA'&&!n)return // salta le non compilate senza nota
+    const info=voceMap[codice]||{zona:'',descr:''}
+    chkRows.push([codice,info.zona,info.descr,val,n])
+  })
+  const wsChk=XLSX.utils.aoa_to_sheet(chkRows)
+  wsChk['!cols']=[{wch:14},{wch:28},{wch:50},{wch:20},{wch:40}]
+  XLSX.utils.book_append_sheet(wb,wsChk,'CHECKLIST')
+
+  // ── Download ──────────────────────────────────────────────────────────────
+  const nome=`visita_${snap.nr_verbale_origine||'bozza'}.xlsx`.replace(/\//g,'_')
+  XLSX.writeFile(wb,nome)
+  toast('Excel esportato','ok')
+}
+
+// ── WIRING sezione Coordinatore – Export Excel ────────────────────────────
+$('btn-adm-excel-exp').onclick=async()=>{
+  const nr=($('adm-excel-verbale').value||'').trim()
+  if(!nr){toast('Inserisci il numero verbale','warn');return}
+  const msg=$('adm-excel-exp-msg')
+  msg.textContent='Ricerca in corso…'; msg.style.display='block'
+  try{
+    const{data:v}=await sb.from('visite').select('visita_id,nr_verbale').eq('nr_verbale',nr).maybeSingle()
+    if(!v){msg.textContent='Verbale non trovato.';return}
+    const{data:snapRow}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',v.visita_id).maybeSingle()
+    if(snapRow?.snapshot){
+      exportToExcel(snapRow.snapshot)
+      msg.textContent='✅ Export completato.'
+    }else{
+      msg.textContent='Snapshot non disponibile per questo verbale. Apri la visita nel form e usa "📤 Snapshot" prima di esportare.'
+    }
+  }catch(e){msg.textContent='Errore: '+e.message;console.error(e)}
+}
+
+// ── WIRING sezione Coordinatore – Import Excel ────────────────────────────
+let pendingXlsxSnap=null
+
+const admDz=$('adm-drop-xlsx')
+admDz.onclick=()=>$('adm-file-xlsx').click()
+admDz.ondragover=e=>{e.preventDefault();admDz.classList.add('drag-over')}
+admDz.ondragleave=()=>admDz.classList.remove('drag-over')
+admDz.ondrop=e=>{e.preventDefault();admDz.classList.remove('drag-over');if(e.dataTransfer.files[0])readExcelFile(e.dataTransfer.files[0])}
+$('adm-file-xlsx').onchange=e=>{if(e.target.files[0])readExcelFile(e.target.files[0])}
+
+function readExcelFile(f){
+  if(!window.XLSX){toast('Libreria Excel non caricata','err');return}
+  const r=new FileReader()
+  r.onerror=()=>toast('Errore lettura file Excel','err')
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'})
+      const snap=xlsxToSnap(wb)
+      if(!snap){toast('Formato Excel non riconosciuto','err');return}
+      pendingXlsxSnap=snap
+      $('adm-xlsx-info').innerHTML=`
+        <p><b>Verbale:</b> ${snap.nr_verbale_origine||'N/D'}</p>
+        <p><b>Cantiere:</b> ${snap.cantiere_label||'N/D'}</p>
+        <p><b>Tecnico:</b> ${snap.tec_display||'N/D'}</p>
+        <p><b>Data visita:</b> ${snap.data_visita||'N/D'}</p>
+        <p><b>Impresa principale:</b> ${snap.imprese?.[0]?.impresa_nome||'N/D'}</p>
+        <p><b>Voci checklist compilate:</b> ${Object.keys(snap.checklist||{}).length}</p>`
+      $('adm-xlsx-preview').style.display='block'
+    }catch(err){toast('File Excel non valido: '+err.message,'err');console.error(err)}
+  }
+  r.readAsArrayBuffer(f)
+}
+
+function xlsxToSnap(wb){
+  // ── Foglio VISITA ─────────────────────────────────────────────────────────
+  const wsV=wb.Sheets['VISITA']
+  if(!wsV)return null
+  const visitaData=XLSX.utils.sheet_to_json(wsV,{header:1})
+  // Costruisce mappa etichetta → valore
+  const labelToVal={}
+  visitaData.slice(1).forEach(row=>{if(row[0]&&row[1]!=null)labelToVal[row[0]]=String(row[1])})
+  // Inverte la mappa EXCEL_FIELDS_VISITA per label→key
+  const labelToKey={}
+  EXCEL_FIELDS_VISITA.forEach(([k,l])=>labelToKey[l]=k)
+  const snap={}
+  Object.entries(labelToVal).forEach(([lbl,val])=>{
+    const key=labelToKey[lbl]
+    if(key)snap[key]=val
+  })
+  // ── Foglio IMPRESE ────────────────────────────────────────────────────────
+  const wsI=wb.Sheets['IMPRESE']
+  if(wsI){
+    const rows=XLSX.utils.sheet_to_json(wsI,{header:1})
+    const hdr=rows[0]||[]
+    const colIdx=(h)=>hdr.indexOf(h)
+    snap.imprese=rows.slice(1).filter(r=>r.some(Boolean)).map((r,i)=>({
+      is_principale:r[colIdx('Principale')]==='SÌ'||i===0,
+      impresa_nome:r[colIdx('Ragione sociale')]||'',
+      piva:r[colIdx('P.IVA')]||'',
+      cf_imp:r[colIdx('Codice fiscale')]||'',
+      ind_imp:r[colIdx('Indirizzo')]||'',
+      com_imp:r[colIdx('Comune')]||'',
+      att:r[colIdx('Attività')]||'',
+      capo_nome:r[colIdx('Capo cantiere nome')]||'',
+      capo_cog:r[colIdx('Capo cantiere cognome')]||'',
+      badge:r[colIdx('Badge')]||'',
+      pat:r[colIdx('Patente a crediti')]||'',
+      note_fasilav:r[colIdx('Note FASILAV')]||'',
+      tipo_imp:r[colIdx('Tipo impresa')]||'',
+      ceiv:r[colIdx('CEIV')]||'',
+      stage_imp:r[colIdx('Stage')]||'',
+      certif:r[colIdx('Certificazioni')]?(r[colIdx('Certificazioni')].split(',').map(s=>s.trim()).filter(Boolean)):[],
+      impresa_id:'',
+    }))
+  }
+  if(!snap.imprese||!snap.imprese.length)
+    snap.imprese=[{impresa_id:'',impresa_nome:'',piva:'',cf_imp:'',ind_imp:'',com_imp:'',att:'',capo_nome:'',capo_cog:'',badge:'',pat:'',note_fasilav:'',tipo_imp:'',certif:[],ceiv:'',stage_imp:'',is_principale:true}]
+  // ── Foglio LAVORAZIONI ────────────────────────────────────────────────────
+  const wsL=wb.Sheets['LAVORAZIONI']
+  if(wsL){
+    const rows=XLSX.utils.sheet_to_json(wsL,{header:1})
+    snap.lavorazioni=rows.slice(1).filter(r=>r.some(Boolean)).map(r=>({genere:r[0]||'',fase:r[1]||'',lavorazione:r[2]||''}))
+  }else snap.lavorazioni=[]
+  // ── Foglio CHECKLIST ──────────────────────────────────────────────────────
+  const wsC=wb.Sheets['CHECKLIST']
+  if(wsC){
+    const rows=XLSX.utils.sheet_to_json(wsC,{header:1})
+    const chk={},note={}
+    rows.slice(1).forEach(r=>{
+      const codice=r[0]
+      if(!codice)return
+      if(r[3]&&r[3]!=='NA')chk[codice]=r[3]
+      if(r[4])note[codice]=r[4]
+    })
+    snap.checklist=chk
+    snap.note_checklist=note
+  }else{snap.checklist={};snap.note_checklist={}}
+  snap.exported_at=new Date().toISOString()
+  return snap
+}
+
+$('btn-adm-load-xlsx').onclick=async()=>{
+  if(!pendingXlsxSnap)return
+  const snap=pendingXlsxSnap
+  pendingXlsxSnap=null
+  $('adm-xlsx-preview').style.display='none'
+  $('adm-file-xlsx').value=''
+  const origNr=snap.nr_verbale_origine
+  $('conf-verb-txt').innerHTML=`Verbale nel file: <strong>${origNr||'N/D'}</strong><br><br>Vuoi mantenere il numero originale o assegnarne uno nuovo?`
+  show('modal-verbale')
+  S._verbCb=async(mantieni)=>{
+    try{
+      hide('modal-verbale')
+      await initForm(snap)
+      if(mantieni&&origNr){vSet('f-verbale',origNr);S.fd.nr_verbale=origNr}
+      else{S.savedId=null;S.fd.visita_id=null}
+      navTo('form')
+      toast(mantieni?`Verbale ${origNr} caricato`:'Nuova visita da Excel — progressivo assegnato','ok')
+    }catch(e){toast('Errore importazione Excel: '+e.message,'err');console.error(e)}
+  }
+}
+$('btn-adm-cancel-xlsx').onclick=()=>{pendingXlsxSnap=null;$('adm-xlsx-preview').style.display='none';$('adm-file-xlsx').value=''}
+
 </script>
 <!-- MODAL FIRME TECNICI -->
 <div id="modal-firme" class="modal-overlay hidden" style="z-index:9999">
