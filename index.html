@@ -564,14 +564,19 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
           <div class="field"><label>Data prevista ultimazione lavori <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="date" id="f-data-ult" readonly style="background:#f8f8f8"></div>
           <div class="sect-title">Committente</div>
-          <div class="sogg-toggle">
+          <!-- 1. Tipologia (prima scelta) -->
+          <div class="field" style="margin-bottom:6px">
+            <label>Tipologia committente</label>
+            <div class="tipo-chips" style="margin-top:4px">
+              <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-pub" value="1"><span>🏛 Pubblico</span></label>
+              <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-priv" value="2"><span>🏠 Privato</span></label>
+              <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-nd" value="3"><span>— N/D</span></label>
+            </div>
+          </div>
+          <!-- 2. PF / PG (visibile solo se Privato o N/D) -->
+          <div class="sogg-toggle" id="comm-sogg-wrap">
             <label><input type="radio" name="comm-sogg" id="comm-radio-pf" value="PF" checked><span>👤 Persona fisica</span></label>
             <label><input type="radio" name="comm-sogg" id="comm-radio-pg" value="PG"><span>🏢 Persona giuridica</span></label>
-          </div>
-          <div class="tipo-chips">
-            <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-pub" value="1"><span>🏛 Pubblico</span></label>
-            <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-priv" value="2"><span>🏠 Privato</span></label>
-            <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-nd" value="3"><span>— N/D</span></label>
           </div>
           <div class="field">
             <label>Cerca committente esistente</label>
@@ -2533,11 +2538,13 @@ function applySnap(snap){
 
   // ── Tab 1 – Committente ───────────────────────────────────────────────────
   if(snap.committente_id)vSet('f-comm-id',snap.committente_id)
-  if(snap.comm_tipo_sogg){
+  // Imposta prima la tipologia (Pubblico/Privato/N/D) — determina visibilità toggle PF/PG
+  if(snap.comm_tipo)setCommTipo(String(snap.comm_tipo))
+  // Poi il soggetto (PF/PG), ma solo se non è Pubblico (che forza PG)
+  if(snap.comm_tipo_sogg && snap.comm_tipo!=='1' && snap.comm_tipo!==1){
     const r=document.querySelector(`input[name="comm-sogg"][value="${snap.comm_tipo_sogg}"]`)
     if(r){r.checked=true;r.dispatchEvent(new Event('change',{bubbles:true}))}
   }
-  if(snap.comm_tipo)vSet('f-comm-tipo',snap.comm_tipo)
   if(snap.comm_titolo)vSet('f-comm-titolo',snap.comm_titolo)
   if(snap.comm_nome)vSet('f-comm-nome',snap.comm_nome)
   if(snap.comm_cog)vSet('f-comm-cog',snap.comm_cog)
@@ -2801,13 +2808,28 @@ document.querySelectorAll('input[name="comm-sogg"]').forEach(r=>{
   r.onchange=()=>toggleCommSogg(r.value)
 })
 
-// Tastini tipo committente → sincronizza hidden f-comm-tipo
+// Tipologia committente: Pubblico / Privato / N/D
+// Pubblico → forza sempre PG, nasconde il toggle PF/PG
+// Privato / N/D → mostra il toggle, l'utente sceglie PF o PG
+function onCommTipoChange(val){
+  const h=$('f-comm-tipo'); if(h)h.value=val||''
+  const soggWrap=$('comm-sogg-wrap')
+  if(val==='1'){
+    // Pubblico: solo persona giuridica
+    if(soggWrap)soggWrap.classList.add('hidden')
+    const pg=$('comm-radio-pg'); if(pg){pg.checked=true;toggleCommSogg('PG')}
+  } else {
+    // Privato o N/D: toggle visibile, mantieni selezione corrente
+    if(soggWrap)soggWrap.classList.remove('hidden')
+  }
+}
 document.querySelectorAll('input[name="comm-tipo"]').forEach(r=>{
-  r.onchange=()=>{ const h=$('f-comm-tipo'); if(h)h.value=r.value }
+  r.onchange=()=>onCommTipoChange(r.value)
 })
 function setCommTipo(val){
   const r=document.querySelector(`input[name="comm-tipo"][value="${val}"]`)
-  if(r){r.checked=true;const h=$('f-comm-tipo');if(h)h.value=val}
+  if(r)r.checked=true
+  onCommTipoChange(val||'')
 }
 
 // ── FOTO ──────────────────────────────────────────────────────────────────────
