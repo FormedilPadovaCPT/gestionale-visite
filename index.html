@@ -79,6 +79,14 @@ th{background:var(--light);padding:7px 9px;text-align:left;font-weight:600;color
 td{padding:7px 9px;border-bottom:1px solid var(--border);vertical-align:middle}
 tr:hover td{background:#fef9f7}
 .tbl-actions{display:flex;gap:5px}
+/* QUICK DETAIL */
+.qd-dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin:10px 0}
+.qd-dl dt{color:#888;font-weight:600;white-space:nowrap}
+.qd-dl dd{margin:0;color:#333}
+.qd-note{background:#fff8f0;border-left:3px solid var(--orange);padding:8px 12px;border-radius:0 6px 6px 0;font-size:13px;white-space:pre-wrap;margin-top:8px;line-height:1.6}
+.qd-section{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--orange);margin:14px 0 6px;border-bottom:1px solid var(--border);padding-bottom:4px}
+tr.row-detail-hover{cursor:pointer}
+tr.row-detail-hover:hover td{background:#fff3ed}
 /* FORM */
 .form-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
 .form-header h2{font-size:16px;color:var(--grey)}
@@ -926,6 +934,36 @@ tr:hover td{background:#fef9f7}
           </div>
         </div>
 
+        <!-- ── GESTIONE IMPRESE ── -->
+        <div class="adm-section">
+          <div class="adm-section-title">🏢 Gestione imprese</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:12px">Cerca e modifica i dati anagrafici delle imprese registrate nel sistema (ragione sociale, P.IVA, contratto CCNL, certificazioni, ecc.).</p>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <input type="text" id="adm-imp-search" placeholder="Ragione sociale o P.IVA…"
+              style="flex:1;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff"
+              oninput="this.style.color='#fff'">
+            <button class="btn-primary btn-sm" onclick="admLoadImprese()">🔍 Cerca</button>
+          </div>
+          <div class="tbl-wrap" style="background:rgba(255,255,255,.05);border-radius:8px">
+            <table id="tbl-adm-imp" style="color:rgba(255,255,255,.85);font-size:12px">
+              <thead>
+                <tr style="border-bottom:1px solid rgba(255,255,255,.15)">
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Ragione sociale</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">P.IVA</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Comune</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">CCNL</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Cassa Edile</th>
+                  <th style="padding:8px 4px"></th>
+                </tr>
+              </thead>
+              <tbody id="tbody-adm-imp">
+                <tr><td colspan="6" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Usa la ricerca per trovare un'impresa</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="adm-imp-empty" class="hidden" style="text-align:center;padding:16px;color:rgba(255,255,255,.35);font-size:13px">Nessuna impresa trovata</div>
+        </div>
+
         <!-- Download file XSD -->
         <div class="adm-section">
           <div class="adm-section-title">Schema XSD – Osservatorio visite</div>
@@ -963,6 +1001,19 @@ tr:hover td{background:#fef9f7}
     </section>
 
   </main>
+</div>
+
+<!-- MODAL QUICK DETAIL (visite e cantieri) -->
+<div class="modal-overlay hidden" id="modal-qd">
+  <div class="modal-box" style="max-width:580px;max-height:88vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <h3 style="margin:0;font-size:15px" id="qd-title">Dettaglio</h3>
+      <button class="btn-outline btn-sm" onclick="hide('modal-qd')">✕ Chiudi</button>
+    </div>
+    <div id="qd-badges" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <div id="qd-body"></div>
+    <div id="qd-actions" style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"></div>
+  </div>
 </div>
 
 <!-- MODAL CANTIERE -->
@@ -1090,6 +1141,106 @@ tr:hover td{background:#fef9f7}
     <div class="modal-actions">
       <button class="btn-outline" id="btn-mi-cancel">Annulla</button>
       <button class="btn-primary" id="btn-mi-save">💾 Salva impresa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MODIFICA IMPRESA (Coordinatore) -->
+<div class="modal-overlay hidden" id="modal-edit-imp">
+  <div class="modal-box" style="max-width:580px">
+    <h3>✏️ Modifica impresa</h3>
+    <div class="sect-title">Dati anagrafici</div>
+    <div class="field">
+      <label>Ragione sociale *</label>
+      <input type="text" id="ei-nome" placeholder="Ragione sociale…">
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Partita IVA <span style="font-size:11px;color:#aaa;font-weight:400">(non modificabile)</span></label>
+        <input type="text" id="ei-piva" readonly style="background:#f4f4f4;color:#888;cursor:not-allowed">
+      </div>
+      <div class="field">
+        <label>Codice fiscale</label>
+        <input type="text" id="ei-cf" placeholder="CF…">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Indirizzo sede</label>
+        <input type="text" id="ei-ind" placeholder="Via/Piazza…">
+      </div>
+      <div class="field">
+        <label>Comune</label>
+        <input type="text" id="ei-com" placeholder="Comune…">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="ei-email" placeholder="info@…">
+      </div>
+      <div class="field">
+        <label>Telefono</label>
+        <input type="tel" id="ei-tel" placeholder="+39…">
+      </div>
+    </div>
+    <div class="sect-title" style="margin-top:10px">Dati societari / Contratto</div>
+    <div class="row">
+      <div class="field">
+        <label>Tipo iscrizione CCIA</label>
+        <select id="ei-tipo-ccia">
+          <option value="">– Seleziona –</option>
+          <option value="ARTIGIANA">Artigiana</option>
+          <option value="INDUSTRIALE">Industriale</option>
+          <option value="COOPERATIVA">Cooperativa</option>
+          <option value="COMMERCIALE">Commerciale</option>
+          <option value="ALTRO">Altro</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Contratto CCNL</label>
+        <select id="ei-ccnl">
+          <option value="">– Seleziona –</option>
+          <option value="EDILIZIA INDUSTRIA">Edilizia Industria</option>
+          <option value="EDILIZIA ARTIGIANATO">Edilizia Artigianato</option>
+          <option value="METALMECCANICO INDUSTRIA">Metalmeccanico Industria</option>
+          <option value="METALMECCANICO ARTIGIANATO">Metalmeccanico Artigianato</option>
+          <option value="INSTALLATORI IMPIANTI">Installatori Impianti</option>
+          <option value="LEGNO">Legno</option>
+          <option value="ALTRO">Altro</option>
+        </select>
+      </div>
+    </div>
+    <div class="field hidden" id="ei-ccnl-altro-wrap">
+      <label>Specifica contratto CCNL</label>
+      <input type="text" id="ei-ccnl-altro" placeholder="Indicare il contratto applicato…">
+    </div>
+    <div class="sect-title" style="margin-top:10px">Cantiere / Sicurezza</div>
+    <div class="field">
+      <label>Iscrizione CEIV</label>
+      <select id="ei-ceiv">
+        <option value="">– Seleziona –</option>
+        <option>C.E.I.V.</option>
+        <option>EDILCASSA VENETO</option>
+        <option>CASSA EDILE BELLUNO</option>
+        <option>CASSA EDILE VENEZIA</option>
+        <option>CASSA EDILE VICENZA</option>
+        <option>ALTRO</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Certificazioni</label>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">
+        <label class="check-inline"><input type="checkbox" id="ei-cert-1"> Asseverata</label>
+        <label class="check-inline"><input type="checkbox" id="ei-cert-2"> Certificata OHSAS 18001</label>
+        <label class="check-inline"><input type="checkbox" id="ei-cert-3"> UNI EN ISO 45001</label>
+        <label class="check-inline"><input type="checkbox" id="ei-cert-4"> Sistema Qualità UNI EN ISO 9001</label>
+        <label class="check-inline"><input type="checkbox" id="ei-cert-5"> Certificazione ambientale ISO 14001</label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" id="btn-ei-cancel">Annulla</button>
+      <button class="btn-primary" id="btn-ei-save">💾 Salva modifiche</button>
     </div>
   </div>
 </div>
@@ -2965,13 +3116,14 @@ function vtRow(v){
   const cant=v.cantieri?.cantiere_etichetta||v.cantieri?.cantiere_indirizzo||'-'
   const ipc=v.ipc||'NR'
   const isBozza=(v.stato||'bozza')==='bozza'
-  return`<tr>
+  return`<tr class="row-detail-hover" data-act="detail-visita" data-id="${v.visita_id}">
     <td>${v.nr_verbale||'-'}</td><td>${fmtDate(v.data_visita)}</td>
     <td>${cant}</td><td>${v.imprese?.impresa_nome||'-'}</td>
     <td><span class="badge ${ipcCls(ipc)}">${ipc}</span></td>
     <td><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span></td>
     <td><div class="tbl-actions">
-      ${isBozza?`<button class="btn-warn btn-sm" data-act="riapri" data-id="${v.visita_id}" title="Riapri bozza per completarla e renderla definitiva">✏️ Riapri</button>`:''}
+      <button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Visualizza dettaglio">👁</button>
+      ${isBozza?`<button class="btn-warn btn-sm" data-act="riapri" data-id="${v.visita_id}" title="Riapri bozza">✏️ Riapri</button>`:''}
       <button class="btn-primary btn-sm" data-act="pdf" data-id="${v.visita_id}">PDF</button>
       <button class="btn-outline btn-sm" data-act="email" data-id="${v.visita_id}" title="Invia verbale via email">📧</button>
       <button class="btn-outline btn-sm" data-act="snap" data-id="${v.visita_id}">📤</button>
@@ -2979,10 +3131,15 @@ function vtRow(v){
   </tr>`
 }
 function bindRowActions(){
-  document.querySelectorAll('[data-act="riapri"]').forEach(b=>b.onclick=()=>riapriBozza(b.dataset.id))
-  document.querySelectorAll('[data-act="pdf"]').forEach(b=>b.onclick=()=>genPDF(b.dataset.id))
-  document.querySelectorAll('[data-act="email"]').forEach(b=>b.onclick=()=>inviEmailVerbaleFromList(b.dataset.id))
-  document.querySelectorAll('[data-act="snap"]').forEach(b=>b.onclick=()=>exportSnapFromDB(b.dataset.id))
+  document.querySelectorAll('[data-act="riapri"]').forEach(b=>b.onclick=e=>{e.stopPropagation();riapriBozza(b.dataset.id)})
+  document.querySelectorAll('[data-act="pdf"]').forEach(b=>b.onclick=e=>{e.stopPropagation();genPDF(b.dataset.id)})
+  document.querySelectorAll('[data-act="email"]').forEach(b=>b.onclick=e=>{e.stopPropagation();inviEmailVerbaleFromList(b.dataset.id)})
+  document.querySelectorAll('[data-act="snap"]').forEach(b=>b.onclick=e=>{e.stopPropagation();exportSnapFromDB(b.dataset.id)})
+  // Dettaglio visita: pulsante 👁 e doppio clic sulla riga
+  document.querySelectorAll('[data-act="detail-visita"]').forEach(el=>{
+    const handler=e=>{e.stopPropagation();showVisitaDetail(el.dataset.id)}
+    if(el.tagName==='TR'){el.ondblclick=handler}else{el.onclick=handler}
+  })
 }
 $('btn-pdf').onclick=()=>{
   if(!S.savedId){toast('Salva prima la visita per generare il PDF','warn');return}
@@ -3008,27 +3165,30 @@ async function loadCantieri(q=''){
   ;(vCounts||[]).forEach(v=>{countMap[v.cantiere_id]=(countMap[v.cantiere_id]||0)+1})
   tbody.innerHTML=rows.map(c=>{
     const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
-    return`<tr>
+    const nVisite=countMap[c.cantiere_id]||0
+    return`<tr class="row-detail-hover" data-act="detail-cantiere" data-id="${c.cantiere_id}">
       <td><strong>${label}</strong></td>
       <td>${c.comune_nome||'–'}</td>
       <td>${c.prot_int||'–'}</td>
       <td>${c.cantiere_cnce||'–'}</td>
-      <td><span class="badge badge-bozza">${countMap[c.cantiere_id]||0}</span></td>
-      <td><button class="btn-primary btn-sm" data-cant-id="${c.cantiere_id}" data-cant-label="${label}" data-cant-detail="${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}${c.comune_nome?' – '+c.comune_nome:''}">+ Visita</button></td>
+      <td><span class="badge badge-bozza">${nVisite}</span></td>
+      <td><div class="tbl-actions">
+        <button class="btn-outline btn-sm" data-act="detail-cantiere" data-id="${c.cantiere_id}" title="Visualizza dettaglio">👁</button>
+        <button class="btn-primary btn-sm" data-cant-id="${c.cantiere_id}" data-cant-label="${label}" data-cant-detail="${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}${c.comune_nome?' – '+c.comune_nome:''}">+ Visita</button>
+      </div></td>
     </tr>`
   }).join('')
   // Click "+ Visita": apre nuova visita precompilando il cantiere
   tbody.querySelectorAll('[data-cant-id]').forEach(btn=>{
-    btn.onclick=async()=>{
+    btn.onclick=async e=>{
+      e.stopPropagation()
       initForm()
       navTo('form')
-      // Precompila cantiere e mostra scheda dettaglio
       setTimeout(async()=>{
         vSet('f-cant-id',btn.dataset.cantId)
         vSet('f-cant-search',btn.dataset.cantLabel)
         const det=$('cant-detail');if(det)det.textContent=btn.dataset.cantDetail
         S.fd.cantiere_id=btn.dataset.cantId
-        // Carica dettaglio completo per la scheda
         const{data:cd}=await sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_cap,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id').eq('cantiere_id',btn.dataset.cantId).single()
         if(cd){
           vSet('f-prot-int',cd.prot_int||'')
@@ -3039,6 +3199,11 @@ async function loadCantieri(q=''){
         }
       },100)
     }
+  })
+  // Pulsante 👁 e doppio clic riga: apre dettaglio cantiere
+  tbody.querySelectorAll('[data-act="detail-cantiere"]').forEach(el=>{
+    const handler=e=>{e.stopPropagation();showCantiereDetail(el.dataset.id)}
+    if(el.tagName==='TR'){el.ondblclick=handler}else{el.onclick=handler}
   })
 }
 $('btn-cerca-cant').onclick=()=>loadCantieri()
@@ -5232,324 +5397,280 @@ async function admGeneraReport(){
 window.admGeneraReport = admGeneraReport
 
 // ══════════════════════════════════════════════════════════════
-// ── EXPORT / IMPORT EXCEL ─────────────────────────────────────
+// ── GESTIONE IMPRESE (Coordinatore) ───────────────────────────
 // ══════════════════════════════════════════════════════════════
 
-// Mappa campi snap → etichetta leggibile per il foglio VISITA
-const EXCEL_FIELDS_VISITA=[
-  ['nr_verbale_origine','N° Verbale'],
-  ['data_visita','Data sopralluogo'],
-  ['ora_visita','Ora inizio'],
-  ['ora_fine','Ora fine'],
-  ['tipo_accesso','Tipologia accesso'],
-  ['acc_cant','Accesso n°'],
-  ['rlst_sn','Aff. RLST (1=sì, 0=no)'],
-  ['stage_vis','Visita stage (1=sì, 0=no)'],
-  ['nom_stage','Nominativo stagista'],
-  ['tec_display','Tecnico responsabile'],
-  ['tecnico_email','Email tecnico'],
-  ['tec2_display','Secondo tecnico'],
-  ['tecnico2_email','Email secondo tecnico'],
-  ['ppre_titolo','Persona presente - Titolo'],
-  ['ppre_nome','Persona presente - Nome'],
-  ['ppre_cog','Persona presente - Cognome'],
-  ['qual_ppre','Persona presente - Qualifica'],
-  ['tel_ppre','Persona presente - Telefono'],
-  ['cantiere_label','Cantiere'],
-  ['prot_int','Protocollo interno'],
-  ['cnce','Codice CNCE'],
-  ['cod_uni','Codice univoco'],
-  ['data_ult','Data prevista ultimazione lavori'],
-  ['comm_tipo_sogg','Committente - Tipo (PF/PG)'],
-  ['comm_tipo','Committente - Tipo pubblico/privato'],
-  ['comm_titolo','Committente - Titolo'],
-  ['comm_nome','Committente - Nome'],
-  ['comm_cog','Committente - Cognome'],
-  ['comm_cf','Committente - Codice fiscale (PF)'],
-  ['comm_email','Committente - Email (PF)'],
-  ['comm_tel','Committente - Telefono (PF)'],
-  ['comm_rag_soc','Committente - Ragione sociale'],
-  ['comm_piva','Committente - Partita IVA'],
-  ['comm_cf_pg','Committente - Codice fiscale (PG)'],
-  ['comm_email_pg','Committente - Email (PG)'],
-  ['comm_tel_pg','Committente - Telefono (PG)'],
-  ['coord','Presenza coordinamento (1=sì)'],
-  ['rl_titolo','RL - Titolo'],
-  ['rl_nome','RL - Nome'],
-  ['rl_cog','RL - Cognome'],
-  ['rl_email','RL - Email'],
-  ['rl_tel','RL - Telefono'],
-  ['csp_titolo','CSP - Titolo'],
-  ['csp_nome','CSP - Nome'],
-  ['csp_cog','CSP - Cognome'],
-  ['csp_email','CSP - Email'],
-  ['csp_tel','CSP - Telefono'],
-  ['cse_titolo','CSE - Titolo'],
-  ['cse_nome','CSE - Nome'],
-  ['cse_cog','CSE - Cognome'],
-  ['cse_email','CSE - Email'],
-  ['cse_tel','CSE - Telefono'],
-  ['nr_imp','N° imprese presenti'],
-  ['nr_ind','N° ditte individuali'],
-  ['nr_lavoratori','N° lavoratori rilevati'],
-  ['nr_lavoratori_stranieri','di cui stranieri'],
-  ['importo','Importo lavori'],
-  ['costi','Costi della sicurezza'],
-  ['stato_lav','Stato lavori'],
-  ['note_lav','Note lavorazioni'],
-  ['oss_tec','Osservazioni tecnico'],
-  ['oss_int','Osservazioni interne'],
-  ['note_for_sn','Formazione mancante (1=sì)'],
-  ['note_for_m','Note formazione mancante'],
-  ['segnalazione','Segnalazione SISAL/ITL (1=sì)'],
-  ['data_ritorno','Data visita successiva'],
-  ['privacy','Privacy acquisita (1=sì)'],
-  ['exported_at','Esportato il'],
-]
+let _editImpId = null  // impresa_id in modifica
 
-function exportToExcel(snap){
-  if(!window.XLSX){toast('Libreria Excel non caricata','err');return}
-  const wb=XLSX.utils.book_new()
-
-  // ── Foglio 1: VISITA ──────────────────────────────────────────────────────
-  const visitaRows=[['CAMPO','VALORE']]
-  EXCEL_FIELDS_VISITA.forEach(([key,lbl])=>{
-    const v=snap[key]
-    if(v!==null&&v!==undefined&&v!=='')
-      visitaRows.push([lbl, typeof v==='boolean'?(v?'1':'0'):String(v)])
-  })
-  const wsVisita=XLSX.utils.aoa_to_sheet(visitaRows)
-  wsVisita['!cols']=[{wch:38},{wch:55}]
-  XLSX.utils.book_append_sheet(wb,wsVisita,'VISITA')
-
-  // ── Foglio 2: IMPRESE ─────────────────────────────────────────────────────
-  const impHdr=['Principale','Ragione sociale','P.IVA','Codice fiscale','Indirizzo','Comune',
-    'Attività','Capo cantiere nome','Capo cantiere cognome','Badge','Patente a crediti',
-    'Note FASILAV','Tipo impresa','CEIV','Stage','Certificazioni']
-  const impRows=[impHdr]
-  ;(snap.imprese||[]).forEach(im=>{
-    impRows.push([
-      im.is_principale?'SÌ':'',
-      im.impresa_nome||'',
-      im.piva||'',
-      im.cf_imp||'',
-      im.ind_imp||'',
-      im.com_imp||'',
-      im.att||'',
-      im.capo_nome||'',
-      im.capo_cog||'',
-      im.badge||'',
-      im.pat||'',
-      im.note_fasilav||'',
-      im.tipo_imp||'',
-      im.ceiv||'',
-      im.stage_imp||'',
-      Array.isArray(im.certif)?im.certif.join(', '):(im.certif||''),
-    ])
-  })
-  const wsImp=XLSX.utils.aoa_to_sheet(impRows.length>1?impRows:[impHdr])
-  wsImp['!cols']=impHdr.map((_,i)=>({wch:i===1?32:i===15?30:18}))
-  XLSX.utils.book_append_sheet(wb,wsImp,'IMPRESE')
-
-  // ── Foglio 3: LAVORAZIONI ─────────────────────────────────────────────────
-  const lavHdr=['Genere','Fase','Lavorazione specifica']
-  const lavRows=[lavHdr]
-  ;(snap.lavorazioni||[]).forEach(l=>lavRows.push([l.genere||'',l.fase||'',l.lavorazione||'']))
-  const wsLav=XLSX.utils.aoa_to_sheet(lavRows)
-  wsLav['!cols']=[{wch:25},{wch:25},{wch:35}]
-  XLSX.utils.book_append_sheet(wb,wsLav,'LAVORAZIONI')
-
-  // ── Foglio 4: CHECKLIST ───────────────────────────────────────────────────
-  const chkHdr=['Codice','Zona','Descrizione voce','Valore (NA/VER/NC-/NC+/OSS)','Nota']
-  const chkRows=[chkHdr]
-  const chk=snap.checklist||{}
-  const note=snap.note_checklist||{}
-  // Raccoglie tutte le voci dalla struttura S.byZona se disponibile
-  const allCodes=new Set([...Object.keys(chk),...Object.keys(note)])
-  // Arricchisce con descrizione dalla struttura locale se disponibile
-  const voceMap={}
-  if(S?.byZona){
-    Object.entries(S.byZona).forEach(([z,voci])=>{
-      voci.forEach(v=>{if(v.codice)voceMap[v.codice]={zona:ZONE_LBL?.[z]||`Zona ${z}`,descr:v.testo||v.descrizione||''}})
-    })
-  }
-  // Prima le voci con risposta, nell'ordine della struttura (byZona)
-  const orderedCodes=[]
-  if(S?.byZona){
-    Object.values(S.byZona).forEach(voci=>voci.forEach(v=>{if(v.codice&&allCodes.has(v.codice))orderedCodes.push(v.codice)}))
-  }
-  // Aggiungi eventuali codici non in byZona
-  allCodes.forEach(c=>{if(!orderedCodes.includes(c))orderedCodes.push(c)})
-  orderedCodes.forEach(codice=>{
-    const val=chk[codice]||'NA'
-    const n=note[codice]||''
-    if(val==='NA'&&!n)return // salta le non compilate senza nota
-    const info=voceMap[codice]||{zona:'',descr:''}
-    chkRows.push([codice,info.zona,info.descr,val,n])
-  })
-  const wsChk=XLSX.utils.aoa_to_sheet(chkRows)
-  wsChk['!cols']=[{wch:14},{wch:28},{wch:50},{wch:20},{wch:40}]
-  XLSX.utils.book_append_sheet(wb,wsChk,'CHECKLIST')
-
-  // ── Download ──────────────────────────────────────────────────────────────
-  const nome=`visita_${snap.nr_verbale_origine||'bozza'}.xlsx`.replace(/\//g,'_')
-  XLSX.writeFile(wb,nome)
-  toast('Excel esportato','ok')
-}
-
-// ── WIRING sezione Coordinatore – Export Excel ────────────────────────────
-$('btn-adm-excel-exp').onclick=async()=>{
-  const nr=($('adm-excel-verbale').value||'').trim()
-  if(!nr){toast('Inserisci il numero verbale','warn');return}
-  const msg=$('adm-excel-exp-msg')
-  msg.textContent='Ricerca in corso…'; msg.style.display='block'
-  try{
-    const{data:v}=await sb.from('visite').select('visita_id,nr_verbale').eq('nr_verbale',nr).maybeSingle()
-    if(!v){msg.textContent='Verbale non trovato.';return}
-    const{data:snapRow}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',v.visita_id).maybeSingle()
-    if(snapRow?.snapshot){
-      exportToExcel(snapRow.snapshot)
-      msg.textContent='✅ Export completato.'
-    }else{
-      msg.textContent='Snapshot non disponibile per questo verbale. Apri la visita nel form e usa "📤 Snapshot" prima di esportare.'
+// Carica e mostra lista imprese filtrate per la ricerca
+async function admLoadImprese() {
+  const q = ($('adm-imp-search')?.value || '').trim().toLowerCase()
+  const tbody = $('tbody-adm-imp')
+  const emptyDiv = $('adm-imp-empty')
+  if (!tbody) return
+  tbody.innerHTML = '<tr><td colspan="6" style="padding:16px;text-align:center;color:rgba(255,255,255,.35)">Caricamento…</td></tr>'
+  try {
+    let query = sb.from('imprese')
+      .select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,impresa_email_ref,cassa_edile,contratto_ccnl,tipo_iscrizione_ccia,elimina')
+      .eq('elimina', 0)
+      .order('impresa_nome', { ascending: true })
+      .limit(100)
+    if (q) {
+      query = query.or(`impresa_nome.ilike.%${q}%,piva.ilike.%${q}%,comune.ilike.%${q}%`)
     }
-  }catch(e){msg.textContent='Errore: '+e.message;console.error(e)}
-}
-
-// ── WIRING sezione Coordinatore – Import Excel ────────────────────────────
-let pendingXlsxSnap=null
-
-const admDz=$('adm-drop-xlsx')
-admDz.onclick=()=>$('adm-file-xlsx').click()
-admDz.ondragover=e=>{e.preventDefault();admDz.classList.add('drag-over')}
-admDz.ondragleave=()=>admDz.classList.remove('drag-over')
-admDz.ondrop=e=>{e.preventDefault();admDz.classList.remove('drag-over');if(e.dataTransfer.files[0])readExcelFile(e.dataTransfer.files[0])}
-$('adm-file-xlsx').onchange=e=>{if(e.target.files[0])readExcelFile(e.target.files[0])}
-
-function readExcelFile(f){
-  if(!window.XLSX){toast('Libreria Excel non caricata','err');return}
-  const r=new FileReader()
-  r.onerror=()=>toast('Errore lettura file Excel','err')
-  r.onload=e=>{
-    try{
-      const wb=XLSX.read(e.target.result,{type:'array'})
-      const snap=xlsxToSnap(wb)
-      if(!snap){toast('Formato Excel non riconosciuto','err');return}
-      pendingXlsxSnap=snap
-      $('adm-xlsx-info').innerHTML=`
-        <p><b>Verbale:</b> ${snap.nr_verbale_origine||'N/D'}</p>
-        <p><b>Cantiere:</b> ${snap.cantiere_label||'N/D'}</p>
-        <p><b>Tecnico:</b> ${snap.tec_display||'N/D'}</p>
-        <p><b>Data visita:</b> ${snap.data_visita||'N/D'}</p>
-        <p><b>Impresa principale:</b> ${snap.imprese?.[0]?.impresa_nome||'N/D'}</p>
-        <p><b>Voci checklist compilate:</b> ${Object.keys(snap.checklist||{}).length}</p>`
-      $('adm-xlsx-preview').style.display='block'
-    }catch(err){toast('File Excel non valido: '+err.message,'err');console.error(err)}
-  }
-  r.readAsArrayBuffer(f)
-}
-
-function xlsxToSnap(wb){
-  // ── Foglio VISITA ─────────────────────────────────────────────────────────
-  const wsV=wb.Sheets['VISITA']
-  if(!wsV)return null
-  const visitaData=XLSX.utils.sheet_to_json(wsV,{header:1})
-  // Costruisce mappa etichetta → valore
-  const labelToVal={}
-  visitaData.slice(1).forEach(row=>{if(row[0]&&row[1]!=null)labelToVal[row[0]]=String(row[1])})
-  // Inverte la mappa EXCEL_FIELDS_VISITA per label→key
-  const labelToKey={}
-  EXCEL_FIELDS_VISITA.forEach(([k,l])=>labelToKey[l]=k)
-  const snap={}
-  Object.entries(labelToVal).forEach(([lbl,val])=>{
-    const key=labelToKey[lbl]
-    if(key)snap[key]=val
-  })
-  // ── Foglio IMPRESE ────────────────────────────────────────────────────────
-  const wsI=wb.Sheets['IMPRESE']
-  if(wsI){
-    const rows=XLSX.utils.sheet_to_json(wsI,{header:1})
-    const hdr=rows[0]||[]
-    const colIdx=(h)=>hdr.indexOf(h)
-    snap.imprese=rows.slice(1).filter(r=>r.some(Boolean)).map((r,i)=>({
-      is_principale:r[colIdx('Principale')]==='SÌ'||i===0,
-      impresa_nome:r[colIdx('Ragione sociale')]||'',
-      piva:r[colIdx('P.IVA')]||'',
-      cf_imp:r[colIdx('Codice fiscale')]||'',
-      ind_imp:r[colIdx('Indirizzo')]||'',
-      com_imp:r[colIdx('Comune')]||'',
-      att:r[colIdx('Attività')]||'',
-      capo_nome:r[colIdx('Capo cantiere nome')]||'',
-      capo_cog:r[colIdx('Capo cantiere cognome')]||'',
-      badge:r[colIdx('Badge')]||'',
-      pat:r[colIdx('Patente a crediti')]||'',
-      note_fasilav:r[colIdx('Note FASILAV')]||'',
-      tipo_imp:r[colIdx('Tipo impresa')]||'',
-      ceiv:r[colIdx('CEIV')]||'',
-      stage_imp:r[colIdx('Stage')]||'',
-      certif:r[colIdx('Certificazioni')]?(r[colIdx('Certificazioni')].split(',').map(s=>s.trim()).filter(Boolean)):[],
-      impresa_id:'',
-    }))
-  }
-  if(!snap.imprese||!snap.imprese.length)
-    snap.imprese=[{impresa_id:'',impresa_nome:'',piva:'',cf_imp:'',ind_imp:'',com_imp:'',att:'',capo_nome:'',capo_cog:'',badge:'',pat:'',note_fasilav:'',tipo_imp:'',certif:[],ceiv:'',stage_imp:'',is_principale:true}]
-  // ── Foglio LAVORAZIONI ────────────────────────────────────────────────────
-  const wsL=wb.Sheets['LAVORAZIONI']
-  if(wsL){
-    const rows=XLSX.utils.sheet_to_json(wsL,{header:1})
-    snap.lavorazioni=rows.slice(1).filter(r=>r.some(Boolean)).map(r=>({genere:r[0]||'',fase:r[1]||'',lavorazione:r[2]||''}))
-  }else snap.lavorazioni=[]
-  // ── Foglio CHECKLIST ──────────────────────────────────────────────────────
-  const wsC=wb.Sheets['CHECKLIST']
-  if(wsC){
-    const rows=XLSX.utils.sheet_to_json(wsC,{header:1})
-    const chk={},note={}
-    rows.slice(1).forEach(r=>{
-      const codice=r[0]
-      if(!codice)return
-      if(r[3]&&r[3]!=='NA')chk[codice]=r[3]
-      if(r[4])note[codice]=r[4]
-    })
-    snap.checklist=chk
-    snap.note_checklist=note
-  }else{snap.checklist={};snap.note_checklist={}}
-  snap.exported_at=new Date().toISOString()
-  return snap
-}
-
-$('btn-adm-load-xlsx').onclick=async()=>{
-  if(!pendingXlsxSnap)return
-  const snap=pendingXlsxSnap
-  pendingXlsxSnap=null
-  $('adm-xlsx-preview').style.display='none'
-  $('adm-file-xlsx').value=''
-  const origNr=snap.nr_verbale_origine
-  $('conf-verb-txt').innerHTML=`Verbale nel file: <strong>${origNr||'N/D'}</strong><br><br>Vuoi mantenere il numero originale o assegnarne uno nuovo?`
-  show('modal-verbale')
-  S._verbCb=async(mantieni)=>{
-    try{
-      hide('modal-verbale')
-      await initForm(snap)
-      if(mantieni&&origNr){vSet('f-verbale',origNr);S.fd.nr_verbale=origNr}
-      else{S.savedId=null;S.fd.visita_id=null}
-      navTo('form')
-      toast(mantieni?`Verbale ${origNr} caricato`:'Nuova visita da Excel — progressivo assegnato','ok')
-    }catch(e){toast('Errore importazione Excel: '+e.message,'err');console.error(e)}
+    const { data, error } = await query
+    if (error) throw error
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Nessuna impresa trovata</td></tr>'
+      if (emptyDiv) emptyDiv.classList.remove('hidden')
+      return
+    }
+    if (emptyDiv) emptyDiv.classList.add('hidden')
+    tbody.innerHTML = data.map(imp => `
+      <tr style="border-bottom:1px solid rgba(255,255,255,.08);transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">
+        <td style="padding:8px 10px;font-weight:500">${esc(imp.impresa_nome||'')}</td>
+        <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:rgba(255,255,255,.6)">${esc(imp.piva||imp.impresa_id||'')}</td>
+        <td style="padding:8px 10px;color:rgba(255,255,255,.65)">${esc(imp.comune||'')}</td>
+        <td style="padding:8px 10px;color:rgba(255,255,255,.65);font-size:11px">${esc(imp.contratto_ccnl||'')}</td>
+        <td style="padding:8px 10px;color:rgba(255,255,255,.65);font-size:11px">${esc(imp.cassa_edile||'')}</td>
+        <td style="padding:8px 4px;text-align:right">
+          <button class="btn-primary btn-sm" onclick="admEditImpresa('${esc(imp.impresa_id||imp.piva||'')}')">✏️ Modifica</button>
+        </td>
+      </tr>`).join('')
+  } catch(e) {
+    console.error('admLoadImprese:', e)
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:16px;text-align:center;color:#ff6b6b">Errore: ' + esc(e.message||'') + '</td></tr>'
   }
 }
-$('btn-adm-cancel-xlsx').onclick=()=>{pendingXlsxSnap=null;$('adm-xlsx-preview').style.display='none';$('adm-file-xlsx').value=''}
 
-</script>
-<!-- MODAL FIRME TECNICI -->
-<div id="modal-firme" class="modal-overlay hidden" style="z-index:9999">
-  <div class="modal-box" style="max-width:480px">
-    <h3 style="margin-bottom:14px;color:var(--orange)">🖊 Firme tecnici</h3>
-    <p style="font-size:12px;color:#666;margin-bottom:14px">Carica l'immagine della firma per ogni tecnico. La firma apparirà in calce al verbale PDF. Formati supportati: PNG, JPG (sfondo trasparente consigliato).</p>
-    <div id="firme-list" style="display:flex;flex-direction:column;gap:10px"></div>
-    <div style="margin-top:18px;text-align:right">
-      <button class="btn-secondary" id="btn-firme-close">Chiudi</button>
-    </div>
-  </div>
-</div>
-</body>
-</html>
+// Apre il modal di modifica pre-popolato con i dati dell'impresa
+async function admEditImpresa(impresaId) {
+  _editImpId = impresaId
+  // Reset modal
+  ;['ei-nome','ei-piva','ei-cf','ei-ind','ei-com','ei-email','ei-tel','ei-ccnl-altro'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  ;['ei-ceiv','ei-tipo-ccia','ei-ccnl'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  ;[1,2,3,4,5].forEach(c=>{const el=$(`ei-cert-${c}`);if(el)el.checked=false})
+  const ccnlWrap=$('ei-ccnl-altro-wrap');if(ccnlWrap)ccnlWrap.classList.add('hidden')
+
+  try {
+    // Carica dati impresa
+    const { data: imp, error } = await sb.from('imprese')
+      .select('*')
+      .eq('impresa_id', impresaId)
+      .single()
+    if (error || !imp) { toast('Impresa non trovata','err'); return }
+
+    // Popola campi
+    vSet('ei-piva', imp.impresa_id || imp.piva || '')
+    vSet('ei-nome', imp.impresa_nome || '')
+    vSet('ei-cf',   imp.impresa_cf || '')
+    vSet('ei-ind',  imp.indirizzo || '')
+    vSet('ei-com',  imp.comune || '')
+    vSet('ei-email',imp.impresa_email_ref || '')
+    vSet('ei-tel',  imp.impresa_telefono || '')
+
+    // CEIV
+    const ceivSel = $('ei-ceiv')
+    if (ceivSel && imp.cassa_edile) {
+      const opt = [...ceivSel.options].find(o => o.value === imp.cassa_edile || o.text === imp.cassa_edile)
+      if (opt) ceivSel.value = opt.value; else ceivSel.value = ''
+    }
+    // Tipo CCIA
+    const cciaSel = $('ei-tipo-ccia')
+    if (cciaSel && imp.tipo_iscrizione_ccia) cciaSel.value = imp.tipo_iscrizione_ccia
+    // CCNL
+    const ccnlSel = $('ei-ccnl')
+    const CCNL_VALS = ['EDILIZIA INDUSTRIA','EDILIZIA ARTIGIANATO','METALMECCANICO INDUSTRIA','METALMECCANICO ARTIGIANATO','INSTALLATORI IMPIANTI','LEGNO']
+    if (ccnlSel && imp.contratto_ccnl) {
+      if (CCNL_VALS.includes(imp.contratto_ccnl)) {
+        ccnlSel.value = imp.contratto_ccnl
+      } else {
+        ccnlSel.value = 'ALTRO'
+        vSet('ei-ccnl-altro', imp.contratto_ccnl)
+        if (ccnlWrap) ccnlWrap.classList.remove('hidden')
+      }
+    }
+    // Certificazioni
+    const { data: certs } = await sb.from('imprese_certificazioni').select('certificazione').eq('impresa_id', impresaId)
+    ;(certs || []).forEach(row => { const el = $(`ei-cert-${row.certificazione}`); if (el) el.checked = true })
+    show('modal-edit-imp')
+  } catch(e) {
+    console.error('admEditImpresa:', e)
+    toast('Errore caricamento impresa: ' + (e.message||e), 'err')
+  }
+}
+
+async function admSaveEditImpresa() {
+  const nome = vGet('ei-nome').trim()
+  if (!nome) { toast('Ragione sociale obbligatoria','warn'); $('ei-nome').focus(); return }
+  const ccnlVal = vGet('ei-ccnl') || null
+  const updates = {
+    impresa_nome: nome,
+    impresa_cf:   vGet('ei-cf').trim() || null,
+    indirizzo:    vGet('ei-ind').trim() || null,
+    comune:       vGet('ei-com').trim() || null,
+    impresa_email_ref: vGet('ei-email').trim() || null,
+    impresa_telefono:  vGet('ei-tel').trim() || null,
+    cassa_edile:  vGet('ei-ceiv') || null,
+    tipo_iscrizione_ccia: vGet('ei-tipo-ccia') || null,
+    contratto_ccnl: ccnlVal === 'ALTRO' ? (vGet('ei-ccnl-altro').trim() || 'ALTRO') : ccnlVal,
+  }
+  const { error } = await sb.from('imprese').update(updates).eq('impresa_id', _editImpId)
+  if (error) { toast('Errore aggiornamento impresa: ' + error.message, 'err'); return }
+  await sb.from('imprese_certificazioni').delete().eq('impresa_id', _editImpId)
+  const certif = [1,2,3,4,5].filter(c => $(`ei-cert-${c}`)?.checked)
+  if (certif.length) {
+    const certRows = certif.map(c => ({ impresa_id: _editImpId, certificazione: c }))
+    const { error: errCert } = await sb.from('imprese_certificazioni').insert(certRows)
+    if (errCert) toast('Avviso: certificazioni non aggiornate – ' + errCert.message, 'warn')
+  }
+  hide('modal-edit-imp')
+  toast('Impresa "' + nome + '" aggiornata', 'ok')
+  admLoadImprese()
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+
+$('btn-ei-cancel').onclick = () => hide('modal-edit-imp')
+$('btn-ei-save').onclick = admSaveEditImpresa
+$('ei-ccnl').addEventListener('change', function(){
+  const wrap = $('ei-ccnl-altro-wrap')
+  if (wrap) this.value === 'ALTRO' ? wrap.classList.remove('hidden') : wrap.classList.add('hidden')
+})
+$('adm-imp-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadImprese() })
+window.admLoadImprese = admLoadImprese
+window.admEditImpresa = admEditImpresa
+
+// ══════════════════════════════════════════════════════════════
+// ── QUICK DETAIL – VISITA e CANTIERE
+// ══════════════════════════════════════════════════════════════
+const _TIP_INT={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',6:'Ripristino',7:'Restauro',8:'Manutenzione'}
+const _TIP_OPE={1:'Industriale',2:'Civile',3:'Commerciale',4:'Agricola',5:'Stradale',8:'Scolastica',16:'Altro'}
+const _DURATA={1:'< 30 gg',2:'30–90 gg',3:'3–6 mesi',4:'6–12 mesi',5:'> 12 mesi'}
+const _IMPORTO={1:'≤ 250k',2:'250k–500k',3:'500k–1M',4:'1–1,5M',5:'1,5–2,5M',6:'2,5–3,5M',7:'3,5–5M',8:'5–10M',11:'N/D'}
+const _TIPO_ACC={1:'Su segnalazione',2:'Su richiesta',3:'Protocolli di intesa',4:'RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT'}
+
+function qdDl(pairs){
+  const rows=pairs.filter(([,v])=>v!=null&&v!==''&&String(v).trim()!=='')
+    .map(([l,v])=>`<dt>${l}</dt><dd>${v}</dd>`).join('')
+  return rows ? `<dl class="qd-dl">${rows}</dl>` : ''
+}
+function qdSec(t){ return `<div class="qd-section">${t}</div>` }
+
+async function showVisitaDetail(vid){
+  $('qd-title').textContent='📋 Caricamento…'
+  $('qd-badges').innerHTML=''
+  $('qd-body').innerHTML='<div style="padding:20px;text-align:center;color:#aaa">Caricamento…</div>'
+  $('qd-actions').innerHTML=''
+  show('modal-qd')
+  try{
+    const{data:v,error}=await sb.from('visite').select(`
+      visita_id,nr_verbale,data_visita,ora_visita,ora_fine,ipc,ipc_nc_pos,ipc_nc_neg,ipc_oss,stato,
+      tipo_accesso,acc_cant,nr_lavoratori,nr_lav_stranieri,prescrizioni,oss_tec,
+      tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),
+      cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,prot_int),
+      imprese(impresa_nome,piva)
+    `).eq('visita_id',vid).single()
+    if(error||!v){toast('Visita non trovata','err');hide('modal-qd');return}
+    const ipc=v.ipc||'NR'
+    const isBozza=(v.stato||'bozza')==='bozza'
+    const tec=v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():'–'
+    const cant=v.cantieri, imp=v.imprese
+    $('qd-title').textContent=`📋 Verbale ${v.nr_verbale||'–'}`
+    $('qd-badges').innerHTML=`<span class="badge ${ipcCls(ipc)}">${ipc}</span><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span>`
+    let ora=''; if(v.ora_visita){ora=v.ora_visita.slice(0,5);if(v.ora_fine)ora+=' → '+v.ora_fine.slice(0,5)}
+    let html=qdSec('Sopralluogo')
+    html+=qdDl([
+      ['Data',fmtDate(v.data_visita)],['Ora',ora],['Tecnico',tec],
+      ['Tipo accesso',_TIPO_ACC[v.tipo_accesso]||''],['N° accesso',v.acc_cant||''],
+      ['Lavoratori',v.nr_lavoratori!=null?`${v.nr_lavoratori} (stranieri: ${v.nr_lav_stranieri||0})`:''],
+      ['NC+ / NC- / OSS',[v.ipc_nc_pos,v.ipc_nc_neg,v.ipc_oss].map(x=>x||0).join(' / ')],
+    ])
+    if(cant){
+      html+=qdSec('Cantiere')
+      html+=qdDl([
+        ['Indirizzo',`${cant.cantiere_indirizzo||''} ${cant.cantiere_civico||''}`.trim()||cant.cantiere_etichetta],
+        ['Comune',cant.comune_nome],['CNCE',cant.cantiere_cnce],['Prot. int.',cant.prot_int],
+      ])
+    }
+    if(imp){ html+=qdSec('Impresa principale')+qdDl([['Ragione sociale',imp.impresa_nome],['P.IVA',imp.piva]]) }
+    if(v.prescrizioni?.trim()) html+=qdSec('Prescrizioni')+`<div class="qd-note">${v.prescrizioni}</div>`
+    if(v.oss_tec?.trim()) html+=qdSec('Osservazioni tecniche')+`<div class="qd-note" style="border-color:#3498db;background:#f4f8ff">${v.oss_tec}</div>`
+    $('qd-body').innerHTML=html
+    const acts=[
+      `<button class="btn-primary btn-sm" onclick="genPDF('${vid}');hide('modal-qd')">📄 PDF</button>`,
+      `<button class="btn-outline btn-sm" onclick="inviEmailVerbaleFromList('${vid}');hide('modal-qd')">📧 Email</button>`,
+      `<button class="btn-outline btn-sm" onclick="exportSnapFromDB('${vid}');hide('modal-qd')">📤 Snapshot</button>`,
+    ]
+    if(isBozza) acts.push(`<button class="btn-warn btn-sm" onclick="riapriBozza('${vid}');hide('modal-qd')">✏️ Riapri</button>`)
+    $('qd-actions').innerHTML=acts.join('')
+  }catch(e){ console.error('showVisitaDetail:',e); $('qd-body').innerHTML=`<div style="color:#c0392b;padding:12px">Errore: ${e.message}</div>` }
+}
+
+async function showCantiereDetail(cantId){
+  $('qd-title').textContent='🏗️ Caricamento…'
+  $('qd-badges').innerHTML=''
+  $('qd-body').innerHTML='<div style="padding:20px;text-align:center;color:#aaa">Caricamento…</div>'
+  $('qd-actions').innerHTML=''
+  show('modal-qd')
+  try{
+    const{data:c,error}=await sb.from('cantieri').select(
+      'cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,'+
+      'cantiere_cnce,nodo_id,prot_int,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,'+
+      'cantiere_importo,cantiere_durata,data_ult,cantiere_comune_cod'
+    ).eq('cantiere_id',cantId).single()
+    if(error||!c){toast('Cantiere non trovato','err');hide('modal-qd');return}
+    const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
+    $('qd-title').textContent=`🏗️ ${label}`
+    const{data:visite}=await sb.from('visite')
+      .select('visita_id,nr_verbale,data_visita,ipc,stato,tecnici!visite_tecnico_id_fkey(tecnico_cognome)')
+      .eq('cantiere_id',cantId).eq('elimina',0)
+      .order('data_visita',{ascending:false}).limit(8)
+    let html=qdSec('Ubicazione')
+    html+=qdDl([
+      ['Indirizzo',`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()],
+      ['Comune',c.comune_nome],['CAP',c.cantiere_cap],['Etichetta',c.cantiere_etichetta],
+    ])
+    html+=qdSec('Dati tecnici')
+    html+=qdDl([
+      ['Tipo intervento',_TIP_INT[c.cantiere_tip_int]||''],
+      ['Tipo opera',(_TIP_OPE[c.cantiere_tip_ope]||'')+(c.cantiere_tip_ope_altro?' – '+c.cantiere_tip_ope_altro:'')],
+      ['Durata',_DURATA[c.cantiere_durata]||''],['Importo',_IMPORTO[c.cantiere_importo]||''],
+      ['Ultimazione',c.data_ult?fmtDate(c.data_ult):''],
+      ['CNCE',c.cantiere_cnce],['Codice univoco',c.nodo_id],['Prot. int.',c.prot_int],
+    ])
+    if(visite&&visite.length){
+      html+=qdSec(`Ultime visite (${visite.length})`)
+      html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr>'
+      html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Verbale</th>'
+      html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Data</th>'
+      html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Tecnico</th>'
+      html+='<th style="padding:4px 6px;color:#888;font-weight:600;font-size:11px">IPC</th>'
+      html+='</tr></thead><tbody>'
+      visite.forEach(vv=>{
+        const ipc=vv.ipc||'NR'
+        html+=`<tr style="border-top:1px solid #f0f0f0">
+          <td style="padding:5px 6px">${vv.nr_verbale||'–'}</td>
+          <td style="padding:5px 6px">${fmtDate(vv.data_visita)}</td>
+          <td style="padding:5px 6px">${vv.tecnici?.tecnico_cognome||'–'}</td>
+          <td style="padding:5px 6px"><span class="badge ${ipcCls(ipc)}" style="font-size:10px">${ipc}</span></td>
+        </tr>`
+      })
+      html+='</tbody></table>'
+    } else {
+      html+=qdSec('Visite')+'<div style="color:#aaa;font-size:13px;padding:6px 0">Nessuna visita registrata</div>'
+    }
+    $('qd-body').innerHTML=html
+    const safeLabel=label.replace(/\/g,'\\').replace(/'/g,"\'")
+    $('qd-actions').innerHTML=`<button class="btn-primary btn-sm" onclick="
+      hide('modal-qd');initForm();navTo('form');
+      setTimeout(async()=>{
+        vSet('f-cant-id','${cantId}');
+        vSet('f-cant-search','${safeLabel}');
+        S.fd.cantiere_id='${cantId}';
+        const r=await sb.from('cantieri').select('*').eq('cantiere_id','${cantId}').single();
+        if(r.data){vSet('f-prot-int',r.data.prot_int||'');vSet('f-cnce',r.data.cantiere_cnce||'');vSet('f-cod-uni',r.data.nodo_id||'');renderCantCard(r.data);}
+      },100)
+    ">+ Nuova visita</button>`
+  }catch(e){ console.error('showCantiereDetail:',e); $('qd-body').innerHTML=`<div style="color:#c0392b;padding:12px">Errore: ${e.message}</div>` }
+}
