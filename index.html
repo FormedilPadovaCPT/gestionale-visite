@@ -1352,6 +1352,27 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 <div id="toast-area"></div>
 
 <script type="module">
+window.onerror=function(msg,src,line,col,err){
+  const sl=document.getElementById('screen-loading')
+  if(sl&&!sl.classList.contains('hidden')){
+    // Mostra login con messaggio di errore invece di restare bloccati
+    const sl2=document.getElementById('screen-login')
+    if(sl2){sl.classList.add('hidden');sl2.classList.remove('hidden')}
+    const el=document.getElementById('login-err')
+    if(el){el.textContent='Errore JS: '+msg+' (riga '+line+')';el.style.display='block'}
+  }
+  console.error('GlobalError:',msg,src,line,col,err)
+}
+window.onunhandledrejection=function(e){
+  console.error('UnhandledRejection:',e.reason)
+  const sl=document.getElementById('screen-loading')
+  if(sl&&!sl.classList.contains('hidden')){
+    const sl2=document.getElementById('screen-login')
+    if(sl2){sl.classList.add('hidden');sl2.classList.remove('hidden')}
+    const el=document.getElementById('login-err')
+    if(el){el.textContent='Errore async: '+(e.reason?.message||e.reason);el.style.display='block'}
+  }
+}
 console.log("%c Gestionale v2025-05-14 caricato correttamente ✓", "color:green;font-weight:bold;font-size:14px")
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
@@ -1462,10 +1483,19 @@ function cSet(id,v){if($(id))$(id).checked=!!v}
 
 // ── AUTH ──
 async function initAuth(){
-  const{data:{session}}=await sb.auth.getSession()
-  if(session)await onLogin(session.user)
-  else showScr('login')
-  sb.auth.onAuthStateChange((_,s)=>s?onLogin(s.user):showScr('login'))
+  try{
+    const{data:{session},error}=await sb.auth.getSession()
+    if(error)throw error
+    if(session)await onLogin(session.user)
+    else showScr('login')
+    sb.auth.onAuthStateChange((_,s)=>s?onLogin(s.user):showScr('login'))
+  }catch(e){
+    console.error('initAuth error:',e)
+    // In caso di errore mostra comunque il login
+    showScr('login')
+    const el=document.getElementById('login-err')
+    if(el){el.textContent='Errore di connessione: '+e.message;el.style.display='block'}
+  }
 }
 async function onLogin(user){
   S.user=user
@@ -2093,7 +2123,7 @@ setupAC('f-comm-search','comm-list', async q=>{
 let _modalImpIdx=0
 $('btn-mi-cancel').onclick=()=>hide('modal-imp')
 // Mostra campo testo CCNL solo se selezionato "Altro"
-$('mi-ccnl').addEventListener('change',function(){
+$('mi-ccnl')?.addEventListener('change',function(){
   const wrap=$('mi-ccnl-altro-wrap')
   if(wrap)this.value==='ALTRO'?wrap.classList.remove('hidden'):wrap.classList.add('hidden')
 })
@@ -5568,7 +5598,7 @@ function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 
 $('btn-ei-cancel').onclick = () => hide('modal-edit-imp')
 $('btn-ei-save').onclick = admSaveEditImpresa
-$('ei-ccnl').addEventListener('change', function(){
+$('ei-ccnl')?.addEventListener('change', function(){
   const wrap = $('ei-ccnl-altro-wrap')
   if (wrap) this.value === 'ALTRO' ? wrap.classList.remove('hidden') : wrap.classList.add('hidden')
 })
