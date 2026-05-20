@@ -5683,16 +5683,30 @@ async function showCantiereDetail(cantId){
       html+=qdSec('Visite')+'<div style="color:#aaa;font-size:13px;padding:6px 0">Nessuna visita registrata</div>'
     }
     $('qd-body').innerHTML=html
-    const safeLabel=label.replace(/\/g,'\\').replace(/'/g,"\'")
-    $('qd-actions').innerHTML=`<button class="btn-primary btn-sm" onclick="
-      hide('modal-qd');initForm();navTo('form');
+    // Azione nuova visita
+    const btnNuova=document.createElement('button')
+    btnNuova.className='btn-primary btn-sm'
+    btnNuova.textContent='+ Nuova visita'
+    btnNuova.onclick=()=>{
+      hide('modal-qd');initForm();navTo('form')
       setTimeout(async()=>{
-        vSet('f-cant-id','${cantId}');
-        vSet('f-cant-search','${safeLabel}');
-        S.fd.cantiere_id='${cantId}';
-        const r=await sb.from('cantieri').select('*').eq('cantiere_id','${cantId}').single();
-        if(r.data){vSet('f-prot-int',r.data.prot_int||'');vSet('f-cnce',r.data.cantiere_cnce||'');vSet('f-cod-uni',r.data.nodo_id||'');renderCantCard(r.data);}
+        const cid=cantId
+        vSet('f-cant-id',cid)
+        vSet('f-cant-search',label)
+        S.fd.cantiere_id=cid
+        const r=await sb.from('cantieri').select('*').eq('cantiere_id',cid).single()
+        if(r.data){
+          vSet('f-prot-int',r.data.prot_int||'')
+          vSet('f-cnce',r.data.cantiere_cnce||'')
+          vSet('f-cod-uni',r.data.nodo_id||'')
+          renderCantCard(r.data)
+        }
       },100)
-    ">+ Nuova visita</button>`
-  }catch(e){ console.error('showCantiereDetail:',e); $('qd-body').innerHTML=`<div style="color:#c0392b;padding:12px">Errore: ${e.message}</div>` }
+    }
+    $('qd-actions').innerHTML=''
+    $('qd-actions').appendChild(btnNuova)
+  }catch(e){
+    console.error('showCantiereDetail:',e)
+    $('qd-body').innerHTML=`<div style="color:#c0392b;padding:12px">Errore: ${e.message}</div>`
+  }
 }
