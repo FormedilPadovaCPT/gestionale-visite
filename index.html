@@ -1336,6 +1336,19 @@ tr.row-detail-hover:hover td{background:#fff3ed}
   </div>
 </div>
 
+
+<!-- MODAL FIRME TECNICI -->
+<div class="modal-overlay hidden" id="modal-firme">
+  <div class="modal-box" style="max-width:560px;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h3 style="margin:0;font-size:15px">✍️ Firme tecnici</h3>
+      <button class="btn-outline btn-sm" id="btn-firme-close">✕ Chiudi</button>
+    </div>
+    <p style="font-size:12px;color:#888;margin:0 0 12px">Carica o sostituisci la firma di ogni tecnico (PNG/JPG/WEBP). La firma viene usata nei verbali PDF.</p>
+    <div id="firme-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</div>
+
 <div id="toast-area"></div>
 
 <script type="module">
@@ -4592,8 +4605,8 @@ window.deleteFirmaDB=async(email)=>{
   openModalFirme()
 }
 $('btn-firme').onclick=openModalFirme
-$('btn-firme-close').onclick=()=>hide('modal-firme')
-$('modal-firme').onclick=(e)=>{if(e.target.id==='modal-firme')hide('modal-firme')}
+$('btn-firme-close')?.addEventListener('click',()=>hide('modal-firme'))
+$('modal-firme')?.addEventListener('click',(e)=>{if(e.target.id==='modal-firme')hide('modal-firme')})
 
 // ── ESPOSIZIONE GLOBALE funzioni usate in onclick inline ──
 // (necessario perché lo script è type="module" e non ha scope globale)
