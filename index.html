@@ -1901,7 +1901,7 @@ $('btn-mi-save').onclick=async()=>{
   if(!piva){toast('Partita IVA obbligatoria','warn');$('mi-piva').focus();return}
   const cf=vGet('mi-cf').trim()||null
   const imp={
-    impresa_id:uuid(),
+    impresa_id:piva,
     impresa_nome:nome,
     impresa_cf:cf||piva,
     piva:piva||null,
