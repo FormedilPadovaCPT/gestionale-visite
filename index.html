@@ -375,6 +375,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="form" id="nav-nuova">➕ Nuova visita</button>
     <button data-view="lista">📋 Visite</button>
     <button data-view="cantieri">🏗️ Cantieri</button>
+    <button data-view="rubrica">📒 Rubrica</button>
     <button data-view="import">📥 Importa</button>
     <button data-view="admin" id="nav-admin" style="display:none">🔐 Coordinatore</button>
   </nav>
@@ -835,6 +836,25 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </table>
         </div>
         <div id="cantieri-empty" class="hidden" style="text-align:center;padding:24px;color:#aaa">Nessun cantiere trovato</div>
+      </div>
+    </section>
+
+    <!-- RUBRICA -->
+    <section id="view-rubrica" class="hidden">
+      <div class="card">
+        <h3>📒 Rubrica contatti</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <input type="text" id="rub-search" placeholder="Nome, email, telefono, P.IVA…" style="flex:1;min-width:180px" oninput="loadRubrica()">
+          <select id="rub-cat" onchange="loadRubrica()" style="min-width:140px">
+            <option value="">Tutte le categorie</option>
+            <option value="impresa">🏢 Imprese</option>
+            <option value="committente">👤 Committenti</option>
+            <option value="tecnico">👷 Tecnici</option>
+          </select>
+        </div>
+        <div id="rub-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">
+          <p style="color:#aaa;font-size:13px;grid-column:1/-1">Digita nella barra di ricerca per trovare un contatto.</p>
+        </div>
       </div>
     </section>
 
@@ -1604,10 +1624,11 @@ function showScr(n){
 }
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','cantieri','import','admin'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','rubrica','import','admin'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
+  if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
   if(view==='admin')admInit()
 }
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
@@ -5771,6 +5792,97 @@ async function admEditCantiere(cantId) {
 $('adm-cant-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadCantieri() })
 window.admLoadCantieri = admLoadCantieri
 window.admEditCantiere = admEditCantiere
+
+// ══════════════════════════════════════════════════════════════
+// ── RUBRICA CONTATTI
+// ══════════════════════════════════════════════════════════════
+const _CCNL_LBL={'1':'Edilizia Industria','2':'Edilizia Artigianato','3':'Metalmeccanico Ind.','4':'Metalmeccanico Art.','5':'Installatori Impianti','6':'Legno','13':'Altro'}
+const _CCIA_LBL={'1':'Artigiana','2':'Industriale','3':'Cooperativa','4':'Commerciale','5':'Altro'}
+
+async function loadRubrica(){
+  const q=($('rub-search')?.value||'').trim().toLowerCase()
+  const cat=$('rub-cat')?.value||''
+  const res=$('rub-results')
+  if(!res)return
+  if(!q&&!cat){
+    res.innerHTML='<p style="color:#aaa;font-size:13px;grid-column:1/-1">Digita nella barra di ricerca per trovare un contatto.</p>'
+    return
+  }
+  res.innerHTML='<p style="color:#aaa;font-size:13px;grid-column:1/-1">⏳ Ricerca in corso…</p>'
+
+  const cards=[]
+
+  // ── IMPRESE ──
+  if(!cat||cat==='impresa'){
+    let qb=sb.from('imprese').select('impresa_id,impresa_nome,piva,impresa_cf,comune,indirizzo,impresa_email_ref,impresa_telefono,contratto_ccnl,tipo_iscrizione_ccia,cassa_edile').eq('elimina',0).limit(50)
+    if(q)qb=qb.or(`impresa_nome.ilike.*${q}*,piva.ilike.*${q}*,impresa_cf.ilike.*${q}*,impresa_email_ref.ilike.*${q}*,impresa_telefono.ilike.*${q}*,comune.ilike.*${q}*`)
+    const{data}=await qb
+    ;(data||[]).forEach(r=>{
+      const sub=[r.comune,r.piva].filter(Boolean).join(' · ')
+      const extra=[
+        r.impresa_email_ref?`<a href="mailto:${esc(r.impresa_email_ref)}" style="color:var(--orange)">${esc(r.impresa_email_ref)}</a>`:'',
+        r.impresa_telefono?`<a href="tel:${esc(r.impresa_telefono)}" style="color:var(--orange)">${esc(r.impresa_telefono)}</a>`:'',
+        _CCNL_LBL[r.contratto_ccnl]?`CCNL: ${_CCNL_LBL[r.contratto_ccnl]}`:'',
+        _CCIA_LBL[r.tipo_iscrizione_ccia]?`CCIA: ${_CCIA_LBL[r.tipo_iscrizione_ccia]}`:'',
+        r.cassa_edile?`Cassa edile: ${esc(r.cassa_edile)}`:'',
+      ].filter(Boolean)
+      cards.push(rubCard('🏢','impresa',esc(r.impresa_nome||'–'),sub,extra))
+    })
+  }
+
+  // ── COMMITTENTI ──
+  if(!cat||cat==='committente'){
+    let qb=sb.from('committenti').select('committente_id,committente_nome,cf_piva,piva,email,telefono,tipo_sogg').eq('elimina',0).limit(50)
+    if(q)qb=qb.or(`committente_nome.ilike.*${q}*,cf_piva.ilike.*${q}*,email.ilike.*${q}*,telefono.ilike.*${q}*`)
+    const{data}=await qb
+    ;(data||[]).forEach(r=>{
+      const sub=[r.tipo_sogg,r.cf_piva||r.piva].filter(Boolean).join(' · ')
+      const extra=[
+        r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:'',
+        r.telefono?`<a href="tel:${esc(r.telefono)}" style="color:var(--orange)">${esc(r.telefono)}</a>`:'',
+      ].filter(Boolean)
+      cards.push(rubCard('👤','committente',esc(r.committente_nome||'–'),sub,extra))
+    })
+  }
+
+  // ── TECNICI ──
+  if(!cat||cat==='tecnico'){
+    let qb=sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome,email').eq('elimina',0).limit(50)
+    if(q)qb=qb.or(`tecnico_nome.ilike.*${q}*,tecnico_cognome.ilike.*${q}*,email.ilike.*${q}*`)
+    const{data}=await qb
+    ;(data||[]).forEach(r=>{
+      const nome=`${r.tecnico_cognome||''} ${r.tecnico_nome||''}`.trim()
+      const extra=[
+        r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:'',
+      ].filter(Boolean)
+      cards.push(rubCard('👷','tecnico',esc(nome||'–'),'Tecnico CPT',extra))
+    })
+  }
+
+  if(!cards.length){
+    res.innerHTML='<p style="color:#aaa;font-size:13px;grid-column:1/-1">Nessun contatto trovato.</p>'
+    return
+  }
+  res.innerHTML=cards.join('')
+}
+
+function rubCard(icon,tipo,nome,sub,extraLines){
+  const badge={impresa:'#e7f3e8;color:#27ae60',committente:'#fef3e2;color:#e67e22',tecnico:'#eef4ff;color:#2980b9'}[tipo]||'#eee;color:#555'
+  const [bg,col]=badge.split(';color:')
+  return`<div style="background:#fff;border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border-left:3px solid ${col.replace('color:','')}">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="font-size:18px">${icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nome}</div>
+        ${sub?`<div style="font-size:11px;color:#888;margin-top:1px">${sub}</div>`:''}
+      </div>
+      <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${bg};color:${col.replace('color:','')};white-space:nowrap">${tipo.toUpperCase()}</span>
+    </div>
+    ${extraLines.length?`<div style="font-size:12px;line-height:2;border-top:1px solid #f0f0f0;padding-top:6px;margin-top:4px">${extraLines.join('<br>')}</div>`:''}
+  </div>`
+}
+window.loadRubrica=loadRubrica
+$('rub-search')?.addEventListener('keydown',e=>{if(e.key==='Enter')loadRubrica()})
 
 // ══════════════════════════════════════════════════════════════
 // ── QUICK DETAIL – VISITA e CANTIERE
