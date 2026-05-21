@@ -1635,7 +1635,10 @@ function renderZoneTab(ti){
   for(const v of voci){if(!byPref[v.prefisso])byPref[v.prefisso]=[];byPref[v.prefisso].push(v)}
   con.innerHTML=Object.entries(byPref).map(([pref,items])=>`
     <div class="zona-gruppo">
-      <h4>${pref.replace(/_/g,' ')}</h4>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <h4 style="margin-bottom:0">${pref.replace(/_/g,' ')}</h4>
+        <button type="button" class="btn-ver-gruppo" data-pref="${pref}" onclick="setGruppoVer(this)" style="font-size:11px;padding:3px 9px;background:#e8f8ee;color:var(--ok);border:1.5px solid var(--ok);border-radius:4px;cursor:pointer;font-weight:700;white-space:nowrap">✓ Tutto VER</button>
+      </div>
       ${items.map(item=>{
         if(item.is_nota){
           // voce-nota separata: nascosta, ogni voce ha già il proprio campo note inline
@@ -1674,6 +1677,20 @@ function renderZoneTab(ti){
     i.oninput=()=>S.noteChk[i.dataset.nota]=i.value
   })
 }
+
+function setGruppoVer(btn){
+  const pref=btn.dataset.pref
+  const gruppo=btn.closest('.zona-gruppo')
+  if(!gruppo)return
+  gruppo.querySelectorAll('input[type=radio][value="VER"]').forEach(r=>{
+    r.checked=true
+    S.checklist[r.dataset.c]='VER'
+    const nw=$(`nw-${r.dataset.c}`)
+    if(nw)nw.classList.remove('show')
+  })
+  updateIPCLive();updateZoneDots()
+}
+window.setGruppoVer=setGruppoVer
 
 function saveTabData(){
   const ti=S.tab
