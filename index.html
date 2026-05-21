@@ -1579,7 +1579,12 @@ async function initAuth(){
     if(error)throw error
     if(session)await onLogin(session.user)
     else showScr('login')
-    sb.auth.onAuthStateChange((_,s)=>s?onLogin(s.user):showScr('login'))
+    sb.auth.onAuthStateChange((event,s)=>{
+      if(!s){showScr('login');return}
+      // TOKEN_REFRESHED e USER_UPDATED: aggiorna solo l'utente senza reinizializzare l'app
+      if(event==='TOKEN_REFRESHED'||event==='USER_UPDATED'){S.user=s.user;return}
+      onLogin(s.user)
+    })
   }catch(e){
     console.error('initAuth error:',e)
     // In caso di errore mostra comunque il login
