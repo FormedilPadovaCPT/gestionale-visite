@@ -1513,6 +1513,25 @@ function toast(msg,type='',ms=3500){const t=document.createElement('div');t.clas
 function show(id){$(id).classList.remove('hidden')}
 function hide(id){$(id).classList.add('hidden')}
 window.show=show;window.hide=hide;
+
+// ── CHIUSURA MODAL: click fuori + Escape ──
+// I modal che richiedono una scelta obbligatoria non si chiudono con click/Escape
+const MODAL_NO_DISMISS=['modal-verbale']
+document.addEventListener('click',e=>{
+  if(!e.target.classList.contains('modal-overlay'))return
+  const id=e.target.id
+  if(MODAL_NO_DISMISS.includes(id))return
+  hide(id)
+  // reset stato modale cantiere se chiuso cliccando fuori
+  if(id==='modal-cant'){window._editCantId=null;const t=$('modal-cant-title');if(t)t.textContent='Nuovo cantiere'}
+})
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return
+  const open=document.querySelector('.modal-overlay:not(.hidden)')
+  if(!open||MODAL_NO_DISMISS.includes(open.id))return
+  hide(open.id)
+  if(open.id==='modal-cant'){window._editCantId=null;const t=$('modal-cant-title');if(t)t.textContent='Nuovo cantiere'}
+})
 function calcIPC(chk){
   const vals=Object.values(chk)
   const np=vals.filter(v=>v==='NC+').length
