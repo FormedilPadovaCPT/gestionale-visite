@@ -1072,6 +1072,19 @@ tr.row-detail-hover:hover td{background:#fff3ed}
   </div>
 </div>
 
+<!-- MODAL DETTAGLIO RUBRICA -->
+<div class="modal-overlay hidden" id="modal-rub-detail">
+  <div class="modal-box" style="max-width:600px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <h3 style="margin:0;font-size:15px" id="rub-detail-title">Dettaglio contatto</h3>
+      <button class="btn-outline btn-sm" onclick="hide('modal-rub-detail')">✕ Chiudi</button>
+    </div>
+    <div id="rub-detail-badge" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <div id="rub-detail-body"></div>
+    <div id="rub-detail-actions" style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"></div>
+  </div>
+</div>
+
 <!-- MODAL CANTIERE -->
 <div class="modal-overlay hidden" id="modal-cant">
   <div class="modal-box">
@@ -5831,7 +5844,7 @@ async function loadRubrica(){
         _CCIA_LBL[r.tipo_iscrizione_ccia]?`CCIA: ${_CCIA_LBL[r.tipo_iscrizione_ccia]}`:'',
         r.cassa_edile?`Cassa edile: ${esc(r.cassa_edile)}`:'',
       ].filter(Boolean)
-      cards.push(rubCard('🏢','impresa',esc(r.impresa_nome||'–'),sub,extra))
+      cards.push(rubCard('🏢','impresa',r.impresa_id,esc(r.impresa_nome||'–'),sub,extra))
     })
   }
 
@@ -5846,7 +5859,7 @@ async function loadRubrica(){
         r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:'',
         r.telefono?`<a href="tel:${esc(r.telefono)}" style="color:var(--orange)">${esc(r.telefono)}</a>`:'',
       ].filter(Boolean)
-      cards.push(rubCard('👤','committente',esc(r.committente_nome||'–'),sub,extra))
+      cards.push(rubCard('👤','committente',r.committente_id,esc(r.committente_nome||'–'),sub,extra))
     })
   }
 
@@ -5860,7 +5873,7 @@ async function loadRubrica(){
       const extra=[
         r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:'',
       ].filter(Boolean)
-      cards.push(rubCard('👷','tecnico',esc(nome||'–'),'Tecnico CPT',extra))
+      cards.push(rubCard('👷','tecnico',r.tecnico_id,esc(nome||'–'),'Tecnico CPT',extra))
     })
   }
 
@@ -5871,10 +5884,10 @@ async function loadRubrica(){
   res.innerHTML=cards.join('')
 }
 
-function rubCard(icon,tipo,nome,sub,extraLines){
+function rubCard(icon,tipo,id,nome,sub,extraLines){
   const badge={impresa:'#e7f3e8;color:#27ae60',committente:'#fef3e2;color:#e67e22',tecnico:'#eef4ff;color:#2980b9'}[tipo]||'#eee;color:#555'
   const [bg,col]=badge.split(';color:')
-  return`<div style="background:#fff;border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border-left:3px solid ${col.replace('color:','')}">
+  return`<div ondblclick="showRubricaDetail('${tipo}',${id})" title="Doppio clic per visualizzare tutti i dati" style="background:#fff;border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border-left:3px solid ${col.replace('color:','')};cursor:pointer;transition:box-shadow .15s,transform .1s" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,.13)';this.style.transform='translateY(-1px)'" onmouseleave="this.style.boxShadow='var(--shadow)';this.style.transform=''">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
       <span style="font-size:18px">${icon}</span>
       <div style="flex:1;min-width:0">
@@ -5884,6 +5897,7 @@ function rubCard(icon,tipo,nome,sub,extraLines){
       <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${bg};color:${col.replace('color:','')};white-space:nowrap">${tipo.toUpperCase()}</span>
     </div>
     ${extraLines.length?`<div style="font-size:12px;line-height:2;border-top:1px solid #f0f0f0;padding-top:6px;margin-top:4px">${extraLines.join('<br>')}</div>`:''}
+    <div style="font-size:10px;color:#bbb;margin-top:6px;text-align:right">↕ doppio clic per il dettaglio</div>
   </div>`
 }
 window.loadRubrica=loadRubrica
@@ -6083,14 +6097,155 @@ async function showCantiereDetail(cantId){
     }
     $('qd-actions').innerHTML=''
     $('qd-actions').appendChild(btnNuova)
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── RUBRICA – DETTAGLIO DOPPIO CLIC
+// ══════════════════════════════════════════════════════════════
+const _CCNL_FULL={1:'Edilizia industria',2:'Edilizia artigianato',3:'Lapidei industria',4:'Lapidei artigianato',5:'Altro/Non edile',6:'Non applicabile'}
+const _CCIA_FULL={1:'Iscritto',2:'Non iscritto',3:'Esonero'}
+
+async function showRubricaDetail(tipo, id){
+  $('rub-detail-title').textContent='⏳ Caricamento…'
+  $('rub-detail-badge').innerHTML=''
+  $('rub-detail-body').innerHTML='<div style="padding:20px;text-align:center;color:#aaa">Caricamento…</div>'
+  $('rub-detail-actions').innerHTML=''
+  show('modal-rub-detail')
+  try{
+    if(tipo==='impresa'){
+      const{data:r,error}=await sb.from('imprese').select('*').eq('impresa_id',id).single()
+      if(error||!r){toast('Impresa non trovata','err');hide('modal-rub-detail');return}
+      $('rub-detail-title').textContent=`🏢 ${r.impresa_nome||'–'}`
+      $('rub-detail-badge').innerHTML=`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#e8f8ee;color:#27ae60">IMPRESA</span>`
+      let html=qdSec('Anagrafica')
+      html+=qdDl([
+        ['Ragione sociale',r.impresa_nome],['P.IVA',r.piva],['Cod. Fiscale',r.impresa_cf],
+        ['Indirizzo',r.indirizzo],['Comune',r.comune],['CAP',r.cap],
+        ['Email',r.impresa_email_ref?`<a href="mailto:${esc(r.impresa_email_ref)}" style="color:var(--orange)">${esc(r.impresa_email_ref)}</a>`:''],
+        ['Telefono',r.impresa_telefono?`<a href="tel:${esc(r.impresa_telefono)}" style="color:var(--orange)">${esc(r.impresa_telefono)}</a>`:''],
+        ['PEC',r.pec],['Sito web',r.sito_web],
+      ])
+      html+=qdSec('Dati contrattuali / CCIA')
+      html+=qdDl([
+        ['CCNL',_CCNL_FULL[r.contratto_ccnl]||r.contratto_ccnl||''],
+        ['Iscrizione CCIA',_CCIA_FULL[r.tipo_iscrizione_ccia]||r.tipo_iscrizione_ccia||''],
+        ['Cassa edile',r.cassa_edile],['Num. iscrizione CCIA',r.nr_iscrizione_ccia],
+        ['Data iscrizione CCIA',r.data_iscrizione_ccia?fmtDate(r.data_iscrizione_ccia):''],
+      ])
+      if(r.note?.trim()) html+=qdSec('Note')+`<div class="qd-note">${esc(r.note)}</div>`
+      // Cantieri collegati
+      const{data:cants}=await sb.from('cantieri')
+        .select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,prot_int')
+        .eq('impresa_id',id).eq('elimina',0).order('cantiere_id',{ascending:false}).limit(10)
+      if(cants&&cants.length){
+        html+=qdSec(`Cantieri collegati (${cants.length})`)
+        html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr>'
+        html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Ubicazione</th>'
+        html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Comune</th>'
+        html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Prot.</th>'
+        html+='</tr></thead><tbody>'
+        cants.forEach(c=>{
+          const loc=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()||'–'
+          html+=`<tr style="border-top:1px solid #f0f0f0">
+            <td style="padding:5px 6px">${esc(loc)}</td>
+            <td style="padding:5px 6px">${esc(c.comune_nome||'–')}</td>
+            <td style="padding:5px 6px">${esc(c.prot_int||'–')}</td>
+          </tr>`
+        })
+        html+='</tbody></table>'
+      } else {
+        html+=qdSec('Cantieri')+'<div style="color:#aaa;font-size:13px;padding:6px 0">Nessun cantiere collegato.</div>'
+      }
+      $('rub-detail-body').innerHTML=html
+      // Azione: apri scheda modifica impresa
+      const btnEdit=document.createElement('button')
+      btnEdit.className='btn-outline btn-sm'
+      btnEdit.textContent='✏️ Modifica impresa'
+      btnEdit.onclick=()=>{ hide('modal-rub-detail'); openEditImpresa && openEditImpresa(id) }
+      $('rub-detail-actions').appendChild(btnEdit)
+    }
+    else if(tipo==='committente'){
+      const{data:r,error}=await sb.from('committenti').select('*').eq('committente_id',id).single()
+      if(error||!r){toast('Committente non trovato','err');hide('modal-rub-detail');return}
+      $('rub-detail-title').textContent=`👤 ${r.committente_nome||'–'}`
+      $('rub-detail-badge').innerHTML=`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#fef3e2;color:#e67e22">COMMITTENTE</span>`
+      let html=qdSec('Anagrafica')
+      html+=qdDl([
+        ['Nome / Ragione sociale',r.committente_nome],['Tipo soggetto',r.tipo_sogg],
+        ['C.F. / P.IVA',r.cf_piva||r.piva],['Codice fiscale',r.cf],
+        ['Indirizzo',r.indirizzo],['Comune',r.comune],['CAP',r.cap],
+        ['Email',r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:''],
+        ['Telefono',r.telefono?`<a href="tel:${esc(r.telefono)}" style="color:var(--orange)">${esc(r.telefono)}</a>`:''],
+        ['PEC',r.pec],
+      ])
+      if(r.note?.trim()) html+=qdSec('Note')+`<div class="qd-note">${esc(r.note)}</div>`
+      // Cantieri come committente
+      const{data:cants}=await sb.from('cantieri')
+        .select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,prot_int')
+        .eq('committente_id',id).eq('elimina',0).order('cantiere_id',{ascending:false}).limit(10)
+      if(cants&&cants.length){
+        html+=qdSec(`Cantieri come committente (${cants.length})`)
+        html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr>'
+        html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Ubicazione</th>'
+        html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Comune</th>'
+        html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Prot.</th>'
+        html+='</tr></thead><tbody>'
+        cants.forEach(c=>{
+          const loc=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()||'–'
+          html+=`<tr style="border-top:1px solid #f0f0f0">
+            <td style="padding:5px 6px">${esc(loc)}</td>
+            <td style="padding:5px 6px">${esc(c.comune_nome||'–')}</td>
+            <td style="padding:5px 6px">${esc(c.prot_int||'–')}</td>
+          </tr>`
+        })
+        html+='</tbody></table>'
+      }
+      $('rub-detail-body').innerHTML=html
+    }
+    else if(tipo==='tecnico'){
+      const{data:r,error}=await sb.from('tecnici').select('*').eq('tecnico_id',id).single()
+      if(error||!r){toast('Tecnico non trovato','err');hide('modal-rub-detail');return}
+      const nome=`${r.tecnico_cognome||''} ${r.tecnico_nome||''}`.trim()
+      $('rub-detail-title').textContent=`👷 ${nome||'–'}`
+      $('rub-detail-badge').innerHTML=`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#eef4ff;color:#2980b9">TECNICO CPT</span>`
+      let html=qdSec('Dati tecnico')
+      html+=qdDl([
+        ['Cognome',r.tecnico_cognome],['Nome',r.tecnico_nome],
+        ['Email',r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:''],
+        ['Telefono',r.telefono?`<a href="tel:${esc(r.telefono)}" style="color:var(--orange)">${esc(r.telefono)}</a>`:''],
+        ['Qualifica',r.qualifica],['Ordine/Collegio',r.ordine],
+        ['N° iscrizione',r.nr_iscrizione],['Codice Osservatorio',r.tecnico_id],
+      ])
+      // Ultime visite del tecnico
+      const{data:visite}=await sb.from('visite')
+        .select('visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_etichetta,cantiere_indirizzo,comune_nome)')
+        .eq('tecnico_id',id).eq('elimina',0)
+        .order('data_visita',{ascending:false}).limit(8)
+      if(visite&&visite.length){
+        html+=qdSec(`Ultime visite (${visite.length})`)
+        html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr>'
+        html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Verbale</th>'
+        html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Data</th>'
+        html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Cantiere</th>'
+        html+='<th style="padding:4px 6px;color:#888;font-weight:600;font-size:11px">IPC</th>'
+        html+='</tr></thead><tbody>'
+        visite.forEach(vv=>{
+          const ipc=vv.ipc||'NR'
+          const loc=vv.cantieri?.cantiere_etichetta||vv.cantieri?.cantiere_indirizzo||'–'
+          html+=`<tr style="border-top:1px solid #f0f0f0">
+            <td style="padding:5px 6px">${vv.nr_verbale||'–'}</td>
+            <td style="padding:5px 6px">${fmtDate(vv.data_visita)}</td>
+            <td style="padding:5px 6px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(loc)}</td>
+            <td style="padding:5px 6px"><span class="badge ${ipcCls(ipc)}" style="font-size:10px">${ipc}</span></td>
+          </tr>`
+        })
+        html+='</tbody></table>'
+      }
+      $('rub-detail-body').innerHTML=html
+    }
   }catch(e){
-    console.error('showCantiereDetail:',e)
-    $('qd-body').innerHTML=`<div style="color:#c0392b;padding:12px">Errore: ${e.message}</div>`
+    console.error('showRubricaDetail:',e)
+    $('rub-detail-body').innerHTML=`<div style="color:#c0392b;padding:12px">Errore: ${esc(e.message)}</div>`
   }
 }
-</script>
-</body>
-</html>
-</script>
-</body>
-</html>
+window.showRubricaDetail=showRubricaDetail
