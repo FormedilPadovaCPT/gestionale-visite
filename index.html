@@ -44,7 +44,8 @@ label{display:block;font-weight:600;margin-bottom:4px;color:var(--grey);font-siz
 .badge-definitivo{background:#e8f8ee;color:var(--ok)}
 .sect-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--grey);background:var(--light);padding:5px 10px;border-radius:var(--radius);margin-bottom:10px;margin-top:4px}
 /* LOADING */
-#screen-loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--orange);z-index:9999}
+#screen-loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--orange);z-index:9999;animation:autoHideLoad 0.4s ease-out 5s forwards}
+@keyframes autoHideLoad{to{opacity:0;pointer-events:none;visibility:hidden}}
 .load-logo{color:#fff;font-size:22px;font-weight:700;letter-spacing:1px;text-align:center}
 .load-logo small{display:block;font-size:13px;font-weight:400;opacity:.8;margin-top:4px}
 /* LOGIN */
@@ -1351,28 +1352,46 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 
 <div id="toast-area"></div>
 
+<!-- Script di sicurezza: garantisce l'uscita dalla schermata di caricamento -->
+<script>
+// Timeout di sicurezza: se il modulo non parte entro 10s, mostra il login
+window.__safetyTimer = setTimeout(function(){
+  var sl = document.getElementById('screen-loading');
+  var sl2 = document.getElementById('screen-login');
+  if(sl && !sl.classList.contains('hidden') && sl2) {
+    sl.classList.add('hidden');
+    sl2.classList.remove('hidden');
+    var el = document.getElementById('login-err');
+    if(el){ el.textContent = 'Timeout avvio – controlla la connessione e ricarica la pagina.'; el.style.display='block'; }
+  }
+}, 4000);
+
+// Intercetta errori del modulo
+window.onerror = function(msg, src, line, col, err) {
+  clearTimeout(window.__safetyTimer);
+  var sl = document.getElementById('screen-loading');
+  var sl2 = document.getElementById('screen-login');
+  if(sl && !sl.classList.contains('hidden') && sl2) {
+    sl.classList.add('hidden');
+    sl2.classList.remove('hidden');
+    var el = document.getElementById('login-err');
+    if(el){ el.textContent = 'Errore JS: ' + msg + ' (riga ' + line + ')'; el.style.display='block'; }
+  }
+};
+window.onunhandledrejection = function(e) {
+  clearTimeout(window.__safetyTimer);
+  var sl = document.getElementById('screen-loading');
+  var sl2 = document.getElementById('screen-login');
+  if(sl && !sl.classList.contains('hidden') && sl2) {
+    sl.classList.add('hidden');
+    sl2.classList.remove('hidden');
+    var el = document.getElementById('login-err');
+    if(el){ el.textContent = 'Errore connessione: ' + ((e.reason && e.reason.message) || e.reason || 'sconosciuto'); el.style.display='block'; }
+  }
+};
+</script>
+
 <script type="module">
-window.onerror=function(msg,src,line,col,err){
-  const sl=document.getElementById('screen-loading')
-  if(sl&&!sl.classList.contains('hidden')){
-    // Mostra login con messaggio di errore invece di restare bloccati
-    const sl2=document.getElementById('screen-login')
-    if(sl2){sl.classList.add('hidden');sl2.classList.remove('hidden')}
-    const el=document.getElementById('login-err')
-    if(el){el.textContent='Errore JS: '+msg+' (riga '+line+')';el.style.display='block'}
-  }
-  console.error('GlobalError:',msg,src,line,col,err)
-}
-window.onunhandledrejection=function(e){
-  console.error('UnhandledRejection:',e.reason)
-  const sl=document.getElementById('screen-loading')
-  if(sl&&!sl.classList.contains('hidden')){
-    const sl2=document.getElementById('screen-login')
-    if(sl2){sl.classList.add('hidden');sl2.classList.remove('hidden')}
-    const el=document.getElementById('login-err')
-    if(el){el.textContent='Errore async: '+(e.reason?.message||e.reason);el.style.display='block'}
-  }
-}
 console.log("%c Gestionale v2025-05-14 caricato correttamente ✓", "color:green;font-weight:bold;font-size:14px")
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
@@ -1528,7 +1547,8 @@ $('btn-logout').onclick=()=>sb.auth.signOut()
 
 // ── SCREEN / NAV ──
 function showScr(n){
-  ['loading','login','app'].forEach(s=>$(('screen-'+s))?.classList.toggle('hidden',s!==n))
+  if(window.__safetyTimer){clearTimeout(window.__safetyTimer);window.__safetyTimer=null}
+  ;['loading','login','app'].forEach(s=>$(('screen-'+s))?.classList.toggle('hidden',s!==n))
 }
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
@@ -4644,7 +4664,8 @@ window.removeLav = removeLav
 window.deleteFoto = deleteFoto
 
 // ── AVVIO ──
-document.addEventListener('DOMContentLoaded', initAuth)
+// I moduli type="module" sono deferiti: il DOM è già pronto qui
+initAuth()
 
 // ══════════════════════════════════════════════════
 // ── ZONA RISERVATA COORDINATORE ──────────────────
