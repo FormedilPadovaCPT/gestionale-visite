@@ -1088,23 +1088,23 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>Tipo iscrizione CCIA</label>
         <select id="mi-tipo-ccia">
           <option value="">– Seleziona –</option>
-          <option value="ARTIGIANA">Artigiana</option>
-          <option value="INDUSTRIALE">Industriale</option>
-          <option value="COOPERATIVA">Cooperativa</option>
-          <option value="COMMERCIALE">Commerciale</option>
-          <option value="ALTRO">Altro</option>
+          <option value="1">Artigiana</option>
+          <option value="2">Industriale</option>
+          <option value="3">Cooperativa</option>
+          <option value="4">Commerciale</option>
+          <option value="5">Altro</option>
         </select>
       </div>
       <div class="field"><label>Contratto CCNL</label>
         <select id="mi-ccnl">
           <option value="">– Seleziona –</option>
-          <option value="EDILIZIA INDUSTRIA">Edilizia Industria</option>
-          <option value="EDILIZIA ARTIGIANATO">Edilizia Artigianato</option>
-          <option value="METALMECCANICO INDUSTRIA">Metalmeccanico Industria</option>
-          <option value="METALMECCANICO ARTIGIANATO">Metalmeccanico Artigianato</option>
-          <option value="INSTALLATORI IMPIANTI">Installatori Impianti</option>
-          <option value="LEGNO">Legno</option>
-          <option value="ALTRO">Altro</option>
+          <option value="1">Edilizia Industria</option>
+          <option value="2">Edilizia Artigianato</option>
+          <option value="3">Metalmeccanico Industria</option>
+          <option value="4">Metalmeccanico Artigianato</option>
+          <option value="5">Installatori Impianti</option>
+          <option value="6">Legno</option>
+          <option value="13">Altro</option>
         </select>
       </div>
     </div>
@@ -1196,24 +1196,24 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <label>Tipo iscrizione CCIA</label>
         <select id="ei-tipo-ccia">
           <option value="">– Seleziona –</option>
-          <option value="ARTIGIANA">Artigiana</option>
-          <option value="INDUSTRIALE">Industriale</option>
-          <option value="COOPERATIVA">Cooperativa</option>
-          <option value="COMMERCIALE">Commerciale</option>
-          <option value="ALTRO">Altro</option>
+          <option value="1">Artigiana</option>
+          <option value="2">Industriale</option>
+          <option value="3">Cooperativa</option>
+          <option value="4">Commerciale</option>
+          <option value="5">Altro</option>
         </select>
       </div>
       <div class="field">
         <label>Contratto CCNL</label>
         <select id="ei-ccnl">
           <option value="">– Seleziona –</option>
-          <option value="EDILIZIA INDUSTRIA">Edilizia Industria</option>
-          <option value="EDILIZIA ARTIGIANATO">Edilizia Artigianato</option>
-          <option value="METALMECCANICO INDUSTRIA">Metalmeccanico Industria</option>
-          <option value="METALMECCANICO ARTIGIANATO">Metalmeccanico Artigianato</option>
-          <option value="INSTALLATORI IMPIANTI">Installatori Impianti</option>
-          <option value="LEGNO">Legno</option>
-          <option value="ALTRO">Altro</option>
+          <option value="1">Edilizia Industria</option>
+          <option value="2">Edilizia Artigianato</option>
+          <option value="3">Metalmeccanico Industria</option>
+          <option value="4">Metalmeccanico Artigianato</option>
+          <option value="5">Installatori Impianti</option>
+          <option value="6">Legno</option>
+          <option value="13">Altro</option>
         </select>
       </div>
     </div>
@@ -2148,7 +2148,7 @@ $('btn-mi-cancel').onclick=()=>hide('modal-imp')
 // Mostra campo testo CCNL solo se selezionato "Altro"
 $('mi-ccnl')?.addEventListener('change',function(){
   const wrap=$('mi-ccnl-altro-wrap')
-  if(wrap)this.value==='ALTRO'?wrap.classList.remove('hidden'):wrap.classList.add('hidden')
+  if(wrap)this.value==='13'?wrap.classList.remove('hidden'):wrap.classList.add('hidden')
 })
 $('btn-mi-save').onclick=async()=>{
   const nome=vGet('mi-nome').trim()
@@ -2167,7 +2167,8 @@ $('btn-mi-save').onclick=async()=>{
     impresa_email_ref:vGet('mi-email').trim()||null,
     cassa_edile:vGet('mi-ceiv')||null,
     tipo_iscrizione_ccia:vGet('mi-tipo-ccia')||null,
-    contratto_ccnl:ccnlVal==='ALTRO'?vGet('mi-ccnl-altro').trim()||'ALTRO':ccnlVal,
+    contratto_ccnl:ccnlVal==='13'?'13':ccnlVal,
+    contratto_ccnl_altro:ccnlVal==='13'?vGet('mi-ccnl-altro').trim()||null:null,
     elimina:0
   }
   const{error}=await sb.from('imprese').insert(imp)
@@ -4904,7 +4905,7 @@ const XSD_FILES={
                 <xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="128"/></xs:restriction></xs:simpleType>
               </xs:element>
               <xs:element name="tipoIscrizioneCcia" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/></xs:restriction></xs:simpleType>
+                <xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/><xs:enumeration value="4"/><xs:enumeration value="5"/></xs:restriction></xs:simpleType>
               </xs:element>
               <xs:element name="contrattoCcnl" minOccurs="0" maxOccurs="1">
                 <xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/><xs:enumeration value="4"/><xs:enumeration value="5"/><xs:enumeration value="6"/><xs:enumeration value="7"/><xs:enumeration value="8"/><xs:enumeration value="9"/><xs:enumeration value="10"/><xs:enumeration value="11"/><xs:enumeration value="12"/><xs:enumeration value="13"/></xs:restriction></xs:simpleType>
@@ -5569,13 +5570,13 @@ async function admEditImpresa(impresaId) {
     if (cciaSel && imp.tipo_iscrizione_ccia) cciaSel.value = imp.tipo_iscrizione_ccia
     // CCNL
     const ccnlSel = $('ei-ccnl')
-    const CCNL_VALS = ['EDILIZIA INDUSTRIA','EDILIZIA ARTIGIANATO','METALMECCANICO INDUSTRIA','METALMECCANICO ARTIGIANATO','INSTALLATORI IMPIANTI','LEGNO']
+    const CCNL_VALS = ['1','2','3','4','5','6']
     if (ccnlSel && imp.contratto_ccnl) {
       if (CCNL_VALS.includes(imp.contratto_ccnl)) {
         ccnlSel.value = imp.contratto_ccnl
       } else {
-        ccnlSel.value = 'ALTRO'
-        vSet('ei-ccnl-altro', imp.contratto_ccnl)
+        ccnlSel.value = '13'
+        vSet('ei-ccnl-altro', imp.contratto_ccnl_altro || '')
         if (ccnlWrap) ccnlWrap.classList.remove('hidden')
       }
     }
@@ -5593,6 +5594,7 @@ async function admSaveEditImpresa() {
   const nome = vGet('ei-nome').trim()
   if (!nome) { toast('Ragione sociale obbligatoria','warn'); $('ei-nome').focus(); return }
   const ccnlVal = vGet('ei-ccnl') || null
+  const isAltro = ccnlVal === '13'
   const updates = {
     impresa_nome: nome,
     impresa_cf:   vGet('ei-cf').trim() || null,
@@ -5602,7 +5604,8 @@ async function admSaveEditImpresa() {
     impresa_telefono:  vGet('ei-tel').trim() || null,
     cassa_edile:  vGet('ei-ceiv') || null,
     tipo_iscrizione_ccia: vGet('ei-tipo-ccia') || null,
-    contratto_ccnl: ccnlVal === 'ALTRO' ? (vGet('ei-ccnl-altro').trim() || 'ALTRO') : ccnlVal,
+    contratto_ccnl: isAltro ? 'ALTRO' : ccnlVal,
+    contratto_ccnl_altro: isAltro ? (vGet('ei-ccnl-altro').trim() || null) : null,
   }
   const { error } = await sb.from('imprese').update(updates).eq('impresa_id', _editImpId)
   if (error) { toast('Errore aggiornamento impresa: ' + error.message, 'err'); return }
@@ -5624,7 +5627,7 @@ $('btn-ei-cancel').onclick = () => hide('modal-edit-imp')
 $('btn-ei-save').onclick = admSaveEditImpresa
 $('ei-ccnl')?.addEventListener('change', function(){
   const wrap = $('ei-ccnl-altro-wrap')
-  if (wrap) this.value === 'ALTRO' ? wrap.classList.remove('hidden') : wrap.classList.add('hidden')
+  if (wrap) this.value === '13' ? wrap.classList.remove('hidden') : wrap.classList.add('hidden')
 })
 $('adm-imp-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadImprese() })
 window.admLoadImprese = admLoadImprese
