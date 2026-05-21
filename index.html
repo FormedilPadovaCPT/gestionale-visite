@@ -5915,13 +5915,16 @@ async function showVisitaDetail(vid){
   $('qd-actions').innerHTML=''
   show('modal-qd')
   try{
-    const{data:v,error}=await sb.from('visite').select(`
-      visita_id,nr_verbale,data_visita,ora_visita,ora_fine,ipc,ipc_nc_plus,ipc_nc_minus,ipc_oss,stato,
-      tipo_accesso,acc_cant,nr_lavoratori,nr_lavoratori_stranieri,prescrizioni,oss_tec,
-      tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),
-      cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,prot_int),
-      imprese(impresa_nome,piva)
-    `).eq('visita_id',vid).single()
+    const[{data:v,error}, {data:chkRows}]=await Promise.all([
+      sb.from('visite').select(`
+        visita_id,nr_verbale,data_visita,ora_visita,ora_fine,ipc,ipc_nc_plus,ipc_nc_minus,ipc_oss,stato,
+        tipo_accesso,acc_cant,nr_lavoratori,nr_lavoratori_stranieri,prescrizioni,oss_tec,
+        tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),
+        cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,prot_int),
+        imprese(impresa_nome,piva)
+      `).eq('visita_id',vid).single(),
+      sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
+    ])
     if(error||!v){toast('Visita non trovata'+(error?' – '+error.message:''),'err');hide('modal-qd');return}
     const ipc=v.ipc||'NR'
     const isBozza=(v.stato||'bozza')==='bozza'
@@ -5945,8 +5948,49 @@ async function showVisitaDetail(vid){
       ])
     }
     if(imp){ html+=qdSec('Impresa principale')+qdDl([['Ragione sociale',imp.impresa_nome],['P.IVA',imp.piva]]) }
-    if(v.prescrizioni?.trim()) html+=qdSec('Prescrizioni')+`<div class="qd-note">${v.prescrizioni}</div>`
-    if(v.oss_tec?.trim()) html+=qdSec('Osservazioni tecniche')+`<div class="qd-note" style="border-color:#3498db;background:#f4f8ff">${v.oss_tec}</div>`
+
+    // ── RILIEVI CHECKLIST ──
+    const chkValMap={'VER':'#27ae60','NC-':'#e67e22','NC+':'#c0392b','OSS':'#8e44ad'}
+    const chkBgMap={'VER':'#e8f8ee','NC-':'#fef3e2','NC+':'#fde8e8','OSS':'#f5eef8'}
+    const rilievi=(chkRows||[]).filter(r=>r.valore&&r.valore!=='NA')
+    if(rilievi.length){
+      // Mappa codice → voce (usa S.voci già in memoria)
+      const voceMap={}
+      ;(S.voci||[]).forEach(vv=>{ voceMap[vv.codice]=vv })
+      // Raggruppa per zona → prefisso
+      const byZona={}
+      rilievi.forEach(r=>{
+        const voce=voceMap[r.codice]
+        if(!voce)return
+        const z=voce.zona_osserv
+        const p=voce.prefisso||'–'
+        if(!byZona[z])byZona[z]={}
+        if(!byZona[z][p])byZona[z][p]=[]
+        byZona[z][p].push({...r,descrizione:voce.descrizione})
+      })
+      html+=qdSec(`Rilievi (${rilievi.length})`)
+      Object.keys(byZona).sort((a,b)=>+a-+b).forEach(z=>{
+        html+=`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--orange);margin:10px 0 4px">${ZONE_LBL[z]||'Zona '+z}</div>`
+        const byPref=byZona[z]
+        Object.keys(byPref).forEach(p=>{
+          html+=`<div style="font-size:10px;font-weight:700;color:var(--grey);margin:6px 0 3px;text-transform:uppercase;letter-spacing:.5px">${p.replace(/_/g,' ')}</div>`
+          byPref[p].forEach(r=>{
+            const col=chkValMap[r.valore]||'#555'
+            const bg=chkBgMap[r.valore]||'#eee'
+            html+=`<div style="display:flex;align-items:flex-start;gap:7px;padding:5px 4px;border-bottom:1px solid #f5f5f5">
+              <span style="flex-shrink:0;font-size:10px;font-weight:800;padding:2px 6px;border-radius:3px;background:${bg};color:${col};border:1px solid ${col};margin-top:1px">${r.valore}</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12px;line-height:1.4">${esc(r.descrizione||r.codice)}</div>
+                ${r.nota?.trim()?`<div style="font-size:11px;color:#666;margin-top:3px;font-style:italic">📝 ${esc(r.nota)}</div>`:''}
+              </div>
+            </div>`
+          })
+        })
+      })
+    }
+
+    if(v.prescrizioni?.trim()) html+=qdSec('Prescrizioni')+`<div class="qd-note">${esc(v.prescrizioni)}</div>`
+    if(v.oss_tec?.trim()) html+=qdSec('Note tecnico')+`<div class="qd-note" style="border-color:#3498db;background:#f4f8ff">${esc(v.oss_tec)}</div>`
     $('qd-body').innerHTML=html
     const acts=[
       `<button class="btn-primary btn-sm" onclick="genPDF('${vid}');hide('modal-qd')">📄 PDF</button>`,
