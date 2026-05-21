@@ -5884,6 +5884,14 @@ function rubCard(icon,tipo,nome,sub,extraLines){
 window.loadRubrica=loadRubrica
 $('rub-search')?.addEventListener('keydown',e=>{if(e.key==='Enter')loadRubrica()})
 
+// Funzioni usate da onclick inline nei modal – devono essere globali
+window.genPDF=genPDF
+window.riapriBozza=riapriBozza
+window.inviEmailVerbaleFromList=inviEmailVerbaleFromList
+window.exportSnapFromDB=exportSnapFromDB
+window.showVisitaDetail=showVisitaDetail
+window.showCantiereDetail=showCantiereDetail
+
 // ══════════════════════════════════════════════════════════════
 // ── QUICK DETAIL – VISITA e CANTIERE
 // ══════════════════════════════════════════════════════════════
@@ -5962,7 +5970,7 @@ async function showCantiereDetail(cantId){
       'cantiere_cnce,nodo_id,prot_int,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,'+
       'cantiere_importo,cantiere_durata,data_ult,cantiere_comune_cod'
     ).eq('cantiere_id',cantId).single()
-    if(error||!c){toast('Cantiere non trovato','err');hide('modal-qd');return}
+    if(error||!c){toast('Cantiere non trovato'+(error?' – '+error.message:''),'err');hide('modal-qd');return}
     const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
     $('qd-title').textContent=`🏗️ ${label}`
     const{data:visite}=await sb.from('visite')
