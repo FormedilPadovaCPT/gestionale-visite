@@ -971,6 +971,35 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div id="adm-imp-empty" class="hidden" style="text-align:center;padding:16px;color:rgba(255,255,255,.35);font-size:13px">Nessuna impresa trovata</div>
         </div>
 
+        <!-- Gestione cantieri -->
+        <div class="adm-section">
+          <div class="adm-section-title">🏗️ Gestione cantieri</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:12px">Cerca e modifica i dati dei cantieri registrati nel sistema.</p>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <input type="text" id="adm-cant-search" placeholder="Indirizzo, etichetta o comune…"
+              style="flex:1;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff"
+              oninput="this.style.color='#fff'">
+            <button class="btn-primary btn-sm" onclick="admLoadCantieri()">🔍 Cerca</button>
+          </div>
+          <div class="tbl-wrap" style="background:rgba(255,255,255,.05);border-radius:8px">
+            <table style="color:rgba(255,255,255,.85);font-size:12px;width:100%;border-collapse:collapse">
+              <thead>
+                <tr style="border-bottom:1px solid rgba(255,255,255,.15)">
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Indirizzo</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Comune</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Etichetta</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">CNCE</th>
+                  <th style="padding:8px 4px"></th>
+                </tr>
+              </thead>
+              <tbody id="tbody-adm-cant">
+                <tr><td colspan="5" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Usa la ricerca per trovare un cantiere</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="adm-cant-empty" class="hidden" style="text-align:center;padding:16px;color:rgba(255,255,255,.35);font-size:13px">Nessun cantiere trovato</div>
+        </div>
+
         <!-- Download file XSD -->
         <div class="adm-section">
           <div class="adm-section-title">Schema XSD – Osservatorio visite</div>
@@ -1026,7 +1055,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 <!-- MODAL CANTIERE -->
 <div class="modal-overlay hidden" id="modal-cant">
   <div class="modal-box">
-    <h3>Nuovo cantiere</h3>
+    <h3 id="modal-cant-title">Nuovo cantiere</h3>
     <div class="row">
       <div class="field" style="flex:3"><label>Indirizzo *</label><input type="text" id="mc-ind"></div>
       <div class="field" style="flex:1"><label>Civico *</label><input type="text" id="mc-civ"></div>
@@ -2233,12 +2262,11 @@ function resetModalCantiere(){
   const wrap=$('mc-tip-ope-altro-wrap');if(wrap)wrap.classList.add('hidden')
 }
 $('btn-new-cant').onclick=()=>{hideCantCard();resetModalCantiere();show('modal-cant')}
-$('btn-mc-cancel').onclick=()=>hide('modal-cant')
+$('btn-mc-cancel').onclick=()=>{hide('modal-cant');window._editCantId=null;$('modal-cant-title').textContent='Nuovo cantiere'}
 $('btn-mc-save').onclick=async()=>{
   const ind=vGet('mc-ind').trim();const civ=vGet('mc-civ').trim()
   if(!ind||!civ){toast('Indirizzo e civico obbligatori','warn');return}
-  const c={
-    cantiere_id:uuid(),
+  const fields={
     cantiere_indirizzo:ind,
     cantiere_civico:civ,
     comune_nome:vGet('mc-com').trim()||null,
@@ -2253,8 +2281,16 @@ $('btn-mc-save').onclick=async()=>{
     data_ult:vGet('mc-data-ult')||null,
     cantiere_comune_cod:vGet('mc-comune-cod').trim()||null,
     cantiere_tip_ope_altro:vGet('mc-tip-ope-altro').trim()||null,
-    elimina:0
   }
+  // Modalità modifica (da coordinatore)
+  if(window._editCantId){
+    const{error}=await sb.from('cantieri').update(fields).eq('cantiere_id',window._editCantId)
+    if(error){toast('Errore aggiornamento cantiere: '+error.message,'err');return}
+    hide('modal-cant');toast('Cantiere aggiornato','ok')
+    window._editCantId=null;$('modal-cant-title').textContent='Nuovo cantiere'
+    admLoadCantieri();return
+  }
+  const c={...fields,cantiere_id:uuid(),elimina:0}
   const{error}=await sb.from('cantieri').insert(c)
   if(error){toast('Errore: '+error.message,'err');return}
   vSet('f-cant-id',c.cantiere_id)
@@ -5650,6 +5686,72 @@ $('ei-ccnl')?.addEventListener('change', function(){
 $('adm-imp-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadImprese() })
 window.admLoadImprese = admLoadImprese
 window.admEditImpresa = admEditImpresa
+
+// ── GESTIONE CANTIERI (coordinatore) ──
+async function admLoadCantieri() {
+  const q = ($('adm-cant-search')?.value || '').trim()
+  const tbody = $('tbody-adm-cant')
+  const emptyDiv = $('adm-cant-empty')
+  try {
+    let qb = sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,cantiere_cnce,prot_int').eq('elimina',0).order('updated_at',{ascending:false}).limit(100)
+    if (q) qb = qb.or(`cantiere_indirizzo.ilike.*${q}*,cantiere_etichetta.ilike.*${q}*,comune_nome.ilike.*${q}*,cantiere_cnce.ilike.*${q}*`)
+    const { data, error } = await qb
+    if (error) { toast('Errore: ' + error.message, 'err'); return }
+    const rows = data || []
+    if (!rows.length) {
+      tbody.innerHTML = ''
+      emptyDiv?.classList.remove('hidden')
+      return
+    }
+    emptyDiv?.classList.add('hidden')
+    tbody.innerHTML = rows.map(c => {
+      const label = c.cantiere_etichetta || `${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.08)">
+        <td style="padding:8px 10px">${esc(c.cantiere_indirizzo||'')} ${esc(c.cantiere_civico||'')}</td>
+        <td style="padding:8px 10px;color:rgba(255,255,255,.6)">${esc(c.comune_nome||'–')}</td>
+        <td style="padding:8px 10px;color:rgba(255,255,255,.6)">${esc(c.cantiere_etichetta||'–')}</td>
+        <td style="padding:8px 10px;color:rgba(255,255,255,.6);font-family:monospace">${esc(c.cantiere_cnce||'–')}</td>
+        <td style="padding:8px 4px;text-align:right">
+          <button class="btn-primary btn-sm" onclick="admEditCantiere('${esc(c.cantiere_id)}')">✏️ Modifica</button>
+        </td>
+      </tr>`
+    }).join('')
+  } catch(e) { toast('Errore: ' + e.message, 'err') }
+}
+
+async function admEditCantiere(cantId) {
+  const { data: c, error } = await sb.from('cantieri').select('*').eq('cantiere_id', cantId).single()
+  if (error || !c) { toast('Cantiere non trovato', 'err'); return }
+  resetModalCantiere()
+  window._editCantId = cantId
+  $('modal-cant-title').textContent = '✏️ Modifica cantiere'
+  vSet('mc-ind', c.cantiere_indirizzo || '')
+  vSet('mc-civ', c.cantiere_civico || '')
+  vSet('mc-etich', c.cantiere_etichetta || '')
+  vSet('mc-cap', c.cantiere_cap || '')
+  vSet('mc-cnce', c.cantiere_cnce || '')
+  vSet('mc-cod-uni', c.nodo_id || '')
+  vSet('mc-data-ult', c.data_ult || '')
+  vSet('mc-comune-cod', c.cantiere_comune_cod || '')
+  vSet('mc-tip-ope-altro', c.cantiere_tip_ope_altro || '')
+  const comSel = $('mc-com')
+  if (comSel) {
+    // prova a selezionare il comune esistente, altrimenti lascia testo libero
+    const opt = [...comSel.options].find(o => o.value === c.comune_nome || o.textContent === c.comune_nome)
+    if (opt) comSel.value = opt.value
+  }
+  if ($('mc-tip-int') && c.cantiere_tip_int) $('mc-tip-int').value = c.cantiere_tip_int
+  if ($('mc-tip-ope') && c.cantiere_tip_ope) {
+    $('mc-tip-ope').value = c.cantiere_tip_ope
+    if (c.cantiere_tip_ope == 16 && c.cantiere_tip_ope_altro) $('mc-tip-ope-altro-wrap')?.classList.remove('hidden')
+  }
+  if ($('mc-durata') && c.cantiere_durata) $('mc-durata').value = c.cantiere_durata
+  if ($('mc-importo') && c.cantiere_importo) $('mc-importo').value = c.cantiere_importo
+  show('modal-cant')
+}
+$('adm-cant-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadCantieri() })
+window.admLoadCantieri = admLoadCantieri
+window.admEditCantiere = admEditCantiere
 
 // ══════════════════════════════════════════════════════════════
 // ── QUICK DETAIL – VISITA e CANTIERE
