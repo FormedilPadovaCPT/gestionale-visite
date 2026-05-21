@@ -1482,6 +1482,7 @@ function fmtDate(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateSt
 function toast(msg,type='',ms=3500){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;$('toast-area').appendChild(t);setTimeout(()=>t.remove(),ms)}
 function show(id){$(id).classList.remove('hidden')}
 function hide(id){$(id).classList.add('hidden')}
+window.show=show;window.hide=hide;
 function calcIPC(chk){
   const vals=Object.values(chk)
   const np=vals.filter(v=>v==='NC+').length
@@ -3172,7 +3173,7 @@ function annoEdile(){
 // ── DASHBOARD ──
 async function loadDash(){
   const ae=annoEdile()
-  const{data}=await sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).gte('data_visita',ae.da).lte('data_visita',ae.a).eq('elimina',0).order('nr_verbale',{ascending:false})
+  const{data}=await sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).gte('data_visita',ae.da).lte('data_visita',ae.a).eq('elimina',0).order('data_visita',{ascending:false})
   const vs=data||[]
   $('s-tot').textContent=vs.length
   $('s-alto').textContent=vs.filter(v=>v.ipc==='ALTO').length
@@ -3186,7 +3187,7 @@ async function loadDash(){
 async function loadLista(){
   const q=vGet('q-search').trim()
   const fi=vGet('q-ipc');const fs=vGet('q-stato')
-  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).eq('elimina',0).order('nr_verbale',{ascending:false}).limit(2000)
+  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).eq('elimina',0).order('data_visita',{ascending:false}).limit(2000)
   if(fi)qb=qb.eq('ipc',fi)
   if(fs)qb=qb.eq('stato',fs)
   const{data}=await qb
@@ -3236,7 +3237,7 @@ $('btn-pdf').onclick=()=>{
 // ── LISTA CANTIERI ──
 async function loadCantieri(q=''){
   const qStr=q||vGet('q-cant')?.trim()||''
-  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina').eq('elimina',0).order('cantiere_indirizzo').limit(200)
+  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina').eq('elimina',0).order('updated_at',{ascending:false}).limit(200)
   if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*`)
   const{data,error}=await qb
   if(error){toast('Errore caricamento cantieri: '+error.message,'err');return}
