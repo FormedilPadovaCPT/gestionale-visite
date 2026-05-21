@@ -1362,9 +1362,9 @@ window.__safetyTimer = setTimeout(function(){
     sl.classList.add('hidden');
     sl2.classList.remove('hidden');
     var el = document.getElementById('login-err');
-    if(el){ el.textContent = 'Timeout avvio – controlla la connessione e ricarica la pagina.'; el.style.display='block'; }
+    if(el){ el.textContent = 'Errore di avvio – verifica la connessione internet e ricarica la pagina.'; el.style.display='block'; }
   }
-}, 4000);
+}, 15000);
 
 // Intercetta errori del modulo
 window.onerror = function(msg, src, line, col, err) {
@@ -1502,6 +1502,8 @@ function cSet(id,v){if($(id))$(id).checked=!!v}
 
 // ── AUTH ──
 async function initAuth(){
+  // Cancella subito il safety timer: il modulo è caricato, solo Supabase potrebbe essere lento
+  if(window.__safetyTimer){clearTimeout(window.__safetyTimer);window.__safetyTimer=null}
   try{
     const{data:{session},error}=await sb.auth.getSession()
     if(error)throw error
