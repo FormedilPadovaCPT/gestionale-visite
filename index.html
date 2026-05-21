@@ -44,10 +44,11 @@ label{display:block;font-weight:600;margin-bottom:4px;color:var(--grey);font-siz
 .badge-definitivo{background:#e8f8ee;color:var(--ok)}
 .sect-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--grey);background:var(--light);padding:5px 10px;border-radius:var(--radius);margin-bottom:10px;margin-top:4px}
 /* LOADING */
-#screen-loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--orange);z-index:9999;animation:autoHideLoad 0.4s ease-out 5s forwards}
-@keyframes autoHideLoad{to{opacity:0;pointer-events:none;visibility:hidden}}
+#screen-loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--orange);z-index:9999}
+#screen-loading.hidden{display:none}
 .load-logo{color:#fff;font-size:22px;font-weight:700;letter-spacing:1px;text-align:center}
 .load-logo small{display:block;font-size:13px;font-weight:400;opacity:.8;margin-top:4px}
+.load-status{display:block;font-size:11px;font-weight:400;opacity:.7;margin-top:10px;min-height:14px}
 /* LOGIN */
 #screen-login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--orange) 0%,#b83d0a 100%);padding:20px}
 .login-card{background:#fff;border-radius:16px;padding:36px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
@@ -295,8 +296,23 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 </script>
 
 <div id="screen-loading">
-  <div class="load-logo">FORMEDIL PADOVA<small>Caricamento…</small></div>
+  <div class="load-logo">FORMEDIL PADOVA<small>Caricamento…</small><span class="load-status" id="load-status">Inizializzazione…</span></div>
 </div>
+<script>
+// Aggiornamento periodico stato di caricamento (rassicurante in caso di rete lenta)
+(function(){
+  var msgs=['Inizializzazione…','Caricamento libreria…','Connessione al server…','Quasi pronto…','Avvio in corso…'];
+  var i=0;
+  window.__loadStatusInt=setInterval(function(){
+    var el=document.getElementById('load-status');
+    if(!el)return;
+    var sl=document.getElementById('screen-loading');
+    if(sl && sl.classList.contains('hidden')){clearInterval(window.__loadStatusInt);return;}
+    i=(i+1)%msgs.length;
+    el.textContent=msgs[i];
+  },3000);
+})();
+</script>
 
 <!-- LOGIN -->
 <div id="screen-login" class="hidden">
@@ -1417,46 +1433,97 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 
 <!-- Script di sicurezza: garantisce l'uscita dalla schermata di caricamento -->
 <script>
-// Timeout di sicurezza: se il modulo non parte entro 10s, mostra il login
-window.__safetyTimer = setTimeout(function(){
+// Helper: mostra schermata di login con messaggio di errore + pulsante ricarica
+function __showStartupError(titleHtml, detailHtml){
   var sl = document.getElementById('screen-loading');
   var sl2 = document.getElementById('screen-login');
-  if(sl && !sl.classList.contains('hidden') && sl2) {
-    sl.classList.add('hidden');
-    sl2.classList.remove('hidden');
-    var el = document.getElementById('login-err');
-    if(el){ el.textContent = 'Errore di avvio – verifica la connessione internet e ricarica la pagina.'; el.style.display='block'; }
+  if(sl) sl.classList.add('hidden');
+  if(sl2) sl2.classList.remove('hidden');
+  var el = document.getElementById('login-err');
+  if(!el) return;
+  var online = navigator.onLine ? '🟢 Online' : '🔴 Offline';
+  el.innerHTML =
+    '<div style="font-weight:700;margin-bottom:6px">⚠️ ' + titleHtml + '</div>' +
+    '<div style="font-weight:400;font-size:12px;line-height:1.4">' + detailHtml + '</div>' +
+    '<div style="font-size:11px;color:#888;margin-top:6px">Stato rete: ' + online + '</div>' +
+    '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">' +
+      '<button type="button" onclick="location.reload()" style="padding:6px 14px;background:#e7500f;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px">🔄 Ricarica</button>' +
+      '<button type="button" onclick="var p=document.getElementById(\'diag-panel\');if(p)p.style.display=\'block\'" style="padding:6px 14px;background:#fff;color:#565c66;border:1px solid #ccc;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px">🔍 Dettagli</button>' +
+    '</div>';
+  el.style.display='block';
+}
+
+// Timeout di sicurezza: se il modulo non parte entro 25s, mostra il login con errore
+window.__safetyTimer = setTimeout(function(){
+  var sl = document.getElementById('screen-loading');
+  if(sl && !sl.classList.contains('hidden')){
+    var detail = navigator.onLine
+      ? 'Sembri connesso, ma il caricamento è bloccato. Possibili cause: CDN (cdn.jsdelivr.net / esm.sh) bloccato da firewall o proxy aziendale, oppure connessione molto lenta.'
+      : 'Sei offline. Connettiti a internet e ricarica la pagina.';
+    __showStartupError('Errore di avvio', detail);
   }
-}, 15000);
+}, 25000);
 
 // Intercetta errori del modulo
 window.onerror = function(msg, src, line, col, err) {
   clearTimeout(window.__safetyTimer);
   var sl = document.getElementById('screen-loading');
-  var sl2 = document.getElementById('screen-login');
-  if(sl && !sl.classList.contains('hidden') && sl2) {
-    sl.classList.add('hidden');
-    sl2.classList.remove('hidden');
-    var el = document.getElementById('login-err');
-    if(el){ el.textContent = 'Errore JS: ' + msg + ' (riga ' + line + ')'; el.style.display='block'; }
+  if(sl && !sl.classList.contains('hidden')){
+    __showStartupError('Errore JavaScript', (msg||'sconosciuto') + ' (riga ' + (line||'?') + ')');
   }
 };
 window.onunhandledrejection = function(e) {
   clearTimeout(window.__safetyTimer);
   var sl = document.getElementById('screen-loading');
-  var sl2 = document.getElementById('screen-login');
-  if(sl && !sl.classList.contains('hidden') && sl2) {
-    sl.classList.add('hidden');
-    sl2.classList.remove('hidden');
-    var el = document.getElementById('login-err');
-    if(el){ el.textContent = 'Errore connessione: ' + ((e.reason && e.reason.message) || e.reason || 'sconosciuto'); el.style.display='block'; }
+  if(sl && !sl.classList.contains('hidden')){
+    var m = (e && e.reason && e.reason.message) || (e && e.reason) || 'sconosciuto';
+    __showStartupError('Errore di connessione', String(m));
   }
 };
 </script>
 
 <script type="module">
-console.log("%c Gestionale v2025-05-14 caricato correttamente ✓", "color:green;font-weight:bold;font-size:14px")
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+console.log("%c Gestionale v2025-05-21 caricato correttamente ✓", "color:green;font-weight:bold;font-size:14px")
+
+// ── Caricamento robusto di Supabase con fallback su più CDN ───────────────────
+// Risolve i blocchi di avvio causati da CDN irraggiungibili (firewall, proxy,
+// connessione lenta). Prova in ordine jsdelivr → esm.sh → skypack.
+async function __loadSupabase(){
+  const cdns = [
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
+    'https://esm.sh/@supabase/supabase-js@2',
+    'https://cdn.skypack.dev/@supabase/supabase-js@2'
+  ];
+  let lastErr=null;
+  for(const url of cdns){
+    try{
+      const m = await import(url);
+      if(m && typeof m.createClient==='function'){
+        console.log('[boot] Supabase caricato da', url);
+        return m.createClient;
+      }
+    }catch(e){
+      lastErr=e;
+      console.warn('[boot] CDN non raggiungibile:', url, (e&&e.message)||e);
+    }
+  }
+  throw new Error('Tutti i CDN Supabase non raggiungibili'+(lastErr?': '+(lastErr.message||lastErr):''));
+}
+
+let createClient;
+try{
+  createClient = await __loadSupabase();
+}catch(e){
+  // Mostra schermata di errore con dettaglio e pulsante ricarica
+  if(window.__safetyTimer){clearTimeout(window.__safetyTimer);window.__safetyTimer=null;}
+  if(typeof __showStartupError==='function'){
+    __showStartupError('CDN bloccato',
+      'Impossibile caricare la libreria Supabase da nessun CDN. ' +
+      'Probabile causa: firewall o proxy aziendale che blocca cdn.jsdelivr.net, esm.sh e skypack.dev. ' +
+      'Contatta l\'IT per autorizzare questi domini, oppure usa una connessione diversa.');
+  }
+  throw e;
+}
 
 const SB_URL='https://utdantrfugnmqsuujxbe.supabase.co'
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0ZGFudHJmdWdubXFzdXVqeGJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNjEzMTYsImV4cCI6MjA5MzgzNzMxNn0.L6YUgMD9rYPtqZCn5-c6hB-ok5nSCISpSolj_a-pcmM'
@@ -1588,7 +1655,12 @@ async function initAuth(){
   // Cancella subito il safety timer: il modulo è caricato, solo Supabase potrebbe essere lento
   if(window.__safetyTimer){clearTimeout(window.__safetyTimer);window.__safetyTimer=null}
   try{
-    const{data:{session},error}=await sb.auth.getSession()
+    // Timeout di 12s sulla getSession per evitare hang se Supabase non risponde
+    const getSessionWithTimeout = Promise.race([
+      sb.auth.getSession(),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timeout Supabase Auth (12s) – server non risponde')),12000))
+    ])
+    const{data:{session},error}=await getSessionWithTimeout
     if(error)throw error
     if(session)await onLogin(session.user)
     else showScr('login')
@@ -1600,10 +1672,14 @@ async function initAuth(){
     })
   }catch(e){
     console.error('initAuth error:',e)
-    // In caso di errore mostra comunque il login
+    // In caso di errore mostra comunque il login con messaggio chiaro
     showScr('login')
-    const el=document.getElementById('login-err')
-    if(el){el.textContent='Errore di connessione: '+e.message;el.style.display='block'}
+    if(typeof __showStartupError==='function'){
+      __showStartupError('Errore di connessione a Supabase', (e&&e.message)||String(e))
+    }else{
+      const el=document.getElementById('login-err')
+      if(el){el.textContent='Errore di connessione: '+((e&&e.message)||e);el.style.display='block'}
+    }
   }
 }
 async function onLogin(user){
