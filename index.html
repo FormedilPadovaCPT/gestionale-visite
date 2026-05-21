@@ -4163,9 +4163,11 @@ async function genPDF(vid, output='save'){
       const nome=im.imprese?.impresa_nome||'–'
       const ruolo=im.ruolo||'–'
       const cf=im.imprese?.impresa_cf||'–'
+      const piva=im.imprese?.piva||''
       const email=im.imprese?.impresa_email_ref||'–'
+      const nomeCell=`${i+1}. ${nome}`+(piva?`\nP.IVA: ${piva}`:'')
       impsRows.push([
-        {content:`${i+1}. ${nome}`,styles:{fontStyle:'bold'}},
+        {content:nomeCell,styles:{fontStyle:'bold'}},
         {content:ruolo,styles:{halign:'center'}},
         {content:cf},
         {content:email,styles:{fontSize:6.5}}
