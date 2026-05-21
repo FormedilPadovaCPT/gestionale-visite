@@ -6175,6 +6175,10 @@ async function showCantiereDetail(cantId){
     }
     $('qd-actions').innerHTML=''
     $('qd-actions').appendChild(btnNuova)
+  }catch(e){
+    console.error('showCantiereDetail:',e)
+    $('qd-body').innerHTML=`<div style="color:#c0392b;padding:12px">Errore: ${esc(e.message)}</div>`
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
