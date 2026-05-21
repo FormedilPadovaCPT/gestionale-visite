@@ -5916,13 +5916,13 @@ async function showVisitaDetail(vid){
   show('modal-qd')
   try{
     const{data:v,error}=await sb.from('visite').select(`
-      visita_id,nr_verbale,data_visita,ora_visita,ora_fine,ipc,ipc_nc_pos,ipc_nc_neg,ipc_oss,stato,
-      tipo_accesso,acc_cant,nr_lavoratori,nr_lav_stranieri,prescrizioni,oss_tec,
+      visita_id,nr_verbale,data_visita,ora_visita,ora_fine,ipc,ipc_nc_plus,ipc_nc_minus,ipc_oss,stato,
+      tipo_accesso,acc_cant,nr_lavoratori,nr_lavoratori_stranieri,prescrizioni,oss_tec,
       tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),
       cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,prot_int),
       imprese(impresa_nome,piva)
     `).eq('visita_id',vid).single()
-    if(error||!v){toast('Visita non trovata','err');hide('modal-qd');return}
+    if(error||!v){toast('Visita non trovata'+(error?' – '+error.message:''),'err');hide('modal-qd');return}
     const ipc=v.ipc||'NR'
     const isBozza=(v.stato||'bozza')==='bozza'
     const tec=v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():'–'
@@ -5934,8 +5934,8 @@ async function showVisitaDetail(vid){
     html+=qdDl([
       ['Data',fmtDate(v.data_visita)],['Ora',ora],['Tecnico',tec],
       ['Tipo accesso',_TIPO_ACC[v.tipo_accesso]||''],['N° accesso',v.acc_cant||''],
-      ['Lavoratori',v.nr_lavoratori!=null?`${v.nr_lavoratori} (stranieri: ${v.nr_lav_stranieri||0})`:''],
-      ['NC+ / NC- / OSS',[v.ipc_nc_pos,v.ipc_nc_neg,v.ipc_oss].map(x=>x||0).join(' / ')],
+      ['Lavoratori',v.nr_lavoratori!=null?`${v.nr_lavoratori} (stranieri: ${v.nr_lavoratori_stranieri||0})`:''],
+      ['NC+ / NC- / OSS',[v.ipc_nc_plus,v.ipc_nc_minus,v.ipc_oss].map(x=>x||0).join(' / ')],
     ])
     if(cant){
       html+=qdSec('Cantiere')
