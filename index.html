@@ -6497,7 +6497,9 @@ async function admEsportaExcel(){
     ws3['!cols']=[{wch:28},{wch:28},{wch:50}]
     XLSX.utils.book_append_sheet(wb,ws3,'Lavorazioni')
     const ws4Data=[['Codice','Macro-area','Descrizione','Esito','Nota']]
-    const allCodes=Object.keys(snap.checklist||{})
+    // Base = TUTTE le voci dal DB; overlay con i valori dello snap (snap puo' avere solo voci non-NA)
+    const allCodes=Object.keys(voci).length>0?Object.keys(voci):Object.keys(snap.checklist||{})
+    Object.keys(snap.checklist||{}).forEach(c=>{if(!allCodes.includes(c))allCodes.push(c)})
     Object.keys(snap.note_checklist||{}).forEach(c=>{if(!allCodes.includes(c))allCodes.push(c)})
     allCodes.sort().forEach(cod=>{
       ws4Data.push([cod,_chkMacroArea(cod),voci[cod]||cod,_xlsxValLabel(snap.checklist?.[cod]||'NA'),snap.note_checklist?.[cod]||''])
@@ -6633,11 +6635,6 @@ document.getElementById('btn-adm-load-xlsx')?.addEventListener('click',function(
   _xlsxPending=null;if(_fi)_fi.value=''
   const t=document.querySelector('[data-tab="form"]');if(t)t.click()
   setTimeout(function(){applySnap(snap);toast('Visita caricata da Excel','ok')},300)
-})
-document.getElementById('btn-adm-cancel-xlsx')?.addEventListener('click',function(){
-  const p=document.getElementById('adm-xlsx-preview');if(p)p.style.display='none'
-  _xlsxPending=null;if(_fi)_fi.value=''
-})
 
 </script>
 </body>
