@@ -6332,6 +6332,313 @@ async function showRubricaDetail(tipo, id){
 }
 window.showRubricaDetail=showRubricaDetail
 
+// ── EXCEL EXPORT / IMPORT ──
+
+const _CHK_PREF={
+  'IMP_LOG':'Logistica','IMP_IGS':'Appr. igienico-sanitari',
+  'IMP_ELE':'Impianti elettrici','IMP_AGI':'Agibilita cantiere',
+  'IMP_ORG':'Organizzazione lavoro','IMP_SEG':'Segnaletica','IMP_CON':'Condizioni al contorno',
+  'PLL_SCA':'Aree di scavo','PLL_DEM':'Aree demolizione','PLL_OCA':'Altre aree pericolo','PLL_PER':'Opere in c.a.',
+  'SOL_GRU':'Gru','SOL_AUT':'Autogru','SOL_ARG':'Argano',
+  'SOL_PIA':'Piattaforme elevabili','SOL_ASO':'Altri sollevatori',
+  'ASU_ATT':'Attrezzature','ASU_SCA':'Scale','ASU_UTE':'Utensili',
+  'MAC_MAS':'Macchine mov. terra','MAC_MMM':'Macchine mov. materiale','MAC_MMT':'Macchine stradali',
+  'OPE_POF':'Ponteggi fissi','OPE_POS':'Ponteggi sospesi','OPE_POC':'Ponti su cavalletti',
+  'OPE_POT':'Trabattelli','OPE_DPC':'Altri DPC',
+  'PIN_IND':'Indumenti protezione','PIN_TES':'Protezione testa','PIN_PIE':'Protezione piedi',
+  'PIN_MAN':'Protezione mani','PIN_UDI':'Protezione udito',
+  'PIN_CAD':'Protezione caduta','PIN_OCC':'Protezione occhi','PIN_RES':'Protezione resp.',
+  'DOC_GEN':'Doc. generale','DOC_GEN_SOL':'Doc. sollevamento','DOC_MA4':'Doc. macchine',
+  'DOC_ELE':'Doc. imp. elettrico','DOC_PON':'Doc. ponteggi',
+  'SOG_FIG':'Nomine figure sistema',
+  'FOR_BAS':'Formazione base','FOR_FIG':'Form. figura sistema',
+  'FOR_RIS':'Form. rischi specifici','FOR_ATM':'Form. attrezzature'
+}
+function _chkMacroArea(c){return _CHK_PREF[c.substring(0,7)]||_CHK_PREF[c.substring(0,6)]||c.split('_').slice(0,2).join('_')}
+function _xlsxValLabel(v){
+  if(!v||v==='NA')return 'N/A'
+  if(v==='VER')return 'Verificato'
+  if(v==='NC-')return 'NC lieve'
+  if(v==='NC+')return 'NC grave'
+  if(v==='OSS')return 'Osservazione'
+  if(v==='NP')return 'Non presente'
+  return v
+}
+async function _loadSnapForVerbale(verbale){
+  const nr=verbale.trim().toUpperCase()
+  const{data:vRow,error}=await sb.from('visite').select('visita_id').eq('nr_verbale',nr).maybeSingle()
+  if(error||!vRow)throw new Error('Verbale non trovato: '+nr)
+  const vid=vRow.visita_id
+  const{data:snapRow}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).maybeSingle()
+  if(snapRow?.snapshot)return snapRow.snapshot
+  const{data:v}=await sb.from('visite').select('*,tecnici!visite_tecnico_id_fkey(*),cantieri(*)').eq('visita_id',vid).single()
+  if(!v)throw new Error('Dati non trovati')
+  const{data:chkRows}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
+  const{data:lavRows}=await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid)
+  const{data:impRows}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva,ind_imp,com_imp)').eq('visita_id',vid).order('ordine')
+  const checklist={},note_checklist={}
+  ;(chkRows||[]).forEach(r=>{checklist[r.codice]=r.valore||'NA';if(r.nota)note_checklist[r.codice]=r.nota})
+  const cant=v.cantieri||{}
+  return{visita_id:vid,nr_verbale_origine:v.nr_verbale||'',
+    data_visita:v.data_visita||null,ora_visita:v.ora_visita||null,ora_fine:v.ora_fine||null,
+    tipo_accesso:v.tipo_accesso||null,acc_cant:v.acc_cant||null,
+    rlst_sn:v.rlst_sn,stage_vis:v.stage_vis,nom_stage:v.nom_stage||null,
+    ppre_nome:v.ppre_nome||null,ppre_cog:v.ppre_cog||null,qual_ppre:v.qual_ppre||null,tel_ppre:v.tel_ppre||null,
+    tecnico_email:v.tecnici?.email||null,
+    tec_display:v.tecnici?(v.tecnici.tecnico_nome+' '+v.tecnici.tecnico_cognome).trim():null,
+    cantiere_id:v.cantiere_id||null,
+    cantiere_label:cant.cantiere_etichetta||((cant.cantiere_indirizzo||'')+' '+(cant.cantiere_civico||'')).trim(),
+    cantiere_detail:cant.comune_nome||null,prot_int:cant.prot_int||null,cnce:cant.cantiere_cnce||null,cod_uni:cant.nodo_id||null,
+    comm_tipo_sogg:v.comm_tipo_sogg||null,comm_tipo:v.comm_tipo||null,
+    comm_nome:v.comm_nome||null,comm_cog:v.comm_cog||null,comm_cf:v.comm_cf||null,
+    comm_email:v.comm_email||null,comm_tel:v.comm_tel||null,
+    comm_rag_soc:v.comm_rag_soc||null,comm_piva:v.comm_piva||null,coord:v.coord||false,
+    rl_nome:v.resp_lav||null,rl_email:v.rl_email||null,rl_tel:v.rl_tel||null,
+    csp_nome:v.csp||null,csp_email:v.csp_email||null,csp_tel:v.csp_tel||null,
+    cse_nome:v.cse||null,cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
+    nr_imp:v.nr_imp||0,nr_ind:v.nr_ind||0,nr_lavoratori:v.nr_lavoratori||0,nr_lavoratori_stranieri:v.nr_lavoratori_stranieri||0,
+    importo:v.importo||null,costi:v.costi||null,stato_lav:v.stato_lav||null,
+    imprese:(impRows||[]).map((im,i)=>({
+      impresa_id:im.impresa_id||'',impresa_nome:im.imprese?.impresa_nome||'',
+      piva:im.imprese?.piva||'',cf_imp:im.imprese?.impresa_cf||'',
+      ind_imp:im.imprese?.ind_imp||'',com_imp:im.imprese?.com_imp||'',
+      att:im.att||'',capo_nome:im.capo_nome||'',capo_cog:im.capo_cog||'',
+      badge:im.badge||'',tipo_imp:im.tipo_imp||'',is_principale:i===0
+    })),
+    checklist,note_checklist,
+    lavorazioni:(lavRows||[]).map(l=>({genere:l.genere,fase:l.fase,lavorazione:l.lavorazione})),
+    oss_tec:v.oss_tec||null,oss_int:v.oss_tec_int||null,
+    note_for_sn:v.note_for_sn||false,note_for_m:v.note_for_m||null,
+    segnalazione:v.segnalazione||false,data_ritorno:v.data_ritorno||null,
+    exported_at:new Date().toISOString()
+  }
+}
+let _chkVociCache=null
+async function _getChkVoci(){
+  if(_chkVociCache)return _chkVociCache
+  const{data}=await sb.from('checklist_voci').select('codice,descrizione').order('ordine')
+  _chkVociCache={}
+  ;(data||[]).forEach(r=>{_chkVociCache[r.codice]=r.descrizione||r.codice})
+  return _chkVociCache
+}
+async function admEsportaExcel(){
+  const verbale=($('adm-excel-verbale')?.value||'').trim()
+  const msgEl=$('adm-excel-exp-msg')
+  const btn=$('btn-adm-excel-exp')
+  if(!verbale){
+    if(msgEl){msgEl.textContent='Inserisci il numero verbale.';msgEl.style.display='block';msgEl.style.color='#e74c3c'}
+    return
+  }
+  btn.disabled=true;btn.textContent='Generazione...'
+  if(msgEl)msgEl.style.display='none'
+  try{
+    toast('Recupero dati visita...')
+    const snap=await _loadSnapForVerbale(verbale)
+    const voci=await _getChkVoci()
+    const wb=XLSX.utils.book_new()
+    const TACC={'1':'Su segnalazione','2':'Su richiesta','3':'Protocolli intesa','4':'RLS/RLST','5':'Programmata','6':'Cantiere qualita','7':'Dal CPT'}
+    const ILBL={'1':'fino a 250k','2':'250k-500k','3':'500k-1M','4':'1-1,5M','5':'1,5-2,5M','6':'2,5-3,5M','7':'3,5-5M','8':'5-10M','11':'N/D'}
+    const ws1Data=[['Campo','Valore'],
+      ['N. Verbale',snap.nr_verbale_origine||''],
+      ['Data visita',snap.data_visita||''],
+      ['Ora inizio',snap.ora_visita||''],
+      ['Ora fine',snap.ora_fine||''],
+      ['Tipo accesso',TACC[String(snap.tipo_accesso)]||snap.tipo_accesso||''],
+      ['Accesso cantiere',snap.acc_cant||''],
+      ['RLST presente',(snap.rlst_sn==='1'||snap.rlst_sn===true)?'Si':'No'],
+      ['Stagista presente',(snap.stage_vis==='1'||snap.stage_vis===true)?'Si':'No'],
+      ['Nome stagista',snap.nom_stage||''],
+      ['Pers. presente - Nome',snap.ppre_nome||''],
+      ['Pers. presente - Cognome',snap.ppre_cog||''],
+      ['Pers. presente - Qualifica',snap.qual_ppre||''],
+      ['Pers. presente - Tel.',snap.tel_ppre||''],
+      ['Tecnico',snap.tec_display||snap.tecnico_email||''],
+      ['Cantiere',snap.cantiere_label||''],
+      ['Cantiere dettaglio',snap.cantiere_detail||''],
+      ['Prot. interno',snap.prot_int||''],
+      ['CNCE',snap.cnce||''],
+      ['Cod. Unico',snap.cod_uni||''],
+      ['Committente tipo',(snap.comm_tipo==='1'||snap.comm_tipo===1)?'Pubblico':(snap.comm_tipo==='2'||snap.comm_tipo===2)?'Privato':'N/D'],
+      ['Committente soggetto',snap.comm_tipo_sogg==='PG'?'Persona giuridica':'Persona fisica'],
+      ['Committente nome',snap.comm_nome||''],
+      ['Committente cognome',snap.comm_cog||''],
+      ['Committente CF',snap.comm_cf||''],
+      ['Committente email',snap.comm_email||''],
+      ['Committente tel.',snap.comm_tel||''],
+      ['Committente rag. soc.',snap.comm_rag_soc||''],
+      ['Committente P.IVA',snap.comm_piva||''],
+      ['Coordinamento',snap.coord?'Si':'No'],
+      ['RL - Nome',snap.rl_nome||''],['RL - Email',snap.rl_email||''],['RL - Tel.',snap.rl_tel||''],
+      ['CSP - Nome',snap.csp_nome||''],['CSP - Email',snap.csp_email||''],['CSP - Tel.',snap.csp_tel||''],
+      ['CSE - Nome',snap.cse_nome||''],['CSE - Email',snap.cse_email||''],['CSE - Tel.',snap.cse_tel||''],
+      ['N. imprese',snap.nr_imp||''],['N. lav. indip.',snap.nr_ind||''],
+      ['N. lavoratori',snap.nr_lavoratori||''],['N. lav. stranieri',snap.nr_lavoratori_stranieri||''],
+      ['Importo lavori',ILBL[String(snap.importo)]||snap.importo||''],
+      ['Tipo lavorazione',snap.stato_lav||''],
+      ['Segnalazione',snap.segnalazione?'Si':'No'],
+      ['Data ritorno',snap.data_ritorno||''],
+      ['Osservazioni tecniche',snap.oss_tec||''],
+      ['Note interne',snap.oss_int||''],
+      ['Note per mail',snap.note_for_m||'']
+    ]
+    const ws1=XLSX.utils.aoa_to_sheet(ws1Data)
+    ws1['!cols']=[{wch:30},{wch:60}]
+    XLSX.utils.book_append_sheet(wb,ws1,'Visita')
+    const ws2Data=[['#','Ragione sociale','P.IVA','CF','Indirizzo','Comune','Attivita','Capo nome','Capo cognome','Badge','Tipo','Princ.']]
+    ;(snap.imprese||[]).forEach((im,i)=>{
+      ws2Data.push([i+1,im.impresa_nome||'',im.piva||'',im.cf_imp||'',im.ind_imp||'',im.com_imp||'',im.att||'',im.capo_nome||'',im.capo_cog||'',im.badge||'',im.tipo_imp||'',im.is_principale?'Si':'No'])
+    })
+    const ws2=XLSX.utils.aoa_to_sheet(ws2Data)
+    ws2['!cols']=[{wch:4},{wch:30},{wch:14},{wch:16},{wch:24},{wch:16},{wch:14},{wch:14},{wch:14},{wch:10},{wch:8},{wch:6}]
+    XLSX.utils.book_append_sheet(wb,ws2,'Imprese')
+    const ws3Data=[['Genere','Fase','Lavorazione']]
+    ;(snap.lavorazioni||[]).forEach(l=>{ws3Data.push([l.genere||'',l.fase||'',l.lavorazione||''])})
+    const ws3=XLSX.utils.aoa_to_sheet(ws3Data)
+    ws3['!cols']=[{wch:28},{wch:28},{wch:50}]
+    XLSX.utils.book_append_sheet(wb,ws3,'Lavorazioni')
+    const ws4Data=[['Codice','Macro-area','Descrizione','Esito','Nota']]
+    const allCodes=Object.keys(snap.checklist||{})
+    Object.keys(snap.note_checklist||{}).forEach(c=>{if(!allCodes.includes(c))allCodes.push(c)})
+    allCodes.sort().forEach(cod=>{
+      ws4Data.push([cod,_chkMacroArea(cod),voci[cod]||cod,_xlsxValLabel(snap.checklist?.[cod]||'NA'),snap.note_checklist?.[cod]||''])
+    })
+    const ws4=XLSX.utils.aoa_to_sheet(ws4Data)
+    ws4['!cols']=[{wch:16},{wch:28},{wch:50},{wch:18},{wch:60}]
+    XLSX.utils.book_append_sheet(wb,ws4,'Checklist')
+    const fname='visita_'+(snap.nr_verbale_origine||'export').replace(/\//g,'-')+'.xlsx'
+    XLSX.writeFile(wb,fname)
+    toast('Excel scaricato: '+fname,'ok')
+    if(msgEl){msgEl.textContent='File scaricato: '+fname;msgEl.style.display='block';msgEl.style.color='#27ae60'}
+  }catch(e){
+    console.error('admEsportaExcel:',e)
+    toast('Errore: '+e.message,'err')
+    if(msgEl){msgEl.textContent='Errore: '+e.message;msgEl.style.display='block';msgEl.style.color='#e74c3c'}
+  }finally{btn.disabled=false;btn.textContent='Esporta Excel'}
+}
+document.getElementById('btn-adm-excel-exp')?.addEventListener('click',admEsportaExcel)
+
+let _xlsxPending=null
+function _parseXlsxSnap(wb){
+  const snap={}
+  const ws1=wb.Sheets['Visita']
+  if(ws1){
+    const rows=XLSX.utils.sheet_to_json(ws1,{header:1,defval:''})
+    const m={}
+    rows.slice(1).forEach(r=>{if(r[0])m[String(r[0]).trim()]=String(r[1]??'').trim()})
+    snap.nr_verbale_origine=m['N. Verbale']||''
+    snap.data_visita=m['Data visita']||null
+    snap.ora_visita=m['Ora inizio']||null
+    snap.ora_fine=m['Ora fine']||null
+    const ta={'Su segnalazione':'1','Su richiesta':'2','Protocolli intesa':'3','RLS/RLST':'4','Programmata':'5','Cantiere qualita':'6','Dal CPT':'7'}
+    snap.tipo_accesso=ta[m['Tipo accesso']]||null
+    snap.rlst_sn=m['RLST presente']==='Si'?'1':'0'
+    snap.stage_vis=m['Stagista presente']==='Si'?'1':'0'
+    snap.nom_stage=m['Nome stagista']||null
+    snap.ppre_nome=m['Pers. presente - Nome']||null
+    snap.ppre_cog=m['Pers. presente - Cognome']||null
+    snap.qual_ppre=m['Pers. presente - Qualifica']||null
+    snap.tel_ppre=m['Pers. presente - Tel.']||null
+    snap.tec_display=m['Tecnico']||null
+    snap.cantiere_label=m['Cantiere']||null
+    snap.cantiere_detail=m['Cantiere dettaglio']||null
+    snap.prot_int=m['Prot. interno']||null
+    snap.cnce=m['CNCE']||null
+    snap.cod_uni=m['Cod. Unico']||null
+    snap.comm_tipo=m['Committente tipo']==='Pubblico'?'1':m['Committente tipo']==='Privato'?'2':null
+    snap.comm_tipo_sogg=m['Committente soggetto']==='Persona giuridica'?'PG':'PF'
+    snap.comm_nome=m['Committente nome']||null
+    snap.comm_cog=m['Committente cognome']||null
+    snap.comm_cf=m['Committente CF']||null
+    snap.comm_email=m['Committente email']||null
+    snap.comm_tel=m['Committente tel.']||null
+    snap.comm_rag_soc=m['Committente rag. soc.']||null
+    snap.comm_piva=m['Committente P.IVA']||null
+    snap.coord=m['Coordinamento']==='Si'
+    snap.rl_nome=m['RL - Nome']||null;snap.rl_email=m['RL - Email']||null;snap.rl_tel=m['RL - Tel.']||null
+    snap.csp_nome=m['CSP - Nome']||null;snap.csp_email=m['CSP - Email']||null;snap.csp_tel=m['CSP - Tel.']||null
+    snap.cse_nome=m['CSE - Nome']||null;snap.cse_email=m['CSE - Email']||null;snap.cse_tel=m['CSE - Tel.']||null
+    snap.nr_imp=parseInt(m['N. imprese'])||0
+    snap.nr_lavoratori=parseInt(m['N. lavoratori'])||0
+    snap.nr_lavoratori_stranieri=parseInt(m['N. lav. stranieri'])||0
+    snap.stato_lav=m['Tipo lavorazione']||null
+    snap.segnalazione=m['Segnalazione']==='Si'
+    snap.data_ritorno=m['Data ritorno']||null
+    snap.oss_tec=m['Osservazioni tecniche']||null
+    snap.oss_int=m['Note interne']||null
+    snap.note_for_m=m['Note per mail']||null
+  }
+  const ws2=wb.Sheets['Imprese']
+  if(ws2){
+    const rows=XLSX.utils.sheet_to_json(ws2,{header:1,defval:''})
+    snap.imprese=rows.slice(1).filter(r=>r[1]).map((r,i)=>({
+      impresa_nome:String(r[1]||''),piva:String(r[2]||''),cf_imp:String(r[3]||''),
+      ind_imp:String(r[4]||''),com_imp:String(r[5]||''),att:String(r[6]||''),
+      capo_nome:String(r[7]||''),capo_cog:String(r[8]||''),badge:String(r[9]||''),
+      tipo_imp:String(r[10]||''),is_principale:i===0,certif:[],ceiv:'',stage_imp:'',note_fasilav:'',pat:''
+    }))
+  }
+  const ws3=wb.Sheets['Lavorazioni']
+  if(ws3){
+    const rows=XLSX.utils.sheet_to_json(ws3,{header:1,defval:''})
+    snap.lavorazioni=rows.slice(1).filter(r=>r[0]).map(r=>({genere:String(r[0]||''),fase:String(r[1]||''),lavorazione:String(r[2]||'')}))
+  }
+  const ws4=wb.Sheets['Checklist']
+  if(ws4){
+    const rows=XLSX.utils.sheet_to_json(ws4,{header:1,defval:''})
+    snap.checklist={};snap.note_checklist={}
+    const em={'Verificato':'VER','NC lieve':'NC-','NC grave':'NC+','Osservazione':'OSS','Non presente':'NP','N/A':'NA'}
+    rows.slice(1).forEach(r=>{
+      const cod=String(r[0]||'').trim();if(!cod)return
+      snap.checklist[cod]=em[String(r[3]||'')]||'NA'
+      const nota=String(r[4]||'').trim();if(nota)snap.note_checklist[cod]=nota
+    })
+  }
+  return snap
+}
+function _admXlsxShowPreview(snap,fname){
+  _xlsxPending=snap
+  const ni=(snap.imprese||[]).length,nl=(snap.lavorazioni||[]).length,nc=Object.keys(snap.checklist||{}).length
+  const el=document.getElementById('adm-xlsx-info')
+  if(el)el.innerHTML='<b>File:</b> '+esc(fname)+'<br><b>Verbale:</b> '+esc(snap.nr_verbale_origine||'?')+'<br><b>Data:</b> '+(snap.data_visita||'?')+'<br><b>Imprese:</b> '+ni+' | <b>Lavorazioni:</b> '+nl+' | <b>Checklist:</b> '+nc+' voci'
+  const p=document.getElementById('adm-xlsx-preview');if(p)p.style.display=''
+}
+function _admReadXlsx(file){
+  const reader=new FileReader()
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'})
+      _admXlsxShowPreview(_parseXlsxSnap(wb),file.name)
+    }catch(err){console.error(err);toast('Errore lettura xlsx: '+err.message,'err')}
+  }
+  reader.readAsArrayBuffer(file)
+}
+const _dz=document.getElementById('adm-drop-xlsx')
+const _fi=document.getElementById('adm-file-xlsx')
+if(_dz){
+  _dz.addEventListener('click',function(){if(_fi)_fi.click()})
+  _dz.addEventListener('dragover',function(e){e.preventDefault();_dz.style.borderColor='#e7500f'})
+  _dz.addEventListener('dragleave',function(){_dz.style.borderColor='rgba(255,255,255,.25)'})
+  _dz.addEventListener('drop',function(e){
+    e.preventDefault();_dz.style.borderColor='rgba(255,255,255,.25)'
+    const f=e.dataTransfer?.files?.[0]
+    if(f&&f.name.endsWith('.xlsx'))_admReadXlsx(f)
+    else toast('Seleziona un file .xlsx','warn')
+  })
+}
+if(_fi)_fi.addEventListener('change',function(e){const f=e.target.files?.[0];if(f)_admReadXlsx(f);e.target.value=''})
+document.getElementById('btn-adm-load-xlsx')?.addEventListener('click',function(){
+  if(!_xlsxPending){toast('Nessun file','warn');return}
+  const snap=Object.assign({},_xlsxPending);delete snap.visita_id
+  const p=document.getElementById('adm-xlsx-preview');if(p)p.style.display='none'
+  _xlsxPending=null;if(_fi)_fi.value=''
+  const t=document.querySelector('[data-tab="form"]');if(t)t.click()
+  setTimeout(function(){applySnap(snap);toast('Visita caricata da Excel','ok')},300)
+})
+document.getElementById('btn-adm-cancel-xlsx')?.addEventListener('click',function(){
+  const p=document.getElementById('adm-xlsx-preview');if(p)p.style.display='none'
+  _xlsxPending=null;if(_fi)_fi.value=''
+})
+
 </script>
 </body>
 </html>
