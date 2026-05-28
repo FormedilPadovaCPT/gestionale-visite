@@ -6496,13 +6496,19 @@ async function admEsportaExcel(){
     const ws3=XLSX.utils.aoa_to_sheet(ws3Data)
     ws3['!cols']=[{wch:28},{wch:28},{wch:50}]
     XLSX.utils.book_append_sheet(wb,ws3,'Lavorazioni')
+    // Legge checklist DIRETTAMENTE dal DB (piu' affidabile dello snap)
+    const{data:chkDirect}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',snap.visita_id)
+    const chkMap={},notaMap={}
+    ;(chkDirect||[]).forEach(r=>{chkMap[r.codice]=r.valore||'NA';if(r.nota)notaMap[r.codice]=r.nota})
+    // Merge con snap.checklist per voci eventualmente non in DB
+    Object.entries(snap.checklist||{}).forEach(([c,v])=>{if(!chkMap[c])chkMap[c]=v})
+    Object.entries(snap.note_checklist||{}).forEach(([c,n])=>{if(!notaMap[c])notaMap[c]=n})
+    // Lista completa codici: prima voci DB, poi eventuali extra
+    const allCodes=Object.keys(voci).length>0?Object.keys(voci):Object.keys(chkMap)
+    Object.keys(chkMap).forEach(c=>{if(!allCodes.includes(c))allCodes.push(c)})
     const ws4Data=[['Codice','Macro-area','Descrizione','Esito','Nota']]
-    // Base = TUTTE le voci dal DB; overlay con i valori dello snap (snap puo' avere solo voci non-NA)
-    const allCodes=Object.keys(voci).length>0?Object.keys(voci):Object.keys(snap.checklist||{})
-    Object.keys(snap.checklist||{}).forEach(c=>{if(!allCodes.includes(c))allCodes.push(c)})
-    Object.keys(snap.note_checklist||{}).forEach(c=>{if(!allCodes.includes(c))allCodes.push(c)})
     allCodes.sort().forEach(cod=>{
-      ws4Data.push([cod,_chkMacroArea(cod),voci[cod]||cod,_xlsxValLabel(snap.checklist?.[cod]||'NA'),snap.note_checklist?.[cod]||''])
+      ws4Data.push([cod,_chkMacroArea(cod),voci[cod]||cod,_xlsxValLabel(chkMap[cod]||'NA'),notaMap[cod]||''])
     })
     const ws4=XLSX.utils.aoa_to_sheet(ws4Data)
     ws4['!cols']=[{wch:16},{wch:28},{wch:50},{wch:18},{wch:60}]
