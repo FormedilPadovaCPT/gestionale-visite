@@ -6635,6 +6635,11 @@ document.getElementById('btn-adm-load-xlsx')?.addEventListener('click',function(
   _xlsxPending=null;if(_fi)_fi.value=''
   const t=document.querySelector('[data-tab="form"]');if(t)t.click()
   setTimeout(function(){applySnap(snap);toast('Visita caricata da Excel','ok')},300)
+})
+document.getElementById('btn-adm-cancel-xlsx')?.addEventListener('click',function(){
+  const p=document.getElementById('adm-xlsx-preview');if(p)p.style.display='none'
+  _xlsxPending=null;if(_fi)_fi.value=''
+})
 
 </script>
 </body>
