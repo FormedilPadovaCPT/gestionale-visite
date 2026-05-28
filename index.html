@@ -5965,7 +5965,7 @@ async function loadRubrica(){
 function rubCard(icon,tipo,id,nome,sub,extraLines){
   const badge={impresa:'#e7f3e8;color:#27ae60',committente:'#fef3e2;color:#e67e22',tecnico:'#eef4ff;color:#2980b9'}[tipo]||'#eee;color:#555'
   const [bg,col]=badge.split(';color:')
-  return`<div ondblclick="showRubricaDetail('${tipo}',${id})" title="Doppio clic per visualizzare tutti i dati" style="background:#fff;border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border-left:3px solid ${col.replace('color:','')};cursor:pointer;transition:box-shadow .15s,transform .1s" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,.13)';this.style.transform='translateY(-1px)'" onmouseleave="this.style.boxShadow='var(--shadow)';this.style.transform=''">
+  return`<div ondblclick="showRubricaDetail('${tipo}','${id}')" title="Doppio clic per visualizzare tutti i dati" style="background:#fff;border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border-left:3px solid ${col.replace('color:','')};cursor:pointer;transition:box-shadow .15s,transform .1s" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,.13)';this.style.transform='translateY(-1px)'" onmouseleave="this.style.boxShadow='var(--shadow)';this.style.transform=''">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
       <span style="font-size:18px">${icon}</span>
       <div style="flex:1;min-width:0">
