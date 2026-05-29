@@ -4060,7 +4060,7 @@ async function genPDF(vid, output='save'){
     if(eV)throw new Error('Errore caricamento visita: '+eV.message)
     const{data:chk}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
     const{data:lavs}=await sb.from('visite_lavorazioni').select('lavorazione').eq('visita_id',vid)
-    const{data:imps}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,impresa_email_ref)').eq('visita_id',vid).order('ordine')
+    const{data:imps}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva,impresa_email_ref)').eq('visita_id',vid).order('ordine')
 
     if(!v){toast('Visita non trovata','err');return}
 
@@ -4237,7 +4237,7 @@ async function genPDF(vid, output='save'){
     const impsRows=[]
     ;(imps||[]).forEach((im,i)=>{
       const nome=im.imprese?.impresa_nome||'–'
-      const ruolo=im.ruolo||'–'
+      const ruolo=TIPO_IMP_OPT[im.tipo_imp]||im.ruolo||'–'
       const cf=im.imprese?.impresa_cf||'–'
       const piva=im.imprese?.piva||''
       const email=im.imprese?.impresa_email_ref||'–'
