@@ -4239,7 +4239,7 @@ async function genPDF(vid, output='save'){
       const nome=im.imprese?.impresa_nome||'–'
       const ruolo=TIPO_IMP_OPT[im.tipo_imp]||im.ruolo||'–'
       const cf=im.imprese?.impresa_cf||'–'
-      const piva=im.imprese?.piva||''
+      const piva=im.imprese?.piva||(im.impresa_id&&!/^\d{1,6}$/.test(im.impresa_id)?im.impresa_id:'')||''
       const email=im.imprese?.impresa_email_ref||'–'
       const nomeCell=`${i+1}. ${nome}`+(piva?`\nP.IVA: ${piva}`:'')
       impsRows.push([
