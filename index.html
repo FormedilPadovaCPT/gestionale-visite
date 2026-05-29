@@ -4241,22 +4241,24 @@ async function genPDF(vid, output='save'){
       const cf=im.imprese?.impresa_cf||'–'
       const piva=im.imprese?.piva||(im.impresa_id&&!/^\d{1,6}$/.test(im.impresa_id)?im.impresa_id:'')||''
       const email=im.imprese?.impresa_email_ref||'–'
-      const nomeCell=`${i+1}. ${nome}`+(piva?`\nP.IVA: ${piva}`:'')
+      const nomeCell=`${i+1}. ${nome}`
       impsRows.push([
         {content:nomeCell,styles:{fontStyle:'bold'}},
         {content:ruolo,styles:{halign:'center'}},
+        {content:piva||'–'},
         {content:cf},
         {content:email,styles:{fontSize:6.5}}
       ])
     })
-    if(!impsRows.length) impsRows.push([{content:'Nessuna impresa registrata',colSpan:4,styles:{halign:'center',textColor:[180,180,180]}}])
+    if(!impsRows.length) impsRows.push([{content:'Nessuna impresa registrata',colSpan:5,styles:{halign:'center',textColor:[180,180,180]}}])
 
     doc.autoTable({startY:y,
       head:[[
         {content:'Ragione sociale',styles:{fontStyle:'bold'}},
-        {content:'Ruolo',styles:{fontStyle:'bold',cellWidth:30,halign:'center'}},
-        {content:'Cod. fiscale',styles:{fontStyle:'bold',cellWidth:35}},
-        {content:'Email verbale',styles:{fontStyle:'bold',cellWidth:50}}
+        {content:'Ruolo',styles:{fontStyle:'bold',cellWidth:28,halign:'center'}},
+        {content:'P.IVA',styles:{fontStyle:'bold',cellWidth:28}},
+        {content:'Cod. fiscale',styles:{fontStyle:'bold',cellWidth:30}},
+        {content:'Email verbale',styles:{fontStyle:'bold',cellWidth:44}}
       ]],
       body:impsRows,
       styles:{fontSize:7.5,cellPadding:1.8},
