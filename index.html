@@ -94,14 +94,23 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 .form-header h2{font-size:16px;color:var(--grey)}
 .ipc-live-wrap{display:flex;align-items:center;gap:8px}
 .ipc-live-val{font-size:16px;font-weight:800}
-/* TAB BAR */
-.tab-bar{display:flex;gap:0;overflow-x:auto;margin-bottom:14px;border-bottom:2px solid var(--border);white-space:nowrap}
-.tab-btn{background:none;border:none;border-bottom:3px solid transparent;border-radius:0;padding:8px 13px;color:var(--grey);font-size:12px;font-weight:600;transition:all .15s;margin-bottom:-2px}
-.tab-btn.active{color:var(--orange);border-bottom-color:var(--orange)}
+/* TAB SIDEBAR + LAYOUT */
+.form-layout{display:flex;align-items:flex-start;gap:0}
+.tab-area{flex:1;min-width:0}
+.tab-bar{display:flex;flex-direction:column;gap:0;width:150px;flex-shrink:0;border-right:2px solid var(--border);margin-right:16px;padding-right:0;position:sticky;top:calc(var(--header-h) + var(--nav-h) + 14px);max-height:calc(100vh - var(--header-h) - var(--nav-h) - 28px);overflow-y:auto;align-self:flex-start}
+.tab-btn{background:none;border:none;border-right:3px solid transparent;border-radius:0;padding:8px 12px 8px 4px;color:var(--grey);font-size:12px;font-weight:600;transition:all .15s;margin-right:-2px;text-align:left;white-space:normal;line-height:1.3;width:100%}
+.tab-btn.active{color:var(--orange);border-right-color:var(--orange);background:#fff8f4}
 .tab-btn.has-rilievi{color:var(--danger)}
-.tab-btn.has-rilievi.active{border-bottom-color:var(--danger)}
+.tab-btn.has-rilievi.active{border-right-color:var(--danger)}
 .tab-content{display:none}
 .tab-content.active{display:block}
+@media(max-width:700px){
+  .form-layout{flex-direction:column}
+  .tab-bar{flex-direction:row;width:100%;border-right:none;border-bottom:2px solid var(--border);margin-right:0;margin-bottom:12px;padding-bottom:0;position:static;max-height:none;overflow-x:auto;overflow-y:hidden}
+  .tab-btn{border-right:none;border-bottom:3px solid transparent;padding:8px 10px;margin-right:0;margin-bottom:-2px;white-space:nowrap;width:auto}
+  .tab-btn.active{border-right-color:transparent;border-bottom-color:var(--orange)}
+  .tab-btn.has-rilievi.active{border-bottom-color:var(--danger)}
+}
 /* CHECKLIST */
 .zona-gruppo{margin-bottom:18px}
 .zona-gruppo h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--grey);background:var(--light);padding:5px 10px;border-radius:var(--radius);margin-bottom:6px}
@@ -424,7 +433,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <span id="ipc-cnt" style="font-size:11px;color:#aaa;margin-left:4px"></span>
         </div>
       </div>
+      <div class="form-layout">
       <div class="tab-bar" id="tab-bar"></div>
+      <div class="tab-area">
 
       <!-- TAB 0: DATI VISITA -->
       <div class="tab-content active" data-tab="0">
@@ -817,10 +828,12 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
       </div>
 
-      <div style="display:flex;justify-content:space-between;padding:10px 0;position:sticky;bottom:0;background:#fff;z-index:100;border-top:1px solid var(--border);margin-top:12px">
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--border);margin-top:12px">
         <button class="btn-outline" id="btn-prev">◀ Precedente</button>
         <button class="btn-primary" id="btn-next">Successivo ▶</button>
       </div>
+      </div><!-- /tab-area -->
+      </div><!-- /form-layout -->
     </section>
 
     <!-- LISTA VISITE -->
