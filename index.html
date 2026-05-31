@@ -1782,15 +1782,15 @@ function buildTabs(){
   })
   // Build zone tab divs 3–12 if not already present (zone 1–10)
   const ref=$('[data-tab="13"]')
-  const form=$('view-form')
+  const tabArea=document.querySelector('#view-form .tab-area')
   for(let z=1;z<=10;z++){
     const ti=z+2
-    if(!form.querySelector(`[data-tab="${ti}"]`)){
+    if(!tabArea.querySelector(`[data-tab="${ti}"]`)){
       const d=document.createElement('div')
       d.className='tab-content'
       d.dataset.tab=ti
       d.innerHTML=`<div class="card"><h3>${ZONE_LBL[z]}</h3><div id="zi-${z}"></div></div>`
-      form.insertBefore(d,ref)
+      tabArea.insertBefore(d,ref)
     }
   }
   activateTab(0)
