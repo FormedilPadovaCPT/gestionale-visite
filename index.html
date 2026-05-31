@@ -3653,23 +3653,43 @@ async function loadDash(){
 }
 
 // ── SCADENZE VISITE DI RITORNO ──
+
+// Calcola data rientro secondo procedura Formedil
+// acc: numero accesso cantiere (1=prima visita, 2=seconda, 3+=terza+)
+// ipc: 'ALTO'|'MEDIO'|'BASSO'|'NR'|''
+// Restituisce {date, tipo:'ordinaria'|'urgente'|'immediata'|null}
+function calcRientroFormedil(dataVisita, acc, ipc){
+  const n=+(acc)||1
+  const i=ipc||'NR'
+  let giorni=null, tipo=null
+  if(n===1){
+    if(i==='ALTO'){giorni=3;tipo='urgente'}
+    else if(i==='MEDIO'||i==='BASSO'){giorni=22;tipo='ordinaria'}
+  } else if(n===2){
+    if(i==='ALTO'){giorni=3;tipo='immediata'}
+    else if(i==='MEDIO'){giorni=22;tipo='ordinaria'}
+  } else { // 3+
+    if(i==='ALTO'){giorni=3;tipo='immediata'}
+  }
+  if(!giorni||!dataVisita)return{date:null,tipo:null}
+  const d=new Date(dataVisita);d.setHours(0,0,0,0);d.setDate(d.getDate()+giorni)
+  return{date:d,tipo}
+}
+
 async function loadScadenze(){
   const oggi=new Date();oggi.setHours(0,0,0,0)
   const ipcOrd={ALTO:0,MEDIO:1,BASSO:2,NR:3,'':3}
 
-  // Fetch TUTTE le visite non eliminate, ordinate per data desc
-  // In JS raggruppiamo per cantiere e prendiamo solo l'ultima
   const{data:vs}=await sb.from('visite')
-    .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_etichetta)')
+    .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,acc_cant,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_etichetta)')
     .eq('elimina',0).order('data_visita',{ascending:false})
   const visite=vs||[]
 
-  // Tecnici
   const{data:tecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome')
   const tecMap={}
   ;(tecs||[]).forEach(t=>{tecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()})
 
-  // Ultima visita per cantiere (visite già ordinate desc → primo trovato = ultimo)
+  // Ultima visita per cantiere
   const ultimePerCantiere={}
   visite.forEach(v=>{
     if(!v.cantiere_id)return
@@ -3681,27 +3701,32 @@ async function loadScadenze(){
   const urgenti=[], prossime=[]
 
   Object.values(ultimePerCantiere).forEach(v=>{
-    if(!v.data_ritorno)return
-    const dr=new Date(v.data_ritorno);dr.setHours(0,0,0,0)
-    const diffDays=Math.round((dr-oggi)/(1000*60*60*24))
     const ipc=v.ipc||'NR'
+    // Determina data rientro: prima quella inserita dal tecnico, poi quella calcolata
+    let dr, isCalcolata=false, tipoCalc=null
+    if(v.data_ritorno){
+      dr=new Date(v.data_ritorno);dr.setHours(0,0,0,0)
+    } else {
+      const calc=calcRientroFormedil(v.data_visita, v.acc_cant, ipc)
+      if(!calc.date)return // archiviazione, nessun rientro
+      dr=calc.date;isCalcolata=true;tipoCalc=calc.tipo
+    }
+
+    const diffDays=Math.round((dr-oggi)/(1000*60*60*24))
 
     if(dr>oggi&&dr<=sixtyDaysLater){
-      // Prossima visita pianificata (qualsiasi IPC)
-      prossime.push({...v,diffDays})
-    } else if(dr<=oggi&&dr>dueWeeksAgo){
-      // Scaduta di recente (< 2 settimane): mostra solo se IPC non NR
-      if(ipc!=='NR')urgenti.push({...v,diffDays})
-    } else if(dr<=dueWeeksAgo){
-      // Scaduta da più di 2 settimane: solo se IPC non NR
-      if(ipc!=='NR')urgenti.push({...v,diffDays})
+      prossime.push({...v,diffDays,dr,isCalcolata,tipoCalc})
+    } else if(dr<=oggi){
+      // Urgente solo se IPC non NR
+      if(ipc!=='NR')urgenti.push({...v,diffDays,dr,isCalcolata,tipoCalc})
     }
+    // Se dr > 60 giorni: non mostrata (pianificazione futura ok)
   })
 
-  // Ordina prossime: data più vicina prima
   prossime.sort((a,b)=>a.diffDays-b.diffDays)
-  // Ordina urgenti: IPC Alto prima, poi data più vecchia
-  urgenti.sort((a,b)=>(ipcOrd[a.ipc||'']||3)-(ipcOrd[b.ipc||'']||3)||new Date(a.data_ritorno)-new Date(b.data_ritorno))
+  urgenti.sort((a,b)=>(ipcOrd[a.ipc||'']||3)-(ipcOrd[b.ipc||'']||3)||a.dr-b.dr)
+
+  const TIPO_LBL={ordinaria:'<span style="font-size:10px;color:#f39c12;background:#fff8ec;border:1px solid #f39c12;padding:1px 5px;border-radius:3px">ordinaria</span>',urgente:'<span style="font-size:10px;color:#e7500f;background:#fff3ee;border:1px solid #e7500f;padding:1px 5px;border-radius:3px">urgente</span>',immediata:'<span style="font-size:10px;color:#e74c3c;background:#fff0f0;border:1px solid #e74c3c;padding:1px 5px;border-radius:3px">immediata</span>'}
 
   function scadRow(v,isUrgente){
     const cant=v.cantieri?.cantiere_etichetta||v.cantieri?.cantiere_indirizzo||'–'
@@ -3711,10 +3736,13 @@ async function loadScadenze(){
     const diffLbl=isUrgente
       ?`<span style="color:#e74c3c;font-weight:700">${diff===0?'oggi':diff+' gg fa'}</span>`
       :`<span style="color:#27ae60;font-weight:600">${diff===0?'oggi':'tra '+v.diffDays+' gg'}</span>`
+    const drLbl=v.isCalcolata
+      ?`<span style="color:#888;font-style:italic">${fmtDate(v.dr.toISOString().slice(0,10))}</span> ${v.tipoCalc?TIPO_LBL[v.tipoCalc]:''} <span style="font-size:10px;color:#aaa" title="Data calcolata secondo procedura Formedil">⚙</span>`
+      :fmtDate(v.data_ritorno)
     return`<tr>
       <td>${v.nr_verbale||'–'}</td>
       <td>${fmtDate(v.data_visita)}</td>
-      <td>${fmtDate(v.data_ritorno)}</td>
+      <td>${drLbl}</td>
       <td>${diffLbl}</td>
       <td style="font-size:12px">${tec}</td>
       <td style="font-size:12px">${cant}</td>
