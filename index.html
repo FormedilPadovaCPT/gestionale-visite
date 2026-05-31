@@ -828,10 +828,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
       </div>
 
-      <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--border);margin-top:12px">
-        <button class="btn-outline" id="btn-prev">◀ Precedente</button>
-        <button class="btn-primary" id="btn-next">Successivo ▶</button>
-      </div>
       </div><!-- /tab-area -->
       </div><!-- /form-layout -->
     </section>
@@ -1093,6 +1089,11 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     </section>
 
   </main>
+  <!-- BARRA NAV FORM (fissa in fondo, visibile solo nel form visita) -->
+  <div id="form-nav-bar" class="hidden" style="position:fixed;bottom:0;left:0;right:0;z-index:150;background:#fff;border-top:2px solid var(--border);padding:10px 20px;justify-content:space-between;align-items:center;box-shadow:0 -2px 8px rgba(0,0,0,.1)">
+    <button class="btn-outline" id="btn-prev">◀ Precedente</button>
+    <button class="btn-primary" id="btn-next">Successivo ▶</button>
+  </div>
 </div>
 
 <!-- MODAL QUICK DETAIL (visite e cantieri) -->
@@ -1740,6 +1741,8 @@ function showScr(n){
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
   ;['dashboard','form','lista','cantieri','rubrica','import','admin'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  const navBar=$('form-nav-bar')
+  if(navBar){navBar.style.display=view==='form'?'flex':'none';document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
