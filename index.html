@@ -592,7 +592,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-nd" value="3"><span>— N/D</span></label>
             </div>
           </div>
-          <!-- 2. PF / PG (visibile solo se Privato o N/D) -->
+          <!-- Blocco body committente: nascosto quando N/D -->
+          <div id="comm-body">
+          <!-- 2. PF / PG (visibile solo se Privato) -->
           <div class="sogg-toggle" id="comm-sogg-wrap">
             <label><input type="radio" name="comm-sogg" id="comm-radio-pf" value="PF" checked><span>👤 Persona fisica</span></label>
             <label><input type="radio" name="comm-sogg" id="comm-radio-pg" value="PG"><span>🏢 Persona giuridica</span></label>
@@ -605,8 +607,16 @@ tr.row-detail-hover:hover td{background:#fff3ed}
                 <div class="ac-list hidden" id="comm-list"></div>
               </div>
               <button class="btn-outline btn-sm" id="btn-new-comm" type="button" style="white-space:nowrap;margin-top:1px">+ Nuovo</button>
+              <button class="btn-sm" id="btn-clear-comm" type="button" style="white-space:nowrap;margin-top:1px;display:none" title="Deseleziona committente">✕</button>
             </div>
             <input type="hidden" id="f-comm-id">
+          </div>
+          <!-- Info card committente selezionato (solo lettura) -->
+          <div id="comm-info-card" class="hidden" style="margin-top:6px;padding:10px 14px;background:#f8f8f8;border-radius:8px;border-left:3px solid var(--orange);font-size:12px;line-height:1.8;color:#333"></div>
+          <!-- Email verbale alternativa (visibile solo quando committente selezionato) -->
+          <div id="comm-email-alt-wrap" class="field hidden" style="margin-top:8px">
+            <label>Email invio verbale <span style="font-weight:400;font-size:11px;color:#aaa">(lascia vuoto per usare quella registrata)</span></label>
+            <input type="email" id="f-comm-email-alt" placeholder="email alternativa@…">
           </div>
           <!-- PERSONA FISICA -->
           <div id="comm-pf-fields">
@@ -639,6 +649,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               <div class="field"><label>Telefono</label><input type="tel" id="f-comm-tel-pg" placeholder="+39…"></div>
             </div>
           </div>
+          </div><!-- /comm-body -->
           <input type="hidden" id="f-comm-tipo">
           <div class="sect-title">Figure di coordinamento</div>
           <div class="row">
@@ -2291,9 +2302,62 @@ $('btn-mc-comm-save').onclick=async()=>{
     if(tel)vSet('f-comm-tel',tel)
   }
   if(tipoVal)setCommTipo(tipoVal)
+  renderCommCard(comm)
+  setCommFieldsReadonly(true)
   hide('modal-comm')
   toast('Committente "'+nome+'" creato e selezionato','ok')
 }
+
+// ── COMMITTENTE INFO CARD ──
+function renderCommCard(c){
+  const card=$('comm-info-card'); if(!card)return
+  const row=(label,val)=>val?`<div><b style="color:#565c66;min-width:120px;display:inline-block">${label}</b> ${val}</div>`:''
+  const tipo=c.committente_tipo==1?'🏛 Pubblico':c.committente_tipo==2?'🏠 Privato':''
+  const sogg=c.tipo_sogg==='PG'?'Persona giuridica':'Persona fisica'
+  card.innerHTML=`
+    <div style="font-weight:600;color:var(--orange);margin-bottom:6px;font-size:13px">👤 Committente selezionato</div>
+    ${row('Nome / Rag. soc.',c.committente_nome)}
+    ${row('Tipo',tipo?tipo+' – '+sogg:sogg)}
+    ${row('CF / P.IVA',c.cf_piva||c.piva||'')}
+    ${row('Email',c.email||'')}
+    ${row('Telefono',c.telefono||'')}
+  `.trim()
+  card.classList.remove('hidden')
+}
+function hideCommCard(){const card=$('comm-info-card');if(card){card.innerHTML='';card.classList.add('hidden')}}
+
+function setCommFieldsReadonly(on){
+  const ids=['f-comm-titolo','f-comm-nome','f-comm-cog','f-comm-cf','f-comm-email','f-comm-tel',
+             'f-comm-rag-soc','f-comm-piva','f-comm-cf-pg','f-comm-email-pg','f-comm-tel-pg']
+  ids.forEach(id=>{
+    const el=$(id); if(!el)return
+    if(on){el.setAttribute('readonly','');el.style.background='#f8f8f8';el.style.color='#666';el.style.cursor='default'}
+    else{el.removeAttribute('readonly');el.style.background='';el.style.color='';el.style.cursor=''}
+  })
+  const sel=$('f-comm-titolo')
+  if(sel){sel.disabled=on}
+  const soggRadios=document.querySelectorAll('input[name="comm-sogg"]')
+  soggRadios.forEach(r=>r.disabled=on)
+  const btnNew=$('btn-new-comm'),btnClear=$('btn-clear-comm')
+  if(btnNew)btnNew.style.display=on?'none':'inline-flex'
+  if(btnClear)btnClear.style.display=on?'inline-flex':'none'
+  const altWrap=$('comm-email-alt-wrap')
+  if(altWrap)altWrap.classList.toggle('hidden',!on)
+}
+
+function clearCommittente(){
+  vSet('f-comm-id',''); vSet('f-comm-search','')
+  const ids=['f-comm-titolo','f-comm-nome','f-comm-cog','f-comm-cf','f-comm-email','f-comm-tel',
+             'f-comm-rag-soc','f-comm-piva','f-comm-cf-pg','f-comm-email-pg','f-comm-tel-pg','f-comm-email-alt']
+  ids.forEach(id=>{const el=$(id);if(el)el.value=''})
+  setCommFieldsReadonly(false)
+  hideCommCard()
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const btnClear=$('btn-clear-comm')
+  if(btnClear)btnClear.onclick=()=>{clearCommittente()}
+})
 
 // ── AUTOCOMPLETE COMMITTENTE ──
 setupAC('f-comm-search','comm-list', async q=>{
@@ -2315,12 +2379,13 @@ setupAC('f-comm-search','comm-list', async q=>{
       vSet('f-comm-email-pg',item.extra.email||'')
       vSet('f-comm-tel-pg',item.extra.telefono||'')
     }else{
-      // Cerca di splittare nome committente in titolo/nome/cognome (best effort)
       vSet('f-comm-cf',item.extra.cf_piva||'')
       vSet('f-comm-email',item.extra.email||'')
       vSet('f-comm-tel',item.extra.telefono||'')
     }
     if(item.extra.committente_tipo)setCommTipo(String(item.extra.committente_tipo))
+    renderCommCard(item.extra)
+    setCommFieldsReadonly(true)
   }
 })
 
@@ -2682,6 +2747,7 @@ function buildSnap(vid=null){
     comm_cf_pg:vGet('f-comm-cf-pg')||null,
     comm_email_pg:vGet('f-comm-email-pg')||null,
     comm_tel_pg:vGet('f-comm-tel-pg')||null,
+    comm_email_alt:vGet('f-comm-email-alt')||null,
     // Tab 1 – Figure coordinamento
     coord:cGet('f-coord'),
     rl_titolo:vGet('f-rl-titolo')||null,
@@ -2812,6 +2878,13 @@ function applySnap(snap){
   if(snap.comm_cf_pg)vSet('f-comm-cf-pg',snap.comm_cf_pg)
   if(snap.comm_email_pg)vSet('f-comm-email-pg',snap.comm_email_pg)
   if(snap.comm_tel_pg)vSet('f-comm-tel-pg',snap.comm_tel_pg)
+  if(snap.comm_email_alt)vSet('f-comm-email-alt',snap.comm_email_alt)
+  // Se c'è un committente_id dal DB (non dallo snap locale), carica la card e metti readonly
+  if(snap.committente_id){
+    sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,email,telefono,piva,tipo_sogg').eq('committente_id',snap.committente_id).single().then(({data:cd})=>{
+      if(cd){renderCommCard(cd);setCommFieldsReadonly(true);vSet('f-comm-search',cd.committente_nome||'')}
+    })
+  }
 
   // ── Tab 1 – Figure coordinamento ─────────────────────────────────────────
   if(snap.coord!=null)cSet('f-coord',snap.coord)
@@ -3066,16 +3139,26 @@ document.querySelectorAll('input[name="comm-sogg"]').forEach(r=>{
 
 // Tipologia committente: Pubblico / Privato / N/D
 // Pubblico → forza sempre PG, nasconde il toggle PF/PG
-// Privato / N/D → mostra il toggle, l'utente sceglie PF o PG
+// Privato → mostra il toggle, l'utente sceglie PF o PG
+// N/D → nasconde tutto il corpo committente
 function onCommTipoChange(val){
   const h=$('f-comm-tipo'); if(h)h.value=val||''
+  const commBody=$('comm-body')
   const soggWrap=$('comm-sogg-wrap')
+  if(val==='3'){
+    // N/D: nascondi tutto il corpo e svuota
+    if(commBody)commBody.classList.add('hidden')
+    clearCommittente()
+    return
+  }
+  // Pubblico o Privato: mostra il corpo
+  if(commBody)commBody.classList.remove('hidden')
   if(val==='1'){
     // Pubblico: solo persona giuridica
     if(soggWrap)soggWrap.classList.add('hidden')
     const pg=$('comm-radio-pg'); if(pg){pg.checked=true;toggleCommSogg('PG')}
   } else {
-    // Privato o N/D: toggle visibile, mantieni selezione corrente
+    // Privato: toggle visibile, mantieni selezione corrente
     if(soggWrap)soggWrap.classList.remove('hidden')
   }
 }
