@@ -1847,11 +1847,9 @@ function suggerisciDataRientro(){
   const hint=$('ritorno-hint')
   if(!campo||!hint)return
   // Se il tecnico ha già inserito una data, non sovrascrivere ma mostra comunque il suggerimento
-  const dataVisita=vGet('f-data-visita')
+  const dataVisita=vGet('f-data')
   const accCant=vGet('f-acc-cant')||'1'
-  // Leggi IPC corrente dal badge live
-  const ipcEl=$('ipc-val')
-  const ipc=ipcEl?ipcEl.textContent.trim():'NR'
+  const ipc=(calcIPC(S.checklist)||{}).ipc||'NR'
   const calc=calcRientroFormedil(dataVisita, accCant, ipc)
   if(!calc.date){
     hint.style.display='block'
