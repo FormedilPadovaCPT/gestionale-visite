@@ -923,23 +923,23 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <!-- ══ ZONA RISERVATA COORDINATORE ══ -->
     <!-- SCADENZE VISITE DI RITORNO -->
     <section id="view-scadenze" class="hidden">
-      <div class="card" style="border-left:5px solid #e74c3c;margin-bottom:14px">
-        <h3 style="color:#e74c3c">⚠️ Urgenti — scadenza superata da più di 2 settimane</h3>
-        <p style="font-size:12px;color:#888;margin-bottom:10px">Cantieri con visita di ritorno prevista e non ancora effettuata. Ordine per IPC (Alto prima) e data più vecchia.</p>
+      <div class="card" style="border-left:5px solid #f39c12;margin-bottom:14px">
+        <h3 style="color:#e7500f">📅 Prossime visite pianificate</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:10px">Ultima visita per cantiere con rientro previsto nei prossimi 60 giorni, ordinate per data più vicina.</p>
         <div class="tbl-wrap">
-          <table><thead><tr><th>Verbale</th><th>Data visita</th><th>Ritorno previsto</th><th>Scaduta da</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
-          <tbody id="tbody-scad-urgenti"></tbody></table>
-        </div>
-        <div id="scad-urg-empty" class="hidden" style="text-align:center;color:#aaa;padding:18px;font-size:13px">✅ Nessuna visita urgente scaduta</div>
-      </div>
-      <div class="card" style="border-left:5px solid #f39c12">
-        <h3 style="color:#f39c12">📅 Prossime visite pianificate</h3>
-        <p style="font-size:12px;color:#888;margin-bottom:10px">Visite di ritorno previste nei prossimi 60 giorni, ordinate per data più vicina.</p>
-        <div class="tbl-wrap">
-          <table><thead><tr><th>Verbale</th><th>Data visita</th><th>Ritorno previsto</th><th>Tra giorni</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
+          <table><thead><tr><th>Verbale</th><th>Data visita</th><th>Rientro previsto</th><th>Tra giorni</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
           <tbody id="tbody-scad-prossime"></tbody></table>
         </div>
         <div id="scad-pros-empty" class="hidden" style="text-align:center;color:#aaa;padding:18px;font-size:13px">Nessuna visita pianificata nei prossimi 60 giorni</div>
+      </div>
+      <div class="card" style="border-left:5px solid #e74c3c">
+        <h3 style="color:#e74c3c">⚠️ Urgenti — rientro scaduto da più di 2 settimane</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:10px">Ultima visita per cantiere con IPC non NR e rientro scaduto. Ordine per IPC (Alto prima) poi per data più vecchia.</p>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>Verbale</th><th>Data visita</th><th>Rientro previsto</th><th>Scaduto da</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
+          <tbody id="tbody-scad-urgenti"></tbody></table>
+        </div>
+        <div id="scad-urg-empty" class="hidden" style="text-align:center;color:#27ae60;padding:18px;font-size:13px">✅ Nessun rientro urgente scaduto</div>
       </div>
     </section>
 
@@ -3657,11 +3657,11 @@ async function loadScadenze(){
   const oggi=new Date();oggi.setHours(0,0,0,0)
   const ipcOrd={ALTO:0,MEDIO:1,BASSO:2,NR:3,'':3}
 
-  // Fetch tutte le visite con data_ritorno compilata, non eliminate
+  // Fetch TUTTE le visite non eliminate, ordinate per data desc
+  // In JS raggruppiamo per cantiere e prendiamo solo l'ultima
   const{data:vs}=await sb.from('visite')
-    .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,tecnico_id,cantieri(cantiere_indirizzo,cantiere_etichetta)')
-    .not('data_ritorno','is',null).eq('elimina',0)
-    .order('data_ritorno',{ascending:true})
+    .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_etichetta)')
+    .eq('elimina',0).order('data_visita',{ascending:false})
   const visite=vs||[]
 
   // Tecnici
@@ -3669,21 +3669,37 @@ async function loadScadenze(){
   const tecMap={}
   ;(tecs||[]).forEach(t=>{tecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()})
 
-  // Per ogni visita con data_ritorno, controlla se esiste già una visita successiva sullo stesso cantiere
-  // (semplificazione: mostriamo tutte le visite con data_ritorno; filtrare le "già evase" richiederebbe join complesso)
-  const urgenti=[], prossime=[]
+  // Ultima visita per cantiere (visite già ordinate desc → primo trovato = ultimo)
+  const ultimePerCantiere={}
+  visite.forEach(v=>{
+    if(!v.cantiere_id)return
+    if(!ultimePerCantiere[v.cantiere_id])ultimePerCantiere[v.cantiere_id]=v
+  })
+
   const dueWeeksAgo=new Date(oggi);dueWeeksAgo.setDate(dueWeeksAgo.getDate()-14)
   const sixtyDaysLater=new Date(oggi);sixtyDaysLater.setDate(sixtyDaysLater.getDate()+60)
+  const urgenti=[], prossime=[]
 
-  visite.forEach(v=>{
+  Object.values(ultimePerCantiere).forEach(v=>{
     if(!v.data_ritorno)return
     const dr=new Date(v.data_ritorno);dr.setHours(0,0,0,0)
     const diffDays=Math.round((dr-oggi)/(1000*60*60*24))
-    if(dr<=dueWeeksAgo){urgenti.push({...v,diffDays})}
-    else if(dr>oggi&&dr<=sixtyDaysLater){prossime.push({...v,diffDays})}
-    else if(dr>dueWeeksAgo&&dr<=oggi){urgenti.push({...v,diffDays})} // scaduta ma meno di 2 sett — comunque urgente
+    const ipc=v.ipc||'NR'
+
+    if(dr>oggi&&dr<=sixtyDaysLater){
+      // Prossima visita pianificata (qualsiasi IPC)
+      prossime.push({...v,diffDays})
+    } else if(dr<=oggi&&dr>dueWeeksAgo){
+      // Scaduta di recente (< 2 settimane): mostra solo se IPC non NR
+      if(ipc!=='NR')urgenti.push({...v,diffDays})
+    } else if(dr<=dueWeeksAgo){
+      // Scaduta da più di 2 settimane: solo se IPC non NR
+      if(ipc!=='NR')urgenti.push({...v,diffDays})
+    }
   })
 
+  // Ordina prossime: data più vicina prima
+  prossime.sort((a,b)=>a.diffDays-b.diffDays)
   // Ordina urgenti: IPC Alto prima, poi data più vecchia
   urgenti.sort((a,b)=>(ipcOrd[a.ipc||'']||3)-(ipcOrd[b.ipc||'']||3)||new Date(a.data_ritorno)-new Date(b.data_ritorno))
 
@@ -3691,29 +3707,27 @@ async function loadScadenze(){
     const cant=v.cantieri?.cantiere_etichetta||v.cantieri?.cantiere_indirizzo||'–'
     const ipc=v.ipc||'NR'
     const tec=tecMap[v.tecnico_id]||'–'
-    const dr=fmtDate(v.data_ritorno)
     const diff=Math.abs(v.diffDays)
     const diffLbl=isUrgente
-      ?`<span style="color:#e74c3c;font-weight:700">${diff} gg fa</span>`
-      :`<span style="color:#27ae60;font-weight:600">tra ${v.diffDays} gg</span>`
-    const ipcStyle=ipc==='ALTO'?'color:#e74c3c':ipc==='MEDIO'?'color:#f39c12':ipc==='BASSO'?'color:#27ae60':''
+      ?`<span style="color:#e74c3c;font-weight:700">${diff===0?'oggi':diff+' gg fa'}</span>`
+      :`<span style="color:#27ae60;font-weight:600">${diff===0?'oggi':'tra '+v.diffDays+' gg'}</span>`
     return`<tr>
       <td>${v.nr_verbale||'–'}</td>
       <td>${fmtDate(v.data_visita)}</td>
-      <td>${dr}</td>
+      <td>${fmtDate(v.data_ritorno)}</td>
       <td>${diffLbl}</td>
       <td style="font-size:12px">${tec}</td>
       <td style="font-size:12px">${cant}</td>
-      <td><span class="badge ${ipcCls(ipc)}" style="${ipcStyle}">${ipc}</span></td>
+      <td><span class="badge ${ipcCls(ipc)}">${ipc}</span></td>
       <td><button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Dettaglio">👁</button></td>
     </tr>`
   }
 
-  const tbU=$('tbody-scad-urgenti'), tbP=$('tbody-scad-prossime')
-  if(urgenti.length){tbU.innerHTML=urgenti.map(v=>scadRow(v,true)).join('');hide('scad-urg-empty')}
-  else{tbU.innerHTML='';show('scad-urg-empty')}
+  const tbU=$('tbody-scad-urgenti'),tbP=$('tbody-scad-prossime')
   if(prossime.length){tbP.innerHTML=prossime.map(v=>scadRow(v,false)).join('');hide('scad-pros-empty')}
   else{tbP.innerHTML='';show('scad-pros-empty')}
+  if(urgenti.length){tbU.innerHTML=urgenti.map(v=>scadRow(v,true)).join('');hide('scad-urg-empty')}
+  else{tbU.innerHTML='';show('scad-urg-empty')}
   bindRowActions()
 }
 
