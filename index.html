@@ -781,7 +781,11 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div class="field"><label>Note sulla formazione mancante</label><textarea id="f-note-for-m" rows="2"></textarea></div>
           <div class="field"><label><span class="check-inline"><input type="checkbox" id="f-segnalazione"> Propongo segnalazione a SISAL / ITL</span></label></div>
           <div class="sect-title">Visita di ritorno</div>
-          <div class="field"><label>Data / periodo previsto visita successiva</label><input type="date" id="f-data-ritorno"></div>
+          <div class="field">
+            <label>Data / periodo previsto visita successiva</label>
+            <input type="date" id="f-data-ritorno">
+            <div id="ritorno-hint" style="display:none;margin-top:5px;font-size:11px;color:#888;background:#f8f8f8;border:1px solid #e0e0e0;border-radius:4px;padding:5px 9px"></div>
+          </div>
         </div>
       </div>
 
@@ -1835,6 +1839,34 @@ function activateTab(n){
   if(n===15)buildRiepilogo()
   if(n===2)renderImpreseAccordion()
   if(n===14)initFotoTab()
+  if(n===13)suggerisciDataRientro()
+}
+
+function suggerisciDataRientro(){
+  const campo=$('f-data-ritorno')
+  const hint=$('ritorno-hint')
+  if(!campo||!hint)return
+  // Se il tecnico ha già inserito una data, non sovrascrivere ma mostra comunque il suggerimento
+  const dataVisita=vGet('f-data-visita')
+  const accCant=vGet('f-acc-cant')||'1'
+  // Leggi IPC corrente dal badge live
+  const ipcEl=$('ipc-val')
+  const ipc=ipcEl?ipcEl.textContent.trim():'NR'
+  const calc=calcRientroFormedil(dataVisita, accCant, ipc)
+  if(!calc.date){
+    hint.style.display='block'
+    hint.innerHTML='⚙ Procedura Formedil: <strong>archiviazione</strong> — nessun rientro necessario per questo IPC e numero di accesso.'
+    return
+  }
+  const dStr=calc.date.toISOString().slice(0,10)
+  const TIPO_DESC={ordinaria:'pianificazione ordinaria (15-30 gg)',urgente:'pianificazione urgente (1-5 gg)',immediata:'segnalazione — immediata'}
+  hint.style.display='block'
+  hint.innerHTML=`⚙ Suggerimento Formedil: <strong>${TIPO_DESC[calc.tipo]||calc.tipo}</strong> — data proposta: <strong>${fmtDate(dStr)}</strong>`
+  // Pre-compila solo se il campo è vuoto
+  if(!campo.value){
+    campo.value=dStr
+    hint.innerHTML+=' <span style="color:#27ae60">(compilata automaticamente)</span>'
+  }
 }
 
 // ── ZONE RENDER ──
