@@ -1635,6 +1635,26 @@ const LAV_DATA={
   }
 }
 const ZONE_LBL={1:'Impianti di cantiere',2:'Protezione luoghi di lavoro',3:'Apparecchi di sollevamento',4:'Attrezzature, scale, utensili',5:'Macchine di cantiere',6:'Opere provvisionali',7:'DPI',8:'Documentazione',9:'Soggetti',10:'Formazione'}
+const PREF_LBL={
+  'IMP_LOG':'Logistica','IMP_IGS':'Apprestamenti igienico-sanitari e di sicurezza',
+  'IMP_ELE':'Impianti elettrici','IMP_AGI':'Agibilità del cantiere',
+  'IMP_CON':'Contiguità e interferenze','IMP_ORG':'Organizzazione','IMP_SEG':'Segnaletica',
+  'PLL_PER':'Protezione perimetrale','PLL_OCA':'Opere in calcestruzzo armato',
+  'PLL_SCA':'Scavi','PLL_DEM':'Demolizioni',
+  'ASU_ATT':'Attrezzature','ASU_SCA':'Scale','ASU_UTE':'Utensili',
+  'MAC_MMT':'Macchine movimento terra','MAC_MMM':'Macchine movimento materiali',
+  'MAC_MAS':'Macchine asservimento',
+  'OPE_POT':'Ponteggi tubolari','OPE_POF':'Ponteggi a telaio prefabbricato',
+  'OPE_POS':'Ponti su cavalletti','OPE_POC':'Ponti su ruote','OPE_DPC':'Disposizioni contro cadute',
+  'PIN_TES':'Protezione testa','PIN_OCC':'Protezione occhi','PIN_UDI':'Protezione udito',
+  'PIN_RES':'Protezione vie respiratorie','PIN_MAN':'Protezione mani',
+  'PIN_PIE':'Protezione piedi','PIN_IND':'Indumenti protezione','PIN_CAD':'Protezione anticaduta',
+  'DOC_GEN':'Documentazione generale','DOC_GEN_SOL':'Apparecchi di sollevamento',
+  'DOC_MA4':'Macchine e attrezzature','DOC_PON':'Ponteggi','DOC_ELE':'Impianti elettrici',
+  'SOG_FIG':'Figure di cantiere',
+  'FOR_BAS':'Formazione base','FOR_FIG':'Figure specifiche',
+  'FOR_RIS':'Rischi specifici','FOR_ATM':'Attrezzature e macchine'
+}
 const TIPO_IMP_OPT={1:'Affidataria',2:'Affidataria ed esecutrice',3:'Esecutrice'}
 const CERTIF_OPT={1:'Asseverata',2:'Certificata OHSAS 18001',3:'UNI EN ISO 45001',4:'Sistema Qualità UNI EN ISO 9001',5:'Certificazione ambientale ISO 14001'}
 const CEIV_OPT=['C.E.I.V.','EDILCASSA VENETO','CASSA EDILE BELLUNO','CASSA EDILE VENEZIA','CASSA EDILE VICENZA','ALTRO']
@@ -1880,7 +1900,7 @@ function renderZoneTab(ti){
   con.innerHTML=Object.entries(byPref).map(([pref,items])=>`
     <div class="zona-gruppo">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <h4 style="margin-bottom:0">${pref.replace(/_/g,' ')}</h4>
+        <h4 style="margin-bottom:0">${PREF_LBL[pref]||pref.replace(/_/g,' ')}</h4>
         <button type="button" class="btn-ver-gruppo" data-pref="${pref}" onclick="setGruppoVer(this)" style="font-size:11px;padding:3px 9px;background:#e8f8ee;color:var(--ok);border:1.5px solid var(--ok);border-radius:4px;cursor:pointer;font-weight:700;white-space:nowrap">✓ Tutto VER</button>
       </div>
       ${items.map(item=>{
