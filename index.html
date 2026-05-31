@@ -810,7 +810,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
       </div>
 
-      <div style="display:flex;justify-content:space-between;margin-top:12px">
+      <div style="display:flex;justify-content:space-between;padding:10px 0;position:sticky;bottom:0;background:#fff;z-index:100;border-top:1px solid var(--border);margin-top:12px">
         <button class="btn-outline" id="btn-prev">◀ Precedente</button>
         <button class="btn-primary" id="btn-next">Successivo ▶</button>
       </div>
@@ -1665,9 +1665,9 @@ async function initAuth(){
     if(session)await onLogin(session.user)
     else showScr('login')
     sb.auth.onAuthStateChange((event,s)=>{
-      if(!s){showScr('login');return}
-      // TOKEN_REFRESHED e USER_UPDATED: aggiorna solo l'utente senza reinizializzare l'app
-      if(event==='TOKEN_REFRESHED'||event==='USER_UPDATED'){S.user=s.user;return}
+      if(!s){S.appReady=false;showScr('login');return}
+      // Se l'app è già inizializzata, aggiorna solo l'utente senza reinizializzare (evita reset al cambio scheda)
+      if(S.appReady&&(event==='TOKEN_REFRESHED'||event==='USER_UPDATED'||event==='SIGNED_IN')){S.user=s.user;return}
       onLogin(s.user)
     })
   }catch(e){
@@ -1703,6 +1703,7 @@ async function onLogin(user){
   populateComuniSelect()
   loadFirmeCache()
   navTo('dashboard')
+  S.appReady=true
 }
 $('btn-login').onclick=async()=>{
   const{error}=await sb.auth.signInWithPassword({email:vGet('l-email'),password:vGet('l-pwd')})
@@ -1807,9 +1808,9 @@ function renderZoneTab(ti){
           // voce-nota separata: nascosta, ogni voce ha già il proprio campo note inline
           return ''
         }
-        const cur=S.checklist[item.codice]||'NA'
+        const cur=S.checklist[item.codice]||''
         const nota=S.noteChk[item.codice]||''
-        const notaShow=(cur!=='NA'||nota)?'show':''
+        const notaShow=(cur&&cur!=='NA'||nota)?'show':''
         return`<div class="check-item" style="flex-direction:column;align-items:stretch;gap:0">
           <div style="display:flex;align-items:center;gap:8px;padding:5px 4px">
             <span class="check-label">${item.descrizione}</span>
@@ -2587,16 +2588,16 @@ async function saveVisita(stato){
       }
     }
 
-    // Checklist (save non-NA + note)
+    // Checklist (salva valori espliciti incluso NA + note)
     // Merge valore e nota nello stesso record per evitare duplicati su (visita_id, codice)
     await sb.from('visite_checklist').delete().eq('visita_id',vid)
     const chkMerge={}
-    Object.entries(S.checklist).filter(([,v])=>v&&v!=='NA').forEach(([codice,valore])=>{
+    Object.entries(S.checklist).filter(([,v])=>v).forEach(([codice,valore])=>{
       if(!chkMerge[codice])chkMerge[codice]={visita_id:vid,codice,valore,nota:null}
       else chkMerge[codice].valore=valore
     })
     Object.entries(S.noteChk).filter(([,n])=>n?.trim()).forEach(([codice,nota])=>{
-      if(!chkMerge[codice])chkMerge[codice]={visita_id:vid,codice,valore:'NA',nota}
+      if(!chkMerge[codice])chkMerge[codice]={visita_id:vid,codice,valore:null,nota}
       else chkMerge[codice].nota=nota
     })
     const chkRows=Object.values(chkMerge)
@@ -3887,7 +3888,7 @@ async function riapriBozza(vid){
       const{data:impRows}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva)').eq('visita_id',vid).order('ordine')
       const checklist={},note_checklist={}
       ;(chkRows||[]).forEach(r=>{
-        if(r.valore&&r.valore!=='NA')checklist[r.codice]=r.valore
+        if(r.valore)checklist[r.codice]=r.valore
         if(r.nota)note_checklist[r.codice]=r.nota
       })
       const imprese=(impRows||[]).map((im,i)=>({
@@ -3956,7 +3957,7 @@ async function exportSnapFromDB(vid){
     // Ricostruisce checklist e note
     const checklist={},note_checklist={}
     ;(chkRows||[]).forEach(r=>{
-      if(r.valore&&r.valore!=='NA')checklist[r.codice]=r.valore
+      if(r.valore)checklist[r.codice]=r.valore
       if(r.nota)note_checklist[r.codice]=r.nota
     })
     // Ricostruisce imprese
