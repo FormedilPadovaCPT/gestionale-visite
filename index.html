@@ -698,14 +698,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             </div>
           </div>
           <div class="sect-title">Dati cantiere al momento della visita</div>
-          <div class="row">
-            <div class="field"><label>N° imprese presenti</label><input type="number" id="f-nr-imp" min="0" value="0"></div>
-            <div class="field"><label>N° ditte individuali</label><input type="number" id="f-nr-ind" min="0" value="0"></div>
-          </div>
-          <div class="row">
-            <div class="field"><label>N° lavoratori rilevati (totale)</label><input type="number" id="f-nr-lav" min="0" value="0"></div>
-            <div class="field"><label>di cui stranieri</label><input type="number" id="f-nr-lav-str" min="0" value="0"></div>
-          </div>
+          <p style="font-size:12px;color:#888;margin:-4px 0 12px">
+            N° imprese e lavoratori (totali e di cui stranieri) vengono calcolati automaticamente
+            dalle imprese inserite nella scheda <strong>Imprese</strong>, indicando i dipendenti in cantiere per ciascuna.
+          </p>
           <div class="field"><label>Importo lavori</label>
             <select id="f-importo">
               <option value="">– Seleziona –</option>
@@ -2113,6 +2109,10 @@ function renderImpreseAccordion(){
       const el=$(`im-${f}-${idx}`)
       if(el)el.oninput=()=>S.imprese[idx][f]=el.value
     })
+    ;['nr_lav','nr_lav_str'].forEach(f=>{
+      const el=$(`im-${f}-${idx}`)
+      if(el)el.oninput=()=>S.imprese[idx][f]=+el.value||0
+    })
     const tiEl=$(`im-tipo-${idx}`)
     if(tiEl)tiEl.onchange=()=>S.imprese[idx].tipo_imp=tiEl.value
   })
@@ -2160,6 +2160,10 @@ function impreseAccordionHTML(im,idx){
         <div class="field"><label>Cap./Prep. – Nome</label><input type="text" id="im-capo_nome-${idx}" value="${capNome}" placeholder="Nome"></div>
         <div class="field"><label>Cap./Prep. – Cognome</label><input type="text" id="im-capo_cog-${idx}" value="${capCog}" placeholder="Cognome"></div>
       </div>
+      <div class="row">
+        <div class="field"><label>N° lavoratori in cantiere</label><input type="number" id="im-nr_lav-${idx}" min="0" value="${im.nr_lav||0}"></div>
+        <div class="field"><label>di cui stranieri</label><input type="number" id="im-nr_lav_str-${idx}" min="0" value="${im.nr_lav_str||0}"></div>
+      </div>
       <div class="field"><label>Email invio verbale</label><input type="email" id="im-email_verbale-${idx}" value="${im.email_verbale||''}" placeholder="Lascia vuoto per usare quella in anagrafica…"></div>
       <div class="field"><label>Note fasi lavorazione (questa impresa)</label><textarea id="im-note_fasilav-${idx}" rows="2">${im.note_fasilav||''}</textarea></div>
     </div>
@@ -2167,8 +2171,18 @@ function impreseAccordionHTML(im,idx){
 }
 
 $('btn-add-imp').onclick=()=>{
-  S.imprese.push({impresa_id:'',impresa_nome:'',piva:'',cf_imp:'',ind_imp:'',com_imp:'',att:'',capo_nome:'',capo_cog:'',badge:'',pat:'',note_fasilav:'',tipo_imp:'',certif:[],ceiv:'',stage_imp:'',is_principale:false})
+  S.imprese.push({impresa_id:'',impresa_nome:'',piva:'',cf_imp:'',ind_imp:'',com_imp:'',att:'',capo_nome:'',capo_cog:'',badge:'',pat:'',note_fasilav:'',tipo_imp:'',certif:[],ceiv:'',stage_imp:'',is_principale:false,nr_lav:0,nr_lav_str:0})
   renderImpreseAccordion()
+}
+
+// Totali lavoratori/imprese calcolati dalle imprese inserite
+function computeImpTotals(){
+  const list=(S.imprese||[]).filter(im=>im.impresa_id)
+  return{
+    nr_imp:list.length||0,
+    nr_lavoratori:list.reduce((s,im)=>s+(+im.nr_lav||0),0),
+    nr_lavoratori_stranieri:list.reduce((s,im)=>s+(+im.nr_lav_str||0),0)
+  }
 }
 
 // ── SCHEDA DETTAGLIO CANTIERE ──
@@ -2566,8 +2580,8 @@ async function saveVisita(stato){
       tecnico2_id:tec2_id||null,
       cantiere_id:cant_id,
       impresa_id:S.imprese[0].impresa_id,
-      nr_lavoratori:+vGet('f-nr-lav')||0,
-      nr_lavoratori_stranieri:+vGet('f-nr-lav-str')||0,
+      nr_lavoratori:computeImpTotals().nr_lavoratori,
+      nr_lavoratori_stranieri:computeImpTotals().nr_lavoratori_stranieri,
       ipc:ipcVal,
       tipo_accesso:+vGet('f-tipo')||null,
       elimina:0,
@@ -2602,8 +2616,8 @@ async function saveVisita(stato){
       comm_tel:vGet('f-comm-tel')||vGet('f-comm-tel-pg')||null,
       comm_piva:vGet('f-comm-piva')||null,
       comm_rag_soc:vGet('f-comm-rag-soc')||null,
-      nr_imp:+vGet('f-nr-imp')||null,
-      nr_ind:+vGet('f-nr-ind')||null,
+      nr_imp:computeImpTotals().nr_imp||null,
+      nr_ind:null,
       coord:cGet('f-coord'),
       costi:vGet('f-costi')||null,
       stato_lav:vGet('f-stato-lav')||null,
@@ -2680,6 +2694,7 @@ async function saveVisita(stato){
       visita_id:vid,impresa_id:im.impresa_id,
       att:im.att||null,nom_prec:[im.capo_nome||'',im.capo_cog||''].map(s=>s.trim()).filter(Boolean).join(' ')||im.nom_prec||null,badge:im.badge||null,
       pat:im.pat||null,note_fasilav:im.note_fasilav||null,
+      nr_lav:+im.nr_lav||0,nr_lav_str:+im.nr_lav_str||0,
       tipo_imp:+im.tipo_imp||null,is_principale:i===0,ordine:i
     }))
     if(impRows.length)await sb.from('visite_imprese_presenti').insert(impRows)
@@ -2766,10 +2781,10 @@ function buildSnap(vid=null){
     cse_email:vGet('f-cse-email')||null,
     cse_tel:vGet('f-cse-tel')||null,
     // Tab 1 – Dati cantiere al momento della visita
-    nr_imp:+vGet('f-nr-imp')||0,
-    nr_ind:+vGet('f-nr-ind')||0,
-    nr_lavoratori:+vGet('f-nr-lav')||0,
-    nr_lavoratori_stranieri:+vGet('f-nr-lav-str')||0,
+    nr_imp:computeImpTotals().nr_imp||0,
+    nr_ind:0,
+    nr_lavoratori:computeImpTotals().nr_lavoratori,
+    nr_lavoratori_stranieri:computeImpTotals().nr_lavoratori_stranieri,
     importo:vGet('f-importo')||null,
     costi:vGet('f-costi')||null,
     stato_lav:vGet('f-stato-lav')||null,
@@ -3418,7 +3433,8 @@ function buildRiepilogo(){
     ['Cantiere',vGet('f-cant-search')||'-'],
     ['Impresa principale',S.imprese[0]?.impresa_nome||'-'],
     ['Tecnico',vGet('f-tec-display')],
-    ['N° lavoratori',vGet('f-nr-lav')||'0'],
+    ['N° imprese',String(computeImpTotals().nr_imp)],
+    ['N° lavoratori',`${computeImpTotals().nr_lavoratori} (di cui stranieri: ${computeImpTotals().nr_lavoratori_stranieri})`],
   ].map(([k,v])=>`<div class="rp-item"><div class="rp-k">${k}</div><div class="rp-v">${v||'-'}</div></div>`).join('')
 
   let zoneHtml=''
@@ -3977,7 +3993,7 @@ async function riapriBozza(vid){
       const imprese=(impRows||[]).map((im,i)=>({
         impresa_id:im.impresa_id||'',impresa_nome:im.imprese?.impresa_nome||'',
         piva:im.imprese?.piva||'',cf_imp:im.imprese?.impresa_cf||'',
-        att:im.att||'',is_principale:i===0
+        att:im.att||'',nr_lav:+im.nr_lav||0,nr_lav_str:+im.nr_lav_str||0,is_principale:i===0
       }))
       const cant=v.cantieri||{}
       snap={
@@ -4050,6 +4066,7 @@ async function exportSnapFromDB(vid){
       piva:im.imprese?.piva||'',
       cf_imp:im.imprese?.impresa_cf||'',
       att:im.att||'',
+      nr_lav:+im.nr_lav||0,nr_lav_str:+im.nr_lav_str||0,
       is_principale:i===0
     }))
     const cant=v.cantieri||{}
@@ -4326,23 +4343,28 @@ async function genPDF(vid, output='save'){
       const piva=im.imprese?.piva||(im.impresa_id&&!/^\d{1,6}$/.test(im.impresa_id)?im.impresa_id:'')||''
       const email=im.imprese?.impresa_email_ref||'–'
       const nomeCell=`${i+1}. ${nome}`
+      const nrLav=+im.nr_lav||0, nrLavStr=+im.nr_lav_str||0
       impsRows.push([
         {content:nomeCell,styles:{fontStyle:'bold'}},
         {content:ruolo,styles:{halign:'center'}},
         {content:piva||'–'},
         {content:cf},
+        {content:String(nrLav),styles:{halign:'center'}},
+        {content:String(nrLavStr),styles:{halign:'center'}},
         {content:email,styles:{fontSize:6.5}}
       ])
     })
-    if(!impsRows.length) impsRows.push([{content:'Nessuna impresa registrata',colSpan:5,styles:{halign:'center',textColor:[180,180,180]}}])
+    if(!impsRows.length) impsRows.push([{content:'Nessuna impresa registrata',colSpan:7,styles:{halign:'center',textColor:[180,180,180]}}])
 
     doc.autoTable({startY:y,
       head:[[
         {content:'Ragione sociale',styles:{fontStyle:'bold'}},
-        {content:'Ruolo',styles:{fontStyle:'bold',cellWidth:28,halign:'center'}},
-        {content:'P.IVA',styles:{fontStyle:'bold',cellWidth:28}},
-        {content:'Cod. fiscale',styles:{fontStyle:'bold',cellWidth:30}},
-        {content:'Email verbale',styles:{fontStyle:'bold',cellWidth:44}}
+        {content:'Ruolo',styles:{fontStyle:'bold',cellWidth:24,halign:'center'}},
+        {content:'P.IVA',styles:{fontStyle:'bold',cellWidth:26}},
+        {content:'Cod. fiscale',styles:{fontStyle:'bold',cellWidth:28}},
+        {content:'N° lav.',styles:{fontStyle:'bold',cellWidth:14,halign:'center'}},
+        {content:'di cui stran.',styles:{fontStyle:'bold',cellWidth:16,halign:'center'}},
+        {content:'Email verbale',styles:{fontStyle:'bold',cellWidth:40}}
       ]],
       body:impsRows,
       styles:{fontSize:7.5,cellPadding:1.8},
@@ -4394,8 +4416,8 @@ async function genPDF(vid, output='save'){
         [{content:'Tipo intervento',styles:{fontStyle:'bold',fillColor:LBL}},{content:tipInt},{content:'Tipo opera',styles:{fontStyle:'bold',fillColor:LBL}},{content:tipOpe}],
         [{content:'Importo lavori (€)',styles:{fontStyle:'bold',fillColor:LBL}},{content:impLbl},{content:'Durata cantiere',styles:{fontStyle:'bold',fillColor:LBL}},{content:durLbl}],
         [{content:'Codice CNCE',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.cantiere_cnce||'–'},{content:'',colSpan:2}],
-        [{content:'N° imprese in cantiere',styles:{fontStyle:'bold',fillColor:LBL}},{content:String(v.nr_imp||1)},{content:'Totale lavoratori',styles:{fontStyle:'bold',fillColor:LBL}},{content:String(v.nr_lavoratori||0)}],
-        [{content:'di cui autonomi',styles:{fontStyle:'bold',fillColor:LBL}},{content:String(v.nr_ind||0)},{content:'',colSpan:2}]
+        [{content:'N° imprese in cantiere',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).filter(im=>im.impresa_id).length||v.nr_imp||1)},{content:'Totale lavoratori',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).reduce((s,im)=>s+(+im.nr_lav||0),0)||v.nr_lavoratori||0)}],
+        [{content:'di cui stranieri',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).reduce((s,im)=>s+(+im.nr_lav_str||0),0)||v.nr_lavoratori_stranieri||0)},{content:'',colSpan:2}]
       ],
       styles:{fontSize:7.5,cellPadding:1.8},
       columnStyles:{0:{cellWidth:40},1:{cellWidth:50},2:{cellWidth:40}},
@@ -6489,6 +6511,7 @@ async function _loadSnapForVerbale(verbale){
       piva:im.imprese?.piva||'',cf_imp:im.imprese?.impresa_cf||'',
       ind_imp:im.imprese?.ind_imp||'',com_imp:im.imprese?.com_imp||'',
       att:im.att||'',capo_nome:im.capo_nome||'',capo_cog:im.capo_cog||'',
+      nr_lav:+im.nr_lav||0,nr_lav_str:+im.nr_lav_str||0,
       badge:im.badge||'',tipo_imp:im.tipo_imp||'',is_principale:i===0
     })),
     checklist,note_checklist,
