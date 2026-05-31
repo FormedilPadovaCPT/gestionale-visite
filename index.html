@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Gestionale Visite – Formedil Padova · v2025-05-14</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -414,12 +415,14 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="stat-card"><div class="num" id="s-medio" style="color:var(--warn)">–</div><div class="lbl">IPC Medio</div></div>
         <div class="stat-card"><div class="num" id="s-basso" style="color:var(--ok)">–</div><div class="lbl">IPC Basso/NR</div></div>
       </div>
-      <div class="card">
-        <h3>Ultime visite</h3>
-        <div class="tbl-wrap">
-          <table><thead><tr><th>Verbale</th><th>Data</th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th>Stato</th><th></th></tr></thead>
-          <tbody id="tbody-dash"></tbody></table>
-        </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card" style="margin-bottom:0"><h3>Visite per tecnico</h3><canvas id="ch-tecnico" height="200"></canvas></div>
+        <div class="card" style="margin-bottom:0"><h3>Tipo impresa (Cassa Edile)</h3><canvas id="ch-ceiv" height="200"></canvas></div>
+      </div>
+      <div class="card"><h3>Visite con RLST per tecnico</h3><canvas id="ch-rlst" height="130"></canvas></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card" style="margin-bottom:0"><h3>IPC per tipo di accesso</h3><canvas id="ch-accesso" height="220"></canvas></div>
+        <div class="card" style="margin-bottom:0"><h3>Visite mese per mese</h3><canvas id="ch-mesi" height="220"></canvas></div>
       </div>
     </section>
 
@@ -3476,16 +3479,91 @@ function annoEdile(){
 }
 
 // ── DASHBOARD ──
+// Cache istanze Chart.js per distruggerle prima di ricrearle
+const _dashCharts={}
+function _mkChart(id,cfg){
+  if(_dashCharts[id]){_dashCharts[id].destroy()}
+  const ctx=document.getElementById(id)
+  if(!ctx)return
+  _dashCharts[id]=new Chart(ctx,cfg)
+}
+
 async function loadDash(){
   const ae=annoEdile()
-  const{data}=await sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).gte('data_visita',ae.da).lte('data_visita',ae.a).eq('elimina',0).order('data_visita',{ascending:false})
-  const vs=data||[]
-  $('s-tot').textContent=vs.length
-  $('s-alto').textContent=vs.filter(v=>v.ipc==='ALTO').length
-  $('s-medio').textContent=vs.filter(v=>v.ipc==='MEDIO').length
-  $('s-basso').textContent=vs.filter(v=>v.ipc==='BASSO'||v.ipc==='NR'||!v.ipc).length
-  $('tbody-dash').innerHTML=vs.slice(0,10).map(v=>vtRow(v)).join('')||`<tr><td colspan="7" style="text-align:center;color:#aaa;padding:18px">Nessuna visita nell\'anno edile ${ae.label}</td></tr>`
-  bindRowActions()
+  // Fetch visite anno edile con tecnico
+  const{data:vs}=await sb.from('visite')
+    .select('visita_id,data_visita,ipc,rlst_sn,tipo_accesso,tecnico_id,elimina')
+    .gte('data_visita',ae.da).lte('data_visita',ae.a).eq('elimina',0)
+  const visite=vs||[]
+
+  // Contatori KPI
+  $('s-tot').textContent=visite.length
+  $('s-alto').textContent=visite.filter(v=>v.ipc==='ALTO').length
+  $('s-medio').textContent=visite.filter(v=>v.ipc==='MEDIO').length
+  $('s-basso').textContent=visite.filter(v=>v.ipc==='BASSO'||v.ipc==='NR'||!v.ipc).length
+
+  // Fetch tecnici
+  const{data:tecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome').eq('elimina',false)
+  const tecMap={}
+  ;(tecs||[]).forEach(t=>{tecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()||t.tecnico_id})
+
+  // Fetch ceiv impresa principale per le visite dell'anno
+  const vids=visite.map(v=>v.visita_id)
+  let ceivMap={}
+  if(vids.length){
+    const{data:vip}=await sb.from('visite_imprese_presenti')
+      .select('visita_id,imprese(cassa_edile)')
+      .in('visita_id',vids).eq('is_principale',true)
+    ;(vip||[]).forEach(r=>{ceivMap[r.visita_id]=(r.imprese?.cassa_edile||'').trim()||'Altra/Non indicata'})
+  }
+
+  const TACC={1:'Su segnalazione',2:'Su richiesta',3:'Protocolli intesa',4:'RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Dal CPT'}
+  const C={alto:'#e74c3c',medio:'#f39c12',basso:'#27ae60',nr:'#95a5a6',orange:'#e7500f',grey:'#565c66',blue:'#2980b9',green:'#27ae60',purple:'#8e44ad'}
+
+  // ── GRAFICO 1: Visite per tecnico ──
+  const tecCount={}
+  visite.forEach(v=>{const n=tecMap[v.tecnico_id]||'Non assegnato';tecCount[n]=(tecCount[n]||0)+1})
+  const tecLabels=Object.keys(tecCount).sort((a,b)=>tecCount[b]-tecCount[a])
+  _mkChart('ch-tecnico',{type:'bar',data:{labels:tecLabels,datasets:[{label:'Visite',data:tecLabels.map(l=>tecCount[l]),backgroundColor:C.orange,borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}})
+
+  // ── GRAFICO 2: Tipo impresa (cassa edile) ──
+  const ceivCount={}
+  visite.forEach(v=>{const ce=ceivMap[v.visita_id]||'Altra/Non indicata';ceivCount[ce]=(ceivCount[ce]||0)+1})
+  const ceivLabels=Object.keys(ceivCount)
+  const ceivColors=['#e7500f','#565c66','#27ae60','#f39c12','#2980b9','#8e44ad','#e74c3c','#1abc9c']
+  _mkChart('ch-ceiv',{type:'doughnut',data:{labels:ceivLabels,datasets:[{data:ceivLabels.map(l=>ceivCount[l]),backgroundColor:ceivColors.slice(0,ceivLabels.length),borderWidth:2}]},options:{plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:14}}}}})
+
+  // ── GRAFICO 3: RLST per tecnico ──
+  const rlstTot={},rlstSi={}
+  visite.forEach(v=>{const n=tecMap[v.tecnico_id]||'Non assegnato';rlstTot[n]=(rlstTot[n]||0)+1;if(v.rlst_sn)rlstSi[n]=(rlstSi[n]||0)+1})
+  const rlstLabels=Object.keys(rlstTot).sort()
+  _mkChart('ch-rlst',{type:'bar',data:{labels:rlstLabels,datasets:[{label:'Totale visite',data:rlstLabels.map(l=>rlstTot[l]),backgroundColor:C.grey,borderRadius:3},{label:'Con RLST',data:rlstLabels.map(l=>rlstSi[l]||0),backgroundColor:C.orange,borderRadius:3}]},options:{plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}})
+
+  // ── GRAFICO 4: IPC per tipo accesso ──
+  const accKeys=Object.keys(TACC).map(Number)
+  const accIpc={}
+  accKeys.forEach(k=>{accIpc[k]={ALTO:0,MEDIO:0,BASSO:0,NR:0}})
+  accIpc[0]={ALTO:0,MEDIO:0,BASSO:0,NR:0}
+  visite.forEach(v=>{
+    const k=+(v.tipo_accesso)||0
+    if(!accIpc[k])accIpc[k]={ALTO:0,MEDIO:0,BASSO:0,NR:0}
+    const ipc=(v.ipc==='ALTO'||v.ipc==='MEDIO'||v.ipc==='BASSO')?v.ipc:'NR'
+    accIpc[k][ipc]++
+  })
+  const accLabels=[...accKeys.filter(k=>accIpc[k]&&(accIpc[k].ALTO+accIpc[k].MEDIO+accIpc[k].BASSO+accIpc[k].NR)>0).map(k=>TACC[k]),(accIpc[0]?.ALTO+accIpc[0]?.MEDIO+accIpc[0]?.BASSO+accIpc[0]?.NR)>0?['Non indicato']:[]].flat()
+  const accKeysUsed=[...accKeys.filter(k=>accIpc[k]&&(accIpc[k].ALTO+accIpc[k].MEDIO+accIpc[k].BASSO+accIpc[k].NR)>0),(accIpc[0]?.ALTO+accIpc[0]?.MEDIO+accIpc[0]?.BASSO+accIpc[0]?.NR)>0?[0]:[]].flat()
+  _mkChart('ch-accesso',{type:'bar',data:{labels:accLabels,datasets:[{label:'ALTO',data:accKeysUsed.map(k=>accIpc[k]?.ALTO||0),backgroundColor:C.alto,borderRadius:2},{label:'MEDIO',data:accKeysUsed.map(k=>accIpc[k]?.MEDIO||0),backgroundColor:C.medio,borderRadius:2},{label:'BASSO',data:accKeysUsed.map(k=>accIpc[k]?.BASSO||0),backgroundColor:C.basso,borderRadius:2},{label:'NR',data:accKeysUsed.map(k=>accIpc[k]?.NR||0),backgroundColor:C.nr,borderRadius:2}]},options:{plugins:{legend:{position:'top'}},scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1}}}}})
+
+  // ── GRAFICO 5: Visite mese per mese ──
+  const mesiMap={}
+  visite.forEach(v=>{
+    if(!v.data_visita)return
+    const m=v.data_visita.slice(0,7) // YYYY-MM
+    mesiMap[m]=(mesiMap[m]||0)+1
+  })
+  const mesiSorted=Object.keys(mesiMap).sort()
+  const mesiLabels=mesiSorted.map(m=>{const[y,mo]=m.split('-');return`${['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'][+mo-1]} ${y}`})
+  _mkChart('ch-mesi',{type:'line',data:{labels:mesiLabels,datasets:[{label:'Visite',data:mesiSorted.map(m=>mesiMap[m]),borderColor:C.orange,backgroundColor:'rgba(231,80,15,.1)',fill:true,tension:.3,pointRadius:5,pointBackgroundColor:C.orange}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}})
 }
 
 // ── LISTA ──
