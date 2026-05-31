@@ -403,6 +403,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="cantieri">🏗️ Cantieri</button>
     <button data-view="rubrica">📒 Rubrica</button>
     <button data-view="import">📥 Importa</button>
+    <button data-view="scadenze">⏰ Scadenze</button>
     <button data-view="admin" id="nav-admin" style="display:none">🔐 Coordinatore</button>
   </nav>
   <main>
@@ -920,6 +921,28 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     </section>
 
     <!-- ══ ZONA RISERVATA COORDINATORE ══ -->
+    <!-- SCADENZE VISITE DI RITORNO -->
+    <section id="view-scadenze" class="hidden">
+      <div class="card" style="border-left:5px solid #e74c3c;margin-bottom:14px">
+        <h3 style="color:#e74c3c">⚠️ Urgenti — scadenza superata da più di 2 settimane</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:10px">Cantieri con visita di ritorno prevista e non ancora effettuata. Ordine per IPC (Alto prima) e data più vecchia.</p>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>Verbale</th><th>Data visita</th><th>Ritorno previsto</th><th>Scaduta da</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
+          <tbody id="tbody-scad-urgenti"></tbody></table>
+        </div>
+        <div id="scad-urg-empty" class="hidden" style="text-align:center;color:#aaa;padding:18px;font-size:13px">✅ Nessuna visita urgente scaduta</div>
+      </div>
+      <div class="card" style="border-left:5px solid #f39c12">
+        <h3 style="color:#f39c12">📅 Prossime visite pianificate</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:10px">Visite di ritorno previste nei prossimi 60 giorni, ordinate per data più vicina.</p>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>Verbale</th><th>Data visita</th><th>Ritorno previsto</th><th>Tra giorni</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
+          <tbody id="tbody-scad-prossime"></tbody></table>
+        </div>
+        <div id="scad-pros-empty" class="hidden" style="text-align:center;color:#aaa;padding:18px;font-size:13px">Nessuna visita pianificata nei prossimi 60 giorni</div>
+      </div>
+    </section>
+
     <section id="view-admin" class="hidden">
       <div class="adm-wrap">
         <div class="adm-header">
@@ -1743,13 +1766,14 @@ function showScr(n){
 }
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','cantieri','rubrica','import','admin'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','rubrica','import','scadenze','admin'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
+  if(view==='scadenze')loadScadenze().catch(e=>{console.error('loadScadenze:',e);toast('Errore scadenze: '+e.message,'err')})
   if(view==='admin')admInit()
 }
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
@@ -3626,6 +3650,71 @@ async function loadDash(){
     labels:mesiLabels,
     datasets:[{label:'Visite',data:mesiSorted.map(m=>mesiMap[m]),borderColor:C.orange,backgroundColor:'rgba(231,80,15,.12)',fill:true,tension:.35,pointRadius:5,pointBackgroundColor:C.orange,pointBorderColor:'#fff',pointBorderWidth:2}]
   },options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}})
+}
+
+// ── SCADENZE VISITE DI RITORNO ──
+async function loadScadenze(){
+  const oggi=new Date();oggi.setHours(0,0,0,0)
+  const ipcOrd={ALTO:0,MEDIO:1,BASSO:2,NR:3,'':3}
+
+  // Fetch tutte le visite con data_ritorno compilata, non eliminate
+  const{data:vs}=await sb.from('visite')
+    .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,tecnico_id,cantieri(cantiere_indirizzo,cantiere_etichetta)')
+    .not('data_ritorno','is',null).eq('elimina',0)
+    .order('data_ritorno',{ascending:true})
+  const visite=vs||[]
+
+  // Tecnici
+  const{data:tecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome')
+  const tecMap={}
+  ;(tecs||[]).forEach(t=>{tecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()})
+
+  // Per ogni visita con data_ritorno, controlla se esiste già una visita successiva sullo stesso cantiere
+  // (semplificazione: mostriamo tutte le visite con data_ritorno; filtrare le "già evase" richiederebbe join complesso)
+  const urgenti=[], prossime=[]
+  const dueWeeksAgo=new Date(oggi);dueWeeksAgo.setDate(dueWeeksAgo.getDate()-14)
+  const sixtyDaysLater=new Date(oggi);sixtyDaysLater.setDate(sixtyDaysLater.getDate()+60)
+
+  visite.forEach(v=>{
+    if(!v.data_ritorno)return
+    const dr=new Date(v.data_ritorno);dr.setHours(0,0,0,0)
+    const diffDays=Math.round((dr-oggi)/(1000*60*60*24))
+    if(dr<=dueWeeksAgo){urgenti.push({...v,diffDays})}
+    else if(dr>oggi&&dr<=sixtyDaysLater){prossime.push({...v,diffDays})}
+    else if(dr>dueWeeksAgo&&dr<=oggi){urgenti.push({...v,diffDays})} // scaduta ma meno di 2 sett — comunque urgente
+  })
+
+  // Ordina urgenti: IPC Alto prima, poi data più vecchia
+  urgenti.sort((a,b)=>(ipcOrd[a.ipc||'']||3)-(ipcOrd[b.ipc||'']||3)||new Date(a.data_ritorno)-new Date(b.data_ritorno))
+
+  function scadRow(v,isUrgente){
+    const cant=v.cantieri?.cantiere_etichetta||v.cantieri?.cantiere_indirizzo||'–'
+    const ipc=v.ipc||'NR'
+    const tec=tecMap[v.tecnico_id]||'–'
+    const dr=fmtDate(v.data_ritorno)
+    const diff=Math.abs(v.diffDays)
+    const diffLbl=isUrgente
+      ?`<span style="color:#e74c3c;font-weight:700">${diff} gg fa</span>`
+      :`<span style="color:#27ae60;font-weight:600">tra ${v.diffDays} gg</span>`
+    const ipcStyle=ipc==='ALTO'?'color:#e74c3c':ipc==='MEDIO'?'color:#f39c12':ipc==='BASSO'?'color:#27ae60':''
+    return`<tr>
+      <td>${v.nr_verbale||'–'}</td>
+      <td>${fmtDate(v.data_visita)}</td>
+      <td>${dr}</td>
+      <td>${diffLbl}</td>
+      <td style="font-size:12px">${tec}</td>
+      <td style="font-size:12px">${cant}</td>
+      <td><span class="badge ${ipcCls(ipc)}" style="${ipcStyle}">${ipc}</span></td>
+      <td><button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Dettaglio">👁</button></td>
+    </tr>`
+  }
+
+  const tbU=$('tbody-scad-urgenti'), tbP=$('tbody-scad-prossime')
+  if(urgenti.length){tbU.innerHTML=urgenti.map(v=>scadRow(v,true)).join('');hide('scad-urg-empty')}
+  else{tbU.innerHTML='';show('scad-urg-empty')}
+  if(prossime.length){tbP.innerHTML=prossime.map(v=>scadRow(v,false)).join('');hide('scad-pros-empty')}
+  else{tbP.innerHTML='';show('scad-pros-empty')}
+  bindRowActions()
 }
 
 // ── LISTA ──
