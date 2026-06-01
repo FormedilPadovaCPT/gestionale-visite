@@ -511,9 +511,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
                 <option value="7">Indicata dal CPT</option>
               </select>
             </div>
-            <div class="field" style="flex:0 0 100px">
-              <label>Accesso n°</label>
-              <input type="text" id="f-acc-cant" placeholder="N°">
+            <div class="field" style="flex:0 0 150px">
+              <label>Accesso n° <span style="font-weight:400;font-size:11px;color:#aaa">(automatico)</span></label>
+              <input type="text" id="f-acc-cant" placeholder="–" readonly title="Calcolato automaticamente alla selezione del cantiere" style="background:#f8f8f8;cursor:not-allowed">
+              <p style="font-size:11px;color:#aaa;margin-top:3px">Si calcola da solo selezionando il cantiere</p>
             </div>
             <div class="field" style="flex:0 0 auto">
               <label style="white-space:nowrap;font-size:12px">Aff. RLST?</label>
