@@ -3561,6 +3561,23 @@ function buildRiepilogo(){
   $('rp-ipc-val').textContent=ipc==='NR'?'Nessun Rilievo':ipc
   $('rp-ipc-cnt').textContent=`NC+: ${np}   NC-: ${nm}   OSS: ${os}`
 
+  // ── Visita di ritorno: ricalcola la proposta Formedil e compila se vuota ──
+  // (allinea il riepilogo alla logica della scheda Note, così la proposta è
+  //  sempre visibile e applicata anche se l'utente non si è fermato sul tab 13)
+  const accCant=vGet('f-acc-cant')||'1'
+  const calcRit=calcRientroFormedil(vGet('f-data'),accCant,ipc)
+  let ritornoTxt
+  if(vGet('f-data-ritorno')){
+    ritornoTxt=fmtDate(vGet('f-data-ritorno'))
+    if(calcRit.date)ritornoTxt+=' <span style="font-size:11px;color:#888">(proposta: '+fmtDate(calcRit.date.toISOString().slice(0,10))+')</span>'
+  }else if(calcRit.date){
+    const dStr=calcRit.date.toISOString().slice(0,10)
+    vSet('f-data-ritorno',dStr)   // compila automaticamente il campo
+    ritornoTxt=fmtDate(dStr)+' <span style="font-size:11px;color:#27ae60">(proposta Formedil compilata)</span>'
+  }else{
+    ritornoTxt='<span style="color:#888">Archiviazione — nessun rientro previsto per questo IPC / n° accesso</span>'
+  }
+
   $('rp-dati').innerHTML=[
     ['Verbale',vGet('f-verbale')],
     ['Data',fmtDate(vGet('f-data'))],
@@ -3569,6 +3586,7 @@ function buildRiepilogo(){
     ['Tecnico',vGet('f-tec-display')],
     ['N° imprese',String(computeImpTotals().nr_imp)],
     ['N° lavoratori',`${computeImpTotals().nr_lavoratori} (di cui stranieri: ${computeImpTotals().nr_lavoratori_stranieri})`],
+    ['Visita di ritorno',ritornoTxt],
   ].map(([k,v])=>`<div class="rp-item"><div class="rp-k">${k}</div><div class="rp-v">${v||'-'}</div></div>`).join('')
 
   let zoneHtml=''
