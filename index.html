@@ -247,6 +247,17 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 .tipo-chip input[type=radio]:checked+span{border-color:var(--grey);background:var(--grey);color:#fff}
 @media(max-width:600px){
   .row{flex-direction:column;gap:0}
+  /* NUOVA VISITA: forza i campi a tutta larghezza, sovrascrive i flex-basis inline */
+  #view-form .row{flex-direction:column!important;flex-wrap:wrap;gap:0!important}
+  #view-form .row>.field{flex:1 1 100%!important;min-width:100%!important;width:100%}
+  #view-form .field{width:100%}
+  #view-form .field>input,
+  #view-form .field>select,
+  #view-form .field>textarea{width:100%;box-sizing:border-box}
+  /* contenitori flex inline (es. ricerca committente, +Nuovo) */
+  #view-form .row[style*="flex"],
+  #view-form .field>div[style*="display:flex"]{flex-wrap:wrap}
+  #view-form .autocomplete-wrap{flex:1 1 100%!important;min-width:100%!important}
   .check-radios{gap:2px}
   .radio-chip{font-size:10px;padding:2px 4px}
   main{padding:8px}
