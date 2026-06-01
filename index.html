@@ -72,6 +72,7 @@ main{flex:1;padding:14px;max-width:1140px;margin:0 auto;width:100%}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
 .stat-card{background:#fff;border-radius:var(--radius);padding:14px;text-align:center;box-shadow:var(--shadow)}
 .stat-card .num{font-size:30px;font-weight:800;color:var(--orange)}
+.stat-card .pct{font-size:14px;font-weight:700;margin-top:1px}
 .stat-card .lbl{font-size:11px;color:var(--grey);margin-top:3px;text-transform:uppercase}
 .card{background:#fff;border-radius:var(--radius);padding:15px;box-shadow:var(--shadow);margin-bottom:14px}
 .card h3{font-size:14px;margin-bottom:12px;color:var(--grey);border-bottom:2px solid var(--light);padding-bottom:7px;text-transform:uppercase;letter-spacing:.5px}
@@ -425,9 +426,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <section id="view-dashboard">
       <div class="stats-grid">
         <div class="stat-card"><div class="num" id="s-tot">–</div><div class="lbl">Visite anno edile</div></div>
-        <div class="stat-card"><div class="num" id="s-alto" style="color:var(--danger)">–</div><div class="lbl">IPC Alto</div></div>
-        <div class="stat-card"><div class="num" id="s-medio" style="color:var(--warn)">–</div><div class="lbl">IPC Medio</div></div>
-        <div class="stat-card"><div class="num" id="s-basso" style="color:var(--ok)">–</div><div class="lbl">IPC Basso/Nessun Rilievo</div></div>
+        <div class="stat-card"><div class="num" id="s-alto" style="color:var(--danger)">–</div><div class="pct" id="s-alto-pct" style="color:var(--danger)"></div><div class="lbl">IPC Alto</div></div>
+        <div class="stat-card"><div class="num" id="s-medio" style="color:var(--warn)">–</div><div class="pct" id="s-medio-pct" style="color:var(--warn)"></div><div class="lbl">IPC Medio</div></div>
+        <div class="stat-card"><div class="num" id="s-basso" style="color:#a07a00">–</div><div class="pct" id="s-basso-pct" style="color:#a07a00"></div><div class="lbl">IPC Basso</div></div>
+        <div class="stat-card"><div class="num" id="s-nr" style="color:var(--ok)">–</div><div class="pct" id="s-nr-pct" style="color:var(--ok)"></div><div class="lbl">IPC Nessun Rilievo</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
         <div class="card" style="margin-bottom:0"><h3>Visite per tecnico</h3><canvas id="ch-tecnico" height="200"></canvas></div>
@@ -3626,10 +3628,17 @@ async function loadDash(){
     .gte('data_visita',ae.da).lte('data_visita',ae.a).eq('elimina',0)
   const visite=vs||[]
 
-  $('s-tot').textContent=visite.length
-  $('s-alto').textContent=visite.filter(v=>v.ipc==='ALTO').length
-  $('s-medio').textContent=visite.filter(v=>v.ipc==='MEDIO').length
-  $('s-basso').textContent=visite.filter(v=>v.ipc==='BASSO'||v.ipc==='NR'||!v.ipc).length
+  const nTot=visite.length
+  const nAlto=visite.filter(v=>v.ipc==='ALTO').length
+  const nMedio=visite.filter(v=>v.ipc==='MEDIO').length
+  const nBasso=visite.filter(v=>v.ipc==='BASSO').length
+  const nNR=visite.filter(v=>!v.ipc||v.ipc==='NR').length
+  const pct=n=>nTot?Math.round(n/nTot*100)+'%':'–'
+  $('s-tot').textContent=nTot
+  $('s-alto').textContent=nAlto;$('s-alto-pct').textContent=pct(nAlto)
+  $('s-medio').textContent=nMedio;$('s-medio-pct').textContent=pct(nMedio)
+  $('s-basso').textContent=nBasso;$('s-basso-pct').textContent=pct(nBasso)
+  $('s-nr').textContent=nNR;$('s-nr-pct').textContent=pct(nNR)
 
   // Tecnici
   const{data:tecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome')
