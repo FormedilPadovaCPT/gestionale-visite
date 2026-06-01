@@ -427,7 +427,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="stat-card"><div class="num" id="s-tot">–</div><div class="lbl">Visite anno edile</div></div>
         <div class="stat-card"><div class="num" id="s-alto" style="color:var(--danger)">–</div><div class="lbl">IPC Alto</div></div>
         <div class="stat-card"><div class="num" id="s-medio" style="color:var(--warn)">–</div><div class="lbl">IPC Medio</div></div>
-        <div class="stat-card"><div class="num" id="s-basso" style="color:var(--ok)">–</div><div class="lbl">IPC Basso/NR</div></div>
+        <div class="stat-card"><div class="num" id="s-basso" style="color:var(--ok)">–</div><div class="lbl">IPC Basso/Nessun Rilievo</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
         <div class="card" style="margin-bottom:0"><h3>Visite per tecnico</h3><canvas id="ch-tecnico" height="200"></canvas></div>
@@ -446,7 +446,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <h2 id="form-title">Nuova Visita</h2>
         <div class="ipc-live-wrap">
           <span id="ipc-lbl" style="font-size:12px;color:var(--grey);margin-right:4px">IPC:</span>
-          <span id="ipc-val" class="badge badge-nr">NR</span>
+          <span id="ipc-val" class="badge badge-nr">Nessun Rilievo</span>
           <span id="ipc-cnt" style="font-size:11px;color:#aaa;margin-left:4px"></span>
         </div>
       </div>
@@ -830,7 +830,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="card">
           <h3>Riepilogo e salvataggio</h3>
           <div id="rp-ipc-box" class="ipc-box NR">
-            <div class="ipc-val" id="rp-ipc-val">NR</div>
+            <div class="ipc-val" id="rp-ipc-val">Nessun Rilievo</div>
             <div style="font-size:13px;color:#666">Indice di Pericolosità del Cantiere</div>
             <div class="ipc-counters" id="rp-ipc-cnt">NC+: 0 &nbsp; NC-: 0 &nbsp; OSS: 0</div>
           </div>
@@ -856,7 +856,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <h3>Elenco visite</h3>
         <div class="search-bar">
           <input type="text" id="q-search" placeholder="Verbale, cantiere, impresa…">
-          <select id="q-ipc"><option value="">Tutti IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">NR</option></select>
+          <select id="q-ipc"><option value="">Tutti IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun Rilievo</option></select>
           <select id="q-stato"><option value="">Tutti stati</option><option value="bozza">Bozza</option><option value="definitivo">Definitivo</option></select>
           <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button>
         </div>
@@ -948,7 +948,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       </div>
       <div class="card" style="border-left:5px solid #e74c3c">
         <h3 style="color:#e74c3c">⚠️ Urgenti — rientro scaduto da più di 2 settimane</h3>
-        <p style="font-size:12px;color:#888;margin-bottom:10px">Ultima visita per cantiere con IPC non NR e rientro scaduto. Ordine per IPC (Alto prima) poi per data più vecchia.</p>
+        <p style="font-size:12px;color:#888;margin-bottom:10px">Ultima visita per cantiere con IPC diverso da Nessun Rilievo e rientro scaduto. Ordine per IPC (Alto prima) poi per data più vecchia.</p>
         <div class="tbl-wrap">
           <table><thead><tr><th>Verbale</th><th>N° accesso</th><th>Data visita</th><th>Rientro previsto</th><th>Scaduto da</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
           <tbody id="tbody-scad-urgenti"></tbody></table>
@@ -987,7 +987,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <div class="adm-stat"><div class="n" id="adm-n-tec">–</div><div class="l">Tecnici</div></div>
             <div class="adm-stat"><div class="n" id="adm-n-alto" style="color:#c0392b">–</div><div class="l">IPC Alto</div></div>
             <div class="adm-stat"><div class="n" id="adm-n-medio" style="color:#e67e22">–</div><div class="l">IPC Medio</div></div>
-            <div class="adm-stat"><div class="n" id="adm-n-basso" style="color:#27ae60">–</div><div class="l">IPC Basso/NR</div></div>
+            <div class="adm-stat"><div class="n" id="adm-n-basso" style="color:#27ae60">–</div><div class="l">IPC Basso/Nessun Rilievo</div></div>
           </div>
         </div>
 
@@ -1726,6 +1726,8 @@ function calcIPC(chk){
   return{ipc,np,nm,os}
 }
 function ipcCls(ipc){return{ALTO:'badge-alto',MEDIO:'badge-medio',BASSO:'badge-basso',NR:'badge-nr'}[ipc]||'badge-nr'}
+// Etichetta IPC da mostrare: NR → "Nessun Rilievo"
+function ipcLbl(ipc){return(!ipc||ipc==='NR')?'Nessun Rilievo':ipc}
 function vGet(id){return $(id)?.value}
 function vSet(id,v){if($(id))$(id).value=v??''}
 function cGet(id){return $(id)?.checked}
@@ -3831,7 +3833,7 @@ async function loadScadenze(){
       <td>${diffLbl}</td>
       <td style="font-size:12px">${tec}</td>
       <td style="font-size:12px">${cant}</td>
-      <td><span class="badge ${ipcCls(ipc)}">${ipc}</span></td>
+      <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
       <td><button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Dettaglio">👁</button></td>
     </tr>`
   }
@@ -3868,7 +3870,7 @@ function vtRow(v){
   return`<tr class="row-detail-hover" data-act="detail-visita" data-id="${v.visita_id}">
     <td>${v.nr_verbale||'-'}</td><td>${fmtDate(v.data_visita)}</td>
     <td>${cant}</td><td>${v.imprese?.impresa_nome||'-'}</td>
-    <td><span class="badge ${ipcCls(ipc)}">${ipc}</span></td>
+    <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
     <td><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span></td>
     <td><div class="tbl-actions">
       <button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Visualizza dettaglio">👁</button>
@@ -6004,7 +6006,7 @@ async function admGeneraReport(){
     // IPC donut + Tipo accesso donut  (half + half)
     const ipcImg=rptDonut({
       data:[nAlto,nMedio,nBasso,nNR],
-      labels:['Alto','Medio','Basso','NR'],
+      labels:['Alto','Medio','Basso','Nessun Rilievo'],
       colors:['#c0392b','#e67e22','#27ae60','#95a5a6'],
       title:'Distribuzione IPC',w:380,h:240
     })
@@ -6509,7 +6511,7 @@ async function showVisitaDetail(vid){
     const tec=v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():'–'
     const cant=v.cantieri, imp=v.imprese
     $('qd-title').textContent=`📋 Verbale ${v.nr_verbale||'–'}`
-    $('qd-badges').innerHTML=`<span class="badge ${ipcCls(ipc)}">${ipc}</span><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span>`
+    $('qd-badges').innerHTML=`<span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span>`
     let ora=''; if(v.ora_visita){ora=v.ora_visita.slice(0,5);if(v.ora_fine)ora+=' → '+v.ora_fine.slice(0,5)}
     let html=qdSec('Sopralluogo')
     html+=qdDl([
@@ -6626,7 +6628,7 @@ async function showCantiereDetail(cantId){
           <td style="padding:5px 6px">${vv.nr_verbale||'–'}</td>
           <td style="padding:5px 6px">${fmtDate(vv.data_visita)}</td>
           <td style="padding:5px 6px">${vv.tecnici?.tecnico_cognome||'–'}</td>
-          <td style="padding:5px 6px"><span class="badge ${ipcCls(ipc)}" style="font-size:10px">${ipc}</span></td>
+          <td style="padding:5px 6px"><span class="badge ${ipcCls(ipc)}" style="font-size:10px">${ipcLbl(ipc)}</span></td>
         </tr>`
       })
       html+='</tbody></table>'
@@ -6799,7 +6801,7 @@ async function showRubricaDetail(tipo, id){
             <td style="padding:5px 6px">${vv.nr_verbale||'–'}</td>
             <td style="padding:5px 6px">${fmtDate(vv.data_visita)}</td>
             <td style="padding:5px 6px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(loc)}</td>
-            <td style="padding:5px 6px"><span class="badge ${ipcCls(ipc)}" style="font-size:10px">${ipc}</span></td>
+            <td style="padding:5px 6px"><span class="badge ${ipcCls(ipc)}" style="font-size:10px">${ipcLbl(ipc)}</span></td>
           </tr>`
         })
         html+='</tbody></table>'
