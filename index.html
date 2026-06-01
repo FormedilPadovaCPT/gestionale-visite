@@ -428,7 +428,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="stat-card"><div class="num" id="s-tot">–</div><div class="lbl">Visite anno edile</div></div>
         <div class="stat-card"><div class="num" id="s-alto" style="color:var(--danger)">–</div><div class="pct" id="s-alto-pct" style="color:var(--danger)"></div><div class="lbl">IPC Alto</div></div>
         <div class="stat-card"><div class="num" id="s-medio" style="color:var(--warn)">–</div><div class="pct" id="s-medio-pct" style="color:var(--warn)"></div><div class="lbl">IPC Medio</div></div>
-        <div class="stat-card"><div class="num" id="s-basso" style="color:#a07a00">–</div><div class="pct" id="s-basso-pct" style="color:#a07a00"></div><div class="lbl">IPC Basso</div></div>
+        <div class="stat-card"><div class="num" id="s-basso" style="color:#b89000">–</div><div class="pct" id="s-basso-pct" style="color:#b89000"></div><div class="lbl">IPC Basso</div></div>
         <div class="stat-card"><div class="num" id="s-nr" style="color:var(--ok)">–</div><div class="pct" id="s-nr-pct" style="color:var(--ok)"></div><div class="lbl">IPC Nessun Rilievo</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -4578,7 +4578,7 @@ async function genPDF(vid, output='save'){
     const PW=210,L=14,W=PW-28
     let y=0
 
-    const ORANGE=[231,80,15],GREY=[86,92,102],WHITE=[255,255,255],BLUE=[52,103,147]
+    const ORANGE=[231,80,15],GREY=[86,92,102],WHITE=[255,255,255],BLUE=[149,194,47]
     const setFont=(style='normal',sz=9,color=GREY)=>{doc.setFont('helvetica',style);doc.setFontSize(sz);doc.setTextColor(...color)}
     const ln=(h=5)=>{y+=h}
     const hLine=(color=GREY,lw=0.3)=>{doc.setDrawColor(...color);doc.setLineWidth(lw);doc.line(L,y,PW-L,y)}
@@ -4713,18 +4713,32 @@ async function genPDF(vid, output='save'){
 
     // Header
     doc.setFillColor(...ORANGE);doc.rect(0,0,PW,20,'F')
-    setFont('bold',13,WHITE);doc.text('FORMEDIL PADOVA',L,9)
-    setFont('normal',7,WHITE);doc.text('ENTE UNICO FORMAZIONE E SICUREZZA',L,15)
-    setFont('bold',10,WHITE);doc.text('Scuola Costruzioni Giuseppe Jappelli',PW-L,9,{align:'right'})
-    setFont('normal',7,WHITE);doc.text('VERBALE DI SOPRALLUOGO IN CANTIERE',PW-L,15,{align:'right'})
+    setFont('bold',16,WHITE);doc.text('FORMEDIL PADOVA',L,11)
+    setFont('normal',7,WHITE);doc.text('ENTE UNICO FORMAZIONE E SICUREZZA',L,17)
+    setFont('bold',13,WHITE);doc.text('VERBALE DI SOPRALLUOGO IN CANTIERE',PW-L,11,{align:'right'})
+    setFont('normal',7,WHITE);doc.text('Area Sicurezza e Salute',PW-L,17,{align:'right'})
     y=24
 
-    // Riga tecnico/data/tipo
-    const _tecLines=[tecNome].concat(tec2Nome?['2° '+tec2Nome]:[]).concat(nomStagePDF?['Stagista: '+nomStagePDF]:[])
-    const _tecCell=_tecLines.filter(Boolean).join('\n')||'–'
+    // Riga tecnico/data/tipo – eventuale 2° tecnico e stagista su righe separate
+    const _bodyRiga1=[
+      {content:tecNome||'–',styles:{fontStyle:'bold'}},
+      fmtDate(v.data_visita),
+      TIPO_ACC[v.tipo_accesso]||'–',
+      cant.cantiere_etichetta||'–',
+      v.nr_verbale||'–'
+    ]
+    const _tecBody=[_bodyRiga1]
+    if(tec2Nome||nomStagePDF){
+      _tecBody.push([
+        tec2Nome?{content:'2° '+tec2Nome,styles:{fontSize:7,textColor:[80,80,80]}}:{content:'',styles:{textColor:[180,180,180]}},
+        '','',
+        nomStagePDF?{content:'Stagista: '+nomStagePDF,styles:{fontSize:7,textColor:[80,80,80]}}:'',
+        ''
+      ])
+    }
     doc.autoTable({startY:y,
       head:[['TECNICO','DATA','TIPOLOGIA VISITA','ETICHETTA CANTIERE','NR VISITA']],
-      body:[[_tecCell,fmtDate(v.data_visita),TIPO_ACC[v.tipo_accesso]||'–',cant.cantiere_etichetta||'–',v.nr_verbale||'–']],
+      body:_tecBody,
       styles:{fontSize:8,cellPadding:2},
       headStyles:{fillColor:GREY,textColor:WHITE,fontStyle:'bold',fontSize:7},
       columnStyles:{0:{cellWidth:42},1:{cellWidth:22},2:{cellWidth:38},4:{cellWidth:18,halign:'center'}},
@@ -4733,7 +4747,7 @@ async function genPDF(vid, output='save'){
     y=doc.lastAutoTable.finalY+3
 
     // ── IMPRESE PRESENTI (tutte) ──
-    const LBL=[220,230,242]
+    const LBL=[232,244,210]
     doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
     setFont('bold',8,WHITE);doc.text('Imprese presenti in cantiere',L+2,y+4);y+=7
 
@@ -4847,7 +4861,7 @@ async function genPDF(vid, output='save'){
     let ipcLabel,ipcBg,ipcTxt
     if(_cntNCp>0){ipcLabel='ALTO';ipcBg=[200,30,30];ipcTxt=WHITE}
     else if(_cntNCn>0){ipcLabel='MEDIO';ipcBg=[231,80,15];ipcTxt=WHITE}
-    else if(_cntOSS>0){ipcLabel='BASSO';ipcBg=[180,140,0];ipcTxt=WHITE}
+    else if(_cntOSS>0){ipcLabel='BASSO';ipcBg=[210,170,0];ipcTxt=WHITE}
     else{ipcLabel='NESSUN RILIEVO';ipcBg=[39,174,96];ipcTxt=WHITE}
     const ipcDetail=`NC+: ${_cntNCp}   NC-: ${_cntNCn}   OSS: ${_cntOSS}   VER: ${_cntVER}`
     doc.autoTable({startY:y,
@@ -4867,8 +4881,8 @@ async function genPDF(vid, output='save'){
       :ipcLabel==='BASSO'
       ?"Vogliate tener conto delle osservazioni sopra riportate. Si invita l'impresa ad attivare le procedure atte ad eliminare i rischi riscontrati. Si precisa che l'attività di consulenza tecnica erogata non solleva l'Impresa dalle proprie responsabilità per il mancato adempimento delle prescrizioni di legge."
       :"Il cantiere risulta in buone condizioni di sicurezza." 
-    const ipcMsgFill=(ipcLabel==='ALTO'||ipcLabel==='MEDIO')?[255,220,220]:ipcLabel==='BASSO'?[255,255,200]:[220,245,220]
-    const ipcMsgLine=(ipcLabel==='ALTO'||ipcLabel==='MEDIO')?[200,0,0]:ipcLabel==='BASSO'?[160,120,0]:[39,130,60]
+    const ipcMsgFill=(ipcLabel==='ALTO'||ipcLabel==='MEDIO')?[255,220,220]:ipcLabel==='BASSO'?[255,250,180]:[220,245,220]
+    const ipcMsgLine=(ipcLabel==='ALTO'||ipcLabel==='MEDIO')?[200,0,0]:ipcLabel==='BASSO'?[190,150,0]:[39,130,60]
     doc.autoTable({startY:y,
       body:[[{content:ipcMsg}]],
       styles:{fontSize:7.5,cellPadding:2,fontStyle:'italic',textColor:[50,50,50],fillColor:ipcMsgFill,lineColor:ipcMsgLine,lineWidth:0.5},
@@ -5198,7 +5212,8 @@ async function genPDF(vid, output='save'){
     }else{
       await _drawFirma(tecNome,tecEmail,L,W)
     }
-    ln(5)
+    ln(22)
+    hLine([220,220,220],0.2);ln(4)
     setFont('normal',7,[180,180,180])
     doc.text(`Generato il ${new Date().toLocaleString('it-IT')} – Formedil Padova CPT`,PW/2,y,{align:'center'})
 
