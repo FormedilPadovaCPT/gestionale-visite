@@ -811,9 +811,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             e archiviate in Google Drive nella cartella del verbale.
             La foto Privacy è il documento con firma del responsabile.
           </p>
-          <div class="field" style="margin-bottom:14px">
-            <label><span class="check-inline"><input type="checkbox" id="f-privacy"> Privacy acquisita (documento firmato dal responsabile)</span></label>
-          </div>
           <div class="foto-grid" id="foto-grid">
             <!-- slot generati da JS -->
           </div>
@@ -2722,7 +2719,7 @@ async function saveVisita(stato){
       stage_vis:vGet('f-stage-vis')==='1',
       nom_stage:vGet('f-nom-stage')||null,
       rlst_sn:vGet('f-rlst')==='1',
-      privacy:cGet('f-privacy'),
+      privacy:hasFotoPrivacy(),
       // Tab 1 – figure coordinamento
       resp_lav:[vGet('f-rl-titolo'),vGet('f-rl-nome'),vGet('f-rl-cog')].filter(Boolean).join(' ')||null,
       rl_email:vGet('f-rl-email')||null,
@@ -2931,7 +2928,7 @@ function buildSnap(vid=null){
     segnalazione:cGet('f-segnalazione'),
     data_ritorno:vGet('f-data-ritorno')||null,
     // Foto
-    privacy:cGet('f-privacy'),
+    privacy:hasFotoPrivacy(),
     exported_at:new Date().toISOString()
   }
 }
@@ -3325,6 +3322,8 @@ const FOTO_SLOTS=[
 
 // Stato foto: { foto1:{file,base64,fileId,url,nome}, ... }
 if(!S.foto)S.foto={}
+// Privacy acquisita = è stata caricata la foto del documento firmato
+function hasFotoPrivacy(){const p=S.foto&&S.foto['privacy'];return !!(p&&(p.base64||p.url||p.fileId))}
 
 async function initFotoTab(){
   if(!S.foto)S.foto={}
