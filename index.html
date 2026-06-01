@@ -931,7 +931,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <h3 style="color:#e7500f">📅 Prossime visite pianificate</h3>
         <p style="font-size:12px;color:#888;margin-bottom:10px">Ultima visita per cantiere con rientro previsto nei prossimi 60 giorni, ordinate per data più vicina.</p>
         <div class="tbl-wrap">
-          <table><thead><tr><th>Verbale</th><th>Data visita</th><th>Rientro previsto</th><th>Tra giorni</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
+          <table><thead><tr><th>Verbale</th><th>N° accesso</th><th>Data visita</th><th>Rientro previsto</th><th>Tra giorni</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
           <tbody id="tbody-scad-prossime"></tbody></table>
         </div>
         <div id="scad-pros-empty" class="hidden" style="text-align:center;color:#aaa;padding:18px;font-size:13px">Nessuna visita pianificata nei prossimi 60 giorni</div>
@@ -940,7 +940,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <h3 style="color:#e74c3c">⚠️ Urgenti — rientro scaduto da più di 2 settimane</h3>
         <p style="font-size:12px;color:#888;margin-bottom:10px">Ultima visita per cantiere con IPC non NR e rientro scaduto. Ordine per IPC (Alto prima) poi per data più vecchia.</p>
         <div class="tbl-wrap">
-          <table><thead><tr><th>Verbale</th><th>Data visita</th><th>Rientro previsto</th><th>Scaduto da</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
+          <table><thead><tr><th>Verbale</th><th>N° accesso</th><th>Data visita</th><th>Rientro previsto</th><th>Scaduto da</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
           <tbody id="tbody-scad-urgenti"></tbody></table>
         </div>
         <div id="scad-urg-empty" class="hidden" style="text-align:center;color:#27ae60;padding:18px;font-size:13px">✅ Nessun rientro urgente scaduto</div>
@@ -3791,6 +3791,7 @@ async function loadScadenze(){
       :fmtDate(v.data_ritorno)
     return`<tr>
       <td>${v.nr_verbale||'–'}</td>
+      <td style="text-align:center;font-weight:600">${v.acc_cant||'–'}</td>
       <td>${fmtDate(v.data_visita)}</td>
       <td>${drLbl}</td>
       <td>${diffLbl}</td>
