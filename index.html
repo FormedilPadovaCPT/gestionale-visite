@@ -2328,7 +2328,7 @@ setupAC('f-cant-search','cant-list', async q=>{
   if(q)qb=qb.or(`cantiere_indirizzo.ilike.%${q}%,cantiere_etichetta.ilike.%${q}%,comune_nome.ilike.%${q}%`)
   const{data}=await qb
   return(data||[]).map(c=>({id:c.cantiere_id,label:c.cantiere_etichetta||`${c.cantiere_indirizzo} ${c.cantiere_civico}`,detail:`${c.cantiere_indirizzo} ${c.cantiere_civico}${c.comune_nome?' – '+c.comune_nome:''}`,extra:c}))
-},item=>{
+},async item=>{
   vSet('f-cant-id',item.id)
   $('cant-detail').textContent=item.detail||''
   S.fd.cantiere_id=item.id
@@ -2343,7 +2343,26 @@ setupAC('f-cant-search','cant-list', async q=>{
     S.fd.cantiere_civico=item.extra.cantiere_civico||''
     renderCantCard(item.extra)
   }
+  // Calcolo automatico n° accesso al cantiere = visite già registrate + 1
+  await autoAccCant(item.id)
 })
+
+// Compila in automatico "Accesso n°" contando le visite già fatte sul cantiere.
+// Esclude la visita corrente (caso modifica/riapertura bozza).
+async function autoAccCant(cantId){
+  if(!cantId)return
+  try{
+    const curId=S.savedId||S.fd.visita_id||null
+    let qb=sb.from('visite').select('visita_id',{count:'exact',head:true}).eq('cantiere_id',cantId).eq('elimina',0)
+    if(curId)qb=qb.neq('visita_id',curId)
+    const{count,error}=await qb
+    if(error)return
+    const n=(count||0)+1
+    vSet('f-acc-cant',String(n))
+    const el=$('f-acc-cant')
+    if(el){el.title='Calcolato automaticamente: '+(count||0)+' visite precedenti su questo cantiere. Modificabile se necessario.';el.style.background='#eef9f0'}
+  }catch(e){console.error('autoAccCant:',e)}
+}
 
 // ── MODAL NUOVO COMMITTENTE ──
 $('btn-new-comm').onclick=()=>{
@@ -2622,6 +2641,9 @@ $('btn-mc-save').onclick=async()=>{
   vSet('f-cod-uni',c.nodo_id||'')
   vSet('f-data-ult',c.data_ult||'')
   renderCantCard(c)
+  // Cantiere nuovo: nessuna visita precedente → accesso n° 1
+  vSet('f-acc-cant','1')
+  {const el=$('f-acc-cant');if(el){el.title='Calcolato automaticamente: cantiere nuovo, prima visita. Modificabile se necessario.';el.style.background='#eef9f0'}}
   hide('modal-cant')
   toast('Cantiere creato','ok')
   // Aggiorna la lista cantieri se è visibile
@@ -3925,6 +3947,7 @@ async function loadCantieri(q=''){
           vSet('f-data-ult',cd.data_ult||'')
           renderCantCard(cd)
         }
+        await autoAccCant(btn.dataset.cantId)
       },100)
     }
   })
