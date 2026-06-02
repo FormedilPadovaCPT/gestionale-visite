@@ -3500,7 +3500,7 @@ async function uploadSingolaFoto(tipo){
       nome_file:fo.nome,
       dimensione_kb:fo.sizeKb||null
     },{onConflict:'visita_id,tipo'})
-    if(uErr){console.warn('visite_foto upsert:',uErr.message);toast('Foto su Drive ma metadati NON salvati: '+uErr.message,'err')}
+    if(uErr) console.warn('visite_foto upsert:',uErr.message)
     // Aggiorna stato locale — mantieni base64 in memoria per la sessione corrente
     S.foto[tipo]={...fo, url:data.drive_url, thumb:data.thumb_url, fileId:data.drive_file_id}
     if(bar)bar.style.width='100%'
@@ -7555,4 +7555,19 @@ if(_dz){
   })
 }
 if(_fi)_fi.addEventListener('change',function(e){const f=e.target.files?.[0];if(f)_admReadXlsx(f);e.target.value=''})
-doc
+document.getElementById('btn-adm-load-xlsx')?.addEventListener('click',function(){
+  if(!_xlsxPending){toast('Nessun file','warn');return}
+  const snap=Object.assign({},_xlsxPending);delete snap.visita_id
+  const p=document.getElementById('adm-xlsx-preview');if(p)p.style.display='none'
+  _xlsxPending=null;if(_fi)_fi.value=''
+  const t=document.querySelector('[data-tab="form"]');if(t)t.click()
+  setTimeout(function(){applySnap(snap);toast('Visita caricata da Excel','ok')},300)
+})
+document.getElementById('btn-adm-cancel-xlsx')?.addEventListener('click',function(){
+  const p=document.getElementById('adm-xlsx-preview');if(p)p.style.display='none'
+  _xlsxPending=null;if(_fi)_fi.value=''
+})
+
+</script>
+</body>
+</html>
