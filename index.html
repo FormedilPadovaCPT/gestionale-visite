@@ -8,6 +8,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 :root{
   --orange:#E7500F;--grey:#565C66;--green:#95C22F;--white:#fff;
@@ -439,6 +441,12 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
         <div class="card" style="margin-bottom:0"><h3>IPC per tipo di accesso</h3><canvas id="ch-accesso" height="220"></canvas></div>
         <div class="card" style="margin-bottom:0"><h3>Visite mese per mese</h3><canvas id="ch-mesi" height="220"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Mappa cantieri visitati &mdash; IPC ultima visita</h3>
+        <div id="dash-map-filters" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0 10px;font-size:12px"></div>
+        <div id="dash-map" style="height:520px;width:100%;border-radius:8px;border:1px solid var(--line,#e3e3e6)"></div>
+        <div id="dash-map-note" style="font-size:11px;color:#999;margin-top:6px">I segnaposto con bordo tratteggiato sono al centro del comune (indirizzo non geolocalizzabile con precisione); gli altri sono geolocalizzati sull'indirizzo.</div>
       </div>
     </section>
 
@@ -3766,6 +3774,75 @@ async function loadDash(){
     labels:mesiLabels,
     datasets:[{label:'Visite',data:mesiSorted.map(m=>mesiMap[m]),borderColor:C.orange,backgroundColor:'rgba(231,80,15,.12)',fill:true,tension:.35,pointRadius:5,pointBackgroundColor:C.orange,pointBorderColor:'#fff',pointBorderWidth:2}]
   },options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}})
+
+  loadDashMap().catch(e=>console.error('loadDashMap:',e))
+}
+
+// ── MAPPA CANTIERI (dashboard) ──
+let _dashMap=null, _dashMapLayers=null
+const _DM_IPC={
+  'NR':   {label:'Nessun rilievo', color:'#95C22F'},
+  'BASSO':{label:'Basso',          color:'#f2c200'},
+  'MEDIO':{label:'Medio',          color:'#e7500f'},
+  'ALTO': {label:'Alto',           color:'#e74c3c'}
+}
+async function loadDashMap(){
+  if(typeof L==='undefined'){console.warn('Leaflet non caricato');return}
+  const{data,error}=await sb.from('v_mappa_cantieri')
+    .select('lat,lng,ipc,geocode_status,indirizzo,comune_nome,tecnico,data_visita,nr_verbale')
+  if(error){console.error('v_mappa_cantieri:',error);return}
+  const rows=(data||[]).filter(r=>r.lat!=null&&r.lng!=null)
+  const order=['NR','BASSO','MEDIO','ALTO']
+
+  if(!_dashMap){
+    _dashMap=L.map('dash-map').setView([45.35,11.85],10)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(_dashMap)
+  }
+  if(_dashMapLayers){order.forEach(k=>{_dashMap.removeLayer(_dashMapLayers[k])})}
+  _dashMapLayers={};order.forEach(k=>_dashMapLayers[k]=L.layerGroup().addTo(_dashMap))
+
+  // spread a raggiera per i marker a livello comune sovrapposti
+  const grp={}
+  rows.forEach(d=>{if(d.geocode_status==='comune'){const key=d.lat.toFixed(5)+','+d.lng.toFixed(5);(grp[key]=grp[key]||[]).push(d)}})
+  Object.values(grp).forEach(list=>{
+    if(list.length<2)return
+    const R=0.0018
+    list.forEach((d,i)=>{const a=2*Math.PI*i/list.length;d.lat+=R*Math.cos(a);d.lng+=R*Math.sin(a)/Math.cos(d.lat*Math.PI/180)})
+  })
+
+  const bounds=[]
+  rows.forEach(d=>{
+    const k=_DM_IPC[d.ipc]?d.ipc:'NR'
+    const c=_DM_IPC[k].color
+    const approx=d.geocode_status==='comune'
+    const m=L.circleMarker([d.lat,d.lng],{radius:7,color:approx?'#777':'#fff',weight:2,dashArray:approx?'3 2':null,fillColor:c,fillOpacity:0.9})
+    const dt=d.data_visita?new Date(d.data_visita).toLocaleDateString('it-IT'):'-'
+    m.bindPopup(
+      '<span class="badge badge-'+(k==='NR'?'nr':k.toLowerCase())+'" style="background:'+c+';color:#fff;padding:1px 8px;border-radius:10px;font-weight:600">IPC '+_DM_IPC[k].label+'</span><br>'+
+      '<b>'+(d.indirizzo||'')+'</b><br>'+(d.comune_nome||'')+'<br><br>'+
+      '<b>N. verbale:</b> '+(d.nr_verbale||'-')+'<br>'+
+      '<b>Tecnico:</b> '+(d.tecnico||'-')+'<br>'+
+      '<b>Data visita:</b> '+dt+
+      (approx?'<br><i style="color:#999">posizione approssimata (comune)</i>':'')
+    )
+    m.addTo(_dashMapLayers[k])
+    bounds.push([d.lat,d.lng])
+  })
+  if(bounds.length)_dashMap.fitBounds(bounds,{padding:[30,30]})
+  setTimeout(()=>_dashMap.invalidateSize(),200)
+
+  const fdiv=$('dash-map-filters');if(fdiv){fdiv.innerHTML=''
+    order.forEach(k=>{
+      const n=rows.filter(d=>(_DM_IPC[d.ipc]?d.ipc:'NR')===k).length
+      const lab=document.createElement('label')
+      lab.style.cssText='display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:3px 9px;border:1px solid var(--line,#e3e3e6);border-radius:20px'
+      lab.innerHTML='<input type="checkbox" checked style="margin:0"> <span style="width:12px;height:12px;border-radius:50%;background:'+_DM_IPC[k].color+';border:2px solid #fff;box-shadow:0 0 0 1px #999"></span> '+_DM_IPC[k].label+' ('+n+')'
+      lab.querySelector('input').addEventListener('change',e=>{
+        if(e.target.checked)_dashMap.addLayer(_dashMapLayers[k]);else _dashMap.removeLayer(_dashMapLayers[k])
+      })
+      fdiv.appendChild(lab)
+    })
+  }
 }
 
 // ── SCADENZE VISITE DI RITORNO ──
