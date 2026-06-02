@@ -3500,7 +3500,7 @@ async function uploadSingolaFoto(tipo){
       nome_file:fo.nome,
       dimensione_kb:fo.sizeKb||null
     },{onConflict:'visita_id,tipo'})
-    if(uErr) console.warn('visite_foto upsert:',uErr.message)
+    if(uErr){console.warn('visite_foto upsert:',uErr.message);toast('Foto su Drive ma metadati NON salvati: '+uErr.message,'err')}
     // Aggiorna stato locale — mantieni base64 in memoria per la sessione corrente
     S.foto[tipo]={...fo, url:data.drive_url, thumb:data.thumb_url, fileId:data.drive_file_id}
     if(bar)bar.style.width='100%'
@@ -4692,13 +4692,20 @@ async function genPDF(vid, output='save'){
     // Firma testuale a sinistra
     const _firmaW=qrX-L-5
     setFont('bold',8,[40,40,40]);doc.text('Renato Squizzato',L,y+4)
-    setFont('bold',7,ORANGE);doc.text('Area Sicurezza e Salute | FORMEDIL PADOVA',L,y+9)
+    // Logo Formedil ufficiale sotto la firma
+    let _logoH=0
+    try{
+      const _logoPng=await getLogoPng()
+      if(_logoPng){const _lw=44,_lh=_lw*(_logoPng.h/_logoPng.w);doc.addImage(_logoPng.uri,'PNG',L,y+6.5,_lw,_lh);_logoH=_lh+1.5}
+    }catch(_eL){console.warn('logo pagina 1',_eL)}
+    const _fy=y+6.5+_logoH
+    setFont('bold',7,ORANGE);doc.text('Area Sicurezza e Salute | FORMEDIL PADOVA',L,_fy+4)
     setFont('normal',7,GREY)
-    doc.text('Via Basilicata 10 – 35127 Padova (PD)',L,y+14,{maxWidth:_firmaW})
-    doc.text('email: cpt@formedilpadova.it   Tel. 049 - 761168 (int.4)',L,y+18.5,{maxWidth:_firmaW})
-    doc.text('www.formedilpadova.it',L,y+23,{maxWidth:_firmaW})
+    doc.text('Via Basilicata 10 – 35127 Padova (PD)',L,_fy+9,{maxWidth:_firmaW})
+    doc.text('email: cpt@formedilpadova.it   Tel. 049 - 761168 (int.4)',L,_fy+13.5,{maxWidth:_firmaW})
+    doc.text('www.formedilpadova.it',L,_fy+18,{maxWidth:_firmaW})
     setFont('normal',6,[130,130,130])
-    doc.text('Organismo Accreditato Regione Veneto per la formazione – L.R. n. 19/02 cod. AO119 – per i servizi al lavoro cod. L236',L,y+28,{maxWidth:_firmaW})
+    doc.text('Organismo Accreditato Regione Veneto per la formazione – L.R. n. 19/02 cod. AO119 – per i servizi al lavoro cod. L236',L,_fy+23,{maxWidth:_firmaW})
 
     // Disclaimer GDPR
     y=qrY+qrSize+14
@@ -4866,7 +4873,7 @@ async function genPDF(vid, output='save'){
     const ipcDetail=`NC+: ${_cntNCp}   NC-: ${_cntNCn}   OSS: ${_cntOSS}   VER: ${_cntVER}`
     doc.autoTable({startY:y,
       body:[[
-        {content:'IPC – Indice di Pericolosità del Cantiere',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:90}},
+        {content:'IPC – Indice di Pericolosità del Cantiere',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:90,fontSize:10.5}},
         {content:ipcLabel,styles:{fontStyle:'bold',fillColor:ipcBg,textColor:ipcTxt,halign:'center',cellWidth:32}},
         {content:ipcDetail,styles:{fontSize:7,fillColor:[248,248,248],halign:'center'}}
       ]],
@@ -4893,8 +4900,9 @@ async function genPDF(vid, output='save'){
     // Note del tecnico (se presenti) – sfondo arancione chiaro, bordo grigio spesso
     if(v.oss_tec){
       doc.autoTable({startY:y,
-        body:[[{content:'Osservazioni del tecnico',styles:{fontStyle:'bold',fillColor:[255,200,130],textColor:[80,50,10],cellWidth:42}},{content:v.oss_tec,styles:{fillColor:[255,243,224]}}]],
-        styles:{fontSize:7.5,cellPadding:1.8,lineColor:[86,92,102],lineWidth:0.7},
+        head:[[{content:'OSSERVAZIONI DEL TECNICO',styles:{fontStyle:'bold',fillColor:ipcBg,textColor:ipcTxt,halign:'left',fontSize:8.5}}]],
+        body:[[{content:v.oss_tec,styles:{fillColor:ipcMsgFill}}]],
+        styles:{fontSize:8,cellPadding:2,lineColor:ipcBg,lineWidth:0.5},
         margin:{left:L,right:L},tableWidth:W,theme:'grid'
       })
       y=doc.lastAutoTable.finalY+2
@@ -4908,9 +4916,9 @@ async function genPDF(vid, output='save'){
       'NC-  inadempienze che espongono i lavoratori ad un rischio generico (mancanza totale recinzione di cantiere);',
       'OSS  inadempienze la cui presenza non espone ad alcun rischio diretto (mancanza ricovero per attrezzi);'
     ]
-    doc.setDrawColor(...ORANGE);doc.setLineWidth(0.5)
-    doc.setFillColor(255,245,240);doc.rect(L,y,W,26,'FD')
-    setFont('bold',7,ORANGE);doc.text(metodologia[0],L+2,y+4,{maxWidth:W-4})
+    doc.setDrawColor(...GREY);doc.setLineWidth(0.5)
+    doc.setFillColor(240,241,243);doc.rect(L,y,W,26,'FD')
+    setFont('bold',7,GREY);doc.text(metodologia[0],L+2,y+4,{maxWidth:W-4})
     setFont('normal',7,GREY)
     doc.text(metodologia[1],L+2,y+11,{maxWidth:W-4})
     doc.text(metodologia[2],L+2,y+16,{maxWidth:W-4})
@@ -5082,7 +5090,7 @@ async function genPDF(vid, output='save'){
             if(meta.thumb){
               try{
                 const b64=await fetchImageBase64(meta.thumb)
-                if(b64){
+                if(b64&&b64.length>200){
                   imgMap[tipo]='data:image/jpeg;base64,'+b64
                   console.log('foto thumb OK:',tipo)
                   continue
@@ -5278,12 +5286,36 @@ async function getFirmaSignedUrl(firmaUrl){
   return data?.signedUrl||null
 }
 
+// Logo Formedil ufficiale (rasterizza l'SVG di intestazione) per inserimento nel PDF
+let _logoPngCache=null
+async function getLogoPng(){
+  if(_logoPngCache)return _logoPngCache
+  const svgEl=document.querySelector('.header-logo')
+  if(!svgEl)return null
+  try{
+    const xml=new XMLSerializer().serializeToString(svgEl)
+    const svg64='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(xml)))
+    const img=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=svg64})
+    const vbW=272,vbH=60,scale=8
+    const cv=document.createElement('canvas');cv.width=vbW*scale;cv.height=vbH*scale
+    const ctx=cv.getContext('2d')
+    ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height)
+    ctx.drawImage(img,0,0,cv.width,cv.height)
+    _logoPngCache={uri:cv.toDataURL('image/png'),w:vbW,h:vbH}
+    return _logoPngCache
+  }catch(e){console.warn('logo PDF non generato',e);return null}
+}
+
 // Scarica un'immagine da URL e la converte in base64 (per jsPDF)
 async function fetchImageBase64(url){
   try{
     const r=await fetch(url)
     if(!r.ok)return null
     const blob=await r.blob()
+    // Scarta risposte non-immagine (es. pagine HTML di errore di Drive) che altrimenti
+    // verrebbero incorporate come dati corrotti e non risulterebbero visibili nel PDF
+    if(blob.type&&!blob.type.startsWith('image/'))return null
+    if(blob.size<200)return null
     return new Promise(res=>{
       const rd=new FileReader()
       rd.onload=e=>res(e.target.result.split(',')[1])
