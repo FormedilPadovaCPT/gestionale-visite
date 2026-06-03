@@ -2846,6 +2846,17 @@ async function saveVisita(stato){
       if(snapErr)console.warn('Snapshot non salvato (tabella mancante o constraint):',snapErr.message)
     }catch(snapEx){console.warn('Snapshot skip:',snapEx.message)}
 
+    // Carica su Drive le foto aggiunte PRIMA del primo salvataggio: senza questo
+    // passaggio resterebbero solo in memoria (base64) e non comparirebbero più
+    // nelle rigenerazioni del PDF perché visite_foto resterebbe vuota.
+    try{
+      const pendingFoto=FOTO_SLOTS.filter(sl=>S.foto[sl.tipo]?.base64&&!S.foto[sl.tipo]?.url)
+      if(pendingFoto.length){
+        toast(`Carico ${pendingFoto.length} foto su Drive…`)
+        for(const sl of pendingFoto){ await uploadSingolaFoto(sl.tipo) }
+      }
+    }catch(fe){console.warn('Upload foto durante il salvataggio:',fe)}
+
     show('btn-pdf')
     show('btn-email-verbale')
     toast(`Visita salvata come ${stato==='bozza'?'bozza':'definitivo'}`, 'ok')
