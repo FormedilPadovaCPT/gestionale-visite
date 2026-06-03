@@ -976,6 +976,11 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <!-- ══ ZONA RISERVATA COORDINATORE ══ -->
     <!-- SCADENZE VISITE DI RITORNO -->
     <section id="view-scadenze" class="hidden">
+      <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <label style="font-size:13px;color:var(--grey);font-weight:600">👷 Filtra per tecnico:</label>
+        <select id="scad-tec-filter" style="padding:6px 10px;border-radius:6px;border:1px solid #ccc;font-size:13px;min-width:220px"><option value="">Tutti i tecnici</option></select>
+        <span id="scad-count" style="font-size:12px;color:#888"></span>
+      </div>
       <div class="card" style="border-left:5px solid #f39c12;margin-bottom:14px">
         <h3 style="color:#e7500f">📅 Prossime visite pianificate</h3>
         <p style="font-size:12px;color:#888;margin-bottom:10px">Ultima visita per cantiere con rientro previsto nei prossimi 60 giorni, ordinate per data più vicina.</p>
@@ -4007,11 +4012,36 @@ async function loadScadenze(){
     </tr>`
   }
 
+  // Salva i dati calcolati e (ri)popola il filtro tecnico, poi delega il rendering
+  _scadData={prossime,urgenti,tecMap,scadRow}
+  // Popola il menu a tendina con i soli tecnici che hanno scadenze
+  const sel=$('scad-tec-filter')
+  if(sel){
+    const idsConScad=[...new Set([...prossime,...urgenti].map(v=>v.tecnico_id).filter(Boolean))]
+    const prev=sel.value
+    const opts=idsConScad.map(id=>({id,nome:tecMap[id]||id})).sort((a,b)=>a.nome.localeCompare(b.nome,'it'))
+    sel.innerHTML='<option value="">Tutti i tecnici</option>'+opts.map(o=>`<option value="${o.id}">${o.nome}</option>`).join('')
+    if(prev&&idsConScad.includes(prev))sel.value=prev
+    sel.onchange=renderScadenze
+  }
+  renderScadenze()
+}
+
+// Dati scadenze calcolati (riutilizzati dal filtro senza rileggere il DB)
+let _scadData=null
+function renderScadenze(){
+  if(!_scadData)return
+  const {prossime,urgenti,scadRow}=_scadData
+  const filtroTec=$('scad-tec-filter')?.value||''
+  const fP=filtroTec?prossime.filter(v=>v.tecnico_id===filtroTec):prossime
+  const fU=filtroTec?urgenti.filter(v=>v.tecnico_id===filtroTec):urgenti
   const tbU=$('tbody-scad-urgenti'),tbP=$('tbody-scad-prossime')
-  if(prossime.length){tbP.innerHTML=prossime.map(v=>scadRow(v,false)).join('');hide('scad-pros-empty')}
+  if(fP.length){tbP.innerHTML=fP.map(v=>scadRow(v,false)).join('');hide('scad-pros-empty')}
   else{tbP.innerHTML='';show('scad-pros-empty')}
-  if(urgenti.length){tbU.innerHTML=urgenti.map(v=>scadRow(v,true)).join('');hide('scad-urg-empty')}
+  if(fU.length){tbU.innerHTML=fU.map(v=>scadRow(v,true)).join('');hide('scad-urg-empty')}
   else{tbU.innerHTML='';show('scad-urg-empty')}
+  const cnt=$('scad-count')
+  if(cnt)cnt.textContent=`${fP.length} pianificate · ${fU.length} urgenti`
   bindRowActions()
 }
 
