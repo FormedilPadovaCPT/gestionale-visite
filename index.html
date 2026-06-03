@@ -4824,9 +4824,11 @@ async function genPDF(vid, output='save'){
     y=doc.lastAutoTable.finalY+3
 
     // ── IMPRESE PRESENTI (tutte) ──
-    const LBL=[232,244,210]
-    doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
-    setFont('bold',8,WHITE);doc.text('Imprese presenti in cantiere',L+2,y+4);y+=7
+    const LBL=[240,241,243]        // grigio chiarissimo per celle-etichetta
+    const HDR=[214,217,222]        // grigio chiaro per barre di sezione
+    const HDRTXT=[70,76,86]        // testo scuro su barra grigia
+    doc.setFillColor(...HDR);doc.rect(L,y,W,5.5,'F')
+    setFont('bold',8,HDRTXT);doc.text('Imprese presenti in cantiere',L+2,y+4);y+=7
 
     const impsRows=[]
     ;(imps||[]).forEach((im,i)=>{
@@ -4861,6 +4863,7 @@ async function genPDF(vid, output='save'){
       ]],
       body:impsRows,
       styles:{fontSize:7.5,cellPadding:1.8},
+      columnStyles:{2:{cellWidth:26,fontSize:9,fontStyle:'bold'},3:{cellWidth:28,fontSize:9,fontStyle:'bold'}},
       headStyles:{fillColor:LBL,textColor:GREY,fontStyle:'bold',fontSize:7},
       margin:{left:L,right:L},tableWidth:W,theme:'grid'
     })
@@ -4875,8 +4878,8 @@ async function genPDF(vid, output='save'){
     _addFig('CSE',v.cse,v.cse_email,v.cse_tel)
 
     if(figureRows.length){
-      doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
-      setFont('bold',8,WHITE);doc.text('Figure di sistema',L+2,y+4);y+=7
+      doc.setFillColor(...HDR);doc.rect(L,y,W,5.5,'F')
+      setFont('bold',8,HDRTXT);doc.text('Figure di sistema',L+2,y+4);y+=7
       doc.autoTable({startY:y,
         head:[[
           {content:'Ruolo',styles:{fontStyle:'bold',cellWidth:32}},
@@ -4893,8 +4896,8 @@ async function genPDF(vid, output='save'){
     }
 
     // Sezione cantiere
-    doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
-    setFont('bold',8,WHITE);doc.text('Dati del cantiere',L+2,y+4);y+=7
+    doc.setFillColor(...HDR);doc.rect(L,y,W,5.5,'F')
+    setFont('bold',8,HDRTXT);doc.text('Dati del cantiere',L+2,y+4);y+=7
 
     const tipInt=TIP_INT[cant.cantiere_tip_int]||'–'
     const tipOpe=TIP_OPE[cant.cantiere_tip_ope]||'–'
@@ -4919,8 +4922,8 @@ async function genPDF(vid, output='save'){
     y=doc.lastAutoTable.finalY+3
 
     // Sezione visita (lavorazioni + IPC + note tecnico)
-    doc.setFillColor(...BLUE);doc.rect(L,y,W,5.5,'F')
-    setFont('bold',8,WHITE);doc.text('Dati della visita',L+2,y+4);y+=7
+    doc.setFillColor(...HDR);doc.rect(L,y,W,5.5,'F')
+    setFont('bold',8,HDRTXT);doc.text('Dati della visita',L+2,y+4);y+=7
 
     const lavText=lavs&&lavs.length?lavs.map(l=>l.lavorazione).filter(Boolean).join(', '):'–'
     doc.autoTable({startY:y,
@@ -4935,10 +4938,15 @@ async function genPDF(vid, output='save'){
     const _cntNCn=(chk||[]).filter(r=>r.valore==='NC-').length
     const _cntOSS=(chk||[]).filter(r=>r.valore==='OSS').length
     const _cntVER=(chk||[]).filter(r=>r.valore==='VER').length
+    // Logica IPC ufficiale Formedil (identica a calcIPC dell'app):
+    //  ALTO  = almeno 1 NC+  oppure più di 3 NC-
+    //  MEDIO = più di 6 OSS  oppure da 1 a 3 NC-
+    //  BASSO = da 1 a 6 OSS
+    //  NR    = nessun rilievo
     let ipcLabel,ipcBg,ipcTxt
-    if(_cntNCp>0){ipcLabel='ALTO';ipcBg=[200,30,30];ipcTxt=WHITE}
-    else if(_cntNCn>0){ipcLabel='MEDIO';ipcBg=[231,80,15];ipcTxt=WHITE}
-    else if(_cntOSS>0){ipcLabel='BASSO';ipcBg=[210,170,0];ipcTxt=WHITE}
+    if(_cntNCp>=1||_cntNCn>3){ipcLabel='ALTO';ipcBg=[200,30,30];ipcTxt=WHITE}
+    else if(_cntOSS>6||(_cntNCn>=1&&_cntNCn<=3)){ipcLabel='MEDIO';ipcBg=[231,80,15];ipcTxt=WHITE}
+    else if(_cntOSS>=1&&_cntOSS<=6){ipcLabel='BASSO';ipcBg=[210,170,0];ipcTxt=WHITE}
     else{ipcLabel='NESSUN RILIEVO';ipcBg=[39,174,96];ipcTxt=WHITE}
     const ipcDetail=`NC+: ${_cntNCp}   NC-: ${_cntNCn}   OSS: ${_cntOSS}   VER: ${_cntVER}`
     doc.autoTable({startY:y,
@@ -4967,11 +4975,18 @@ async function genPDF(vid, output='save'){
     })
     y=doc.lastAutoTable.finalY+2
 
-    // Note del tecnico (se presenti) – sfondo arancione chiaro, bordo grigio spesso
+    // Osservazioni del tecnico (se presenti) – colorate in base all'IPC rilevato,
+    // titolo in alto a tutta larghezza per lasciare più spazio al testo inserito.
     if(v.oss_tec){
+      const ossHdr=(ipcLabel==='ALTO')?[235,180,180]:(ipcLabel==='MEDIO')?[250,205,160]:(ipcLabel==='BASSO')?[245,233,160]:[200,228,200]
+      const ossBody=(ipcLabel==='ALTO')?[252,235,235]:(ipcLabel==='MEDIO')?[255,243,224]:(ipcLabel==='BASSO')?[255,251,228]:[233,246,233]
+      const ossLine=(ipcLabel==='ALTO')?[200,0,0]:(ipcLabel==='MEDIO')?[210,90,15]:(ipcLabel==='BASSO')?[190,150,0]:[39,130,60]
       doc.autoTable({startY:y,
-        body:[[{content:'Osservazioni del tecnico',styles:{fontStyle:'bold',fillColor:[255,200,130],textColor:[80,50,10],cellWidth:42}},{content:v.oss_tec,styles:{fillColor:[255,243,224]}}]],
-        styles:{fontSize:7.5,cellPadding:1.8,lineColor:[86,92,102],lineWidth:0.7},
+        body:[
+          [{content:`Osservazioni del tecnico  ·  IPC ${ipcLabel}`,styles:{fontStyle:'bold',fillColor:ossHdr,textColor:[50,50,50]}}],
+          [{content:v.oss_tec,styles:{fillColor:ossBody}}]
+        ],
+        styles:{fontSize:7.5,cellPadding:1.8,lineColor:ossLine,lineWidth:0.7},
         margin:{left:L,right:L},tableWidth:W,theme:'grid'
       })
       y=doc.lastAutoTable.finalY+2
@@ -4986,7 +5001,7 @@ async function genPDF(vid, output='save'){
       'OSS  inadempienze la cui presenza non espone ad alcun rischio diretto (mancanza ricovero per attrezzi);'
     ]
     doc.setDrawColor(...ORANGE);doc.setLineWidth(0.5)
-    doc.setFillColor(255,245,240);doc.rect(L,y,W,26,'FD')
+    doc.setFillColor(240,241,243);doc.rect(L,y,W,26,'FD')
     setFont('bold',7,ORANGE);doc.text(metodologia[0],L+2,y+4,{maxWidth:W-4})
     setFont('normal',7,GREY)
     doc.text(metodologia[1],L+2,y+11,{maxWidth:W-4})
