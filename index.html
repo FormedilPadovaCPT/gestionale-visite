@@ -3973,6 +3973,14 @@ async function loadLista(){
   if(fs)qb=qb.eq('stato',fs)
   const{data}=await qb
   let vs=data||[]
+  // Ordina per data visita (più recente sopra) e, a parità di data,
+  // per numero di verbale decrescente (verbale più alto sopra).
+  const _nrVal=s=>{const m=String(s||'').match(/(\d+)\s*$/);return m?parseInt(m[1],10):0}
+  vs.sort((a,b)=>{
+    const da=a.data_visita||'',db=b.data_visita||''
+    if(da!==db)return da<db?1:-1
+    return _nrVal(b.nr_verbale)-_nrVal(a.nr_verbale)
+  })
   if(q){const ql=q.toLowerCase();vs=vs.filter(v=>v.nr_verbale?.toLowerCase().includes(ql)||v.cantieri?.cantiere_indirizzo?.toLowerCase().includes(ql)||v.cantieri?.cantiere_etichetta?.toLowerCase().includes(ql)||v.imprese?.impresa_nome?.toLowerCase().includes(ql))}
   const tbody=$('tbody-lista')
   if(!vs.length){tbody.innerHTML='';show('lista-empty')}
