@@ -161,6 +161,15 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 .ipc-box.BASSO .ipc-val{color:#a07a00}
 .ipc-box.NR .ipc-val{color:var(--ok)}
 .ipc-counters{display:flex;justify-content:center;gap:18px;font-size:12px;color:#666;margin-top:5px}
+/* TARGET / OBIETTIVO MENSILE */
+.tgt-bar{position:relative;height:14px;border-radius:7px;background:#eceef0;overflow:hidden}
+.tgt-bar-fill{height:100%;width:0%;border-radius:7px;transition:width .4s ease}
+.tgt-bar-mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:#565c66;opacity:.55}
+.tgt-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:8px}
+@media(max-width:720px){.tgt-grid{grid-template-columns:1fr}}
+.tgt-target-table{width:100%;border-collapse:collapse;font-size:13px}
+.tgt-target-table th,.tgt-target-table td{padding:7px 9px;text-align:left;border-bottom:1px solid rgba(255,255,255,.12)}
+.tgt-target-table input{width:90px;padding:5px 7px;border-radius:6px;border:1px solid #ccc;font-size:13px}
 .save-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:2px solid var(--border)}
 /* IMPORT */
 .drop-zone{border:3px dashed var(--border);border-radius:var(--radius);padding:36px;text-align:center;color:#aaa;cursor:pointer;transition:all .2s}
@@ -432,6 +441,25 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="stat-card"><div class="num" id="s-medio" style="color:var(--warn)">–</div><div class="pct" id="s-medio-pct" style="color:var(--warn)"></div><div class="lbl">IPC Medio</div></div>
         <div class="stat-card"><div class="num" id="s-basso" style="color:#b89000">–</div><div class="pct" id="s-basso-pct" style="color:#b89000"></div><div class="lbl">IPC Basso</div></div>
         <div class="stat-card"><div class="num" id="s-nr" style="color:var(--ok)">–</div><div class="pct" id="s-nr-pct" style="color:var(--ok)"></div><div class="lbl">IPC Nessun Rilievo</div></div>
+      </div>
+      <div class="card" id="card-target-mese" style="display:none;margin-bottom:14px">
+        <h3 style="margin-bottom:2px">🎯 Obiettivo mensile — <span id="tgt-tec-nome"></span> · <span id="tgt-mese-lbl" style="text-transform:capitalize"></span></h3>
+        <div class="tgt-grid">
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px">
+              <span>Visite effettuate</span><strong id="tgt-vis-txt">–</strong>
+            </div>
+            <div class="tgt-bar"><div id="tgt-vis-bar" class="tgt-bar-fill" style="background:#e7500f"></div></div>
+            <div id="tgt-vis-note" style="font-size:11px;color:#888;margin-top:5px"></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px">
+              <span>Affiancamento RLST <span style="color:#888">(min 20%)</span></span><strong id="tgt-rlst-txt">–</strong>
+            </div>
+            <div class="tgt-bar"><div id="tgt-rlst-bar" class="tgt-bar-fill" style="background:#95C22F"></div><div class="tgt-bar-mark" id="tgt-rlst-mark" style="left:20%"></div></div>
+            <div id="tgt-rlst-note" style="font-size:11px;color:#888;margin-top:5px"></div>
+          </div>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
         <div class="card" style="margin-bottom:0"><h3>Visite per tecnico</h3><canvas id="ch-tecnico" height="200"></canvas></div>
@@ -999,6 +1027,27 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <div class="adm-stat"><div class="n" id="adm-n-alto" style="color:#c0392b">–</div><div class="l">IPC Alto</div></div>
             <div class="adm-stat"><div class="n" id="adm-n-medio" style="color:#e67e22">–</div><div class="l">IPC Medio</div></div>
             <div class="adm-stat"><div class="n" id="adm-n-basso" style="color:#27ae60">–</div><div class="l">IPC Basso/Nessun Rilievo</div></div>
+          </div>
+        </div>
+
+        <!-- Target visite mensili -->
+        <div class="adm-section">
+          <div class="adm-section-title">🎯 Target visite mensili per tecnico</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:10px">Imposta il numero massimo di visite che ciascun tecnico può effettuare nel mese selezionato. Il tecnico vedrà l'avanzamento nella sua dashboard, insieme alla quota minima del 20% di visite in affiancamento RLST.</p>
+          <div class="adm-date-row">
+            <div class="field" style="min-width:160px">
+              <label>Mese</label>
+              <input type="month" id="adm-target-mese">
+            </div>
+            <button class="btn-primary" onclick="admLoadTarget()">📥 Carica</button>
+          </div>
+          <div id="adm-target-wrap" style="display:none;margin-top:12px">
+            <table class="tgt-target-table">
+              <thead><tr><th>Tecnico</th><th>Max visite</th><th>Effettuate nel mese</th></tr></thead>
+              <tbody id="adm-target-tbody"></tbody>
+            </table>
+            <button class="btn-primary" style="margin-top:12px;background:#95C22F;border-color:#7aa527" onclick="admSaveTarget()">💾 Salva target</button>
+            <span id="adm-target-status" style="font-size:12px;color:rgba(255,255,255,.6);margin-left:10px"></span>
           </div>
         </div>
 
@@ -3674,6 +3723,8 @@ async function loadDash(){
   const nBasso=visite.filter(v=>v.ipc==='BASSO').length
   const nNR=visite.filter(v=>!v.ipc||v.ipc==='NR').length
   const pct=n=>nTot?Math.round(n/nTot*100)+'%':'–'
+  // Card obiettivo mensile del tecnico loggato (non blocca la dashboard se fallisce)
+  loadTargetCard().catch(e=>console.warn('loadTargetCard:',e))
   $('s-tot').textContent=nTot
   $('s-alto').textContent=nAlto;$('s-alto-pct').textContent=pct(nAlto)
   $('s-medio').textContent=nMedio;$('s-medio-pct').textContent=pct(nMedio)
@@ -5525,7 +5576,98 @@ function admInit(){
   const dal=$('adm-dal'),al=$('adm-al')
   if(dal&&!dal.value)dal.value=`${y}-01-01`
   if(al&&!al.value)al.value=today.toISOString().split('T')[0]
+  const tm=$('adm-target-mese')
+  if(tm&&!tm.value)tm.value=`${y}-${String(today.getMonth()+1).padStart(2,'0')}`
 }
+
+// ── TARGET VISITE MENSILI (Coordinatore) ──
+const _MESI_IT=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre']
+function _meseRange(anno,mese){ // mese 1-12 → {da,a} inclusivi (YYYY-MM-DD)
+  const da=`${anno}-${String(mese).padStart(2,'0')}-01`
+  const ultimo=new Date(anno,mese,0).getDate()
+  const a=`${anno}-${String(mese).padStart(2,'0')}-${String(ultimo).padStart(2,'0')}`
+  return{da,a}
+}
+async function admLoadTarget(){
+  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
+  const mv=$('adm-target-mese')?.value
+  if(!mv){toast('Seleziona un mese','warn');return}
+  const[anno,mese]=mv.split('-').map(Number)
+  const{data:tecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome').order('tecnico_cognome')
+  const{data:tgts}=await sb.from('target_visite_mensili').select('tecnico_id,max_visite').eq('anno',anno).eq('mese',mese)
+  const tgtMap={};(tgts||[]).forEach(t=>tgtMap[t.tecnico_id]=t.max_visite)
+  // Visite effettuate nel mese per tecnico
+  const{da,a}=_meseRange(anno,mese)
+  const{data:vs}=await sb.from('visite').select('tecnico_id').eq('elimina',0).gte('data_visita',da).lte('data_visita',a)
+  const visCount={};(vs||[]).forEach(v=>{visCount[v.tecnico_id]=(visCount[v.tecnico_id]||0)+1})
+  const tbody=$('adm-target-tbody')
+  tbody.innerHTML=(tecs||[]).map(t=>{
+    const nome=`${t.tecnico_cognome||''} ${t.tecnico_nome||''}`.trim()||t.tecnico_id
+    const val=tgtMap[t.tecnico_id]??''
+    return`<tr><td>${nome}</td><td><input type="number" min="0" step="1" data-tec="${t.tecnico_id}" value="${val}" placeholder="–"></td><td style="color:rgba(255,255,255,.7)">${visCount[t.tecnico_id]||0}</td></tr>`
+  }).join('')
+  $('adm-target-wrap').style.display='block'
+  $('adm-target-status').textContent=''
+}
+window.admLoadTarget=admLoadTarget
+async function admSaveTarget(){
+  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
+  const mv=$('adm-target-mese')?.value
+  if(!mv)return
+  const[anno,mese]=mv.split('-').map(Number)
+  const rows=[...document.querySelectorAll('#adm-target-tbody input[data-tec]')]
+    .filter(i=>i.value!=='')
+    .map(i=>({tecnico_id:i.dataset.tec,anno,mese,max_visite:Math.max(0,parseInt(i.value,10)||0),updated_at:new Date().toISOString()}))
+  if(!rows.length){toast('Nessun valore da salvare','warn');return}
+  const{error}=await sb.from('target_visite_mensili').upsert(rows,{onConflict:'tecnico_id,anno,mese'})
+  if(error){toast('Errore salvataggio: '+error.message,'err');return}
+  $('adm-target-status').textContent=`✓ Salvati ${rows.length} target`
+  toast('Target salvati','ok')
+}
+window.admSaveTarget=admSaveTarget
+
+// ── CARD OBIETTIVO MENSILE (dashboard del tecnico) ──
+async function loadTargetCard(){
+  const card=$('card-target-mese')
+  if(!card)return
+  const tec=S.tecnico
+  if(!tec?.tecnico_id){card.style.display='none';return}
+  const now=new Date()
+  const anno=now.getFullYear(),mese=now.getMonth()+1
+  const{da,a}=_meseRange(anno,mese)
+  const[{data:tgt},{data:vs}]=await Promise.all([
+    sb.from('target_visite_mensili').select('max_visite').eq('tecnico_id',tec.tecnico_id).eq('anno',anno).eq('mese',mese).maybeSingle(),
+    sb.from('visite').select('rlst_sn').eq('elimina',0).eq('tecnico_id',tec.tecnico_id).gte('data_visita',da).lte('data_visita',a)
+  ])
+  const visite=vs||[]
+  const tot=visite.length
+  const nRlst=visite.filter(v=>v.rlst_sn===true||v.rlst_sn==='1'||v.rlst_sn===1).length
+  const maxV=tgt?.max_visite??null
+  $('tgt-tec-nome').textContent=`${tec.tecnico_nome||''} ${tec.tecnico_cognome||''}`.trim()
+  $('tgt-mese-lbl').textContent=`${_MESI_IT[mese-1]} ${anno}`
+  // Barra visite vs max
+  const visBar=$('tgt-vis-bar'),visTxt=$('tgt-vis-txt'),visNote=$('tgt-vis-note')
+  if(maxV==null){
+    visTxt.textContent=`${tot}`
+    visBar.style.width='0%';visBar.style.background='#cfd3d8'
+    visNote.textContent='Nessun massimo impostato dalla segreteria per questo mese.'
+  }else{
+    const pct=maxV>0?Math.round(tot/maxV*100):0
+    visTxt.textContent=`${tot} / ${maxV}`
+    visBar.style.width=Math.min(100,pct)+'%'
+    visBar.style.background=tot>maxV?'#c0392b':(pct>=90?'#e7500f':'#95C22F')
+    visNote.textContent=tot>maxV?`⚠ Massimo superato di ${tot-maxV} visite.`:`${maxV-tot} visite ancora disponibili (${pct}% del massimo).`
+  }
+  // Barra RLST vs 20%
+  const rlstBar=$('tgt-rlst-bar'),rlstTxt=$('tgt-rlst-txt'),rlstNote=$('tgt-rlst-note')
+  const pctR=tot>0?Math.round(nRlst/tot*100):0
+  rlstTxt.textContent=`${pctR}%`
+  rlstBar.style.width=Math.min(100,pctR)+'%'
+  rlstBar.style.background=pctR>=20?'#95C22F':'#e7500f'
+  rlstNote.textContent=tot===0?'Nessuna visita nel mese.':(pctR>=20?`✓ Obiettivo raggiunto — ${nRlst} su ${tot} in affiancamento RLST.`:`Servono almeno ${Math.max(0,Math.ceil(tot*0.2)-nRlst)} visite RLST in più (${nRlst}/${tot}).`)
+  card.style.display='block'
+}
+window.loadTargetCard=loadTargetCard
 
 async function admLoadStats(){
   if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
