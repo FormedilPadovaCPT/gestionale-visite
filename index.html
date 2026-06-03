@@ -4625,6 +4625,10 @@ async function exportSnapFromDB(vid){
 
 // ── PDF ──
 let _pdfInProgress=false
+// Cache di sessione delle foto già decodificate per il PDF, chiave `${vid}_${tipo}`.
+// Garantisce che alle riedizioni successive del PDF le foto si ricarichino sempre,
+// anche se S.foto è stato svuotato o Drive non risponde / rallenta.
+const _fotoPdfCache={}
 async function genPDF(vid, output='save'){
   if(_pdfInProgress&&output==='save'){toast('PDF già in generazione, attendi…','warn');return}
   _pdfInProgress=true
@@ -5144,6 +5148,11 @@ async function genPDF(vid, output='save'){
       if(S.foto[tipo]?.base64) imgMap[tipo]='data:image/jpeg;base64,'+S.foto[tipo].base64
     }
 
+    // 1b. Riusa le foto già decodificate in una precedente generazione di QUESTA visita
+    for(const tipo of FOTO_TIPI){
+      if(!imgMap[tipo]&&_fotoPdfCache[vid+'_'+tipo]) imgMap[tipo]=_fotoPdfCache[vid+'_'+tipo]
+    }
+
     // 2. Per gli slot ancora vuoti: recupera metadati foto da DB + S.foto in memoria
     const slotMancanti=FOTO_TIPI.filter(t=>!imgMap[t])
     if(slotMancanti.length){
@@ -5214,6 +5223,10 @@ async function genPDF(vid, output='save'){
         }
       }catch(e){console.warn('foto lookup:',e)}
     }
+
+    // Memorizza in cache di sessione le foto risolte: le riedizioni successive
+    // del PDF le ritroveranno anche se Drive non risponde o S.foto è vuoto.
+    for(const tipo of FOTO_TIPI){ if(imgMap[tipo]) _fotoPdfCache[vid+'_'+tipo]=imgMap[tipo] }
 
     const hasFoto=FOTO_TIPI.some(t=>imgMap[t])
     if(hasFoto){
