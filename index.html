@@ -4522,7 +4522,7 @@ $('btn-ev-invia').onclick=async()=>{
           cantIndirizzo: window._evContext?.cantIndirizzo||'',
           dataVisita: window._evContext?.dataVisita||'',
           driveFileId: upData.drive_file_id,
-          fileName: upData.file_name
+          fileName: (function(){const _ev=window._evContext||{};const _c=s=>(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim();const _cd=(_ev.nr_verbale||vGet('f-verbale')||'').replace(/\D/g,'').slice(-4);const _nm=[`Verb_${_cd}`,_c(_ev.impresa).slice(0,30).trim(),_c(_ev.comune),_c(_ev.tecnico),(_ev.dataVisita||'').replace(/\//g,'-')].filter(Boolean).join(' - ')+'.pdf';return _cd?_nm:upData.file_name})()
         })
       })
     }finally{clearTimeout(tOut)}
@@ -5502,12 +5502,16 @@ async function genPDF(vid, output='save'){
       return doc.output('datauristring')
     }
     const pdfB64=doc.output('datauristring').split(',')[1]
-    const _slugPdf=s=>(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'_').trim()
+    const _slugPdf=s=>(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim()
     const _primaImpPdf=imps&&imps.length?imps[0].imprese?.impresa_nome||'':''
-    const _tecPdf=[v.tecnici?.tecnico_nome,v.tecnici?.tecnico_cognome].filter(Boolean).join('_')
+    // Nome file: Verb_<ultime 4 cifre> - ragione sociale (max 30) - comune - tecnico - data
+    const _codePdf=(v.nr_verbale||'').replace(/\D/g,'').slice(-4)||_slugPdf(v.nr_verbale||vid)
+    const _ragPdf=_slugPdf(_primaImpPdf).slice(0,30).trim()
+    const _comPdf=_slugPdf(comuneLabel)
+    const _tecPdf=_slugPdf([v.tecnici?.tecnico_nome,v.tecnici?.tecnico_cognome].filter(Boolean).join(' '))
     const _dPdf=v.data_visita?new Date(v.data_visita+'T00:00:00'):null
-    const _dataFPdf=_dPdf&&!isNaN(_dPdf)?`${String(_dPdf.getDate()).padStart(2,'0')} ${String(_dPdf.getMonth()+1).padStart(2,'0')} ${_dPdf.getFullYear()}`:''
-    const _pdfName=`Verbale_${_slugPdf(v.nr_verbale||vid)}_${_slugPdf(_primaImpPdf)}_${_slugPdf(_tecPdf)}_${_dataFPdf}.pdf`
+    const _dataFPdf=_dPdf&&!isNaN(_dPdf)?`${String(_dPdf.getDate()).padStart(2,'0')}-${String(_dPdf.getMonth()+1).padStart(2,'0')}-${_dPdf.getFullYear()}`:''
+    const _pdfName=[`Verb_${_codePdf}`,_ragPdf,_comPdf,_tecPdf,_dataFPdf].filter(Boolean).join(' - ')+'.pdf'
     doc.save(_pdfName)
     toast('PDF generato','ok')
     _uploadPdfDrive(pdfB64)   // upload in background
