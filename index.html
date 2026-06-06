@@ -2871,6 +2871,7 @@ async function saveVisita(stato){
       coord:cGet('f-coord'),
       costi:vGet('f-costi')||null,
       stato_lav:vGet('f-stato-lav')||null,
+      note_lav:vGet('f-note-lav')||null,
       // Tab Note
       oss_tec:vGet('f-oss-tec')||null,
       oss_tec_int:vGet('f-oss-int')||null,
@@ -5009,6 +5010,8 @@ async function genPDF(vid, output='save'){
         {content:String(nrLavStr),styles:{halign:'center'}},
         {content:email,styles:{fontSize:6.5}}
       ])
+      const _noteImp=(im.note_fasilav||'').trim()
+      if(_noteImp)impsRows.push([{content:'Note fasi/lavorazione (questa impresa): '+_noteImp,colSpan:7,styles:{fontSize:7,fontStyle:'italic',textColor:[90,90,90],fillColor:[248,248,248]}}])
     })
     if(!impsRows.length) impsRows.push([{content:'Nessuna impresa registrata',colSpan:7,styles:{halign:'center',textColor:[180,180,180]}}])
 
@@ -5059,6 +5062,8 @@ async function genPDF(vid, output='save'){
     // Sezione cantiere
     doc.setFillColor(...HDR);doc.rect(L,y,W,5.5,'F')
     setFont('bold',8,HDRTXT);doc.text('Dati del cantiere',L+2,y+4);y+=7
+    const _lavTextC=lavs&&lavs.length?lavs.map(l=>l.lavorazione).filter(Boolean).join(', '):'–'
+    const _noteLavC=(v.note_lav||'').trim()||'–'
 
     const tipInt=TIP_INT[cant.cantiere_tip_int]||'–'
     const tipOpe=TIP_OPE[cant.cantiere_tip_ope]||'–'
@@ -5074,7 +5079,9 @@ async function genPDF(vid, output='save'){
         [{content:'Importo lavori (€)',styles:{fontStyle:'bold',fillColor:LBL}},{content:impLbl},{content:'Durata cantiere',styles:{fontStyle:'bold',fillColor:LBL}},{content:durLbl}],
         [{content:'Codice CNCE',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.cantiere_cnce||'–'},{content:'',colSpan:2}],
         [{content:'N° imprese in cantiere',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).filter(im=>im.impresa_id).length||v.nr_imp||1)},{content:'Totale lavoratori',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).reduce((s,im)=>s+(+im.nr_lav||0),0)||v.nr_lavoratori||0)}],
-        [{content:'di cui stranieri',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).reduce((s,im)=>s+(+im.nr_lav_str||0),0)||v.nr_lavoratori_stranieri||0)},{content:'',colSpan:2}]
+        [{content:'di cui stranieri',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).reduce((s,im)=>s+(+im.nr_lav_str||0),0)||v.nr_lavoratori_stranieri||0)},{content:'',colSpan:2}],
+        [{content:'Lavorazioni in corso',styles:{fontStyle:'bold',fillColor:LBL}},{content:_lavTextC,colSpan:3}],
+        [{content:'Note lavorazioni',styles:{fontStyle:'bold',fillColor:LBL}},{content:_noteLavC,colSpan:3}]
       ],
       styles:{fontSize:7.5,cellPadding:1.8},
       columnStyles:{0:{cellWidth:40},1:{cellWidth:50},2:{cellWidth:40}},
@@ -5086,13 +5093,6 @@ async function genPDF(vid, output='save'){
     doc.setFillColor(...HDR);doc.rect(L,y,W,5.5,'F')
     setFont('bold',8,HDRTXT);doc.text('Dati della visita',L+2,y+4);y+=7
 
-    const lavText=lavs&&lavs.length?lavs.map(l=>l.lavorazione).filter(Boolean).join(', '):'–'
-    doc.autoTable({startY:y,
-      body:[[{content:'Lavorazioni:',styles:{fontStyle:'bold',fillColor:LBL,cellWidth:28}},{content:lavText}]],
-      styles:{fontSize:7.5,cellPadding:1.8},
-      margin:{left:L,right:L},tableWidth:W,theme:'grid'
-    })
-    y=doc.lastAutoTable.finalY+2
 
     // IPC – Indice di Pericolosità del Cantiere
     const _cntNCp=(chk||[]).filter(r=>r.valore==='NC+').length
