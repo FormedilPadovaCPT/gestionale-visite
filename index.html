@@ -5077,7 +5077,7 @@ async function genPDF(vid, output='save'){
         [{content:'Comune',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.comune_nome||'–'},{content:'CAP',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.cantiere_cap||'–'}],
         [{content:'Tipo intervento',styles:{fontStyle:'bold',fillColor:LBL}},{content:tipInt},{content:'Tipo opera',styles:{fontStyle:'bold',fillColor:LBL}},{content:tipOpe}],
         [{content:'Importo lavori (€)',styles:{fontStyle:'bold',fillColor:LBL}},{content:impLbl},{content:'Durata cantiere',styles:{fontStyle:'bold',fillColor:LBL}},{content:durLbl}],
-        [{content:'Codice CNCE',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.cantiere_cnce||'–'},{content:'',colSpan:2}],
+        [{content:'Codice CNCE',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.cantiere_cnce||'–'},{content:'Codice univoco',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.nodo_id||'–'}],
         [{content:'N° imprese in cantiere',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).filter(im=>im.impresa_id).length||v.nr_imp||1)},{content:'Totale lavoratori',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).reduce((s,im)=>s+(+im.nr_lav||0),0)||v.nr_lavoratori||0)}],
         [{content:'di cui stranieri',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).reduce((s,im)=>s+(+im.nr_lav_str||0),0)||v.nr_lavoratori_stranieri||0)},{content:'',colSpan:2}],
         [{content:'Lavorazioni in corso',styles:{fontStyle:'bold',fillColor:LBL}},{content:_lavTextC,colSpan:3}],
