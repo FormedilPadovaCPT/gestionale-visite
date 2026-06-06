@@ -2452,7 +2452,6 @@ setupAC('f-cant-search','cant-list', async q=>{
   $('cant-detail').textContent=item.detail||''
   S.fd.cantiere_id=item.id
   if(item.extra){
-    vSet('f-prot-int',item.extra.prot_int||'')
     vSet('f-cnce',item.extra.cantiere_cnce||'')
     vSet('f-cod-uni',item.extra.nodo_id||'')
     vSet('f-data-ult',item.extra.data_ult||'')
@@ -2755,6 +2754,9 @@ $('btn-mc-save').onclick=async()=>{
   vSet('f-cant-search',c.cantiere_etichetta||`${ind} ${civ}`)
   $('cant-detail').textContent=`${ind} ${civ}${c.comune_nome?' – '+c.comune_nome:''}`
   S.fd.cantiere_id=c.cantiere_id
+  S.fd.cantiere_indirizzo=ind
+  S.fd.cantiere_civico=civ
+  S.fd.comune_nome=c.comune_nome||''
   // Popola i campi readonly nel form visita
   vSet('f-cnce',c.cantiere_cnce||'')
   vSet('f-cod-uni',c.nodo_id||'')
@@ -2833,6 +2835,7 @@ async function saveVisita(stato){
       tipo_accesso:+vGet('f-tipo')||null,
       elimina:0,
       // estesi Tab 0
+      prot_int:vGet('f-prot-int')||null,
       acc_cant:vGet('f-acc-cant')||null,
       nom_ppre:[vGet('f-ppre-titolo'),vGet('f-ppre-nome'),vGet('f-ppre-cog')].map(s=>s.trim()).filter(Boolean).join(' ')||null,
       qual_ppre:vGet('f-qual-ppre')||null,
@@ -2904,10 +2907,9 @@ async function saveVisita(stato){
     S.savedId=vid
     S.fd.visita_id=vid
 
-    // Aggiorna cantiere con prot_int e cantiere_committente_id (non sono in vistaRow)
+    // Aggiorna cantiere con cantiere_committente_id (prot_int ora è per-visita, su tabella visite)
     if(cant_id){
       const cantUpdate={}
-      const pi=vGet('f-prot-int');if(pi)cantUpdate.prot_int=pi
       const ci=vGet('f-comm-id');if(ci)cantUpdate.cantiere_committente_id=ci
       if(Object.keys(cantUpdate).length){
         await sb.from('cantieri').update(cantUpdate).eq('cantiere_id',cant_id)
@@ -3722,7 +3724,7 @@ function buildRiepilogo(){
     zoneHtml+=`<div style="margin-bottom:10px"><strong style="font-size:12px;color:var(--grey)">${ZONE_LBL[z]}</strong>
     <div style="margin-top:4px">${ril.map(v=>{
       const vl=S.checklist[v.codice]
-      const cls=vl==='NC+'?'badge-alto':vl==='NC-'?'badge-medio':'badge-nr'
+      const cls=vl==='NC+'?'badge-alto':vl==='NC-'?'badge-medio':vl==='OSS'?'badge-basso':'badge-nr'
       return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f0f0f0;font-size:12px">
         <span class="badge ${cls}">${vl}</span>${v.descrizione}</div>`
     }).join('')}</div></div>`
@@ -4202,10 +4204,12 @@ async function loadCantieri(q=''){
         S.fd.cantiere_id=btn.dataset.cantId
         const{data:cd}=await sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_cap,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id').eq('cantiere_id',btn.dataset.cantId).single()
         if(cd){
-          vSet('f-prot-int',cd.prot_int||'')
           vSet('f-cnce',cd.cantiere_cnce||'')
           vSet('f-cod-uni',cd.nodo_id||'')
           vSet('f-data-ult',cd.data_ult||'')
+          S.fd.comune_nome=cd.comune_nome||''
+          S.fd.cantiere_indirizzo=cd.cantiere_indirizzo||''
+          S.fd.cantiere_civico=cd.cantiere_civico||''
           renderCantCard(cd)
         }
         await autoAccCant(btn.dataset.cantId)
@@ -4296,7 +4300,7 @@ Responsabile del Servizio di Prevenzione e Protezione
 e/o del
 Coordinatore per la Sicurezza
 
-Cantiere di ${_eCom||_eInd}
+Cantiere di ${[_eInd,_eCom].filter(Boolean).join(' – ')||_eCom||_eInd}
 
 ${_eData?'Il giorno '+_eData+' è':'È'} passato nel vostro cantiere in oggetto, per fornirvi utili consigli in materia di prevenzione infortuni, uno dei nostri tecnici${_eTec?', '+_eTec:''}.
 
@@ -4404,7 +4408,7 @@ Responsabile del Servizio di Prevenzione e Protezione
 e/o del
 Coordinatore per la Sicurezza
 
-Cantiere di ${_fCom||_fInd}
+Cantiere di ${[_fInd,_fCom].filter(Boolean).join(' – ')||_fCom||_fInd}
 
 ${_fData?'Il giorno '+_fData+' è':'È'} passato nel vostro cantiere in oggetto, per fornirvi utili consigli in materia di prevenzione infortuni, uno dei nostri tecnici${_fTec?', '+_fTec:''}.
 
@@ -7436,9 +7440,11 @@ async function showCantiereDetail(cantId){
         S.fd.cantiere_id=cid
         const r=await sb.from('cantieri').select('*').eq('cantiere_id',cid).single()
         if(r.data){
-          vSet('f-prot-int',r.data.prot_int||'')
           vSet('f-cnce',r.data.cantiere_cnce||'')
           vSet('f-cod-uni',r.data.nodo_id||'')
+          S.fd.comune_nome=r.data.comune_nome||''
+          S.fd.cantiere_indirizzo=r.data.cantiere_indirizzo||''
+          S.fd.cantiere_civico=r.data.cantiere_civico||''
           renderCantCard(r.data)
         }
       },100)
