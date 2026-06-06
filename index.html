@@ -5154,7 +5154,8 @@ async function genPDF(vid, output='save'){
     }
     y+=2
 
-    // Box metodologia
+    // Box metodologia – non spezzare tra le pagine: se non entra intero, vai a pagina nuova
+    if(y+30>282){doc.addPage();y=15}
     const metodologia=[
       'METODOLOGIA DI VALUTAZIONE INTERNA – CNCPT. CRITERI DI GIUDIZIO CHE IL TECNICO USA NELL\'EFFETTUAZIONE DELLA VISITA DI CONSULENZA TECNICA IN CANTIERE',
       'NC+  inadempienze che espongono i lavoratori ad un rischio grave ed imminente (mancanza totale di parapetti su un ponteggio esteso);',
