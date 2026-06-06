@@ -4803,7 +4803,7 @@ async function genPDF(vid, output='save'){
     const{data:v,error:eV}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*,committenti(*)),imprese(*)`).eq('visita_id',vid).single()
     if(eV)throw new Error('Errore caricamento visita: '+eV.message)
     const{data:chk}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
-    const{data:lavs}=await sb.from('visite_lavorazioni').select('lavorazione').eq('visita_id',vid)
+    const{data:lavs}=await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid)
     const{data:imps}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva,impresa_email_ref)').eq('visita_id',vid).order('ordine')
 
     if(!v){toast('Visita non trovata','err');return}
@@ -5062,7 +5062,7 @@ async function genPDF(vid, output='save'){
     // Sezione cantiere
     doc.setFillColor(...HDR);doc.rect(L,y,W,5.5,'F')
     setFont('bold',8,HDRTXT);doc.text('Dati del cantiere',L+2,y+4);y+=7
-    const _lavTextC=lavs&&lavs.length?lavs.map(l=>l.lavorazione).filter(Boolean).join(', '):'–'
+    const _lavTextC=lavs&&lavs.length?lavs.map(l=>[l.genere,l.fase,l.lavorazione].filter(Boolean).join(' - ')).filter(Boolean).join('; '):'–'
     const _noteLavC=(v.note_lav||'').trim()||'–'
 
     const tipInt=TIP_INT[cant.cantiere_tip_int]||'–'
