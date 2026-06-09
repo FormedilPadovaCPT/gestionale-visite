@@ -359,6 +359,15 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <div class="field"><label>Email</label><input type="email" id="l-email" autocomplete="email"></div>
     <div class="field"><label>Password</label><input type="password" id="l-pwd" autocomplete="current-password"></div>
     <button class="btn-primary" id="btn-login">Accedi</button>
+    <div style="margin-top:16px;text-align:center;border-top:1px solid #eee;padding-top:12px">
+      <a href="#" id="link-richiedi" style="font-size:12px;color:var(--orange);text-decoration:underline">Sei un consigliere? Richiedi l'accesso alla dashboard</a>
+    </div>
+    <div id="box-richiedi" class="hidden" style="margin-top:12px;text-align:left">
+      <div class="field"><label>La tua email</label><input type="email" id="ra-email" autocomplete="email"></div>
+      <div class="field"><label>Nome e cognome</label><input type="text" id="ra-nome"></div>
+      <button class="btn-primary" id="btn-richiedi-invia">Invia richiesta</button>
+      <div id="ra-msg" style="font-size:12px;margin-top:8px"></div>
+    </div>
   </div>
 </div>
 
@@ -1887,6 +1896,23 @@ async function initAuth(){
 }
 async function onLogin(user){
   S.user=user
+  // ── Accesso VIEWER (board: direttore/presidente/vicepresidente, consiglieri) → sola dashboard ──
+  let _roleRow=null
+  try{const _r=await sb.from('app_ruoli').select('ruolo,stato,nome').eq('email',user.email).maybeSingle();_roleRow=_r.data}catch(_e){}
+  S.viewer=!!(_roleRow&&_roleRow.ruolo==='viewer'&&_roleRow.stato==='attivo')
+  if(S.viewer){
+    S.tecnico=null
+    $('lbl-user').textContent=(_roleRow.nome||user.email)+' — sola lettura'
+    document.querySelector('nav')?.classList.add('hidden')
+    document.body.classList.add('viewer-mode')
+    await loadVoci().catch(()=>{})
+    showScr('app')
+    navTo('dashboard')
+    S.appReady=true
+    return
+  }
+  document.querySelector('nav')?.classList.remove('hidden')
+  document.body.classList.remove('viewer-mode')
   let{data:tec}=await sb.from('tecnici').select('*').eq('email',user.email).single()
   if(!tec){
     const p=user.email.split('@')[0].split('.')
@@ -1914,6 +1940,21 @@ $('btn-login').onclick=async()=>{
 }
 $('l-pwd').onkeydown=e=>{if(e.key==='Enter')$('btn-login').click()}
 $('btn-logout').onclick=()=>sb.auth.signOut()
+$('link-richiedi')?.addEventListener('click',e=>{e.preventDefault();$('box-richiedi')?.classList.toggle('hidden')})
+$('btn-richiedi-invia')?.addEventListener('click',async()=>{
+  const email=(vGet('ra-email')||'').trim(),nome=(vGet('ra-nome')||'').trim(),msg=$('ra-msg')
+  if(msg){msg.style.color='';msg.textContent=''}
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){if(msg){msg.style.color='#c0392b';msg.textContent='Inserisci una email valida'}return}
+  const btn=$('btn-richiedi-invia');btn.disabled=true;btn.textContent='Invio…'
+  try{
+    const r=await fetch(`${SB_URL}/functions/v1/request-access`,{method:'POST',headers:{'Content-Type':'application/json',apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`},body:JSON.stringify({email,nome})})
+    const d=await r.json().catch(()=>({}))
+    if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status))
+    if(msg){msg.style.color='#27ae60';msg.textContent='Richiesta inviata. La segreteria ti contatterà per abilitare l\'accesso.'}
+    vSet('ra-email','');vSet('ra-nome','')
+  }catch(err){if(msg){msg.style.color='#c0392b';msg.textContent='Errore invio: '+err.message}}
+  finally{btn.disabled=false;btn.textContent='Invia richiesta'}
+})
 
 // ── SCREEN / NAV ──
 function showScr(n){
