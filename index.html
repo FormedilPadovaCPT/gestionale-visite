@@ -3944,6 +3944,7 @@ async function loadDash(){
 
 // ── MAPPA CANTIERI (dashboard) ──
 let _dashMap=null, _dashMapLayers=null
+let _dashMapRows=null, _dashMapOrder=['NR','BASSO','MEDIO','ALTO'], _dashMapIpcOn={NR:true,BASSO:true,MEDIO:true,ALTO:true}, _dashMapTec=''
 const _DM_IPC={
   'NR':   {label:'Nessun rilievo', color:'#95C22F'},
   'BASSO':{label:'Basso',          color:'#f2c200'},
@@ -3974,9 +3975,49 @@ async function loadDashMap(){
     list.forEach((d,i)=>{const a=2*Math.PI*i/list.length;d.lat+=R*Math.cos(a);d.lng+=R*Math.sin(a)/Math.cos(d.lat*Math.PI/180)})
   })
 
+  // Stato filtri e dati per il re-render (IPC + tecnico)
+  _dashMapRows=rows
+  _dashMapOrder=order
+  _dashMapIpcOn={NR:true,BASSO:true,MEDIO:true,ALTO:true}
+  _dashMapTec=$('dash-map-tec')?.value||''
+  renderDashMapMarkers()
+  setTimeout(()=>_dashMap.invalidateSize(),200)
+
+  // ── Barra filtri: IPC (checkbox) + Tecnico (menu a tendina) ──
+  const fdiv=$('dash-map-filters');if(fdiv){fdiv.innerHTML=''
+    order.forEach(k=>{
+      const n=rows.filter(d=>(_DM_IPC[d.ipc]?d.ipc:'NR')===k).length
+      const lab=document.createElement('label')
+      lab.style.cssText='display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:3px 9px;border:1px solid var(--line,#e3e3e6);border-radius:20px'
+      lab.innerHTML='<input type="checkbox" checked style="margin:0"> <span style="width:12px;height:12px;border-radius:50%;background:'+_DM_IPC[k].color+';border:2px solid #fff;box-shadow:0 0 0 1px #999"></span> '+_DM_IPC[k].label+' ('+n+')'
+      lab.querySelector('input').addEventListener('change',e=>{
+        _dashMapIpcOn[k]=e.target.checked
+        renderDashMapMarkers(false)
+      })
+      fdiv.appendChild(lab)
+    })
+    // Menu tecnico
+    const tecs=[...new Set(rows.map(d=>d.tecnico).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'))
+    const sel=document.createElement('select')
+    sel.id='dash-map-tec'
+    sel.style.cssText='padding:4px 9px;border:1px solid var(--line,#e3e3e6);border-radius:20px;font-size:12px;margin-left:4px;cursor:pointer'
+    sel.innerHTML='<option value="">👷 Tutti i tecnici</option>'+tecs.map(t=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join('')
+    if(_dashMapTec&&tecs.includes(_dashMapTec))sel.value=_dashMapTec
+    sel.addEventListener('change',()=>{_dashMapTec=sel.value;renderDashMapMarkers()})
+    fdiv.appendChild(sel)
+  }
+}
+
+// Re-render dei marker della mappa dashboard applicando i filtri IPC + tecnico.
+// fit=true ricentra la mappa sui marker filtrati (default).
+function renderDashMapMarkers(fit=true){
+  if(!_dashMap||!_dashMapLayers||!_dashMapRows)return
+  _dashMapOrder.forEach(k=>_dashMapLayers[k].clearLayers())
   const bounds=[]
-  rows.forEach(d=>{
+  _dashMapRows.forEach(d=>{
     const k=_DM_IPC[d.ipc]?d.ipc:'NR'
+    if(!_dashMapIpcOn[k])return
+    if(_dashMapTec&&d.tecnico!==_dashMapTec)return
     const c=_DM_IPC[k].color
     const approx=d.geocode_status==='comune'
     const m=L.circleMarker([d.lat,d.lng],{radius:7,color:approx?'#777':'#fff',weight:2,dashArray:approx?'3 2':null,fillColor:c,fillOpacity:0.9})
@@ -3992,21 +4033,7 @@ async function loadDashMap(){
     m.addTo(_dashMapLayers[k])
     bounds.push([d.lat,d.lng])
   })
-  if(bounds.length)_dashMap.fitBounds(bounds,{padding:[30,30]})
-  setTimeout(()=>_dashMap.invalidateSize(),200)
-
-  const fdiv=$('dash-map-filters');if(fdiv){fdiv.innerHTML=''
-    order.forEach(k=>{
-      const n=rows.filter(d=>(_DM_IPC[d.ipc]?d.ipc:'NR')===k).length
-      const lab=document.createElement('label')
-      lab.style.cssText='display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:3px 9px;border:1px solid var(--line,#e3e3e6);border-radius:20px'
-      lab.innerHTML='<input type="checkbox" checked style="margin:0"> <span style="width:12px;height:12px;border-radius:50%;background:'+_DM_IPC[k].color+';border:2px solid #fff;box-shadow:0 0 0 1px #999"></span> '+_DM_IPC[k].label+' ('+n+')'
-      lab.querySelector('input').addEventListener('change',e=>{
-        if(e.target.checked)_dashMap.addLayer(_dashMapLayers[k]);else _dashMap.removeLayer(_dashMapLayers[k])
-      })
-      fdiv.appendChild(lab)
-    })
-  }
+  if(fit&&bounds.length)_dashMap.fitBounds(bounds,{padding:[30,30]})
 }
 
 // ── SCADENZE VISITE DI RITORNO ──
