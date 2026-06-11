@@ -6643,6 +6643,11 @@ window.admGeneraReport = admGeneraReport
 // nazionale (admin_CPT_paXXX): quadro di sintesi (schede 1 e 3),
 // poi 4 dimensioni con 3 schede + 2 dimensioni con 2 schede.
 // ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// ── REPORT OSSERVATORIO — replica 1:1 del "REPORT ATTIVITA'" ──
+// Struttura, ordine, criteri e tipi di grafico identici al report
+// nazionale CNCPT; veste grafica brand Formedil (cfr. Formedil Venezia).
+// ══════════════════════════════════════════════════════════════
 const OS_ZP={IMP:1,PLL:2,SOL:3,ASU:4,MAC:5,OPE:6,PIN:7,DOC:8,SOG:9,FOR:10}
 const OS_SUB={
   IMP_LOG:'Logistica',IMP_IGS:'Apprestamenti igienico-sanitari',IMP_ELE:'Impianti elettrici',IMP_AGI:'Agibilità del cantiere',IMP_ORG:'Organizzazione del lavoro',IMP_SEG:'Segnaletica',
@@ -6670,21 +6675,25 @@ function osImportoClass(code){
   if(code<=7)return 4
   return 5
 }
-// ── formattazioni "italiane" stile report ──
+// ── formattazioni ──
 function oxIt(n,d){return (n==null||isNaN(n))?'':Number(n).toFixed(d==null?1:d).replace('.',',')}
 function oxPct(n){return oxIt(n,1)}
 function oxN(n){return n?String(n):''}
 function oxPad2(n){return String(Math.max(0,Math.round(n||0))).padStart(2,'0')}
 
-// ── palette Excel 2010 (tema Office, come l'originale) ──
+// ── palette brand Formedil ──
 const OXC={
-  s1:'#4F81BD',s2:'#9BBB59',red:'#C0504D',ncp:'#FF0000',ncm:'#FFC000',drk:'#953735',
-  pie:['#4F81BD','#C0504D','#9BBB59','#8064A2','#4BACC6','#F79646','#2C4D75','#772C2A'],
-  esiti:['#D8E4BC','#A6A6A6','#FFC000','#1F497D'],
-  trans:['#9BBB59','#EBF1DE','#FDE9D9','#F79646']
+  ar:'#e7500f',gr:'#565c66',ve:'#95C22F',
+  s1:'#e7500f',s2:'#95C22F',
+  ncp:'#e02b20',ncm:'#FFC000',
+  pie:['#e7500f','#95C22F','#565c66','#f29b6b','#c5dd92','#9aa0a8','#7a3c14','#5d7a1e'],
+  esiti:['#c5dd92','#9aa0a8','#FFC000','#e02b20'],
+  trans:['#95C22F','#eef3e2','#fdeadd','#f08a4b']
 }
-const OXT={hdrF:[184,204,228],hdrT:[31,73,125],alt:[220,230,241],tot:[184,204,228],
-  heatG:[196,215,155],heatO:[247,150,70],heatC:[253,233,217]}
+const OXT={
+  hdrF:[230,232,235],hdrT:[60,65,72],alt:[244,245,246],tot:[250,224,210],
+  heatG:[197,221,146],heatO:[242,155,107],heatC:[253,236,222],heatN:[238,243,226]
+}
 
 // ── definizione dimensioni di analisi (ordine identico all'originale) ──
 const OXD=[
@@ -6721,13 +6730,17 @@ function oxCatOf(v,c,ruolo){
   }
 }
 
-// ══════════ GRAFICI CANVAS (stile Excel 2010) ══════════
+// ══════════ GRAFICI CANVAS ══════════
+// Disegno a OXK px per mm (con supersampling 2x): font in px coerenti.
+const OXK=4
 function oxCv(w,h){
-  const c=document.createElement('canvas');c.width=Math.round(w*3);c.height=Math.round(h*3)
-  const g=c.getContext('2d');g.scale(3,3)
-  g.fillStyle='#fff';g.fillRect(0,0,w,h)
-  g.strokeStyle='#bfbfbf';g.lineWidth=.5;g.strokeRect(.5,.5,w-1,h-1)
-  return[c,g]
+  const c=document.createElement('canvas')
+  c.width=Math.round(w*OXK*2);c.height=Math.round(h*OXK*2)
+  const g=c.getContext('2d');g.scale(2,2)
+  const W=w*OXK,H=h*OXK
+  g.fillStyle='#fff';g.fillRect(0,0,W,H)
+  g.strokeStyle='#d4d7db';g.lineWidth=1;g.strokeRect(.5,.5,W-1,H-1)
+  return[c,g,W,H]
 }
 function oxNice(m){
   if(m<=0)return 1
@@ -6736,38 +6749,47 @@ function oxNice(m){
   const n=f<=1?1:f<=2?2:f<=2.5?2.5:f<=4?4:f<=5?5:f<=8?8:10
   return n*p
 }
-function oxWrapTxt(g,t,maxW){
-  const words=String(t).split(' '),lines=[];let cur=''
+function oxWrapTxt(g,t,maxW,maxLines){
+  const words=String(t).split(' '),lines=[]
+  let cur=''
   words.forEach(w=>{
     const test=cur?cur+' '+w:w
     if(g.measureText(test).width>maxW&&cur){lines.push(cur);cur=w}else cur=test
   })
   if(cur)lines.push(cur)
-  return lines.slice(0,2)
+  return lines.slice(0,maxLines||2)
 }
-// grafico a barre raggruppate generico (serie multiple, etichette valori)
+// grafico a barre raggruppate (serie multiple, etichette valori, linea opzionale)
 function oxBars(o){
-  const w=o.w,h=o.h
-  const[c,g]=oxCv(w,h)
-  let top=4
-  if(o.title){g.fillStyle='#595959';g.font='600 7px Helvetica';g.textAlign='center';g.fillText(o.title,w/2,10);top=15}
-  const legB=(o.legend==='bottom')?10:0
-  const legR=(o.legend==='right')?Math.min(52,w*.3):0
-  const padL=16,padR=4+legR,padB=14+legB
-  const px=padL,pw=w-padL-padR,py=top,ph=h-top-padB
+  const[c,g,W,H]=oxCv(o.w,o.h)
+  const F=o.fontScale||1
+  let top=8
+  if(o.title){
+    g.fillStyle=OXC.gr;g.font='bold '+Math.round(12*F)+'px Helvetica,Arial';g.textAlign='center'
+    g.fillText(o.title,W/2,16)
+    top=26
+  }
+  const catFont=Math.round((o.catFont||8.5)*F)
+  const catLines=o.catLines||2
+  const legB=o.legend==='bottom'?18:0
+  const legR=o.legend==='right'?Math.min(120,W*.3):0
+  const padL=34,padR=8+legR
+  const padB=6+catLines*(catFont+2)+legB
+  const px=padL,pw=W-padL-padR,py=top,ph=H-top-padB
   const ser=o.series
   let max=0
   ser.forEach(s=>s.data.forEach(v=>{if(v>max)max=v}))
-  if(o.lineData)o.lineData.forEach(v=>{if(v>max)max=v})
+  if(o.lineData)o.lineData.forEach(v=>{if(v!=null&&v>max)max=v})
   const ymax=oxNice(max||1)
-  // griglia
-  g.strokeStyle='#d9d9d9';g.lineWidth=.4;g.fillStyle='#808080';g.font='5.5px Helvetica';g.textAlign='right'
+  // griglia + asse Y
+  g.strokeStyle='#e2e4e7';g.lineWidth=1
+  g.fillStyle='#8a8f96';g.font=Math.round(8.5*F)+'px Helvetica,Arial';g.textAlign='right'
   const steps=4
   for(let i=0;i<=steps;i++){
     const yy=py+ph-ph*i/steps
     g.beginPath();g.moveTo(px,yy);g.lineTo(px+pw,yy);g.stroke()
     const val=ymax*i/steps
-    g.fillText(o.fmtAxis?o.fmtAxis(val):(val%1?oxIt(val,1):String(val)),px-2,yy+2)
+    g.fillText(o.fmtAxis?o.fmtAxis(val):(val%1?oxIt(val,1):String(val)),px-4,yy+3)
   }
   const n=o.cats.length,k=ser.length
   const slot=pw/n,grpW=slot*.72,bw=grpW/k
@@ -6778,19 +6800,23 @@ function oxBars(o){
       const x=px+i*slot+(slot-grpW)/2+j*bw
       const col=(ser[j].colors&&ser[j].colors[i])||ser[j].color
       g.fillStyle=col
-      if(bh>0)g.fillRect(x,py+ph-bh,Math.max(bw-1,1.2),bh)
+      if(bh>0)g.fillRect(x,py+ph-bh,Math.max(bw-2,2),bh)
       if(o.labels!==false){
         const lbl=o.fmt?o.fmt(v):(v?String(v):(o.zeroLbl||''))
-        if(lbl!==''){g.fillStyle='#404040';g.font='5.5px Helvetica';g.textAlign='center';g.fillText(lbl,x+bw/2,py+ph-bh-2)}
+        if(lbl!==''){
+          g.fillStyle='#4a4f57';g.font=Math.round(8.5*F)+'px Helvetica,Arial';g.textAlign='center'
+          g.fillText(lbl,x+bw/2,py+ph-bh-3)
+        }
       }
     }
-    // etichette categoria
-    g.fillStyle='#595959';g.font='5px Helvetica';g.textAlign='center'
-    oxWrapTxt(g,o.cats[i],slot-2).forEach((ln,li)=>g.fillText(ln,px+i*slot+slot/2,py+ph+6+li*6))
+    g.fillStyle=OXC.gr;g.font=catFont+'px Helvetica,Arial';g.textAlign='center'
+    oxWrapTxt(g,o.cats[i],slot-4,catLines).forEach((ln,li)=>{
+      g.fillText(ln,px+i*slot+slot/2,py+ph+catFont+3+li*(catFont+2))
+    })
   }
-  // linea di tendenza (per scheda 2)
+  // linea di tendenza
   if(o.lineData){
-    g.strokeStyle=o.lineColor||OXC.red;g.lineWidth=1;g.beginPath()
+    g.strokeStyle=o.lineColor||OXC.ncp;g.lineWidth=2;g.beginPath()
     let started=false
     for(let i=0;i<n;i++){
       const v=o.lineData[i]
@@ -6801,36 +6827,50 @@ function oxBars(o){
     g.stroke()
   }
   // legenda
+  const sq=Math.round(8*F)
   if(o.legend==='bottom'){
-    g.font='5.5px Helvetica';g.textAlign='left'
-    let tot=0;ser.forEach(s=>tot+=g.measureText(s.label).width+14)
-    let lx=(w-tot)/2
-    ser.forEach(s=>{g.fillStyle=s.color;g.fillRect(lx,h-8,5,5);g.fillStyle='#595959';g.fillText(s.label,lx+7,h-3.5);lx+=g.measureText(s.label).width+14})
+    g.font=Math.round(9*F)+'px Helvetica,Arial';g.textAlign='left'
+    let tot=0;ser.forEach(s=>tot+=g.measureText(s.label).width+sq+16)
+    let lx=(W-tot)/2
+    ser.forEach(s=>{
+      g.fillStyle=s.color;g.fillRect(lx,H-sq-6,sq,sq)
+      g.fillStyle=OXC.gr;g.fillText(s.label,lx+sq+3,H-7)
+      lx+=g.measureText(s.label).width+sq+16
+    })
   }else if(o.legend==='right'){
-    g.font='5.5px Helvetica';g.textAlign='left'
-    let ly=top+4
-    ser.forEach(s=>{g.fillStyle=s.color;g.fillRect(w-legR+2,ly,5,5);g.fillStyle='#595959';g.fillText(s.label,w-legR+9,ly+4.5);ly+=9})
+    g.font=Math.round(9*F)+'px Helvetica,Arial';g.textAlign='left'
+    let ly=top+6
+    ser.forEach(s=>{
+      g.fillStyle=s.color;g.fillRect(W-legR+4,ly,sq,sq)
+      g.fillStyle=OXC.gr;g.fillText(s.label,W-legR+sq+7,ly+sq-1)
+      ly+=sq+6
+    })
   }
   return c.toDataURL('image/png')
 }
-// torta 3D simulata (come Excel 2010)
+// torta 3D (stile report originale, colori Formedil)
 function oxPie3D(o){
-  const w=o.w,h=o.h
-  const[c,g]=oxCv(w,h)
-  let top=2
-  if(o.title){g.fillStyle='#595959';g.font='600 6.5px Helvetica';g.textAlign='center';g.fillText(o.title,w/2,9);top=11}
-  const legW=Math.min(w*.42,60)
+  const[c,g,W,H]=oxCv(o.w,o.h)
+  let top=4
+  if(o.title){
+    g.fillStyle=OXC.gr;g.font='bold 11px Helvetica,Arial';g.textAlign='center'
+    g.fillText(o.title,W/2,14);top=20
+  }
+  const legW=Math.min(W*.42,150)
   const tot=o.data.reduce((s,x)=>s+(x||0),0)
-  const cx=(w-legW)/2,cy=top+(h-top)/2-3
-  const rx=Math.min((w-legW)/2-8,(h-top)/2-9),ry=rx*.52,dp=Math.max(rx*.22,4)
+  const cx=(W-legW)/2,cy=top+(H-top)/2-5
+  const rx=Math.min((W-legW)/2-16,(H-top)/2-16),ry=rx*.5,dp=Math.max(rx*.2,8)
   function shade(hex,f){
     const r=parseInt(hex.slice(1,3),16),gg=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16)
     return'rgb('+Math.round(r*f)+','+Math.round(gg*f)+','+Math.round(b*f)+')'
   }
-  if(tot>0){
+  if(tot>0&&rx>10){
     let a0=-Math.PI/2
-    const segs=o.data.map((v,i)=>{const a1=a0+(v||0)/tot*Math.PI*2;const s={v:v||0,a0:a0,a1:a1,col:o.colors[i%o.colors.length]};a0=a1;return s})
-    // pareti laterali (solo metà frontale 0..PI)
+    const segs=o.data.map((v,i)=>{
+      const a1=a0+(v||0)/tot*Math.PI*2
+      const s={v:v||0,a0:a0,a1:a1,col:o.colors[i%o.colors.length]}
+      a0=a1;return s
+    })
     segs.forEach(s=>{
       const f0=Math.max(s.a0,0),f1=Math.min(s.a1,Math.PI)
       if(f1<=f0||s.v===0)return
@@ -6840,85 +6880,93 @@ function oxPie3D(o){
       g.ellipse(cx,cy+dp,rx,ry,0,f1,f0,true)
       g.closePath();g.fill()
     })
-    // top
     segs.forEach(s=>{
       if(s.v===0)return
-      g.fillStyle=s.col;g.strokeStyle='#fff';g.lineWidth=.5
+      g.fillStyle=s.col;g.strokeStyle='#fff';g.lineWidth=1.2
       g.beginPath();g.moveTo(cx,cy)
       g.ellipse(cx,cy,rx,ry,0,s.a0,s.a1)
       g.closePath();g.fill();g.stroke()
     })
-    // etichette valori
-    g.font='5.5px Helvetica';g.textAlign='center'
+    g.font='9px Helvetica,Arial';g.textAlign='center'
     segs.forEach(s=>{
       if(s.v===0)return
+      const frac=(s.a1-s.a0)/(Math.PI*2)
+      if(frac<0.03)return
       const am=(s.a0+s.a1)/2
-      const lx=cx+Math.cos(am)*rx*1.12,ly=cy+Math.sin(am)*ry*1.12+(Math.sin(am)>0?dp:0)
-      g.fillStyle='#404040';g.fillText(oxPad2(s.v),lx,ly+2)
+      const lx=cx+Math.cos(am)*rx*.62,ly=cy+Math.sin(am)*ry*.62
+      g.fillStyle='#fff'
+      g.fillText(String(s.v),lx,ly+3)
     })
   }else{
-    g.fillStyle='#999';g.font='6px Helvetica';g.textAlign='center';g.fillText('n.d.',cx,cy)
+    g.fillStyle='#999';g.font='10px Helvetica,Arial';g.textAlign='center'
+    g.fillText('n.d.',cx,cy)
   }
   // legenda a destra
-  g.font='5px Helvetica';g.textAlign='left'
-  let ly=top+6
+  g.font='8.5px Helvetica,Arial';g.textAlign='left'
+  let ly=top+8
   o.labels.forEach((lb,i)=>{
-    if(ly>h-4)return
-    g.fillStyle=o.colors[i%o.colors.length];g.fillRect(w-legW+2,ly-3.5,4,4)
-    g.fillStyle='#595959'
-    oxWrapTxt(g,lb,legW-10).forEach((ln,li)=>{g.fillText(ln,w-legW+8,ly+li*5.5)})
-    ly+=Math.max(7,oxWrapTxt(g,lb,legW-10).length*5.5+2.5)
+    if(ly>H-6)return
+    g.fillStyle=o.colors[i%o.colors.length];g.fillRect(W-legW+4,ly-7,8,8)
+    g.fillStyle=OXC.gr
+    const lines=oxWrapTxt(g,lb,legW-20,2)
+    lines.forEach((ln,li)=>g.fillText(ln,W-legW+16,ly+li*10))
+    ly+=Math.max(13,lines.length*10+4)
   })
   return c.toDataURL('image/png')
 }
 // mini-grafico scheda 2: barre verdi + linea rossa di tendenza
 function oxMiniCombo(o){
   return oxBars({w:o.w,h:o.h,title:o.title,cats:o.cats,
-    series:[{label:'',color:OXC.s2,data:o.bars}],
-    lineData:o.line,lineColor:OXC.red,fmt:v=>'',labels:false})
+    series:[{label:'',color:OXC.ve,data:o.bars}],
+    lineData:o.line,lineColor:OXC.ncp,labels:false,
+    fontScale:.82,catFont:7,catLines:2})
 }
 // mini-grafico NC+/NC- (rosso/giallo) con legenda
 function oxMiniNC(o){
   return oxBars({w:o.w,h:o.h,title:o.title,cats:o.cats,
     series:[{label:'NC+',color:OXC.ncp,data:o.ncp},{label:'NC-',color:OXC.ncm,data:o.ncm}],
-    legend:'right',fmt:v=>'',labels:false,fmtAxis:v=>oxPad2(v)})
+    legend:'right',labels:false,
+    fontScale:.82,catFont:7,catLines:2})
 }
 
-// ══════════ ELEMENTI PDF ══════════
+// ══════════ ELEMENTI PDF (brand Formedil) ══════════
+const OXBRAND=[231,80,15]
 function oxHeader(doc,anno,titolo){
-  doc.setFillColor.apply(doc,[OXT.hdrF[0],OXT.hdrF[1],OXT.hdrF[2]])
-  doc.rect(0,6,210,7,'F')
-  doc.setTextColor.apply(doc,[OXT.hdrT[0],OXT.hdrT[1],OXT.hdrT[2]])
-  doc.setFont('helvetica','bold');doc.setFontSize(9)
-  doc.text('PADOVA',12,10.8)
-  doc.text(anno,198,10.8,{align:'right'})
+  doc.setFillColor(OXBRAND[0],OXBRAND[1],OXBRAND[2])
+  doc.rect(10,6,190,4.6,'F')
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(6.2)
+  doc.text('FORMEDIL PADOVA',12,9.2)
+  doc.setFillColor(OXBRAND[0],OXBRAND[1],OXBRAND[2])
+  doc.rect(10,13,190,8,'F')
   doc.setFontSize(11)
-  doc.text(titolo,105,18.5,{align:'center'})
+  doc.text(titolo,12,18.4)
+  doc.setFontSize(9)
+  doc.text(anno,198,18.4,{align:'right'})
 }
 function oxFooter(doc,pg){
-  doc.setFillColor.apply(doc,[OXT.hdrF[0],OXT.hdrF[1],OXT.hdrF[2]])
-  doc.rect(0,283,210,4,'F')
-  doc.setTextColor(120,120,120);doc.setFont('helvetica','normal');doc.setFontSize(7)
-  doc.text('Pagina '+pg,105,292,{align:'center'})
+  doc.setFillColor(OXBRAND[0],OXBRAND[1],OXBRAND[2])
+  doc.rect(10,282,190,4,'F')
+  doc.setTextColor(130,130,130);doc.setFont('helvetica','normal');doc.setFontSize(7)
+  doc.text('Pagina '+pg,105,291.5,{align:'center'})
 }
 function oxSec(doc,txt,y,sub){
-  doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(64,64,64)
+  doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(86,92,102)
   doc.text(txt,12,y)
   if(sub){
     const wT=doc.getTextWidth(txt)
-    doc.setFont('helvetica','italic');doc.setFontSize(6.5);doc.setTextColor(100,100,100)
+    doc.setFont('helvetica','italic');doc.setFontSize(6.8);doc.setTextColor(120,125,132)
     doc.text(' '+sub,12+wT,y)
   }
 }
 function oxNote(doc,y){
-  doc.setFont('helvetica','bolditalic');doc.setFontSize(6);doc.setTextColor(80,80,80)
+  doc.setFont('helvetica','bolditalic');doc.setFontSize(6.2);doc.setTextColor(86,92,102)
   doc.text("* alcuni enti registrano esclusivamente le verifiche con osservazioni o inadempienze. In questo caso l'universo delle verifiche a fini statistici non corrisponde a quello effettivamente analizzato durante la visita.",12,y,{maxWidth:186})
 }
 function oxTbl(doc,opt){
   const base={
     theme:'plain',
-    styles:{font:'helvetica',fontSize:5.8,cellPadding:{top:.6,bottom:.6,left:1,right:1},textColor:[60,60,60],fillColor:[255,255,255],halign:'center'},
-    headStyles:{fillColor:OXT.hdrF,textColor:OXT.hdrT,fontStyle:'bold',halign:'center',fontSize:5.6},
+    styles:{font:'helvetica',fontSize:6,cellPadding:{top:.7,bottom:.7,left:1,right:1},textColor:[60,65,72],fillColor:[255,255,255],halign:'center'},
+    headStyles:{fillColor:OXT.hdrF,textColor:OXT.hdrT,fontStyle:'bold',halign:'center',fontSize:5.8},
     alternateRowStyles:{fillColor:OXT.alt},
     margin:{left:12,right:12}
   }
@@ -6981,11 +7029,11 @@ async function admGeneraReportOsservatorio(){
       if(r===undefined)return // esclude NA e note
       const z=cod2zona[codice]||OS_ZP[codice.substring(0,3).toUpperCase()]
       if(!z)return
-      const zz=((zoneByVis[visita_id]=zoneByVis[visita_id]||{})[z]=(zoneByVis[visita_id]||{})[z]||{ver:0,oss:0,ncm:0,ncp:0})
-      zoneByVis[visita_id][z]=zz
+      const zo=(zoneByVis[visita_id]=zoneByVis[visita_id]||{})
+      const zz=(zo[z]=zo[z]||{ver:0,oss:0,ncm:0,ncp:0})
       const subKey=codice.split('_').slice(0,2).join('_')
-      const ss=((subByVis[visita_id]=subByVis[visita_id]||{})[subKey]=(subByVis[visita_id]||{})[subKey]||{ver:0,oss:0,ncm:0,ncp:0,zona:z})
-      subByVis[visita_id][subKey]=ss
+      const so=(subByVis[visita_id]=subByVis[visita_id]||{})
+      const ss=(so[subKey]=so[subKey]||{ver:0,oss:0,ncm:0,ncp:0,zona:z})
       if(r===0){zz.ver++;ss.ver++}else if(r===1){zz.oss++;ss.oss++}else if(r===2){zz.ncm++;ss.ncm++}else{zz.ncp++;ss.ncp++}
       const cm=(codByVis[visita_id]=codByVis[visita_id]||{})
       cm[codice]=Math.max(cm[codice]===undefined?-1:cm[codice],r)
@@ -7010,7 +7058,6 @@ async function admGeneraReportOsservatorio(){
     const nV=V.length
     const nCant=new Set(V.map(v=>v.cant)).size
 
-    // etichetta periodo: anno edile se ott→set, altrimenti intervallo
     function oxAnnoLbl(){
       const d=dal.split('-').map(Number),a=al.split('-').map(Number)
       if(d[1]===10&&d[2]===1&&a[1]===9&&a[2]===30&&a[0]===d[0]+1)return'Anno edile '+d[0]+'-'+a[0]
@@ -7019,15 +7066,13 @@ async function admGeneraReportOsservatorio(){
     }
     const anno=oxAnnoLbl()
 
-    // helper categorie con nd dinamico
     OXD.forEach(d=>{
       d._nd=V.some(v=>v.cat[d.key]===0)
       d._cats=d.cats.concat(d._nd?[0]:[])
       d._lbl=c=>c===0?'nd':d.lbl[c]
     })
-    function catIdx(d,v){const i=d._cats.indexOf(v.cat[d.key]);return i}
+    function catIdx(d,v){return d._cats.indexOf(v.cat[d.key])}
 
-    // aggregati globali per zona
     const zonaTot={};for(let z=1;z<=10;z++)zonaTot[z]={ver:0,oss:0,ncm:0,ncp:0,vis:new Set()}
     V.forEach(v=>Object.entries(v.zone).forEach(([z,o])=>{
       const t=zonaTot[z];if(!t)return
@@ -7037,7 +7082,6 @@ async function admGeneraReportOsservatorio(){
     Object.values(zonaTot).forEach(t=>{G.ver+=t.ver;G.oss+=t.oss;G.ncm+=t.ncm;G.ncp+=t.ncp})
     const Gtot=G.ver+G.oss+G.ncm+G.ncp
 
-    // frequenza visite stesso cantiere/impresa (ordinale)
     const byGrp={}
     V.forEach(v=>{(byGrp[v.grp]=byGrp[v.grp]||[]).push(v)})
     Object.values(byGrp).forEach(a=>a.sort((x,y)=>(x.data||'').localeCompare(y.data||'')))
@@ -7052,17 +7096,22 @@ async function admGeneraReportOsservatorio(){
 
     // ── PAGINA 1: COPERTINA ──
     newPage(true)
-    doc.setTextColor(64,64,64);doc.setFont('helvetica','bold');doc.setFontSize(15)
-    doc.text('OSSERVATORIO VISITE CANTIERE',105,42,{align:'center'})
-    doc.setDrawColor(184,204,228);doc.setLineWidth(.6);doc.line(40,48,170,48)
-    doc.setFontSize(24)
-    doc.text("REPORT ATTIVITA'",105,120,{align:'center'})
-    doc.setFont('helvetica','normal');doc.setFontSize(13)
-    doc.text(anno,105,131,{align:'center'})
+    doc.setFillColor(OXBRAND[0],OXBRAND[1],OXBRAND[2])
+    doc.rect(10,10,190,5,'F')
+    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(6.5)
+    doc.text('FORMEDIL PADOVA',12,13.5)
+    doc.setTextColor(86,92,102);doc.setFontSize(16)
+    doc.text('OSSERVATORIO VISITE CANTIERE',105,55,{align:'center'})
+    doc.setDrawColor(OXBRAND[0],OXBRAND[1],OXBRAND[2]);doc.setLineWidth(.8)
+    doc.line(55,62,155,62)
+    doc.setFontSize(26);doc.setTextColor(231,80,15)
+    doc.text("REPORT ATTIVITA'",105,125,{align:'center'})
+    doc.setFont('helvetica','normal');doc.setFontSize(14);doc.setTextColor(86,92,102)
+    doc.text(anno,105,137,{align:'center'})
     doc.setFontSize(11)
-    doc.text('Formedil Padova - Centro per la Formazione e la Sicurezza Edile di Padova',105,176,{align:'center'})
-    doc.setFontSize(9);doc.setTextColor(120,120,120)
-    doc.text('Emesso il '+new Date().toLocaleString('it-IT'),140,235)
+    doc.text('Formedil Padova - Centro per la Formazione e la Sicurezza Edile di Padova',105,180,{align:'center'})
+    doc.setFontSize(9);doc.setTextColor(140,140,140)
+    doc.text('Emesso il '+new Date().toLocaleString('it-IT'),105,235,{align:'center'})
     oxFooter(doc,pg)
 
     // ── PAGINA 2: QUADRO DI SINTESI - scheda 1 ──
@@ -7070,14 +7119,13 @@ async function admGeneraReportOsservatorio(){
     oxHeader(doc,anno,'QUADRO DI SINTESI - scheda 1')
     const visM=Array(12).fill(0),cantM=Array(12).fill(null).map(()=>new Set())
     V.forEach(v=>{if(v.mese!=null){visM[v.mese]++;cantM[v.mese].add(v.cant)}})
-    oxTbl(doc,{startY:25,margin:{left:12},tableWidth:48,
+    oxTbl(doc,{startY:26,margin:{left:12},tableWidth:48,
       head:[['mesi','visite','cantieri']],
-      body:OS_MESI.map((m,i)=>[m,oxN(visM[i]),oxN(cantM[i].size)]).concat([['',String(nV),String(nCant)]]),
+      body:OS_MESI.map((m,i)=>[m,oxN(visM[i]),oxN(cantM[i].size)]).concat([['TOTALE',String(nV),String(nCant)]]),
       didParseCell:d=>{if(d.section==='body'&&d.row.index===12){d.cell.styles.fontStyle='bold';d.cell.styles.fillColor=OXT.tot}}})
-    doc.addImage(oxBars({w:138,h:48,title:"ATTIVITA' MENSILE VISITE",cats:OS_MESI,
-      series:[{label:'',color:OXC.drk,data:visM}],fmt:oxN}),'PNG',58,25,138,48)
-    let y2=Math.max(doc.lastAutoTable.finalY,73)+6
-    // tre sezioni affiancate
+    doc.addImage(oxBars({w:134,h:50,title:"ATTIVITA' MENSILE VISITE",cats:OS_MESI,
+      series:[{label:'',color:OXC.ar,data:visM}],fmt:oxN}),'PNG',64,26,134,50)
+    let y2=Math.max(doc.lastAutoTable.finalY,78)+6
     oxSec(doc,'FREQUENZA VISITE STESSO CANTIERE/IMPRESA',y2)
     doc.text("VISITE SECONDO L'ESITO DELLE VERIFICHE *",78,y2)
     doc.text('ESITO VERIFICHE *',146,y2)
@@ -7087,19 +7135,18 @@ async function admGeneraReportOsservatorio(){
     const esitoVerLbl=['nessuna OSS e/o NC','OSS','NC-','NC+']
     oxTbl(doc,{startY:y2+2,margin:{left:12},tableWidth:60,
       head:[['prime viste','seconde visite','terze visite','visite oltre la terza']],
-      body:[[oxN(freq[0]),oxN(freq[1]),oxN(freq[2]),oxN(freq[3])]],styles:{fontSize:5.2}})
+      body:[[oxN(freq[0]),oxN(freq[1]),oxN(freq[2]),oxN(freq[3])]],styles:{fontSize:5.4},headStyles:{fontSize:5}})
     oxTbl(doc,{startY:y2+2,margin:{left:78},tableWidth:60,
       head:[['nessuna OSS e/o NC','presenza solo OSS','presenza NC-','presenza NC+']],
-      body:[[oxN(esitiVis[0]),oxN(esitiVis[1]),oxN(esitiVis[2]),oxN(esitiVis[3])]],styles:{fontSize:5.2}})
+      body:[[oxN(esitiVis[0]),oxN(esitiVis[1]),oxN(esitiVis[2]),oxN(esitiVis[3])]],styles:{fontSize:5.4},headStyles:{fontSize:5}})
     oxTbl(doc,{startY:y2+2,margin:{left:146},tableWidth:52,
       head:[['nessuna OSS e/o NC','OSS','NC-','NC+']],
-      body:[[oxN(G.ver),oxN(G.oss),oxN(G.ncm),oxN(G.ncp)]],styles:{fontSize:5.2}})
-    const yC=y2+16
-    doc.addImage(oxPie3D({w:60,h:36,data:freq,labels:freqLbl,colors:OXC.pie}),'PNG',12,yC,60,36)
-    doc.addImage(oxBars({w:60,h:36,cats:esitoVisLbl,series:[{label:'',color:OXC.s1,data:esitiVis}],fmt:oxN}),'PNG',78,yC,60,36)
-    doc.addImage(oxBars({w:52,h:36,cats:esitoVerLbl,series:[{label:'',color:'#fff',colors:OXC.esiti,data:[G.ver,G.oss,G.ncm,G.ncp]}],fmt:oxN}),'PNG',146,yC,52,36)
-    let y3=yC+40
-    // esito verifiche per area cantiere
+      body:[[oxN(G.ver),oxN(G.oss),oxN(G.ncm),oxN(G.ncp)]],styles:{fontSize:5.4},headStyles:{fontSize:5}})
+    const yC=y2+15
+    doc.addImage(oxPie3D({w:60,h:38,data:freq,labels:freqLbl,colors:OXC.pie}),'PNG',12,yC,60,38)
+    doc.addImage(oxBars({w:60,h:38,cats:esitoVisLbl,series:[{label:'',color:OXC.ar,data:esitiVis}],fmt:oxN,fontScale:.85,catFont:6.5}),'PNG',78,yC,60,38)
+    doc.addImage(oxBars({w:52,h:38,cats:esitoVerLbl,series:[{label:'',color:'#fff',colors:OXC.esiti,data:[G.ver,G.oss,G.ncm,G.ncp]}],fmt:oxN,fontScale:.85,catFont:6.5}),'PNG',146,yC,52,38)
+    let y3=yC+42
     oxSec(doc,'ESITO VERIFICHE PER AREA CANTIERE *',y3)
     const areaBody=[]
     for(let z=1;z<=10;z++){
@@ -7120,14 +7167,14 @@ async function admGeneraReportOsservatorio(){
     doc.addImage(oxBars({w:186,h:52,title:'% verifiche con inadempienze NC+ e NC- su verifiche totali',
       cats:Object.values(OS_ZONE_NAMI),
       series:[{label:'NC+',color:OXC.ncp,data:pNCp},{label:'NC-',color:OXC.ncm,data:pNCm}],
-      legend:'right',fmt:oxPad2,zeroLbl:'00',fmtAxis:oxPad2}),'PNG',12,y4,186,52)
-    oxNote(doc,y4+58)
+      legend:'right',fmt:oxPad2,zeroLbl:'00',catFont:7,catLines:3}),'PNG',12,y4,186,52)
+    oxNote(doc,y4+57)
     oxFooter(doc,pg)
 
     // ── PAGINA 3: QUADRO DI SINTESI - scheda 3 ──
     newPage()
     oxHeader(doc,anno,'QUADRO DI SINTESI - scheda 3')
-    oxSec(doc,'RIEPILOGO VISITE E VERIFICHE PER AREA E SOTTOAREA CANTIERE',24)
+    oxSec(doc,'RIEPILOGO VISITE E VERIFICHE PER AREA E SOTTOAREA CANTIERE',25)
     const subAgg={}
     V.forEach(v=>Object.entries(v.sub).forEach(([k,o])=>{
       const a=(subAgg[k]=subAgg[k]||{zona:o.zona,ver:0,oss:0,ncm:0,ncp:0,vis:new Set()})
@@ -7135,33 +7182,33 @@ async function admGeneraReportOsservatorio(){
     }))
     const s3body=[],boldRows=[]
     for(let z=1;z<=10;z++){
-      const zt=zonaTot[z],zVis=zt.vis.size
+      const zt=zonaTot[z],zVisN=zt.vis.size
       Object.keys(OS_SUB).filter(k=>OS_ZP[k.substring(0,3)]===z).forEach(k=>{
         const a=subAgg[k]
         if(!a){s3body.push([OS_SUB[k],'',oxPct(0),'','','','','','','','','']);return}
         const tot=a.ver+a.oss+a.ncm+a.ncp
-        s3body.push([OS_SUB[k],oxN(a.vis.size),zVis?oxPct(a.vis.size/zVis*100):'0,0',
+        s3body.push([OS_SUB[k],oxN(a.vis.size),zVisN?oxPct(a.vis.size/zVisN*100):'0,0',
           oxN(tot),oxN(a.ver),oxN(a.oss),oxN(a.ncm),oxN(a.ncp),
           tot?oxPct(a.ver/tot*100):'',tot?oxPct(a.oss/tot*100):'',tot?oxPct(a.ncm/tot*100):'',tot?oxPct(a.ncp/tot*100):''])
       })
       const tot=zt.ver+zt.oss+zt.ncm+zt.ncp
       boldRows.push(s3body.length)
-      s3body.push([OS_ZONE_NAMI[z].toUpperCase(),oxN(zVis),nV?oxPct(zVis/nV*100):'0,0',
+      s3body.push([OS_ZONE_NAMI[z].toUpperCase(),oxN(zVisN),nV?oxPct(zVisN/nV*100):'0,0',
         oxN(tot),oxN(zt.ver),oxN(zt.oss),oxN(zt.ncm),oxN(zt.ncp),
         tot?oxPct(zt.ver/tot*100):'',tot?oxPct(zt.oss/tot*100):'',tot?oxPct(zt.ncm/tot*100):'',tot?oxPct(zt.ncp/tot*100):''])
     }
     boldRows.push(s3body.length)
     s3body.push(['TOTALE',String(nV),'100,0',oxN(Gtot),oxN(G.ver),oxN(G.oss),oxN(G.ncm),oxN(G.ncp),
       Gtot?oxPct(G.ver/Gtot*100):'',Gtot?oxPct(G.oss/Gtot*100):'',Gtot?oxPct(G.ncm/Gtot*100):'',Gtot?oxPct(G.ncp/Gtot*100):''])
-    oxTbl(doc,{startY:27,
+    oxTbl(doc,{startY:28,
       head:[[
         {content:'',rowSpan:2},{content:'VISITE',colSpan:2},{content:'VERIFICHE - numero',colSpan:5},{content:'VERIFICHE - distribuzione %',colSpan:4}],
-        ['n. visite','% sottoarea su area e area su totale','n. verifiche totali','n. verifiche senza oss/nc*','n. verifiche con oss','n. verifiche con nc-','n. verifiche con nc+','n. verifiche senza oss/nc*','n. verifiche con oss','n. verifiche con nc-','n. verifiche con nc+']],
-      body:s3body,styles:{fontSize:5,cellPadding:{top:.45,bottom:.45,left:.8,right:.8}},
-      headStyles:{fontSize:4.6},
+        ['n. visite','% sottoarea su area e area su totale','n. verifiche totali','senza oss/nc*','con oss','con nc-','con nc+','senza oss/nc*','con oss','con nc-','con nc+']],
+      body:s3body,styles:{fontSize:5.2,cellPadding:{top:.5,bottom:.5,left:.8,right:.8}},
+      headStyles:{fontSize:5},
       columnStyles:{0:{halign:'left',cellWidth:48}},
       didParseCell:d=>{if(d.section==='body'&&boldRows.includes(d.row.index)){d.cell.styles.fontStyle='bold';d.cell.styles.fillColor=OXT.tot}}})
-    doc.setFont('helvetica','bolditalic');doc.setFontSize(5.6);doc.setTextColor(80,80,80)
+    doc.setFont('helvetica','bolditalic');doc.setFontSize(5.8);doc.setTextColor(86,92,102)
     doc.text("* l'assenza sistematica di verifiche senza osservazioni o inadempienze indica la scelta dell'ente di non documentare le verifiche prive di problematiche. In questo caso ne risentiranno le analisi statistiche sull'esito globale delle visite",12,doc.lastAutoTable.finalY+4,{maxWidth:186})
     oxFooter(doc,pg)
 
@@ -7173,7 +7220,7 @@ async function admGeneraReportOsservatorio(){
       // ───── SCHEDA 1 ─────
       newPage()
       oxHeader(doc,anno,d.title+' - scheda 1')
-      oxSec(doc,'VISITE E CANTIERI PER MESE',24,d.sub)
+      oxSec(doc,'VISITE E CANTIERI PER MESE',25,d.sub)
       const visMx=OS_MESI.map(()=>cats.map(()=>0))
       const cantMx=OS_MESI.map(()=>cats.map(()=>new Set()))
       const totVis=cats.map(()=>0),totCantS=cats.map(()=>new Set())
@@ -7190,26 +7237,24 @@ async function admGeneraReportOsservatorio(){
         const vr=visMx[i],cr=cantMx[i].map(s=>s.size)
         return[m,...vr.map(oxN),oxN(vr.reduce((s,x)=>s+x,0)),...cr.map(oxN),oxN(cr.reduce((s,x)=>s+x,0))]
       })
-      s1body.push(['',...totVis.map(oxN),String(sumVis),...totCant.map(oxN),oxN(sumCant)])
+      s1body.push(['TOTALE',...totVis.map(oxN),String(sumVis),...totCant.map(oxN),oxN(sumCant)])
       s1body.push(['Distribuzione %',...totVis.map(x=>sumVis?oxPct(x/sumVis*100):'0,0'),'100,0',
         ...totCant.map(x=>sumCant?oxPct(x/sumCant*100):'0,0'),'100,0'])
       oxTbl(doc,{startY:27,head:s1head,body:s1body,
-        styles:{fontSize:4.9,cellPadding:{top:.45,bottom:.45,left:.5,right:.5}},headStyles:{fontSize:4.7},
-        columnStyles:{0:{halign:'left',cellWidth:16}},
+        styles:{fontSize:5.1,cellPadding:{top:.5,bottom:.5,left:.5,right:.5}},headStyles:{fontSize:4.9},
+        columnStyles:{0:{halign:'left',cellWidth:17}},
         didParseCell:dd=>{if(dd.section==='body'&&dd.row.index>=12){dd.cell.styles.fontStyle=dd.row.index===13?'bolditalic':'bold';dd.cell.styles.fillColor=OXT.tot}}})
       let yy=doc.lastAutoTable.finalY+4
-      doc.addImage(oxBars({w:96,h:46,title:'VISITE E CANTIERI PER '+d.title.replace(' CANTIERE',''),
+      doc.addImage(oxBars({w:96,h:48,title:'VISITE E CANTIERI PER '+d.title.replace(' CANTIERE',''),
         cats:lbls,series:[{label:'VISITE',color:OXC.s1,data:totVis},{label:'CANTIERI',color:OXC.s2,data:totCant}],
-        legend:'bottom',fmt:oxN}),'PNG',12,yy,96,46)
-      // coefficiente visite/cantieri + torta 3D
-      doc.setFont('helvetica','bold');doc.setFontSize(6.2);doc.setTextColor(64,64,64)
+        legend:'bottom',fmt:oxN,fontScale:.85,catFont:6.5}),'PNG',12,yy,96,48)
+      doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setTextColor(86,92,102)
       doc.text('COEFFICIENTE VISITE/CANTIERI',155,yy+2,{align:'center'})
       oxTbl(doc,{startY:yy+3,margin:{left:112},tableWidth:86,
         head:[lbls],body:[totVis.map((x,i)=>totCant[i]?oxIt(x/totCant[i],1):'-')],
-        styles:{fontSize:4.7},headStyles:{fontSize:4.5}})
-      doc.addImage(oxPie3D({w:86,h:32,data:totVis,labels:lbls,colors:OXC.pie}),'PNG',112,yy+13,86,32)
-      yy+=50
-      // inadempienze rilevate
+        styles:{fontSize:5},headStyles:{fontSize:4.8}})
+      doc.addImage(oxPie3D({w:86,h:34,data:totVis,labels:lbls,colors:OXC.pie}),'PNG',112,yy+13,86,34)
+      yy+=52
       oxSec(doc,'INADEMPIENZE RILEVATE',yy,d.sub)
       const ncpMx=OS_MESI.map(()=>cats.map(()=>0)),ncmMx=OS_MESI.map(()=>cats.map(()=>0))
       const ncpCat=cats.map(()=>0),ncmCat=cats.map(()=>0)
@@ -7225,35 +7270,34 @@ async function admGeneraReportOsservatorio(){
         const p=ncpMx[i],q=ncmMx[i]
         return[m,...p.map(oxN),oxN(p.reduce((s,x)=>s+x,0)),...q.map(oxN),oxN(q.reduce((s,x)=>s+x,0))]
       })
-      s1bbody.push(['',...ncpCat.map(oxN),oxN(sumNcp),...ncmCat.map(oxN),oxN(sumNcm)])
+      s1bbody.push(['TOTALE',...ncpCat.map(oxN),oxN(sumNcp),...ncmCat.map(oxN),oxN(sumNcm)])
       s1bbody.push(['Distribuzione %',...ncpCat.map(x=>sumNcp?oxPct(x/sumNcp*100):'0,0'),'100,0',
         ...ncmCat.map(x=>sumNcm?oxPct(x/sumNcm*100):'0,0'),'100,0'])
-      oxTbl(doc,{startY:yy+3,head:s1bhead,body:s1bbody,
-        styles:{fontSize:4.9,cellPadding:{top:.45,bottom:.45,left:.5,right:.5}},headStyles:{fontSize:4.7},
-        columnStyles:{0:{halign:'left',cellWidth:16}},
+      oxTbl(doc,{startY:yy+2,head:s1bhead,body:s1bbody,
+        styles:{fontSize:5.1,cellPadding:{top:.5,bottom:.5,left:.5,right:.5}},headStyles:{fontSize:4.9},
+        columnStyles:{0:{halign:'left',cellWidth:17}},
         didParseCell:dd=>{if(dd.section==='body'&&dd.row.index>=12){dd.cell.styles.fontStyle=dd.row.index===13?'bolditalic':'bold';dd.cell.styles.fillColor=OXT.tot}}})
       yy=doc.lastAutoTable.finalY+4
-      doc.addImage(oxBars({w:96,h:42,title:'INADEMPIENZE PER '+d.title.replace(' CANTIERE',''),
+      doc.addImage(oxBars({w:96,h:44,title:'INADEMPIENZE PER '+d.title.replace(' CANTIERE',''),
         cats:lbls,series:[{label:'NC+',color:OXC.ncp,data:ncpCat},{label:'NC-',color:OXC.ncm,data:ncmCat}],
-        legend:'bottom',fmt:oxN}),'PNG',12,yy,96,42)
-      doc.setFont('helvetica','bold');doc.setFontSize(6.2);doc.setTextColor(64,64,64)
+        legend:'bottom',fmt:oxN,fontScale:.85,catFont:6.5}),'PNG',12,yy,96,44)
+      doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setTextColor(86,92,102)
       doc.text('MEDIA INADEMPIENZE PER VISITA',155,yy+2,{align:'center'})
       oxTbl(doc,{startY:yy+3,margin:{left:112},tableWidth:86,
         head:[['',...lbls]],
         body:[['NC+',...cats.map((c,i)=>totVis[i]?oxIt(ncpCat[i]/totVis[i],1):'-')],
               ['NC-',...cats.map((c,i)=>totVis[i]?oxIt(ncmCat[i]/totVis[i],1):'-')]],
-        styles:{fontSize:4.7},headStyles:{fontSize:4.5},columnStyles:{0:{fontStyle:'bold'}}})
+        styles:{fontSize:5},headStyles:{fontSize:4.8},columnStyles:{0:{fontStyle:'bold'}}})
       doc.addImage(oxBars({w:86,h:28,cats:lbls,
         series:[{label:'NC+',color:OXC.ncp,data:cats.map((c,i)=>totVis[i]?ncpCat[i]/totVis[i]:0)},
                 {label:'NC-',color:OXC.ncm,data:cats.map((c,i)=>totVis[i]?ncmCat[i]/totVis[i]:0)}],
-        legend:'right',labels:false,fmtAxis:v=>oxIt(v,1)}),'PNG',112,yy+14,86,28)
+        legend:'right',labels:false,fmtAxis:v=>oxIt(v,1),fontScale:.8,catFont:6}),'PNG',112,yy+15,86,28)
       oxFooter(doc,pg)
 
       // ───── SCHEDA 2 ─────
       newPage()
       oxHeader(doc,anno,d.title+' - scheda 2')
-      oxSec(doc,'VISITE PER AREA CANTIERE E MEDIA VERIFICHE PER VISITA *',24)
-      // visite e verifiche per zona×categoria
+      oxSec(doc,'VISITE PER AREA CANTIERE E MEDIA VERIFICHE PER VISITA *',25)
       const zVis={},zVer={}
       for(let z=1;z<=10;z++){zVis[z]=cats.map(()=>0);zVer[z]=cats.map(()=>0)}
       V.forEach(v=>{
@@ -7266,10 +7310,10 @@ async function admGeneraReportOsservatorio(){
       const s2head=[[{content:'',rowSpan:2},{content:'N. verifiche potenziali',rowSpan:2},{content:'NUMERO VISITE',colSpan:k+1},{content:'MEDIA VERIFICHE PER VISITA',colSpan:k+1}],
         [...lbls,'Totale',...lbls,'Totale']]
       const s2body=[]
-      const totVisZ=cats.map(()=>0),totVerZ=cats.map(()=>0)
+      const totVerZ=cats.map(()=>0)
       for(let z=1;z<=10;z++){
         const vz=zVis[z],vr=zVer[z]
-        vz.forEach((x,i)=>{totVisZ[i]+=x;totVerZ[i]+=vr[i]})
+        vr.forEach((x,i)=>{totVerZ[i]+=x})
         const tv=vz.reduce((s,x)=>s+x,0),tr=vr.reduce((s,x)=>s+x,0)
         s2body.push([OS_ZONE_NAMI[z],oxN(zonaPot[z]),
           ...vz.map(oxN),oxN(tv),
@@ -7280,26 +7324,24 @@ async function admGeneraReportOsservatorio(){
         ...totVis.map(oxN),String(sumVis),
         ...cats.map((c,i)=>totVis[i]?oxIt(totVerZ[i]/totVis[i],1):''),sumVis?oxIt(Gtot/sumVis,1):''])
       oxTbl(doc,{startY:27,head:s2head,body:s2body,
-        styles:{fontSize:4.8,cellPadding:{top:.45,bottom:.45,left:.5,right:.5}},headStyles:{fontSize:4.5},
+        styles:{fontSize:5,cellPadding:{top:.5,bottom:.5,left:.5,right:.5}},headStyles:{fontSize:4.8},
         columnStyles:{0:{halign:'left',cellWidth:34}},
         didParseCell:dd=>{if(dd.section==='body'&&dd.row.index===10){dd.cell.styles.fontStyle='bold';dd.cell.styles.fillColor=OXT.tot}}})
       let ys=doc.lastAutoTable.finalY+3
-      doc.setFont('helvetica','italic');doc.setFontSize(5.4);doc.setTextColor(100,100,100)
+      doc.setFont('helvetica','italic');doc.setFontSize(5.6);doc.setTextColor(120,125,132)
       doc.text('Grafici area cantiere (barre verticali per numero visite, linea di tendenza per media verifiche per visita)',12,ys)
       ys+=2
-      // 9 mini-grafici (Soggetti escluso, come l'originale)
       const miniZones=[1,2,3,4,5,6,7,8,10]
       const miniLbls=cats.map(c=>c===0?'nd':d.lbl[c])
-      const mW=61,mH=25
+      const mW=61,mH=26
       miniZones.forEach((z,mi)=>{
         const col=mi%3,row=Math.floor(mi/3)
         const bars=zVis[z],line=bars.map((x,i)=>x?zVer[z][i]/x:null)
         doc.addImage(oxMiniCombo({w:mW,h:mH,title:OS_ZONE_NAMI[z].toUpperCase(),cats:miniLbls,bars:bars,line:line}),
-          'PNG',12+col*63,ys+row*27,mW,mH)
+          'PNG',12+col*63,ys+row*28,mW,mH)
       })
-      ys+=3*27+2
+      ys+=3*28+3
       oxSec(doc,'VISITE PER AREA CANTIERE. PERCENTUALE INADEMPIENZE SU VERIFICHE EFFETTUATE *',ys)
-      // % NC su verifiche per zona×cat
       const zNcp={},zNcm={}
       for(let z=1;z<=10;z++){zNcp[z]=cats.map(()=>0);zNcm[z]=cats.map(()=>0)}
       V.forEach(v=>{
@@ -7322,7 +7364,7 @@ async function admGeneraReportOsservatorio(){
         ...cats.map((c,i)=>{const vr=totVerZ[i];let q=0;for(let z=1;z<=10;z++)q+=zNcm[z][i];return(q&&vr)?oxPct(q/vr*100):''}),
         Gtot?oxPct(G.ncm/Gtot*100):''])
       oxTbl(doc,{startY:ys+2,head:s2bhead,body:s2bbody,
-        styles:{fontSize:4.8,cellPadding:{top:.45,bottom:.45,left:.5,right:.5}},headStyles:{fontSize:4.5},
+        styles:{fontSize:5,cellPadding:{top:.5,bottom:.5,left:.5,right:.5}},headStyles:{fontSize:4.8},
         columnStyles:{0:{halign:'left',cellWidth:34}},
         didParseCell:dd=>{if(dd.section==='body'&&dd.row.index===10){dd.cell.styles.fontStyle='bold';dd.cell.styles.fillColor=OXT.tot}}})
       ys=doc.lastAutoTable.finalY+2
@@ -7332,21 +7374,20 @@ async function admGeneraReportOsservatorio(){
         const pp=zNcp[z].map((x,i)=>vr[i]?x/vr[i]*100:0)
         const qq=zNcm[z].map((x,i)=>vr[i]?x/vr[i]*100:0)
         doc.addImage(oxMiniNC({w:mW,h:mH,title:OS_ZONE_NAMI[z].toUpperCase(),cats:miniLbls,ncp:pp,ncm:qq}),
-          'PNG',12+col*63,ys+row*27,mW,mH)
+          'PNG',12+col*63,ys+row*28,mW,mH)
       })
-      oxNote(doc,ys+3*27+4)
+      oxNote(doc,Math.min(ys+3*28+4,276))
       oxFooter(doc,pg)
 
-      // ───── SCHEDA 3 (solo dimensioni complete) ─────
+      // ───── SCHEDA 3 ─────
       if(d.schede>=3){
         newPage()
         oxHeader(doc,anno,d.title+' - scheda 3')
-        doc.setFont('helvetica','bold');doc.setFontSize(6.4);doc.setTextColor(64,64,64)
-        doc.text('ANALISI VERIFICHE. VISITE MULTIPLE STESSO CANTIERE-IMPRESA. CONFRONTO TRA PRIMA E ULTIMA VISITA DELLA STESSA VERIFICA*',12,24)
-        let ym=30
+        doc.setFont('helvetica','bold');doc.setFontSize(6.6);doc.setTextColor(86,92,102)
+        doc.text('ANALISI VERIFICHE. VISITE MULTIPLE STESSO CANTIERE-IMPRESA. CONFRONTO TRA PRIMA E ULTIMA VISITA DELLA STESSA VERIFICA*',12,25)
+        let ym=31
         const esitoLblS=['nessun oss/nc','oss','nc-','nc+']
         for(const c of d.cats){
-          // matrice transizioni a livello di singola verifica
           const mx=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]
           Object.values(byGrp).forEach(arr=>{
             if(arr.length<2)return
@@ -7363,10 +7404,10 @@ async function admGeneraReportOsservatorio(){
             if(j<r)migl+=mx[r][j];else if(j>r)pegg+=mx[r][j]
             else if(r===0)stp+=mx[r][j];else stn+=mx[r][j]
           }
-          if(ym>236){oxFooter(doc,pg);newPage();oxHeader(doc,anno,d.title+' - scheda 3 (segue)');ym=27}
-          doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(64,64,64)
+          if(ym>238){oxFooter(doc,pg);newPage();oxHeader(doc,anno,d.title+' - scheda 3 (segue)');ym=27}
+          doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(231,80,15)
           doc.text(d.blk[c]||d.lbl[c].toUpperCase(),60,ym,{align:'center'})
-          doc.setFontSize(5.4)
+          doc.setFontSize(5.6);doc.setTextColor(86,92,102)
           doc.text('esito ultima visita',38,ym+4)
           doc.text('composizione %',86,ym+4)
           const heat=dd=>{
@@ -7377,36 +7418,35 @@ async function admGeneraReportOsservatorio(){
           oxTbl(doc,{startY:ym+5,margin:{left:12},tableWidth:54,
             head:[['esito prima visita',...esitoLblS]],
             body:esitoLblS.map((e,r)=>[e,...mx[r].map(x=>x?String(x):'')]),
-            styles:{fontSize:4.6,cellPadding:{top:.8,bottom:.8,left:.5,right:.5}},headStyles:{fontSize:4.3},
+            styles:{fontSize:5,cellPadding:{top:.9,bottom:.9,left:.5,right:.5}},headStyles:{fontSize:4.6},
             columnStyles:{0:{halign:'left',fontStyle:'bold',cellWidth:16}},didParseCell:heat})
           oxTbl(doc,{startY:ym+5,margin:{left:70},tableWidth:50,
             head:[['',...esitoLblS]],
             body:esitoLblS.map((e,r)=>[e,...mx[r].map(x=>mtot?oxPct(x/mtot*100):'-')]),
-            styles:{fontSize:4.6,cellPadding:{top:.8,bottom:.8,left:.5,right:.5}},headStyles:{fontSize:4.3},
+            styles:{fontSize:5,cellPadding:{top:.9,bottom:.9,left:.5,right:.5}},headStyles:{fontSize:4.6},
             columnStyles:{0:{halign:'left',fontStyle:'bold',cellWidth:14}},didParseCell:heat})
-          // riepilogo migl/stab/pegg
           const sumLbl=['miglioramento','stabilità positiva','stabilità negativa','peggioramento']
           const sumVal=[migl,stp,stn,pegg]
           oxTbl(doc,{startY:ym+5,margin:{left:126},tableWidth:42,
             body:sumLbl.map((s,i)=>[s,mtot?oxPct(sumVal[i]/mtot*100):'-']),
-            styles:{fontSize:4.8,cellPadding:{top:1,bottom:1,left:1,right:1}},
+            styles:{fontSize:5.2,cellPadding:{top:1.1,bottom:1.1,left:1,right:1}},
             columnStyles:{0:{halign:'left',cellWidth:28}},
             didParseCell:dd=>{
               if(dd.column.index===1){
-                dd.cell.styles.fillColor=[OXT.heatG,[235,241,222],OXT.heatC,OXT.heatO][dd.row.index]
+                dd.cell.styles.fillColor=[OXT.heatG,OXT.heatN,OXT.heatC,OXT.heatO][dd.row.index]
               }
             }})
-          // grafico composizione (barre colorate) + legenda
-          doc.addImage(oxBars({w:28,h:24,cats:['','','',''],
-            series:[{label:'',color:'#fff',colors:OXC.trans,data:sumVal}],labels:false}),'PNG',170,ym+3,28,24)
-          doc.setFontSize(3.8);doc.setFont('helvetica','normal');doc.setTextColor(89,89,89)
-          const lgX=[170,184,170,184],lgY=[ym+29,ym+29,ym+32,ym+32]
+          doc.addImage(oxBars({w:26,h:22,cats:['','','',''],
+            series:[{label:'',color:'#fff',colors:OXC.trans,data:sumVal}],labels:false,fontScale:.75}),'PNG',172,ym+3,26,22)
+          doc.setFontSize(4);doc.setFont('helvetica','normal');doc.setTextColor(86,92,102)
+          const lgX=[172,185,172,185],lgY=[ym+28,ym+28,ym+31,ym+31]
           sumLbl.forEach((s,i)=>{
-            doc.setFillColor.apply(doc,OXC.trans[i].match(/\w\w/g).map(x=>parseInt(x,16)))
-            doc.rect(lgX[i],lgY[i]-1.5,1.8,1.8,'F')
-            doc.text(s,lgX[i]+2.4,lgY[i])
+            const rgb=OXC.trans[i].match(/\w\w/g).map(x=>parseInt(x,16))
+            doc.setFillColor(rgb[0],rgb[1],rgb[2])
+            doc.rect(lgX[i],lgY[i]-1.6,1.9,1.9,'F')
+            doc.text(s,lgX[i]+2.6,lgY[i])
           })
-          ym+=36
+          ym+=37
         }
         oxNote(doc,Math.min(ym+2,272))
         oxFooter(doc,pg)
