@@ -1072,6 +1072,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div class="adm-section-title">📄 Report statistico</div>
           <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:10px">Genera un report PDF con statistiche aggregate per il periodo selezionato: distribuzione IPC, tipologie, macro aree della checklist e distribuzione territoriale.</p>
           <button class="btn-primary" onclick="admGeneraReport()" style="background:#95C22F;border-color:#7aa527">📄 Genera Report PDF</button>
+          <div style="margin:8px 0 4px"><label style="font-size:11px;color:rgba(255,255,255,.6)">Anno edile (ott→set): </label><select onchange="osSetAnnoEdile(this.value)" style="padding:4px 8px;border-radius:6px;background:#1d2433;color:#fff;border:1px solid rgba(255,255,255,.2)"><option value="">— intervallo libero —</option><option value="2023">2023-2024</option><option value="2024">2024-2025</option><option value="2025">2025-2026</option><option value="2026">2026-2027</option><option value="2027">2027-2028</option><option value="2028">2028-2029</option></select></div>
           <button class="btn-primary" onclick="admGeneraReportOsservatorio()" style="background:#e7500f;border-color:#c43f0a;margin-top:8px">📑 Report Osservatorio (1:1, 19 pagine)</button>
           <p style="font-size:11px;color:rgba(255,255,255,.4);margin-top:6px">Replica fedele del "REPORT ATTIVITA'" dell'Osservatorio: quadro di sintesi + schede per importo, tipo intervento/opera/committente/visita e ruolo impresa.</p>
         </div>
@@ -6636,8 +6637,13 @@ window.admGeneraReport = admGeneraReport
 // ══════════════════════════════════════════════════════════════════
 
 // Mappa prefisso codice checklist → zona osservatorio (1-10)
+// ══════════════════════════════════════════════════════════════
+// ── REPORT OSSERVATORIO CNCPT — replica 1:1 del "REPORT ATTIVITA'" ──
+// Layout, ordine, criteri e tipi di grafico identici al report
+// nazionale (admin_CPT_paXXX): quadro di sintesi (schede 1 e 3),
+// poi 4 dimensioni con 3 schede + 2 dimensioni con 2 schede.
+// ══════════════════════════════════════════════════════════════
 const OS_ZP={IMP:1,PLL:2,SOL:3,ASU:4,MAC:5,OPE:6,PIN:7,DOC:8,SOG:9,FOR:10}
-// Sottoaree per la scheda "area e sottoarea" (chiave = primi 2 token del codice)
 const OS_SUB={
   IMP_LOG:'Logistica',IMP_IGS:'Apprestamenti igienico-sanitari',IMP_ELE:'Impianti elettrici',IMP_AGI:'Agibilità del cantiere',IMP_ORG:'Organizzazione del lavoro',IMP_SEG:'Segnaletica',
   PLL_SCA:'Aree di scavo',PLL_DEM:'Aree di demolizione',PLL_PER:'Aree di pericolo',
@@ -6645,58 +6651,284 @@ const OS_SUB={
   ASU_ATT:'Attrezzature',ASU_SCA:'Scale',ASU_UTE:'Utensili',
   MAC_MMT:'Macchine movimento terra',MAC_MMM:'Macchine movimentazione materiale',MAC_MAS:'Macchine stradali',
   OPE_POF:'Ponteggi fissi',OPE_POS:'Ponteggi sospesi',OPE_POC:'Ponteggi su cavalletti',OPE_POT:'Ponti su ruote - trabattelli',OPE_DPC:'Altri DPC',
-  PIN_IND:'Indumenti di protezione',PIN_TES:'Protezione della testa',PIN_PIE:'Protezione dei piedi',PIN_MAN:'Protezione delle mani',PIN_UDI:"Protezione dell'udito",PIN_CAD:'Protezione caduta dall’alto',PIN_OCC:'Protezione degli occhi',PIN_RES:'Protezione vie respiratorie',
-  DOC_GEN:'Generale',DOC_MA4:'Macchine e attrezz. (art.71 c4)',DOC_MA8:'Macchine e attrezz. (art.71 c8)',DOC_DPI:'DPI',DOC_ELE:'Impianto elettrico e di terra',DOC_PON:'Ponteggi',
-  SOG_FIG:'Nomine figura di sistema',
-  FOR_BAS:'Formazione di base',FOR_FIG:'Figura di sistema',FOR_RIS:'Form./addes. rischi specifici',FOR_ATM:'Form./addes. attrezzature/macchine'
+  PIN_IND:'Indumenti di protezione',PIN_TES:'Protezione della testa',PIN_PIE:'Protezione dei piedi',PIN_MAN:'Protezione delle mani',PIN_UDI:"Protezione dell'udito",PIN_CAD:'Protezione contro la caduta dall’alto',PIN_OCC:'Protezione degli occhi',PIN_RES:'Protezione delle vie respiratorie',
+  DOC_GEN:'Generale',DOC_MA4:'Macchine e attrezzature (art. 71, c4)',DOC_MA8:'Macchine e attrezzature (art. 71, c8)',DOC_DPI:'DPI',DOC_ELE:'Impianto elettrico e di terra',DOC_PON:'Ponteggi',
+  SOG_FIG:'Nomine di figura di sistema',
+  FOR_BAS:'Formazione di base',FOR_FIG:'Figura di sistema',FOR_RIS:'Form./addes. Rischi specifici',FOR_ATM:'Form./addes. Attrezzature/macchine'
 }
 const OS_ZONE_NAMI={1:'Impianti di cantiere',2:'Protezione luoghi di lavoro',3:'Apparecchi di sollevamento',4:'Attrezzature - scale - utensili',5:'Macchine di cantiere',6:'Opere provvisionali',7:'Disposit. protez. individuali',8:'Documentazione',9:'Soggetti',10:'Formazione'}
-
-// Classi di importo del report (aggregazione dei codici 1-11 di CantiereImporto)
+const OS_MESI=['ott','nov','dic','gen','feb','mar','apr','mag','giu','lug','ago','set']
+const OS_MESI_FULL=['ottobre','novembre','dicembre','gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre']
+function osMeseEdile(m0){return (m0>=9)?(m0-9):(m0+3)}
+// Aggregazione codici importo 1-11 → 5 classi del report + nd
 function osImportoClass(code){
   code=parseInt(code,10)
-  if(!code||code===11)return 0          // 0 = nd
-  if(code===1)return 1                   // Fino a 250
-  if(code===2)return 2                   // da 251 a 500
-  if(code<=4)return 3                    // da 501 a 1.500 (codici 3-4)
-  if(code<=7)return 4                    // da 1.501 a 5.000 (codici 5-7)
-  return 5                               // oltre 5.000 (codici 8-10)
+  if(!code||code===11)return 0
+  if(code===1)return 1
+  if(code===2)return 2
+  if(code<=4)return 3
+  if(code<=7)return 4
+  return 5
+}
+// ── formattazioni "italiane" stile report ──
+function oxIt(n,d){return (n==null||isNaN(n))?'':Number(n).toFixed(d==null?1:d).replace('.',',')}
+function oxPct(n){return oxIt(n,1)}
+function oxN(n){return n?String(n):''}
+function oxPad2(n){return String(Math.max(0,Math.round(n||0))).padStart(2,'0')}
+
+// ── palette Excel 2010 (tema Office, come l'originale) ──
+const OXC={
+  s1:'#4F81BD',s2:'#9BBB59',red:'#C0504D',ncp:'#FF0000',ncm:'#FFC000',drk:'#953735',
+  pie:['#4F81BD','#C0504D','#9BBB59','#8064A2','#4BACC6','#F79646','#2C4D75','#772C2A'],
+  esiti:['#D8E4BC','#A6A6A6','#FFC000','#1F497D'],
+  trans:['#9BBB59','#EBF1DE','#FDE9D9','#F79646']
+}
+const OXT={hdrF:[184,204,228],hdrT:[31,73,125],alt:[220,230,241],tot:[184,204,228],
+  heatG:[196,215,155],heatO:[247,150,70],heatC:[253,233,217]}
+
+// ── definizione dimensioni di analisi (ordine identico all'originale) ──
+const OXD=[
+  {key:'importo',title:'IMPORTO LAVORI CANTIERE',sub:'(classi di importo in migliaia di euro)',schede:3,
+   cats:[1,2,3,4,5],lbl:{1:'Fino a 250',2:'da 251 a 500',3:'da 501 a 1.500',4:'da 1.501 a 5.000',5:'oltre 5.000'},
+   blk:{1:'fino a 250.000',2:'da 250.001 a 500.000',3:'da 500.001 a 1.500.000',4:'da 1.500.001 a 5.000.000',5:'oltre 5.000.000'}},
+  {key:'tipint',title:'TIPO INTERVENTO',sub:'',schede:3,
+   cats:[1,2,3,4,6,7,8],lbl:{1:'costruzione',2:'ristrutturazione',3:'demolizione',4:'ampliamento',6:'consolidamento',7:'messa in sicurezza',8:'demoliz. e ricostruz. post sisma'},
+   blk:{1:'COSTRUZIONE',2:'RISTRUTTURAZIONE',3:'DEMOLIZIONE',4:'AMPLIAMENTO',6:'CONSOLIDAMENTO',7:'MESSA IN SICUREZZA',8:'DEMOLIZ. E RICOSTRUZ. POST SISMA'}},
+  {key:'tipope',title:'TIPO OPERA',sub:'',schede:3,
+   cats:[1,2,3,4,5,6],lbl:{1:'civile',2:'produttivo',3:'trasporti',4:'ospedaliera',5:'scolastico',6:'altro'},
+   blk:{1:'CIVILE',2:'PRODUTTIVO',3:'TRASPORTI',4:'OSPEDALIERO',5:'SCOLASTICO',6:'ALTRO'}},
+  {key:'commtipo',title:'TIPO COMMITTENTE',sub:'',schede:3,
+   cats:[1,2],lbl:{1:'pubblico',2:'privato'},blk:{1:'PUBBLICO',2:'PRIVATO'}},
+  {key:'tipvisita',title:'TIPO VISITA',sub:'',schede:2,
+   cats:[1,2],lbl:{1:'segnalazione e indicata da enti controllo',2:'concordata con impresa'},blk:{}},
+  {key:'ruolo',title:'RUOLO IMPRESA',sub:'',schede:2,
+   cats:[1,2,3],lbl:{1:'affidataria',2:'affidataria ed esecutrice',3:'esecutrice'},blk:{}}
+]
+// mappatura categorie report ← codifiche Osservatorio
+function oxCatOf(v,c,ruolo){
+  const ti=parseInt(c.cantiere_tip_int,10)||0
+  const to=parseInt(c.cantiere_tip_ope,10)||0
+  const tipope=(to===2)?1:([1,3,6,14,15].includes(to)?2:([5,9,10,11].includes(to)?3:(to===4?4:(to===8?5:(to>0?6:0)))))
+  const ct=parseInt((v.comm_tipo!=null?v.comm_tipo:(c.committenti&&c.committenti.committente_tipo)),10)||0
+  const ta=parseInt(v.tipo_accesso,10)||0
+  return{
+    importo:osImportoClass(c.cantiere_importo),
+    tipint:[1,2,3,4,6,7,8].includes(ti)?ti:0,
+    tipope:tipope,
+    commtipo:(ct===1||ct===2)?ct:0,
+    tipvisita:[1,3,4,7].includes(ta)?1:([2,5,6].includes(ta)?2:0),
+    ruolo:[1,2,3].includes(ruolo)?ruolo:0
+  }
 }
 
-// Etichette dimensioni
-const OS_DIM={
-  importo  :{key:'importo' ,nd:true ,cats:[1,2,3,4,5],lbl:{1:'Fino a 250',2:'da 251 a 500',3:'da 501 a 1.500',4:'da 1.501 a 5.000',5:'oltre 5.000'},title:'IMPORTO LAVORI CANTIERE',sub:'(classi di importo in migliaia di euro)'},
-  tipint   :{key:'tipint'  ,nd:true ,cats:[1,2,3,4],lbl:{1:'costruzione',2:'ristrutturazione',3:'demolizione',4:'ampliamento'},title:'TIPO INTERVENTO',sub:''},
-  tipope   :{key:'tipope'  ,nd:true ,cats:[1,2,3,4,5,6,8,16],lbl:{1:'industriale',2:'civile',3:'commerciale',4:'ospedaliera',5:'stradale',6:'rurale',8:'scolastica',16:'altro'},title:'TIPO OPERA',sub:''},
-  commtipo :{key:'commtipo',nd:true ,cats:[1,2],lbl:{1:'pubblico',2:'privato'},title:'TIPO COMMITTENTE',sub:''},
-  tipvisita:{key:'tipvisita',nd:false,cats:[1,2,3,4,5,6,7],lbl:{1:'segnalazione',2:'richiesta',3:'protocolli',4:'RLS/RLST',5:'programmata',6:'qualità',7:'CPT'},title:'TIPO VISITA',sub:''},
-  ruolo    :{key:'ruolo'   ,nd:false,cats:[1,2,3],lbl:{1:'affidataria',2:'affidat. ed esecutrice',3:'esecutrice'},title:'RUOLO IMPRESA',sub:''}
+// ══════════ GRAFICI CANVAS (stile Excel 2010) ══════════
+function oxCv(w,h){
+  const c=document.createElement('canvas');c.width=Math.round(w*3);c.height=Math.round(h*3)
+  const g=c.getContext('2d');g.scale(3,3)
+  g.fillStyle='#fff';g.fillRect(0,0,w,h)
+  g.strokeStyle='#bfbfbf';g.lineWidth=.5;g.strokeRect(.5,.5,w-1,h-1)
+  return[c,g]
+}
+function oxNice(m){
+  if(m<=0)return 1
+  const p=Math.pow(10,Math.floor(Math.log10(m)))
+  const f=m/p
+  const n=f<=1?1:f<=2?2:f<=2.5?2.5:f<=4?4:f<=5?5:f<=8?8:10
+  return n*p
+}
+function oxWrapTxt(g,t,maxW){
+  const words=String(t).split(' '),lines=[];let cur=''
+  words.forEach(w=>{
+    const test=cur?cur+' '+w:w
+    if(g.measureText(test).width>maxW&&cur){lines.push(cur);cur=w}else cur=test
+  })
+  if(cur)lines.push(cur)
+  return lines.slice(0,2)
+}
+// grafico a barre raggruppate generico (serie multiple, etichette valori)
+function oxBars(o){
+  const w=o.w,h=o.h
+  const[c,g]=oxCv(w,h)
+  let top=4
+  if(o.title){g.fillStyle='#595959';g.font='600 7px Helvetica';g.textAlign='center';g.fillText(o.title,w/2,10);top=15}
+  const legB=(o.legend==='bottom')?10:0
+  const legR=(o.legend==='right')?Math.min(52,w*.3):0
+  const padL=16,padR=4+legR,padB=14+legB
+  const px=padL,pw=w-padL-padR,py=top,ph=h-top-padB
+  const ser=o.series
+  let max=0
+  ser.forEach(s=>s.data.forEach(v=>{if(v>max)max=v}))
+  if(o.lineData)o.lineData.forEach(v=>{if(v>max)max=v})
+  const ymax=oxNice(max||1)
+  // griglia
+  g.strokeStyle='#d9d9d9';g.lineWidth=.4;g.fillStyle='#808080';g.font='5.5px Helvetica';g.textAlign='right'
+  const steps=4
+  for(let i=0;i<=steps;i++){
+    const yy=py+ph-ph*i/steps
+    g.beginPath();g.moveTo(px,yy);g.lineTo(px+pw,yy);g.stroke()
+    const val=ymax*i/steps
+    g.fillText(o.fmtAxis?o.fmtAxis(val):(val%1?oxIt(val,1):String(val)),px-2,yy+2)
+  }
+  const n=o.cats.length,k=ser.length
+  const slot=pw/n,grpW=slot*.72,bw=grpW/k
+  for(let i=0;i<n;i++){
+    for(let j=0;j<k;j++){
+      const v=ser[j].data[i]||0
+      const bh=ymax?v/ymax*ph:0
+      const x=px+i*slot+(slot-grpW)/2+j*bw
+      const col=(ser[j].colors&&ser[j].colors[i])||ser[j].color
+      g.fillStyle=col
+      if(bh>0)g.fillRect(x,py+ph-bh,Math.max(bw-1,1.2),bh)
+      if(o.labels!==false){
+        const lbl=o.fmt?o.fmt(v):(v?String(v):(o.zeroLbl||''))
+        if(lbl!==''){g.fillStyle='#404040';g.font='5.5px Helvetica';g.textAlign='center';g.fillText(lbl,x+bw/2,py+ph-bh-2)}
+      }
+    }
+    // etichette categoria
+    g.fillStyle='#595959';g.font='5px Helvetica';g.textAlign='center'
+    oxWrapTxt(g,o.cats[i],slot-2).forEach((ln,li)=>g.fillText(ln,px+i*slot+slot/2,py+ph+6+li*6))
+  }
+  // linea di tendenza (per scheda 2)
+  if(o.lineData){
+    g.strokeStyle=o.lineColor||OXC.red;g.lineWidth=1;g.beginPath()
+    let started=false
+    for(let i=0;i<n;i++){
+      const v=o.lineData[i]
+      if(v==null)continue
+      const x=px+i*slot+slot/2,y=py+ph-(ymax?v/ymax*ph:0)
+      if(!started){g.moveTo(x,y);started=true}else g.lineTo(x,y)
+    }
+    g.stroke()
+  }
+  // legenda
+  if(o.legend==='bottom'){
+    g.font='5.5px Helvetica';g.textAlign='left'
+    let tot=0;ser.forEach(s=>tot+=g.measureText(s.label).width+14)
+    let lx=(w-tot)/2
+    ser.forEach(s=>{g.fillStyle=s.color;g.fillRect(lx,h-8,5,5);g.fillStyle='#595959';g.fillText(s.label,lx+7,h-3.5);lx+=g.measureText(s.label).width+14})
+  }else if(o.legend==='right'){
+    g.font='5.5px Helvetica';g.textAlign='left'
+    let ly=top+4
+    ser.forEach(s=>{g.fillStyle=s.color;g.fillRect(w-legR+2,ly,5,5);g.fillStyle='#595959';g.fillText(s.label,w-legR+9,ly+4.5);ly+=9})
+  }
+  return c.toDataURL('image/png')
+}
+// torta 3D simulata (come Excel 2010)
+function oxPie3D(o){
+  const w=o.w,h=o.h
+  const[c,g]=oxCv(w,h)
+  let top=2
+  if(o.title){g.fillStyle='#595959';g.font='600 6.5px Helvetica';g.textAlign='center';g.fillText(o.title,w/2,9);top=11}
+  const legW=Math.min(w*.42,60)
+  const tot=o.data.reduce((s,x)=>s+(x||0),0)
+  const cx=(w-legW)/2,cy=top+(h-top)/2-3
+  const rx=Math.min((w-legW)/2-8,(h-top)/2-9),ry=rx*.52,dp=Math.max(rx*.22,4)
+  function shade(hex,f){
+    const r=parseInt(hex.slice(1,3),16),gg=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16)
+    return'rgb('+Math.round(r*f)+','+Math.round(gg*f)+','+Math.round(b*f)+')'
+  }
+  if(tot>0){
+    let a0=-Math.PI/2
+    const segs=o.data.map((v,i)=>{const a1=a0+(v||0)/tot*Math.PI*2;const s={v:v||0,a0:a0,a1:a1,col:o.colors[i%o.colors.length]};a0=a1;return s})
+    // pareti laterali (solo metà frontale 0..PI)
+    segs.forEach(s=>{
+      const f0=Math.max(s.a0,0),f1=Math.min(s.a1,Math.PI)
+      if(f1<=f0||s.v===0)return
+      g.fillStyle=shade(s.col,.72)
+      g.beginPath()
+      g.ellipse(cx,cy,rx,ry,0,f0,f1)
+      g.ellipse(cx,cy+dp,rx,ry,0,f1,f0,true)
+      g.closePath();g.fill()
+    })
+    // top
+    segs.forEach(s=>{
+      if(s.v===0)return
+      g.fillStyle=s.col;g.strokeStyle='#fff';g.lineWidth=.5
+      g.beginPath();g.moveTo(cx,cy)
+      g.ellipse(cx,cy,rx,ry,0,s.a0,s.a1)
+      g.closePath();g.fill();g.stroke()
+    })
+    // etichette valori
+    g.font='5.5px Helvetica';g.textAlign='center'
+    segs.forEach(s=>{
+      if(s.v===0)return
+      const am=(s.a0+s.a1)/2
+      const lx=cx+Math.cos(am)*rx*1.12,ly=cy+Math.sin(am)*ry*1.12+(Math.sin(am)>0?dp:0)
+      g.fillStyle='#404040';g.fillText(oxPad2(s.v),lx,ly+2)
+    })
+  }else{
+    g.fillStyle='#999';g.font='6px Helvetica';g.textAlign='center';g.fillText('n.d.',cx,cy)
+  }
+  // legenda a destra
+  g.font='5px Helvetica';g.textAlign='left'
+  let ly=top+6
+  o.labels.forEach((lb,i)=>{
+    if(ly>h-4)return
+    g.fillStyle=o.colors[i%o.colors.length];g.fillRect(w-legW+2,ly-3.5,4,4)
+    g.fillStyle='#595959'
+    oxWrapTxt(g,lb,legW-10).forEach((ln,li)=>{g.fillText(ln,w-legW+8,ly+li*5.5)})
+    ly+=Math.max(7,oxWrapTxt(g,lb,legW-10).length*5.5+2.5)
+  })
+  return c.toDataURL('image/png')
+}
+// mini-grafico scheda 2: barre verdi + linea rossa di tendenza
+function oxMiniCombo(o){
+  return oxBars({w:o.w,h:o.h,title:o.title,cats:o.cats,
+    series:[{label:'',color:OXC.s2,data:o.bars}],
+    lineData:o.line,lineColor:OXC.red,fmt:v=>'',labels:false})
+}
+// mini-grafico NC+/NC- (rosso/giallo) con legenda
+function oxMiniNC(o){
+  return oxBars({w:o.w,h:o.h,title:o.title,cats:o.cats,
+    series:[{label:'NC+',color:OXC.ncp,data:o.ncp},{label:'NC-',color:OXC.ncm,data:o.ncm}],
+    legend:'right',fmt:v=>'',labels:false,fmtAxis:v=>oxPad2(v)})
 }
 
-const OS_MESI=['ott','nov','dic','gen','feb','mar','apr','mag','giu','lug','ago','set']
-// indice mese-calendario (0=gen) → posizione anno edile (0=ott)
-function osMeseEdile(m0){return (m0>=9)?(m0-9):(m0+3)}
-
-function osFmtPct(n){return (n==null||isNaN(n))?'':n.toFixed(1).replace('.',',')}
-function osN(n){return n?String(n):''}
-
-// Header pagina stile Osservatorio
-function osHeader(doc,annoLbl,titolo,scheda){
-  doc.setFillColor(231,80,15);doc.rect(0,0,210,13,'F')
-  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(8)
-  doc.text('PADOVA',6,8.5)
-  doc.text(annoLbl,204,8.5,{align:'right'})
-  doc.setTextColor(40,40,40);doc.setFontSize(11);doc.setFont('helvetica','bold')
-  doc.text(`${titolo}${scheda?' - '+scheda:''}`,105,21,{align:'center'})
-  doc.setFont('helvetica','normal')
+// ══════════ ELEMENTI PDF ══════════
+function oxHeader(doc,anno,titolo){
+  doc.setFillColor.apply(doc,[OXT.hdrF[0],OXT.hdrF[1],OXT.hdrF[2]])
+  doc.rect(0,6,210,7,'F')
+  doc.setTextColor.apply(doc,[OXT.hdrT[0],OXT.hdrT[1],OXT.hdrT[2]])
+  doc.setFont('helvetica','bold');doc.setFontSize(9)
+  doc.text('PADOVA',12,10.8)
+  doc.text(anno,198,10.8,{align:'right'})
+  doc.setFontSize(11)
+  doc.text(titolo,105,18.5,{align:'center'})
 }
-function osFooter(doc,pg){
-  doc.setDrawColor(231,80,15);doc.setLineWidth(0.3);doc.line(12,289,198,289)
-  doc.setFontSize(7);doc.setTextColor(150,150,150)
-  doc.text('Formedil Padova – Osservatorio Visite Cantiere',105,293,{align:'center'})
-  doc.text(`Pagina ${pg}`,198,293,{align:'right'})
+function oxFooter(doc,pg){
+  doc.setFillColor.apply(doc,[OXT.hdrF[0],OXT.hdrF[1],OXT.hdrF[2]])
+  doc.rect(0,283,210,4,'F')
+  doc.setTextColor(120,120,120);doc.setFont('helvetica','normal');doc.setFontSize(7)
+  doc.text('Pagina '+pg,105,292,{align:'center'})
+}
+function oxSec(doc,txt,y,sub){
+  doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(64,64,64)
+  doc.text(txt,12,y)
+  if(sub){
+    const wT=doc.getTextWidth(txt)
+    doc.setFont('helvetica','italic');doc.setFontSize(6.5);doc.setTextColor(100,100,100)
+    doc.text(' '+sub,12+wT,y)
+  }
+}
+function oxNote(doc,y){
+  doc.setFont('helvetica','bolditalic');doc.setFontSize(6);doc.setTextColor(80,80,80)
+  doc.text("* alcuni enti registrano esclusivamente le verifiche con osservazioni o inadempienze. In questo caso l'universo delle verifiche a fini statistici non corrisponde a quello effettivamente analizzato durante la visita.",12,y,{maxWidth:186})
+}
+function oxTbl(doc,opt){
+  const base={
+    theme:'plain',
+    styles:{font:'helvetica',fontSize:5.8,cellPadding:{top:.6,bottom:.6,left:1,right:1},textColor:[60,60,60],fillColor:[255,255,255],halign:'center'},
+    headStyles:{fillColor:OXT.hdrF,textColor:OXT.hdrT,fontStyle:'bold',halign:'center',fontSize:5.6},
+    alternateRowStyles:{fillColor:OXT.alt},
+    margin:{left:12,right:12}
+  }
+  doc.autoTable(Object.assign({},base,opt,{
+    styles:Object.assign({},base.styles,opt.styles||{}),
+    headStyles:Object.assign({},base.headStyles,opt.headStyles||{})
+  }))
 }
 
+// ══════════ FUNZIONE PRINCIPALE ══════════
 async function admGeneraReportOsservatorio(){
   if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
   const dal=($('adm-dal')?.value)||''
@@ -6704,26 +6936,33 @@ async function admGeneraReportOsservatorio(){
   if(!dal||!al){toast('Seleziona entrambe le date prima di generare il report','err');return}
   toast('Elaborazione report Osservatorio in corso…','ok')
   try{
-    // ── 1. Visite + dati cantiere/committente ──
+    // ── 1. visite + cantiere/committente ──
     const{data:visite,error:e1}=await sb.from('visite').select([
-      'visita_id','data_visita','cantiere_id','comm_tipo','tipo_accesso',
+      'visita_id','data_visita','cantiere_id','impresa_id','comm_tipo','tipo_accesso',
       'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_importo,cantiere_committente_id,committenti(committente_tipo))'
     ].join(',')).gte('data_visita',dal).lte('data_visita',al).eq('elimina',0)
     if(e1)throw e1
     if(!visite||!visite.length){toast('Nessuna visita nel periodo selezionato','warn');return}
     const vids=visite.map(v=>v.visita_id)
 
-    // ── 2. checklist_voci → mappa codice→zona (fallback su prefisso) ──
-    const{data:voci}=await sb.from('checklist_voci').select('codice,zona_osserv')
-    const cod2zona={}
-    ;(voci||[]).forEach(v=>{if(v.codice&&v.zona_osserv)cod2zona[v.codice]=v.zona_osserv})
+    // ── 2. voci checklist: zona + verifiche potenziali ──
+    const{data:voci}=await sb.from('checklist_voci').select('codice,zona_osserv,is_nota')
+    const cod2zona={},zonaPot={}
+    ;(voci||[]).forEach(v=>{
+      if(!v.codice)return
+      const z=v.zona_osserv||OS_ZP[v.codice.substring(0,3).toUpperCase()]
+      if(!z)return
+      cod2zona[v.codice]=z
+      if(!v.is_nota)zonaPot[z]=(zonaPot[z]||0)+1
+    })
 
-    // ── 3. checklist per visita (con visita_id) ──
+    // ── 3. esiti checklist per visita ──
     const chk=[]
     for(let i=0;i<vids.length;i+=200){
-      const{data:b}=await sb.from('visite_checklist').select('visita_id,codice,valore').in('visita_id',vids.slice(i,i+200)).neq('valore','NA')
+      const{data:b}=await sb.from('visite_checklist').select('visita_id,codice,valore').in('visita_id',vids.slice(i,i+200))
       if(b)chk.push(...b)
     }
+    const RANK={VER:0,OSS:1,'NC-':2,'NC+':3}
 
     // ── 4. ruolo impresa principale per visita ──
     const ruoloByVis={}
@@ -6734,22 +6973,22 @@ async function admGeneraReportOsservatorio(){
       })
     }
 
-    // ── 5. Pre-elaborazione per visita ──
-    // zona-verifiche per visita: {visita_id:{zona:{ver,oss,ncm,ncp}}}
-    const zoneByVis={}, subByVis={}
+    // ── 5. pre-elaborazione per visita ──
+    const zoneByVis={},subByVis={},codByVis={}
     chk.forEach(({visita_id,codice,valore})=>{
-      if(!codice)return
+      if(!codice||valore==null)return
+      const r=RANK[valore]
+      if(r===undefined)return // esclude NA e note
       const z=cod2zona[codice]||OS_ZP[codice.substring(0,3).toUpperCase()]
       if(!z)return
-      ;(zoneByVis[visita_id]=zoneByVis[visita_id]||{})
-      const zz=(zoneByVis[visita_id][z]=zoneByVis[visita_id][z]||{ver:0,oss:0,ncm:0,ncp:0})
+      const zz=((zoneByVis[visita_id]=zoneByVis[visita_id]||{})[z]=(zoneByVis[visita_id]||{})[z]||{ver:0,oss:0,ncm:0,ncp:0})
+      zoneByVis[visita_id][z]=zz
       const subKey=codice.split('_').slice(0,2).join('_')
-      ;(subByVis[visita_id]=subByVis[visita_id]||{})
-      const ss=(subByVis[visita_id][subKey]=subByVis[visita_id][subKey]||{ver:0,oss:0,ncm:0,ncp:0,zona:z})
-      if(valore==='VER'){zz.ver++;ss.ver++}
-      else if(valore==='OSS'){zz.oss++;ss.oss++}
-      else if(valore==='NC-'){zz.ncm++;ss.ncm++}
-      else if(valore==='NC+'){zz.ncp++;ss.ncp++}
+      const ss=((subByVis[visita_id]=subByVis[visita_id]||{})[subKey]=(subByVis[visita_id]||{})[subKey]||{ver:0,oss:0,ncm:0,ncp:0,zona:z})
+      subByVis[visita_id][subKey]=ss
+      if(r===0){zz.ver++;ss.ver++}else if(r===1){zz.oss++;ss.oss++}else if(r===2){zz.ncm++;ss.ncm++}else{zz.ncp++;ss.ncp++}
+      const cm=(codByVis[visita_id]=codByVis[visita_id]||{})
+      cm[codice]=Math.max(cm[codice]===undefined?-1:cm[codice],r)
     })
 
     const V=visite.map(v=>{
@@ -6758,269 +6997,440 @@ async function admGeneraReportOsservatorio(){
       const z=zoneByVis[v.visita_id]||{}
       let ncp=0,ncm=0,oss=0,ver=0
       Object.values(z).forEach(o=>{ncp+=o.ncp;ncm+=o.ncm;oss+=o.oss;ver+=o.ver})
-      const esito = ncp>0?'nc+':ncm>0?'nc-':oss>0?'oss':(ver>0?'nessuna':'nessuna')
-      return {
-        id:v.visita_id, mese:m0==null?null:osMeseEdile(m0), cantiere:v.cantiere_id||v.visita_id,
-        cat:{
-          importo  :osImportoClass(c.cantiere_importo),
-          tipint   :parseInt(c.cantiere_tip_int,10)||0,
-          tipope   :parseInt(c.cantiere_tip_ope,10)||0,
-          commtipo :parseInt(v.comm_tipo||c.committenti?.committente_tipo,10)||0,
-          tipvisita:parseInt(v.tipo_accesso,10)||0,
-          ruolo    :ruoloByVis[v.visita_id]||0
-        },
-        zone:z, ncp,ncm,oss,ver, totVer:ncp+ncm+oss+ver, esito,
-        data:v.data_visita
+      return{
+        id:v.visita_id,data:v.data_visita,mese:m0==null?null:osMeseEdile(m0),
+        cant:v.cantiere_id||v.visita_id,
+        grp:(v.cantiere_id||v.visita_id)+'|'+(v.impresa_id||''),
+        cat:oxCatOf(v,c,ruoloByVis[v.visita_id]),
+        zone:z,sub:subByVis[v.visita_id]||{},cod:codByVis[v.visita_id]||{},
+        ncp:ncp,ncm:ncm,oss:oss,ver:ver,
+        esito:ncp>0?3:ncm>0?2:oss>0?1:0
       }
     })
-
     const nV=V.length
-    const nCant=new Set(V.map(v=>v.cantiere)).size
-    const annoLbl=`Anno ${dal} / ${al}`
+    const nCant=new Set(V.map(v=>v.cant)).size
 
-    // ════ PDF ════
+    // etichetta periodo: anno edile se ott→set, altrimenti intervallo
+    function oxAnnoLbl(){
+      const d=dal.split('-').map(Number),a=al.split('-').map(Number)
+      if(d[1]===10&&d[2]===1&&a[1]===9&&a[2]===30&&a[0]===d[0]+1)return'Anno edile '+d[0]+'-'+a[0]
+      const f=s=>s.split('-').reverse().join('/')
+      return'Periodo '+f(dal)+' - '+f(al)
+    }
+    const anno=oxAnnoLbl()
+
+    // helper categorie con nd dinamico
+    OXD.forEach(d=>{
+      d._nd=V.some(v=>v.cat[d.key]===0)
+      d._cats=d.cats.concat(d._nd?[0]:[])
+      d._lbl=c=>c===0?'nd':d.lbl[c]
+    })
+    function catIdx(d,v){const i=d._cats.indexOf(v.cat[d.key]);return i}
+
+    // aggregati globali per zona
+    const zonaTot={};for(let z=1;z<=10;z++)zonaTot[z]={ver:0,oss:0,ncm:0,ncp:0,vis:new Set()}
+    V.forEach(v=>Object.entries(v.zone).forEach(([z,o])=>{
+      const t=zonaTot[z];if(!t)return
+      t.ver+=o.ver;t.oss+=o.oss;t.ncm+=o.ncm;t.ncp+=o.ncp;t.vis.add(v.id)
+    }))
+    let G={ver:0,oss:0,ncm:0,ncp:0}
+    Object.values(zonaTot).forEach(t=>{G.ver+=t.ver;G.oss+=t.oss;G.ncm+=t.ncm;G.ncp+=t.ncp})
+    const Gtot=G.ver+G.oss+G.ncm+G.ncp
+
+    // frequenza visite stesso cantiere/impresa (ordinale)
+    const byGrp={}
+    V.forEach(v=>{(byGrp[v.grp]=byGrp[v.grp]||[]).push(v)})
+    Object.values(byGrp).forEach(a=>a.sort((x,y)=>(x.data||'').localeCompare(y.data||'')))
+    const freq=[0,0,0,0]
+    Object.values(byGrp).forEach(a=>a.forEach((_,i)=>{freq[Math.min(i,3)]++}))
+
+    // ════════ PDF ════════
     const{jsPDF}=window.jspdf
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
     let pg=0
-    const newPage=(first)=>{if(!first)doc.addPage();pg++}
+    const newPage=first=>{if(!first)doc.addPage();pg++}
 
-    // ── PAGINA 1 – Copertina ──
+    // ── PAGINA 1: COPERTINA ──
     newPage(true)
-    doc.setFillColor(231,80,15);doc.rect(0,0,210,55,'F')
-    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(22)
-    doc.text('OSSERVATORIO VISITE CANTIERE',105,30,{align:'center'})
-    doc.setFontSize(12);doc.setFont('helvetica','normal')
-    doc.text('Formedil Padova – Area Sicurezza e Salute',105,44,{align:'center'})
-    doc.setTextColor(40,40,40);doc.setFont('helvetica','bold');doc.setFontSize(26)
-    doc.text("REPORT ATTIVITA'",105,100,{align:'center'})
-    doc.setFontSize(13);doc.setFont('helvetica','normal')
-    doc.text(annoLbl,105,114,{align:'center'})
-    doc.setDrawColor(149,194,47);doc.setLineWidth(1);doc.line(60,122,150,122)
+    doc.setTextColor(64,64,64);doc.setFont('helvetica','bold');doc.setFontSize(15)
+    doc.text('OSSERVATORIO VISITE CANTIERE',105,42,{align:'center'})
+    doc.setDrawColor(184,204,228);doc.setLineWidth(.6);doc.line(40,48,170,48)
+    doc.setFontSize(24)
+    doc.text("REPORT ATTIVITA'",105,120,{align:'center'})
+    doc.setFont('helvetica','normal');doc.setFontSize(13)
+    doc.text(anno,105,131,{align:'center'})
     doc.setFontSize(11)
-    doc.text(`Visite totali: ${nV}        Cantieri: ${nCant}`,105,140,{align:'center'})
+    doc.text('Formedil Padova - Centro per la Formazione e la Sicurezza Edile di Padova',105,176,{align:'center'})
     doc.setFontSize(9);doc.setTextColor(120,120,120)
-    doc.text(`Emesso il ${new Date().toLocaleString('it-IT')}`,105,270,{align:'center'})
-    osFooter(doc,pg)
+    doc.text('Emesso il '+new Date().toLocaleString('it-IT'),140,235)
+    oxFooter(doc,pg)
 
-    // ── PAGINA 2 – QUADRO DI SINTESI - scheda 1 ──
+    // ── PAGINA 2: QUADRO DI SINTESI - scheda 1 ──
     newPage()
-    osHeader(doc,annoLbl,'QUADRO DI SINTESI','scheda 1')
-    let y=27
-    // Attività mensile (visite/cantieri per mese)
-    const visPerMese=Array(12).fill(0), cantPerMese={}
-    V.forEach(v=>{if(v.mese!=null){visPerMese[v.mese]++;(cantPerMese[v.mese]=cantPerMese[v.mese]||new Set()).add(v.cantiere)}})
-    doc.autoTable({startY:y,margin:{left:12},tableWidth:60,
-      head:[['mese','visite','cantieri']],
-      body:OS_MESI.map((m,i)=>[m,osN(visPerMese[i]),osN(cantPerMese[i]?cantPerMese[i].size:0)])
-        .concat([['TOTALE',nV,nCant]]),
-      styles:{fontSize:7,cellPadding:1},headStyles:{fillColor:[231,80,15],textColor:255,fontSize:7},
-      didParseCell:d=>{if(d.row.index===12){d.cell.styles.fontStyle='bold';d.cell.styles.fillColor=[235,235,235]}}})
-    const monthImg=rptMonthly({data:OS_MESI.map((_,i)=>visPerMese[i]),year:'',w:520,h:150})
-    doc.addImage(monthImg,'PNG',78,y,118,40)
-    y=Math.max(doc.lastAutoTable.finalY,y+44)+6
-
-    // Esito verifiche globale
-    let g={ncp:0,ncm:0,oss:0,ver:0}
-    V.forEach(v=>{g.ncp+=v.ncp;g.ncm+=v.ncm;g.oss+=v.oss;g.ver+=v.ver})
-    const totVerif=g.ncp+g.ncm+g.oss+g.ver
-    // Frequenza visite stesso cantiere
-    const cantCount={}; V.forEach(v=>cantCount[v.cantiere]=(cantCount[v.cantiere]||0)+1)
-    const freq={prime:0,seconde:0,terze:0,oltre:0}
-    Object.values(cantCount).forEach(c=>{freq.prime++;if(c>=2)freq.seconde++;if(c>=3)freq.terze++;if(c>3)freq.oltre++})
-    doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(60,60,60)
-    doc.text('FREQUENZA VISITE STESSO CANTIERE',12,y)
-    doc.text('ESITO VERIFICHE',120,y)
-    y+=2
-    doc.autoTable({startY:y,margin:{left:12},tableWidth:96,
-      head:[['prime','seconde','terze','oltre la terza']],
-      body:[[freq.prime,freq.seconde,freq.terze,freq.oltre]],
-      styles:{fontSize:7,cellPadding:1.5,halign:'center'},headStyles:{fillColor:[86,92,102],textColor:255,fontSize:7}})
-    doc.autoTable({startY:y,margin:{left:120},tableWidth:78,
-      head:[['VER','OSS','NC-','NC+']],
-      body:[[g.ver,g.oss,g.ncm,g.ncp]],
-      styles:{fontSize:7,cellPadding:1.5,halign:'center'},headStyles:{fillColor:[86,92,102],textColor:255,fontSize:7}})
-    y=doc.lastAutoTable.finalY+6
-
-    // Esito verifiche per area cantiere (10 zone)
-    doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text('ESITO VERIFICHE PER AREA CANTIERE',12,y);y+=2
-    const zonaTot={}; for(let z=1;z<=10;z++)zonaTot[z]={ver:0,oss:0,ncm:0,ncp:0}
-    V.forEach(v=>{Object.entries(v.zone).forEach(([z,o])=>{const t=zonaTot[z];if(t){t.ver+=o.ver;t.oss+=o.oss;t.ncm+=o.ncm;t.ncp+=o.ncp}})})
-    const areaBody=[]; let tA={ver:0,oss:0,ncm:0,ncp:0}
+    oxHeader(doc,anno,'QUADRO DI SINTESI - scheda 1')
+    const visM=Array(12).fill(0),cantM=Array(12).fill(null).map(()=>new Set())
+    V.forEach(v=>{if(v.mese!=null){visM[v.mese]++;cantM[v.mese].add(v.cant)}})
+    oxTbl(doc,{startY:25,margin:{left:12},tableWidth:48,
+      head:[['mesi','visite','cantieri']],
+      body:OS_MESI.map((m,i)=>[m,oxN(visM[i]),oxN(cantM[i].size)]).concat([['',String(nV),String(nCant)]]),
+      didParseCell:d=>{if(d.section==='body'&&d.row.index===12){d.cell.styles.fontStyle='bold';d.cell.styles.fillColor=OXT.tot}}})
+    doc.addImage(oxBars({w:138,h:48,title:"ATTIVITA' MENSILE VISITE",cats:OS_MESI,
+      series:[{label:'',color:OXC.drk,data:visM}],fmt:oxN}),'PNG',58,25,138,48)
+    let y2=Math.max(doc.lastAutoTable.finalY,73)+6
+    // tre sezioni affiancate
+    oxSec(doc,'FREQUENZA VISITE STESSO CANTIERE/IMPRESA',y2)
+    doc.text("VISITE SECONDO L'ESITO DELLE VERIFICHE *",78,y2)
+    doc.text('ESITO VERIFICHE *',146,y2)
+    const esitiVis=[0,0,0,0];V.forEach(v=>esitiVis[v.esito]++)
+    const freqLbl=['prime visite','seconde visite','terze visite','visite oltre la terza']
+    const esitoVisLbl=['nessuna OSS e/o NC','presenza solo OSS','presenza NC-','presenza NC+']
+    const esitoVerLbl=['nessuna OSS e/o NC','OSS','NC-','NC+']
+    oxTbl(doc,{startY:y2+2,margin:{left:12},tableWidth:60,
+      head:[['prime viste','seconde visite','terze visite','visite oltre la terza']],
+      body:[[oxN(freq[0]),oxN(freq[1]),oxN(freq[2]),oxN(freq[3])]],styles:{fontSize:5.2}})
+    oxTbl(doc,{startY:y2+2,margin:{left:78},tableWidth:60,
+      head:[['nessuna OSS e/o NC','presenza solo OSS','presenza NC-','presenza NC+']],
+      body:[[oxN(esitiVis[0]),oxN(esitiVis[1]),oxN(esitiVis[2]),oxN(esitiVis[3])]],styles:{fontSize:5.2}})
+    oxTbl(doc,{startY:y2+2,margin:{left:146},tableWidth:52,
+      head:[['nessuna OSS e/o NC','OSS','NC-','NC+']],
+      body:[[oxN(G.ver),oxN(G.oss),oxN(G.ncm),oxN(G.ncp)]],styles:{fontSize:5.2}})
+    const yC=y2+16
+    doc.addImage(oxPie3D({w:60,h:36,data:freq,labels:freqLbl,colors:OXC.pie}),'PNG',12,yC,60,36)
+    doc.addImage(oxBars({w:60,h:36,cats:esitoVisLbl,series:[{label:'',color:OXC.s1,data:esitiVis}],fmt:oxN}),'PNG',78,yC,60,36)
+    doc.addImage(oxBars({w:52,h:36,cats:esitoVerLbl,series:[{label:'',color:'#fff',colors:OXC.esiti,data:[G.ver,G.oss,G.ncm,G.ncp]}],fmt:oxN}),'PNG',146,yC,52,36)
+    let y3=yC+40
+    // esito verifiche per area cantiere
+    oxSec(doc,'ESITO VERIFICHE PER AREA CANTIERE *',y3)
+    const areaBody=[]
     for(let z=1;z<=10;z++){
-      const o=zonaTot[z];const tot=o.ver+o.oss+o.ncm+o.ncp
-      tA.ver+=o.ver;tA.oss+=o.oss;tA.ncm+=o.ncm;tA.ncp+=o.ncp
-      areaBody.push([OS_ZONE_NAMI[z],osN(tot),osN(o.oss),osN(o.ncm),osN(o.ncp),
-        osFmtPct(tot?o.ncm/tot*100:0),osFmtPct(tot?o.ncp/tot*100:0)])
+      const o=zonaTot[z],tot=o.ver+o.oss+o.ncm+o.ncp
+      areaBody.push([OS_ZONE_NAMI[z],oxN(tot),oxN(o.ver),oxN(o.oss),oxN(o.ncm),oxN(o.ncp),
+        tot?oxPct(o.ncm/tot*100):'0,0',tot?oxPct(o.ncp/tot*100):'0,0'])
     }
-    const totA=tA.ver+tA.oss+tA.ncm+tA.ncp
-    areaBody.push(['TOTALE',osN(totA),osN(tA.oss),osN(tA.ncm),osN(tA.ncp),osFmtPct(totA?tA.ncm/totA*100:0),osFmtPct(totA?tA.ncp/totA*100:0)])
-    doc.autoTable({startY:y,margin:{left:12,right:12},
-      head:[['Area cantiere','verifiche','OSS','NC-','NC+','% NC-','% NC+']],
-      body:areaBody,styles:{fontSize:7,cellPadding:1.2},
-      headStyles:{fillColor:[231,80,15],textColor:255,fontSize:7},
-      columnStyles:{0:{cellWidth:62},1:{halign:'center'},2:{halign:'center'},3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'}},
-      didParseCell:d=>{if(d.row.index===10){d.cell.styles.fontStyle='bold';d.cell.styles.fillColor=[235,235,235]}}})
-    osFooter(doc,pg)
+    areaBody.push(['TOTALE',oxN(Gtot),oxN(G.ver),oxN(G.oss),oxN(G.ncm),oxN(G.ncp),
+      Gtot?oxPct(G.ncm/Gtot*100):'0,0',Gtot?oxPct(G.ncp/Gtot*100):'0,0'])
+    oxTbl(doc,{startY:y3+2,
+      head:[['','verifiche','nessuna OSS/NC','OSS','NC-','NC+','% NC- su totale','% NC+ su totale']],
+      body:areaBody,columnStyles:{0:{halign:'left',cellWidth:60}},
+      didParseCell:d=>{if(d.section==='body'&&d.row.index===10){d.cell.styles.fontStyle='bold';d.cell.styles.fillColor=OXT.tot}}})
+    let y4=doc.lastAutoTable.finalY+4
+    const pNCm=[],pNCp=[]
+    for(let z=1;z<=10;z++){const o=zonaTot[z],tot=o.ver+o.oss+o.ncm+o.ncp
+      pNCp.push(tot?o.ncp/tot*100:0);pNCm.push(tot?o.ncm/tot*100:0)}
+    doc.addImage(oxBars({w:186,h:52,title:'% verifiche con inadempienze NC+ e NC- su verifiche totali',
+      cats:Object.values(OS_ZONE_NAMI),
+      series:[{label:'NC+',color:OXC.ncp,data:pNCp},{label:'NC-',color:OXC.ncm,data:pNCm}],
+      legend:'right',fmt:oxPad2,zeroLbl:'00',fmtAxis:oxPad2}),'PNG',12,y4,186,52)
+    oxNote(doc,y4+58)
+    oxFooter(doc,pg)
 
-    // ── PAGINA 3 – QUADRO DI SINTESI - scheda 3 (area e sottoarea) ──
+    // ── PAGINA 3: QUADRO DI SINTESI - scheda 3 ──
     newPage()
-    osHeader(doc,annoLbl,'QUADRO DI SINTESI','scheda 3')
-    doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text('RIEPILOGO VISITE E VERIFICHE PER AREA E SOTTOAREA CANTIERE',12,26)
-    // aggrega per sottoarea
+    oxHeader(doc,anno,'QUADRO DI SINTESI - scheda 3')
+    oxSec(doc,'RIEPILOGO VISITE E VERIFICHE PER AREA E SOTTOAREA CANTIERE',24)
     const subAgg={}
-    V.forEach(v=>{const sb2=subByVis[v.id]||{};Object.entries(sb2).forEach(([k,o])=>{
+    V.forEach(v=>Object.entries(v.sub).forEach(([k,o])=>{
       const a=(subAgg[k]=subAgg[k]||{zona:o.zona,ver:0,oss:0,ncm:0,ncp:0,vis:new Set()})
       a.ver+=o.ver;a.oss+=o.oss;a.ncm+=o.ncm;a.ncp+=o.ncp;a.vis.add(v.id)
-    })})
-    const subBody=[]
+    }))
+    const s3body=[],boldRows=[]
     for(let z=1;z<=10;z++){
+      const zt=zonaTot[z],zVis=zt.vis.size
       Object.keys(OS_SUB).filter(k=>OS_ZP[k.substring(0,3)]===z).forEach(k=>{
-        const a=subAgg[k];if(!a)return
+        const a=subAgg[k]
+        if(!a){s3body.push([OS_SUB[k],'',oxPct(0),'','','','','','','','','']);return}
         const tot=a.ver+a.oss+a.ncm+a.ncp
-        subBody.push([OS_SUB[k],a.vis.size,tot,osN(a.oss),osN(a.ncm),osN(a.ncp),
-          osFmtPct(tot?a.oss/tot*100:0),osFmtPct(tot?a.ncm/tot*100:0),osFmtPct(tot?a.ncp/tot*100:0)])
+        s3body.push([OS_SUB[k],oxN(a.vis.size),zVis?oxPct(a.vis.size/zVis*100):'0,0',
+          oxN(tot),oxN(a.ver),oxN(a.oss),oxN(a.ncm),oxN(a.ncp),
+          tot?oxPct(a.ver/tot*100):'',tot?oxPct(a.oss/tot*100):'',tot?oxPct(a.ncm/tot*100):'',tot?oxPct(a.ncp/tot*100):''])
       })
+      const tot=zt.ver+zt.oss+zt.ncm+zt.ncp
+      boldRows.push(s3body.length)
+      s3body.push([OS_ZONE_NAMI[z].toUpperCase(),oxN(zVis),nV?oxPct(zVis/nV*100):'0,0',
+        oxN(tot),oxN(zt.ver),oxN(zt.oss),oxN(zt.ncm),oxN(zt.ncp),
+        tot?oxPct(zt.ver/tot*100):'',tot?oxPct(zt.oss/tot*100):'',tot?oxPct(zt.ncm/tot*100):'',tot?oxPct(zt.ncp/tot*100):''])
     }
-    if(!subBody.length)subBody.push([{content:'Nessuna verifica registrata nel periodo',colSpan:9,styles:{halign:'center',textColor:[150,150,150]}}])
-    doc.autoTable({startY:30,margin:{left:12,right:12},
-      head:[['Sottoarea cantiere','n.visite','verifiche','OSS','NC-','NC+','% OSS','% NC-','% NC+']],
-      body:subBody,styles:{fontSize:6.5,cellPadding:1},
-      headStyles:{fillColor:[231,80,15],textColor:255,fontSize:6.5},
-      columnStyles:{0:{cellWidth:58},1:{halign:'center'},2:{halign:'center'},3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'},8:{halign:'center'}}})
-    osFooter(doc,pg)
+    boldRows.push(s3body.length)
+    s3body.push(['TOTALE',String(nV),'100,0',oxN(Gtot),oxN(G.ver),oxN(G.oss),oxN(G.ncm),oxN(G.ncp),
+      Gtot?oxPct(G.ver/Gtot*100):'',Gtot?oxPct(G.oss/Gtot*100):'',Gtot?oxPct(G.ncm/Gtot*100):'',Gtot?oxPct(G.ncp/Gtot*100):''])
+    oxTbl(doc,{startY:27,
+      head:[[
+        {content:'',rowSpan:2},{content:'VISITE',colSpan:2},{content:'VERIFICHE - numero',colSpan:5},{content:'VERIFICHE - distribuzione %',colSpan:4}],
+        ['n. visite','% sottoarea su area e area su totale','n. verifiche totali','n. verifiche senza oss/nc*','n. verifiche con oss','n. verifiche con nc-','n. verifiche con nc+','n. verifiche senza oss/nc*','n. verifiche con oss','n. verifiche con nc-','n. verifiche con nc+']],
+      body:s3body,styles:{fontSize:5,cellPadding:{top:.45,bottom:.45,left:.8,right:.8}},
+      headStyles:{fontSize:4.6},
+      columnStyles:{0:{halign:'left',cellWidth:48}},
+      didParseCell:d=>{if(d.section==='body'&&boldRows.includes(d.row.index)){d.cell.styles.fontStyle='bold';d.cell.styles.fillColor=OXT.tot}}})
+    doc.setFont('helvetica','bolditalic');doc.setFontSize(5.6);doc.setTextColor(80,80,80)
+    doc.text("* l'assenza sistematica di verifiche senza osservazioni o inadempienze indica la scelta dell'ente di non documentare le verifiche prive di problematiche. In questo caso ne risentiranno le analisi statistiche sull'esito globale delle visite",12,doc.lastAutoTable.finalY+4,{maxWidth:186})
+    oxFooter(doc,pg)
 
-    // ── PAGINE DIMENSIONI ──
-    const dimsOrder=[
-      {d:OS_DIM.importo  ,schede:3},
-      {d:OS_DIM.tipint   ,schede:3},
-      {d:OS_DIM.tipope   ,schede:3},
-      {d:OS_DIM.commtipo ,schede:3},
-      {d:OS_DIM.tipvisita,schede:2},
-      {d:OS_DIM.ruolo    ,schede:2}
-    ]
-    for(const {d,schede} of dimsOrder){
-      // ─ scheda 1: visite/cantieri per mese ─
-      newPage(); osHeader(doc,annoLbl,d.title,'scheda 1')
-      let yy=27
-      doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(60,60,60)
-      doc.text(`VISITE E CANTIERI PER MESE ${d.sub}`,12,yy);yy+=2
-      const cats=d.cats.slice(); const catLbl=cats.map(c=>d.lbl[c])
-      if(d.nd){cats.push(0);catLbl.push('nd')}
-      // matrice mese×categoria (visite) + cantieri unici
+    // ════════ PAGINE PER DIMENSIONE ════════
+    for(const d of OXD){
+      const cats=d._cats,k=cats.length
+      const lbls=cats.map(c=>d._lbl(c))
+
+      // ───── SCHEDA 1 ─────
+      newPage()
+      oxHeader(doc,anno,d.title+' - scheda 1')
+      oxSec(doc,'VISITE E CANTIERI PER MESE',24,d.sub)
       const visMx=OS_MESI.map(()=>cats.map(()=>0))
-      const cantMx=cats.map(()=>new Set())
-      const totVisCat=cats.map(()=>0)
+      const cantMx=OS_MESI.map(()=>cats.map(()=>new Set()))
+      const totVis=cats.map(()=>0),totCantS=cats.map(()=>new Set())
       V.forEach(v=>{
-        if(v.mese==null)return
-        const ci=cats.indexOf(v.cat[d.key]); const idx=ci<0?cats.indexOf(0):ci
-        if(idx<0)return
-        visMx[v.mese][idx]++; totVisCat[idx]++; cantMx[idx].add(v.cantiere)
+        const i=catIdx(d,v);if(i<0)return
+        totVis[i]++;totCantS[i].add(v.cant)
+        if(v.mese!=null){visMx[v.mese][i]++;cantMx[v.mese][i].add(v.cant)}
       })
-      const head=[['mese',...catLbl,'Totale']]
-      const body=OS_MESI.map((m,i)=>[m,...visMx[i].map(osN),osN(visMx[i].reduce((s,x)=>s+x,0))])
-      const totRow=['TOTALE',...totVisCat.map(osN),nV]
-      const pctRow=['Distrib. %',...totVisCat.map(x=>osFmtPct(nV?x/nV*100:0)),'100,0']
-      body.push(totRow,pctRow)
-      doc.autoTable({startY:yy,margin:{left:12,right:12},head,body,
-        styles:{fontSize:7,cellPadding:1,halign:'center'},headStyles:{fillColor:[231,80,15],textColor:255,fontSize:6.5},
-        columnStyles:{0:{halign:'left'}},
-        didParseCell:dd=>{if(dd.row.index>=12){dd.cell.styles.fontStyle='bold';dd.cell.styles.fillColor=[235,235,235]}}})
-      yy=doc.lastAutoTable.finalY+5
-      // grafico barre per categoria
-      const barImg=rptBar({data:totVisCat,labels:catLbl,colors:RPT_PALETTE,title:`Visite per ${d.title.toLowerCase()}`,w:520,h:Math.max(90,cats.length*30)})
-      doc.addImage(barImg,'PNG',12,yy,150,Math.min(70,cats.length*22));yy+=Math.min(74,cats.length*22+6)
-      // inadempienze NC+/NC- per categoria
+      const totCant=totCantS.map(s=>s.size)
+      const sumVis=totVis.reduce((s,x)=>s+x,0),sumCant=new Set(V.map(v=>v.cant)).size
+      const s1head=[[{content:'mesi',rowSpan:2},{content:'VISITE',colSpan:k+1},{content:'CANTIERI',colSpan:k+1}],
+        [...lbls,'Totale',...lbls,'Totale']]
+      const s1body=OS_MESI_FULL.map((m,i)=>{
+        const vr=visMx[i],cr=cantMx[i].map(s=>s.size)
+        return[m,...vr.map(oxN),oxN(vr.reduce((s,x)=>s+x,0)),...cr.map(oxN),oxN(cr.reduce((s,x)=>s+x,0))]
+      })
+      s1body.push(['',...totVis.map(oxN),String(sumVis),...totCant.map(oxN),oxN(sumCant)])
+      s1body.push(['Distribuzione %',...totVis.map(x=>sumVis?oxPct(x/sumVis*100):'0,0'),'100,0',
+        ...totCant.map(x=>sumCant?oxPct(x/sumCant*100):'0,0'),'100,0'])
+      oxTbl(doc,{startY:27,head:s1head,body:s1body,
+        styles:{fontSize:4.9,cellPadding:{top:.45,bottom:.45,left:.5,right:.5}},headStyles:{fontSize:4.7},
+        columnStyles:{0:{halign:'left',cellWidth:16}},
+        didParseCell:dd=>{if(dd.section==='body'&&dd.row.index>=12){dd.cell.styles.fontStyle=dd.row.index===13?'bolditalic':'bold';dd.cell.styles.fillColor=OXT.tot}}})
+      let yy=doc.lastAutoTable.finalY+4
+      doc.addImage(oxBars({w:96,h:46,title:'VISITE E CANTIERI PER '+d.title.replace(' CANTIERE',''),
+        cats:lbls,series:[{label:'VISITE',color:OXC.s1,data:totVis},{label:'CANTIERI',color:OXC.s2,data:totCant}],
+        legend:'bottom',fmt:oxN}),'PNG',12,yy,96,46)
+      // coefficiente visite/cantieri + torta 3D
+      doc.setFont('helvetica','bold');doc.setFontSize(6.2);doc.setTextColor(64,64,64)
+      doc.text('COEFFICIENTE VISITE/CANTIERI',155,yy+2,{align:'center'})
+      oxTbl(doc,{startY:yy+3,margin:{left:112},tableWidth:86,
+        head:[lbls],body:[totVis.map((x,i)=>totCant[i]?oxIt(x/totCant[i],1):'-')],
+        styles:{fontSize:4.7},headStyles:{fontSize:4.5}})
+      doc.addImage(oxPie3D({w:86,h:32,data:totVis,labels:lbls,colors:OXC.pie}),'PNG',112,yy+13,86,32)
+      yy+=50
+      // inadempienze rilevate
+      oxSec(doc,'INADEMPIENZE RILEVATE',yy,d.sub)
+      const ncpMx=OS_MESI.map(()=>cats.map(()=>0)),ncmMx=OS_MESI.map(()=>cats.map(()=>0))
       const ncpCat=cats.map(()=>0),ncmCat=cats.map(()=>0)
-      V.forEach(v=>{const ci=cats.indexOf(v.cat[d.key]);const idx=ci<0?cats.indexOf(0):ci;if(idx<0)return;ncpCat[idx]+=v.ncp;ncmCat[idx]+=v.ncm})
-      doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text('INADEMPIENZE RILEVATE',12,yy);yy+=2
-      doc.autoTable({startY:yy,margin:{left:12,right:12},
-        head:[['',...catLbl,'Totale']],
-        body:[['NC+',...ncpCat.map(osN),osN(ncpCat.reduce((s,x)=>s+x,0))],['NC-',...ncmCat.map(osN),osN(ncmCat.reduce((s,x)=>s+x,0))]],
-        styles:{fontSize:7,cellPadding:1.2,halign:'center'},headStyles:{fillColor:[86,92,102],textColor:255,fontSize:6.5},
-        columnStyles:{0:{halign:'left',fontStyle:'bold'}}})
-      osFooter(doc,pg)
+      V.forEach(v=>{
+        const i=catIdx(d,v);if(i<0)return
+        ncpCat[i]+=v.ncp;ncmCat[i]+=v.ncm
+        if(v.mese!=null){ncpMx[v.mese][i]+=v.ncp;ncmMx[v.mese][i]+=v.ncm}
+      })
+      const sumNcp=ncpCat.reduce((s,x)=>s+x,0),sumNcm=ncmCat.reduce((s,x)=>s+x,0)
+      const s1bhead=[[{content:'mesi',rowSpan:2},{content:'NC+',colSpan:k+1},{content:'NC-',colSpan:k+1}],
+        [...lbls,'Totale',...lbls,'Totale']]
+      const s1bbody=OS_MESI_FULL.map((m,i)=>{
+        const p=ncpMx[i],q=ncmMx[i]
+        return[m,...p.map(oxN),oxN(p.reduce((s,x)=>s+x,0)),...q.map(oxN),oxN(q.reduce((s,x)=>s+x,0))]
+      })
+      s1bbody.push(['',...ncpCat.map(oxN),oxN(sumNcp),...ncmCat.map(oxN),oxN(sumNcm)])
+      s1bbody.push(['Distribuzione %',...ncpCat.map(x=>sumNcp?oxPct(x/sumNcp*100):'0,0'),'100,0',
+        ...ncmCat.map(x=>sumNcm?oxPct(x/sumNcm*100):'0,0'),'100,0'])
+      oxTbl(doc,{startY:yy+3,head:s1bhead,body:s1bbody,
+        styles:{fontSize:4.9,cellPadding:{top:.45,bottom:.45,left:.5,right:.5}},headStyles:{fontSize:4.7},
+        columnStyles:{0:{halign:'left',cellWidth:16}},
+        didParseCell:dd=>{if(dd.section==='body'&&dd.row.index>=12){dd.cell.styles.fontStyle=dd.row.index===13?'bolditalic':'bold';dd.cell.styles.fillColor=OXT.tot}}})
+      yy=doc.lastAutoTable.finalY+4
+      doc.addImage(oxBars({w:96,h:42,title:'INADEMPIENZE PER '+d.title.replace(' CANTIERE',''),
+        cats:lbls,series:[{label:'NC+',color:OXC.ncp,data:ncpCat},{label:'NC-',color:OXC.ncm,data:ncmCat}],
+        legend:'bottom',fmt:oxN}),'PNG',12,yy,96,42)
+      doc.setFont('helvetica','bold');doc.setFontSize(6.2);doc.setTextColor(64,64,64)
+      doc.text('MEDIA INADEMPIENZE PER VISITA',155,yy+2,{align:'center'})
+      oxTbl(doc,{startY:yy+3,margin:{left:112},tableWidth:86,
+        head:[['',...lbls]],
+        body:[['NC+',...cats.map((c,i)=>totVis[i]?oxIt(ncpCat[i]/totVis[i],1):'-')],
+              ['NC-',...cats.map((c,i)=>totVis[i]?oxIt(ncmCat[i]/totVis[i],1):'-')]],
+        styles:{fontSize:4.7},headStyles:{fontSize:4.5},columnStyles:{0:{fontStyle:'bold'}}})
+      doc.addImage(oxBars({w:86,h:28,cats:lbls,
+        series:[{label:'NC+',color:OXC.ncp,data:cats.map((c,i)=>totVis[i]?ncpCat[i]/totVis[i]:0)},
+                {label:'NC-',color:OXC.ncm,data:cats.map((c,i)=>totVis[i]?ncmCat[i]/totVis[i]:0)}],
+        legend:'right',labels:false,fmtAxis:v=>oxIt(v,1)}),'PNG',112,yy+14,86,28)
+      oxFooter(doc,pg)
 
-      // ─ scheda 2: visite per area cantiere + media verifiche ─
-      newPage(); osHeader(doc,annoLbl,d.title,'scheda 2')
-      doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(60,60,60)
-      doc.text('VISITE PER AREA CANTIERE E MEDIA VERIFICHE PER VISITA',12,26)
-      // per zona × categoria: n. visite che hanno toccato la zona, e verifiche
-      const areaRows=[]
-      for(let z=1;z<=10;z++){
-        const visCat=cats.map(()=>0), verCat=cats.map(()=>0)
-        V.forEach(v=>{
-          const o=v.zone[z];if(!o)return
-          const ci=cats.indexOf(v.cat[d.key]);const idx=ci<0?cats.indexOf(0):ci;if(idx<0)return
-          visCat[idx]++; verCat[idx]+=(o.ver+o.oss+o.ncm+o.ncp)
+      // ───── SCHEDA 2 ─────
+      newPage()
+      oxHeader(doc,anno,d.title+' - scheda 2')
+      oxSec(doc,'VISITE PER AREA CANTIERE E MEDIA VERIFICHE PER VISITA *',24)
+      // visite e verifiche per zona×categoria
+      const zVis={},zVer={}
+      for(let z=1;z<=10;z++){zVis[z]=cats.map(()=>0);zVer[z]=cats.map(()=>0)}
+      V.forEach(v=>{
+        const i=catIdx(d,v);if(i<0)return
+        Object.entries(v.zone).forEach(([z,o])=>{
+          if(!zVis[z])return
+          zVis[z][i]++;zVer[z][i]+=(o.ver+o.oss+o.ncm+o.ncp)
         })
-        const totVis=visCat.reduce((s,x)=>s+x,0)
-        areaRows.push([OS_ZONE_NAMI[z],...catLbl.map((_,i)=>visCat[i]?`${visCat[i]} (${(verCat[i]/visCat[i]).toFixed(1).replace('.',',')})`:''),osN(totVis)])
-      }
-      doc.autoTable({startY:30,margin:{left:12,right:12},
-        head:[['Area cantiere',...catLbl,'Tot. visite']],
-        body:areaRows,styles:{fontSize:6.5,cellPadding:1},headStyles:{fillColor:[231,80,15],textColor:255,fontSize:6},
-        columnStyles:{0:{cellWidth:50,halign:'left'}}})
-      let yA=doc.lastAutoTable.finalY+4
-      doc.setFontSize(6.5);doc.setTextColor(120,120,120);doc.setFont('helvetica','italic')
-      doc.text('Ogni cella: n. visite (media verifiche per visita).',12,yA);yA+=5
-      // % inadempienze su verifiche per zona
-      doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(60,60,60)
-      doc.text('PERCENTUALE INADEMPIENZE (NC+ e NC-) SU VERIFICHE PER AREA',12,yA);yA+=2
-      const pctRows=[]
+      })
+      const s2head=[[{content:'',rowSpan:2},{content:'N. verifiche potenziali',rowSpan:2},{content:'NUMERO VISITE',colSpan:k+1},{content:'MEDIA VERIFICHE PER VISITA',colSpan:k+1}],
+        [...lbls,'Totale',...lbls,'Totale']]
+      const s2body=[]
+      const totVisZ=cats.map(()=>0),totVerZ=cats.map(()=>0)
       for(let z=1;z<=10;z++){
-        const o=zonaTot[z];const tot=o.ver+o.oss+o.ncm+o.ncp
-        pctRows.push([OS_ZONE_NAMI[z],osFmtPct(tot?o.ncp/tot*100:0),osFmtPct(tot?o.ncm/tot*100:0)])
+        const vz=zVis[z],vr=zVer[z]
+        vz.forEach((x,i)=>{totVisZ[i]+=x;totVerZ[i]+=vr[i]})
+        const tv=vz.reduce((s,x)=>s+x,0),tr=vr.reduce((s,x)=>s+x,0)
+        s2body.push([OS_ZONE_NAMI[z],oxN(zonaPot[z]),
+          ...vz.map(oxN),oxN(tv),
+          ...vz.map((x,i)=>x?oxIt(vr[i]/x,1):''),tv?oxIt(tr/tv,1):''])
       }
-      doc.autoTable({startY:yA,margin:{left:12,right:12},
-        head:[['Area cantiere','% NC+','% NC-']],
-        body:pctRows,styles:{fontSize:7,cellPadding:1.2},headStyles:{fillColor:[86,92,102],textColor:255,fontSize:7},
-        columnStyles:{0:{cellWidth:90},1:{halign:'center'},2:{halign:'center'}}})
-      osFooter(doc,pg)
+      const potTot=Object.values(zonaPot).reduce((s,x)=>s+x,0)
+      s2body.push(['TOTALE',oxN(potTot),
+        ...totVis.map(oxN),String(sumVis),
+        ...cats.map((c,i)=>totVis[i]?oxIt(totVerZ[i]/totVis[i],1):''),sumVis?oxIt(Gtot/sumVis,1):''])
+      oxTbl(doc,{startY:27,head:s2head,body:s2body,
+        styles:{fontSize:4.8,cellPadding:{top:.45,bottom:.45,left:.5,right:.5}},headStyles:{fontSize:4.5},
+        columnStyles:{0:{halign:'left',cellWidth:34}},
+        didParseCell:dd=>{if(dd.section==='body'&&dd.row.index===10){dd.cell.styles.fontStyle='bold';dd.cell.styles.fillColor=OXT.tot}}})
+      let ys=doc.lastAutoTable.finalY+3
+      doc.setFont('helvetica','italic');doc.setFontSize(5.4);doc.setTextColor(100,100,100)
+      doc.text('Grafici area cantiere (barre verticali per numero visite, linea di tendenza per media verifiche per visita)',12,ys)
+      ys+=2
+      // 9 mini-grafici (Soggetti escluso, come l'originale)
+      const miniZones=[1,2,3,4,5,6,7,8,10]
+      const miniLbls=cats.map(c=>c===0?'nd':d.lbl[c])
+      const mW=61,mH=25
+      miniZones.forEach((z,mi)=>{
+        const col=mi%3,row=Math.floor(mi/3)
+        const bars=zVis[z],line=bars.map((x,i)=>x?zVer[z][i]/x:null)
+        doc.addImage(oxMiniCombo({w:mW,h:mH,title:OS_ZONE_NAMI[z].toUpperCase(),cats:miniLbls,bars:bars,line:line}),
+          'PNG',12+col*63,ys+row*27,mW,mH)
+      })
+      ys+=3*27+2
+      oxSec(doc,'VISITE PER AREA CANTIERE. PERCENTUALE INADEMPIENZE SU VERIFICHE EFFETTUATE *',ys)
+      // % NC su verifiche per zona×cat
+      const zNcp={},zNcm={}
+      for(let z=1;z<=10;z++){zNcp[z]=cats.map(()=>0);zNcm[z]=cats.map(()=>0)}
+      V.forEach(v=>{
+        const i=catIdx(d,v);if(i<0)return
+        Object.entries(v.zone).forEach(([z,o])=>{if(zNcp[z]){zNcp[z][i]+=o.ncp;zNcm[z][i]+=o.ncm}})
+      })
+      const s2bhead=[[{content:'',rowSpan:2},{content:'NC+',colSpan:k+1},{content:'NC-',colSpan:k+1}],
+        [...lbls,'Totale',...lbls,'Totale']]
+      const s2bbody=[]
+      for(let z=1;z<=10;z++){
+        const vr=zVer[z],p=zNcp[z],q=zNcm[z]
+        const tr=vr.reduce((s,x)=>s+x,0),tp=p.reduce((s,x)=>s+x,0),tq=q.reduce((s,x)=>s+x,0)
+        s2bbody.push([OS_ZONE_NAMI[z],
+          ...p.map((x,i)=>(x&&vr[i])?oxPct(x/vr[i]*100):''),(tp&&tr)?oxPct(tp/tr*100):'',
+          ...q.map((x,i)=>(x&&vr[i])?oxPct(x/vr[i]*100):''),(tq&&tr)?oxPct(tq/tr*100):''])
+      }
+      s2bbody.push(['TOTALE',
+        ...cats.map((c,i)=>{const vr=totVerZ[i];let p=0;for(let z=1;z<=10;z++)p+=zNcp[z][i];return(p&&vr)?oxPct(p/vr*100):''}),
+        Gtot?oxPct(G.ncp/Gtot*100):'',
+        ...cats.map((c,i)=>{const vr=totVerZ[i];let q=0;for(let z=1;z<=10;z++)q+=zNcm[z][i];return(q&&vr)?oxPct(q/vr*100):''}),
+        Gtot?oxPct(G.ncm/Gtot*100):''])
+      oxTbl(doc,{startY:ys+2,head:s2bhead,body:s2bbody,
+        styles:{fontSize:4.8,cellPadding:{top:.45,bottom:.45,left:.5,right:.5}},headStyles:{fontSize:4.5},
+        columnStyles:{0:{halign:'left',cellWidth:34}},
+        didParseCell:dd=>{if(dd.section==='body'&&dd.row.index===10){dd.cell.styles.fontStyle='bold';dd.cell.styles.fillColor=OXT.tot}}})
+      ys=doc.lastAutoTable.finalY+2
+      miniZones.forEach((z,mi)=>{
+        const col=mi%3,row=Math.floor(mi/3)
+        const vr=zVer[z]
+        const pp=zNcp[z].map((x,i)=>vr[i]?x/vr[i]*100:0)
+        const qq=zNcm[z].map((x,i)=>vr[i]?x/vr[i]*100:0)
+        doc.addImage(oxMiniNC({w:mW,h:mH,title:OS_ZONE_NAMI[z].toUpperCase(),cats:miniLbls,ncp:pp,ncm:qq}),
+          'PNG',12+col*63,ys+row*27,mW,mH)
+      })
+      oxNote(doc,ys+3*27+4)
+      oxFooter(doc,pg)
 
-      // ─ scheda 3: matrice confronto prima/ultima visita (solo dimensioni con 3 schede) ─
-      if(schede>=3){
-        newPage(); osHeader(doc,annoLbl,d.title,'scheda 3')
-        doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(60,60,60)
-        doc.text('ANALISI VERIFICHE – CONFRONTO TRA PRIMA E ULTIMA VISITA STESSO CANTIERE',12,25)
+      // ───── SCHEDA 3 (solo dimensioni complete) ─────
+      if(d.schede>=3){
+        newPage()
+        oxHeader(doc,anno,d.title+' - scheda 3')
+        doc.setFont('helvetica','bold');doc.setFontSize(6.4);doc.setTextColor(64,64,64)
+        doc.text('ANALISI VERIFICHE. VISITE MULTIPLE STESSO CANTIERE-IMPRESA. CONFRONTO TRA PRIMA E ULTIMA VISITA DELLA STESSA VERIFICA*',12,24)
         let ym=30
-        const esitoLbls=['nessuna','oss','nc-','nc+']
-        const esitoKey={'nessuna':0,'oss':1,'nc-':2,'nc+':3}
-        cats.filter(c=>c!==0).forEach((c,ci)=>{
-          // raggruppa visite per cantiere dentro la categoria
-          const byCant={}
-          V.filter(v=>v.cat[d.key]===c).forEach(v=>{(byCant[v.cantiere]=byCant[v.cantiere]||[]).push(v)})
+        const esitoLblS=['nessun oss/nc','oss','nc-','nc+']
+        for(const c of d.cats){
+          // matrice transizioni a livello di singola verifica
           const mx=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]
-          let multi=0
-          Object.values(byCant).forEach(arr=>{
+          Object.values(byGrp).forEach(arr=>{
             if(arr.length<2)return
-            multi++
-            arr.sort((a,b)=>(a.data||'').localeCompare(b.data||''))
-            const p=esitoKey[arr[0].esito], u=esitoKey[arr[arr.length-1].esito]
-            mx[p][u]++
+            if(arr[arr.length-1].cat[d.key]!==c)return
+            const A=arr[0].cod,B=arr[arr.length-1].cod
+            Object.keys(A).forEach(code=>{
+              if(B[code]===undefined)return
+              mx[A[code]][B[code]]++
+            })
           })
-          if(ym>250){newPage();osHeader(doc,annoLbl,d.title,'scheda 3 (segue)');ym=25}
-          doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(231,80,15)
-          doc.text(`${d.lbl[c]}  ${multi?'':'(nessuna visita multipla)'}`,12,ym);ym+=2
-          doc.autoTable({startY:ym,margin:{left:12},tableWidth:120,
-            head:[['prima \\ ultima',...esitoLbls]],
-            body:esitoLbls.map((e,ri)=>[e,...mx[ri].map(x=>x||'–')]),
-            styles:{fontSize:7,cellPadding:1.2,halign:'center'},headStyles:{fillColor:[86,92,102],textColor:255,fontSize:6.5},
-            columnStyles:{0:{halign:'left',fontStyle:'bold'}}})
-          ym=doc.lastAutoTable.finalY+5
-        })
-        osFooter(doc,pg)
+          const mtot=mx.flat().reduce((s,x)=>s+x,0)
+          let migl=0,stp=0,stn=0,pegg=0
+          for(let r=0;r<4;r++)for(let j=0;j<4;j++){
+            if(j<r)migl+=mx[r][j];else if(j>r)pegg+=mx[r][j]
+            else if(r===0)stp+=mx[r][j];else stn+=mx[r][j]
+          }
+          if(ym>236){oxFooter(doc,pg);newPage();oxHeader(doc,anno,d.title+' - scheda 3 (segue)');ym=27}
+          doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(64,64,64)
+          doc.text(d.blk[c]||d.lbl[c].toUpperCase(),60,ym,{align:'center'})
+          doc.setFontSize(5.4)
+          doc.text('esito ultima visita',38,ym+4)
+          doc.text('composizione %',86,ym+4)
+          const heat=dd=>{
+            if(dd.section!=='body'||dd.column.index===0)return
+            const r=dd.row.index,j=dd.column.index-1
+            dd.cell.styles.fillColor=j<r?OXT.heatG:(j>r?OXT.heatO:OXT.heatC)
+          }
+          oxTbl(doc,{startY:ym+5,margin:{left:12},tableWidth:54,
+            head:[['esito prima visita',...esitoLblS]],
+            body:esitoLblS.map((e,r)=>[e,...mx[r].map(x=>x?String(x):'')]),
+            styles:{fontSize:4.6,cellPadding:{top:.8,bottom:.8,left:.5,right:.5}},headStyles:{fontSize:4.3},
+            columnStyles:{0:{halign:'left',fontStyle:'bold',cellWidth:16}},didParseCell:heat})
+          oxTbl(doc,{startY:ym+5,margin:{left:70},tableWidth:50,
+            head:[['',...esitoLblS]],
+            body:esitoLblS.map((e,r)=>[e,...mx[r].map(x=>mtot?oxPct(x/mtot*100):'-')]),
+            styles:{fontSize:4.6,cellPadding:{top:.8,bottom:.8,left:.5,right:.5}},headStyles:{fontSize:4.3},
+            columnStyles:{0:{halign:'left',fontStyle:'bold',cellWidth:14}},didParseCell:heat})
+          // riepilogo migl/stab/pegg
+          const sumLbl=['miglioramento','stabilità positiva','stabilità negativa','peggioramento']
+          const sumVal=[migl,stp,stn,pegg]
+          oxTbl(doc,{startY:ym+5,margin:{left:126},tableWidth:42,
+            body:sumLbl.map((s,i)=>[s,mtot?oxPct(sumVal[i]/mtot*100):'-']),
+            styles:{fontSize:4.8,cellPadding:{top:1,bottom:1,left:1,right:1}},
+            columnStyles:{0:{halign:'left',cellWidth:28}},
+            didParseCell:dd=>{
+              if(dd.column.index===1){
+                dd.cell.styles.fillColor=[OXT.heatG,[235,241,222],OXT.heatC,OXT.heatO][dd.row.index]
+              }
+            }})
+          // grafico composizione (barre colorate) + legenda
+          doc.addImage(oxBars({w:28,h:24,cats:['','','',''],
+            series:[{label:'',color:'#fff',colors:OXC.trans,data:sumVal}],labels:false}),'PNG',170,ym+3,28,24)
+          doc.setFontSize(3.8);doc.setFont('helvetica','normal');doc.setTextColor(89,89,89)
+          const lgX=[170,184,170,184],lgY=[ym+29,ym+29,ym+32,ym+32]
+          sumLbl.forEach((s,i)=>{
+            doc.setFillColor.apply(doc,OXC.trans[i].match(/\w\w/g).map(x=>parseInt(x,16)))
+            doc.rect(lgX[i],lgY[i]-1.5,1.8,1.8,'F')
+            doc.text(s,lgX[i]+2.4,lgY[i])
+          })
+          ym+=36
+        }
+        oxNote(doc,Math.min(ym+2,272))
+        oxFooter(doc,pg)
       }
     }
 
-    const fname=`Report_Osservatorio_${dal}_${al}.pdf`
+    const fname='Report_Osservatorio_'+dal+'_'+al+'.pdf'
     doc.save(fname)
-    toast(`Report Osservatorio generato (${pg} pagine): ${fname}`,'ok')
+    toast('Report Osservatorio generato ('+pg+' pagine): '+fname,'ok')
   }catch(e){
     console.error('admGeneraReportOsservatorio:',e)
     toast('Errore generazione report: '+(e.message||e),'err')
   }
 }
 window.admGeneraReportOsservatorio = admGeneraReportOsservatorio
+// imposta rapidamente le date dell'anno edile (ott→set)
+function osSetAnnoEdile(y){
+  if(!y)return
+  y=parseInt(y,10)
+  const dal=$('adm-dal'),al=$('adm-al')
+  if(dal)dal.value=y+'-10-01'
+  if(al)al.value=(y+1)+'-09-30'
+}
+window.osSetAnnoEdile = osSetAnnoEdile
 
 // ══════════════════════════════════════════════════════════════
 // ── GESTIONE IMPRESE (Coordinatore) ───────────────────────────
