@@ -7195,7 +7195,7 @@ async function admGeneraReportOsservatorio(){
     doc.addImage(oxBars({w:186,h:52,title:'% verifiche con inadempienze NC+ e NC- su verifiche totali',
       cats:Object.values(OS_ZONE_NAMI),
       series:[{label:'NC+',color:OXC.ncp,data:pNCp},{label:'NC-',color:OXC.ncm,data:pNCm}],
-      legend:'right',fmt:oxPad2,zeroLbl:'00',catFont:7,catLines:3}),'PNG',12,y4,186,52)
+      legend:'right',fmt:v=>oxIt(v,1),catFont:7,catLines:3}),'PNG',12,y4,186,52)
     oxNote(doc,y4+57)
     oxFooter(doc,pg)
 
