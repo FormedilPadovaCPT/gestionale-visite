@@ -6351,20 +6351,29 @@ async function admGeneraReport(){
     // ── 3. Checklist items per tutte le visite ──
     const visitaIds=visite.map(v=>v.visita_id)
     const chkAll=[]
-    for(let i=0;i<visitaIds.length;i+=200){
-      const{data:batch}=await sb.from('visite_checklist')
-        .select('codice,valore').in('visita_id',visitaIds.slice(i,i+200)).neq('valore','NA')
-      if(batch)chkAll.push(...batch)
+    for(let i=0;i<visitaIds.length;i+=100){
+      for(let from=0;;from+=1000){
+        const{data:batch}=await sb.from('visite_checklist')
+          .select('codice,valore').in('visita_id',visitaIds.slice(i,i+100)).neq('valore','NA')
+          .order('id').range(from,from+999)
+        if(batch&&batch.length)chkAll.push(...batch)
+        if(!batch||batch.length<1000)break
+      }
     }
 
     // ── 4. Imprese nel periodo → iscrizione Cassa Edile / CEIV ──
     // Conta imprese uniche per valore di cassa_edile
     const ceivImpSet=new Set()
     const ceivMap={}
-    for(let i=0;i<visitaIds.length;i+=200){
-      const{data:vipBatch}=await sb.from('visite_imprese_presenti')
-        .select('impresa_id,imprese(cassa_edile)')
-        .in('visita_id',visitaIds.slice(i,i+200))
+    for(let i=0;i<visitaIds.length;i+=100){
+      const vipBatch=[]
+      for(let from=0;;from+=1000){
+        const{data:bb}=await sb.from('visite_imprese_presenti')
+          .select('impresa_id,imprese(cassa_edile)')
+          .in('visita_id',visitaIds.slice(i,i+100)).order('id').range(from,from+999)
+        if(bb&&bb.length)vipBatch.push(...bb)
+        if(!bb||bb.length<1000)break
+      }
       ;(vipBatch||[]).forEach(r=>{
         if(!r.impresa_id||ceivImpSet.has(r.impresa_id))return
         ceivImpSet.add(r.impresa_id)
@@ -6985,11 +6994,17 @@ async function admGeneraReportOsservatorio(){
   toast('Elaborazione report Osservatorio in corso…','ok')
   try{
     // ── 1. visite + cantiere/committente ──
-    const{data:visite,error:e1}=await sb.from('visite').select([
-      'visita_id','data_visita','cantiere_id','impresa_id','comm_tipo','tipo_accesso',
-      'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_importo,cantiere_committente_id,committenti(committente_tipo))'
-    ].join(',')).gte('data_visita',dal).lte('data_visita',al).eq('elimina',0)
-    if(e1)throw e1
+    const visite=[]
+    for(let from=0;;from+=1000){
+      const{data:b,error:e1}=await sb.from('visite').select([
+        'visita_id','data_visita','cantiere_id','impresa_id','comm_tipo','tipo_accesso',
+        'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_importo,cantiere_committente_id,committenti(committente_tipo))'
+      ].join(',')).gte('data_visita',dal).lte('data_visita',al).eq('elimina',0)
+        .order('visita_id').range(from,from+999)
+      if(e1)throw e1
+      if(b&&b.length)visite.push(...b)
+      if(!b||b.length<1000)break
+    }
     if(!visite||!visite.length){toast('Nessuna visita nel periodo selezionato','warn');return}
     const vids=visite.map(v=>v.visita_id)
 
@@ -7006,16 +7021,29 @@ async function admGeneraReportOsservatorio(){
 
     // ── 3. esiti checklist per visita ──
     const chk=[]
-    for(let i=0;i<vids.length;i+=200){
-      const{data:b}=await sb.from('visite_checklist').select('visita_id,codice,valore').in('visita_id',vids.slice(i,i+200))
-      if(b)chk.push(...b)
+    for(let i=0;i<vids.length;i+=100){
+      const ids=vids.slice(i,i+100)
+      for(let from=0;;from+=1000){
+        const{data:b,error:e2}=await sb.from('visite_checklist').select('visita_id,codice,valore')
+          .in('visita_id',ids).order('id').range(from,from+999)
+        if(e2)throw e2
+        if(b&&b.length)chk.push(...b)
+        if(!b||b.length<1000)break
+      }
     }
     const RANK={VER:0,OSS:1,'NC-':2,'NC+':3}
 
     // ── 4. ruolo impresa principale per visita ──
     const ruoloByVis={}
-    for(let i=0;i<vids.length;i+=200){
-      const{data:b}=await sb.from('visite_imprese_presenti').select('visita_id,tipo_imp,is_principale').in('visita_id',vids.slice(i,i+200))
+    for(let i=0;i<vids.length;i+=100){
+      const b=[]
+      for(let from=0;;from+=1000){
+        const{data:bb,error:e3}=await sb.from('visite_imprese_presenti').select('visita_id,tipo_imp,is_principale')
+          .in('visita_id',vids.slice(i,i+100)).order('id').range(from,from+999)
+        if(e3)throw e3
+        if(bb&&bb.length)b.push(...bb)
+        if(!bb||bb.length<1000)break
+      }
       ;(b||[]).forEach(r=>{
         if(ruoloByVis[r.visita_id]===undefined||r.is_principale)ruoloByVis[r.visita_id]=parseInt(r.tipo_imp,10)||0
       })
