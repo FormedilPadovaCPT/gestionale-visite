@@ -445,12 +445,24 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 
     <!-- DASHBOARD -->
     <section id="view-dashboard">
-      <div class="stats-grid">
-        <div class="stat-card"><div class="num" id="s-tot">–</div><div class="lbl">Visite anno edile</div></div>
-        <div class="stat-card"><div class="num" id="s-alto" style="color:var(--danger)">–</div><div class="pct" id="s-alto-pct" style="color:var(--danger)"></div><div class="lbl">IPC Alto</div></div>
-        <div class="stat-card"><div class="num" id="s-medio" style="color:var(--warn)">–</div><div class="pct" id="s-medio-pct" style="color:var(--warn)"></div><div class="lbl">IPC Medio</div></div>
-        <div class="stat-card"><div class="num" id="s-basso" style="color:#b89000">–</div><div class="pct" id="s-basso-pct" style="color:#b89000"></div><div class="lbl">IPC Basso</div></div>
-        <div class="stat-card"><div class="num" id="s-nr" style="color:var(--ok)">–</div><div class="pct" id="s-nr-pct" style="color:var(--ok)"></div><div class="lbl">IPC Nessun Rilievo</div></div>
+            <!-- FILTRI DASHBOARD -->
+      <div class="card" id="dash-filtri" style="margin-bottom:14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div class="field"><label>Esercizio</label><select id="fd-eserc" style="font-size:13px"></select></div>
+          <div class="field"><label>Tecnico</label><select id="fd-tec" style="font-size:13px"></select></div>
+          <div class="field"><label>Tipo visita</label><select id="fd-tipo" style="font-size:13px"></select></div>
+          <div class="field"><label>Pericolosità (IPC)</label><select id="fd-ipc" style="font-size:13px"></select></div>
+        </div>
+        <div id="fd-count" style="text-align:right;font-size:12px;color:#888;margin-top:8px;font-style:italic"></div>
+      </div>
+      <!-- KPI -->
+      <div class="stats-grid" id="dash-kpi">
+        <div class="stat-card"><div class="num" id="k-sopr" style="color:var(--orange)">–</div><div class="lbl">Sopralluoghi</div></div>
+        <div class="stat-card"><div class="num" id="k-ncplus" style="color:var(--danger)">–</div><div class="lbl">NC+ totali</div></div>
+        <div class="stat-card"><div class="num" id="k-ipcam" style="color:var(--warn)">–</div><div class="pct" id="k-ipcam-pct" style="color:var(--warn)"></div><div class="lbl">IPC Alto + Medio</div></div>
+        <div class="stat-card"><div class="num" id="k-rlst" style="color:#95C22F">–</div><div class="pct" id="k-rlst-pct" style="color:#95C22F"></div><div class="lbl">Affiancamento RLST</div></div>
+        <div class="stat-card"><div class="num" id="k-oss">–</div><div class="lbl">Osservazioni</div></div>
+        <div class="stat-card"><div class="num" id="k-comuni" style="color:var(--grey)">–</div><div class="lbl">Comuni serviti</div></div>
       </div>
       <div class="card" id="card-target-mese" style="display:none;margin-bottom:14px">
         <h3 style="margin-bottom:2px">🎯 Obiettivo mensile — <span id="tgt-tec-nome"></span> · <span id="tgt-mese-lbl" style="text-transform:capitalize"></span></h3>
@@ -471,14 +483,31 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
         </div>
       </div>
+      <div class="card"><h3>Visite per esercizio (1 ott – 30 set)</h3><canvas id="ch-esercizio" height="120"></canvas></div>
+      <div class="card"><h3>Attività mensile sopralluoghi</h3><canvas id="ch-mesi" height="110"></canvas></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
-        <div class="card" style="margin-bottom:0"><h3>Visite per tecnico</h3><canvas id="ch-tecnico" height="200"></canvas></div>
-        <div class="card" style="margin-bottom:0"><h3>Tipo impresa (Cassa Edile)</h3><canvas id="ch-ceiv" height="200"></canvas></div>
+        <div class="card" style="margin-bottom:0"><h3>Sopralluoghi per tecnico</h3><canvas id="ch-tecnico" height="220"></canvas></div>
+        <div class="card" style="margin-bottom:0"><h3>Affiancamento con RLST</h3><canvas id="ch-rlst" height="220"></canvas></div>
       </div>
-      <div class="card"><h3>Visite con RLST per tecnico</h3><canvas id="ch-rlst" height="130"></canvas></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
-        <div class="card" style="margin-bottom:0"><h3>IPC per tipo di accesso</h3><canvas id="ch-accesso" height="220"></canvas></div>
-        <div class="card" style="margin-bottom:0"><h3>Visite mese per mese</h3><canvas id="ch-mesi" height="220"></canvas></div>
+        <div class="card" style="margin-bottom:0"><h3>IPC — Indice di Pericolosità Cantiere</h3><canvas id="ch-ipc" height="220"></canvas></div>
+        <div class="card" style="margin-bottom:0"><h3>IPC per n° accesso al cantiere</h3><canvas id="ch-accesso" height="220"></canvas></div>
+      </div>
+      <div class="card"><h3>Produttività e qualità per tecnico</h3><div id="tbl-prod" style="overflow-x:auto"></div></div>
+      <div class="card"><h3>NC+ / NC− / OSS per macroarea (10 aree)</h3><div id="tbl-macro" style="overflow-x:auto"></div></div>
+      <div class="card"><h3>Imprese ricorrenti — cantieri da monitorare</h3><div id="tbl-imprese" style="overflow-x:auto"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card" style="margin-bottom:0"><h3>Ruolo impresa visitata</h3><canvas id="ch-ruolo" height="180"></canvas></div>
+        <div class="card" style="margin-bottom:0"><h3>Tipologia di visita</h3><canvas id="ch-tipovis" height="180"></canvas></div>
+      </div>
+      <div class="card"><h3>Top 20 comuni</h3><div id="tbl-comuni" style="overflow-x:auto"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card" style="margin-bottom:0"><h3>Tipo di intervento</h3><canvas id="ch-tipint" height="220"></canvas></div>
+        <div class="card" style="margin-bottom:0"><h3>Tipologia di opera</h3><canvas id="ch-tipope" height="220"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card" style="margin-bottom:0"><h3>Importo dei lavori</h3><canvas id="ch-importo" height="220"></canvas></div>
+        <div class="card" style="margin-bottom:0"><h3>Iscrizione Cassa Edile</h3><canvas id="ch-ceiv" height="220"></canvas></div>
       </div>
       <div class="card">
         <h3>Mappa cantieri visitati &mdash; IPC ultima visita</h3>
@@ -3813,135 +3842,243 @@ const datalabelPlugin={id:'datalabel',afterDatasetsDraw(chart){
   })
 }}
 
+// ══════════════════════════════════════════════════════════════
+// DASHBOARD report-style (visite in cantiere) — fetch unico storico
+// + filtri client-side (esercizio / tecnico / tipo visita / IPC)
+// ══════════════════════════════════════════════════════════════
+let _dashRaw=null, _dashTecMap={}
+const _DASH_C={alto:'#e74c3c',medio:'#f39c12',basso:'#f1c40f',nr:'#95C22F',orange:'#e7500f',grey:'#565c66',green:'#95C22F'}
+const _DASH_PIE=['#e7500f','#565c66','#95C22F','#f39c12','#2563eb','#8e44ad','#e74c3c','#1abc9c','#e67e22','#34495e']
+const _DASH_MACRO={1:'01 Impianti di cantiere',2:'02 Protezione luoghi di lavoro',3:'03 Apparecchi di sollevamento',4:'04 Attrezzature, scale, utensili',5:'05 Macchine di cantiere',6:'06 Opere provvisionali',7:'07 DPI',8:'08 Documentazione',9:'09 Soggetti',10:'10 Formazione'}
+const _DASH_IMPORTO={1:'≤ 250.000',2:'250.001–500.000',3:'500.001–1.000.000',4:'1.000.001–1.500.000',5:'1.500.001–2.500.000',6:'2.500.001–3.500.000',7:'3.500.001–5.000.000',8:'5.000.001–10.000.000',9:'10.000.001–15.000.000',10:'oltre 15.000.000',11:'Non disponibile'}
+
+function _esercizioDa(d){if(!d)return null;const y=+d.slice(0,4),m=+d.slice(5,7);const s=m>=10?y:y-1;return s+'/'+(s+1)}
+
 async function loadDash(){
-  const ae=annoEdile()
-  const{data:vs}=await sb.from('visite')
-    .select('visita_id,data_visita,ipc,rlst_sn,acc_cant,tecnico_id')
-    .gte('data_visita',ae.da).lte('data_visita',ae.a).eq('elimina',0)
-  const visite=vs||[]
-
-  const nTot=visite.length
-  const nAlto=visite.filter(v=>v.ipc==='ALTO').length
-  const nMedio=visite.filter(v=>v.ipc==='MEDIO').length
-  const nBasso=visite.filter(v=>v.ipc==='BASSO').length
-  const nNR=visite.filter(v=>!v.ipc||v.ipc==='NR').length
-  const pct=n=>nTot?Math.round(n/nTot*100)+'%':'–'
-  // Card obiettivo mensile del tecnico loggato (non blocca la dashboard se fallisce)
-  loadTargetCard().catch(e=>console.warn('loadTargetCard:',e))
-  $('s-tot').textContent=nTot
-  $('s-alto').textContent=nAlto;$('s-alto-pct').textContent=pct(nAlto)
-  $('s-medio').textContent=nMedio;$('s-medio-pct').textContent=pct(nMedio)
-  $('s-basso').textContent=nBasso;$('s-basso-pct').textContent=pct(nBasso)
-  $('s-nr').textContent=nNR;$('s-nr-pct').textContent=pct(nNR)
-
-  // Tecnici
+  if($('fd-count'))$('fd-count').textContent='Caricamento dati…'
+  // mappa tecnici
   const{data:tecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome')
-  const tecMap={}
-  ;(tecs||[]).forEach(t=>{tecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()||t.tecnico_id})
-
-  // CEIV impresa principale
-  const vids=visite.map(v=>v.visita_id)
-  const ceivMap={}
-  if(vids.length){
-    const{data:vip}=await sb.from('visite_imprese_presenti')
-      .select('visita_id,imprese(cassa_edile)').in('visita_id',vids).eq('is_principale',true)
-    ;(vip||[]).forEach(r=>{ceivMap[r.visita_id]=(r.imprese?.cassa_edile||'').trim()||'Altro'})
+  _dashTecMap={}
+  ;(tecs||[]).forEach(t=>{_dashTecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()||t.tecnico_id})
+  // card obiettivo mensile (non blocca la dashboard se fallisce)
+  loadTargetCard&&loadTargetCard().catch(e=>console.warn('loadTargetCard:',e))
+  // fetch storico completo (paginato) con cantiere + impresa principale
+  const cols=`visita_id,data_visita,ipc,rlst_sn,acc_cant,tecnico_id,tipo_accesso,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantiere_id,impresa_id,cantieri(comune_nome,cantiere_tip_int,cantiere_tip_ope,cantiere_importo),visite_imprese_presenti(is_principale,tipo_imp,impresa_id,imprese(impresa_nome,cassa_edile))`
+  let rows=[],from=0
+  for(;;){
+    const{data,error}=await sb.from('visite').select(cols).eq('elimina',0).order('data_visita',{ascending:true}).range(from,from+999)
+    if(error)throw error
+    rows=rows.concat(data||[])
+    if(!data||data.length<1000)break
+    from+=1000
   }
-
-  const C={alto:'#e74c3c',medio:'#f39c12',basso:'#95C22F',nr:'#95a5a6',orange:'#e7500f',grey:'#565c66'}
-  const PIE_COLORS=['#2563eb','#e7500f','#27ae60','#f39c12','#8e44ad','#e74c3c','#1abc9c','#565c66','#e67e22']
-
-  const tot=visite.length
-
-  // ── GRAFICO 1: Ciambella visite per tecnico ──
-  const tecCount={}
-  visite.forEach(v=>{const n=tecMap[v.tecnico_id]||'Non assegnato';tecCount[n]=(tecCount[n]||0)+1})
-  const tecLabels=Object.keys(tecCount).sort((a,b)=>tecCount[b]-tecCount[a])
-  _mkChart('ch-tecnico',{type:'doughnut',data:{
-    labels:tecLabels,
-    datasets:[{data:tecLabels.map(l=>tecCount[l]),backgroundColor:PIE_COLORS.slice(0,tecLabels.length),borderWidth:2}]
-  },options:{plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:14,generateLabels(chart){
-    return chart.data.labels.map((lbl,i)=>({text:`${lbl} – ${chart.data.datasets[0].data[i]} (${Math.round(chart.data.datasets[0].data[i]/tot*100)}%)`,fillStyle:PIE_COLORS[i],strokeStyle:'#fff',lineWidth:1,index:i}))
-  }}}}}})
-
-  // ── GRAFICO 2: Ciambella CEIV ──
-  const ceivCount={}
-  visite.forEach(v=>{const ce=ceivMap[v.visita_id]||'Altro';ceivCount[ce]=(ceivCount[ce]||0)+1})
-  const ceivLabels=Object.keys(ceivCount).sort((a,b)=>ceivCount[b]-ceivCount[a])
-  _mkChart('ch-ceiv',{type:'doughnut',data:{
-    labels:ceivLabels,
-    datasets:[{data:ceivLabels.map(l=>ceivCount[l]),backgroundColor:PIE_COLORS.slice(0,ceivLabels.length),borderWidth:2}]
-  },options:{plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:14,generateLabels(chart){
-    return chart.data.labels.map((lbl,i)=>({text:`${lbl} – ${chart.data.datasets[0].data[i]} (${Math.round(chart.data.datasets[0].data[i]/tot*100)}%)`,fillStyle:PIE_COLORS[i],strokeStyle:'#fff',lineWidth:1,index:i}))
-  }}}}}})
-
-  // ── GRAFICO 3: RLST per tecnico — barre orizzontali impilate ──
-  const rlstSi={},rlstNo={}
-  visite.forEach(v=>{
-    const n=tecMap[v.tecnico_id]||'Non assegnato'
-    if(v.rlst_sn){rlstSi[n]=(rlstSi[n]||0)+1}else{rlstNo[n]=(rlstNo[n]||0)+1}
+  _dashRaw=rows.map(r=>{
+    const arr=r.visite_imprese_presenti||[]
+    const p=arr.find(x=>x.is_principale)||arr[0]||null
+    const c=r.cantieri||{}
+    return{
+      data:r.data_visita,
+      ipc:(['ALTO','MEDIO','BASSO'].indexOf(r.ipc)>=0?r.ipc:'NR'),
+      rlst:!!r.rlst_sn, acc:+r.acc_cant||0, tec:r.tecnico_id, tipo:r.tipo_accesso,
+      ncp:+r.ipc_nc_plus||0, ncm:+r.ipc_nc_minus||0, oss:+r.ipc_oss||0,
+      comune:c.comune_nome||null, tipint:c.cantiere_tip_int||null, tipope:c.cantiere_tip_ope||null, importo:c.cantiere_importo||null,
+      ruolo:(p&&p.tipo_imp)||null, ceiv:((p&&p.imprese&&p.imprese.cassa_edile)||'').trim()||'Altro',
+      impnome:(p&&p.imprese&&p.imprese.impresa_nome)||null, impid:(p&&p.impresa_id)||null,
+      eserc:_esercizioDa(r.data_visita)
+    }
   })
-  const rlstLabels=Object.keys({...rlstSi,...rlstNo}).sort((a,b)=>{
-    const ta=(rlstSi[a]||0)+(rlstNo[a]||0),tb=(rlstSi[b]||0)+(rlstNo[b]||0);return tb-ta
-  })
-  // Plugin totali a destra
-  const rlstTotPlugin={id:'rlstTot',afterDatasetsDraw(chart){
-    const{ctx}=chart
-    rlstLabels.forEach((_,i)=>{
-      const siMeta=chart.getDatasetMeta(0),noMeta=chart.getDatasetMeta(1)
-      const barNo=noMeta.data[i]
-      if(!barNo)return
-      const totVal=(rlstSi[rlstLabels[i]]||0)+(rlstNo[rlstLabels[i]]||0)
-      ctx.save();ctx.font='bold 11px Segoe UI,sans-serif';ctx.fillStyle='#888';ctx.textAlign='left';ctx.textBaseline='middle'
-      ctx.fillText(totVal,barNo.x+6,barNo.y)
-      ctx.restore()
-    })
-  }}
-  _mkChart('ch-rlst',{type:'bar',plugins:[rlstTotPlugin],data:{
-    labels:rlstLabels,
-    datasets:[
-      {label:'Sì',data:rlstLabels.map(l=>rlstSi[l]||0),backgroundColor:C.grey,borderRadius:2},
-      {label:'No',data:rlstLabels.map(l=>rlstNo[l]||0),backgroundColor:C.orange,borderRadius:2}
-    ]
-  },options:{indexAxis:'y',plugins:{legend:{position:'bottom'},datalabels:{display:false}},scales:{x:{stacked:true,beginAtZero:true},y:{stacked:true}},layout:{padding:{right:40}}}})
-
-  // ── GRAFICO 4: IPC per numero accesso cantiere ──
-  // Raggruppa: 1=Primo, 2=Secondo, 3=Terzo, 4=Quarto, 5+=Quinto+
-  const accGrp={}
-  const accLabel=n=>{if(n<=0||!n)return'Non ind.';if(n===1)return'Primo';if(n===2)return'Secondo';if(n===3)return'Terzo';if(n===4)return'Quarto';return'Quinto+'}
-  visite.forEach(v=>{
-    const n=+(v.acc_cant)||0
-    const lbl=accLabel(n)
-    if(!accGrp[lbl])accGrp[lbl]={TOT:0,NR:0,BASSO:0,MEDIO:0,ALTO:0}
-    accGrp[lbl].TOT++
-    const ipc=(v.ipc==='ALTO'||v.ipc==='MEDIO'||v.ipc==='BASSO')?v.ipc:'NR'
-    accGrp[lbl][ipc]++
-  })
-  const ordAcc=['Primo','Secondo','Terzo','Quarto','Quinto+','Non ind.'].filter(l=>accGrp[l])
-  _mkChart('ch-accesso',{type:'bar',plugins:[datalabelPlugin],data:{
-    labels:ordAcc,
-    datasets:[
-      {label:'TOT',data:ordAcc.map(l=>accGrp[l]?.TOT||0),backgroundColor:'#565c66',borderRadius:3},
-      {label:'IPC Nessun rilievo',data:ordAcc.map(l=>accGrp[l]?.NR||0),backgroundColor:'#95C22F',borderRadius:3},
-      {label:'IPC Basso',data:ordAcc.map(l=>accGrp[l]?.BASSO||0),backgroundColor:'#f1c40f',borderRadius:3},
-      {label:'IPC Medio',data:ordAcc.map(l=>accGrp[l]?.MEDIO||0),backgroundColor:C.orange,borderRadius:3},
-      {label:'IPC Alto',data:ordAcc.map(l=>accGrp[l]?.ALTO||0),backgroundColor:C.alto,borderRadius:3}
-    ]
-  },options:{plugins:{legend:{position:'top'}},scales:{x:{grouped:true,ticks:{font:{size:11}}},y:{beginAtZero:true}}}})
-
-  // ── GRAFICO 5: Visite mese per mese ──
-  const mesiMap={}
-  visite.forEach(v=>{if(!v.data_visita)return;const m=v.data_visita.slice(0,7);mesiMap[m]=(mesiMap[m]||0)+1})
-  const mesiSorted=Object.keys(mesiMap).sort()
-  const MNOMI=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
-  const mesiLabels=mesiSorted.map(m=>{const[y,mo]=m.split('-');return`${MNOMI[+mo-1]} ${y}`})
-  _mkChart('ch-mesi',{type:'line',data:{
-    labels:mesiLabels,
-    datasets:[{label:'Visite',data:mesiSorted.map(m=>mesiMap[m]),borderColor:C.orange,backgroundColor:'rgba(231,80,15,.12)',fill:true,tension:.35,pointRadius:5,pointBackgroundColor:C.orange,pointBorderColor:'#fff',pointBorderWidth:2}]
-  },options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}})
-
+  _dashFillSelectors()
+  applyDashFilters()
   loadDashMap().catch(e=>console.error('loadDashMap:',e))
 }
+
+function _dashFillSelectors(){
+  const cur=annoEdile().label
+  const es=Array.from(new Set(_dashRaw.map(x=>x.eserc).filter(Boolean))).sort()
+  const selE=$('fd-eserc')
+  if(selE&&!selE.dataset.init){
+    selE.innerHTML='<option value="">Tutto lo storico</option>'+es.map(e=>`<option value="${e}">Es. ${e}</option>`).join('')
+    selE.value=es.indexOf(cur)>=0?cur:''
+    selE.dataset.init='1';selE.onchange=applyDashFilters
+  }
+  const selT=$('fd-tec')
+  if(selT&&!selT.dataset.init){
+    const tids=Array.from(new Set(_dashRaw.map(x=>x.tec).filter(Boolean)))
+    tids.sort((a,b)=>(_dashTecMap[a]||'').localeCompare(_dashTecMap[b]||''))
+    selT.innerHTML='<option value="">Tutti i tecnici</option>'+tids.map(t=>`<option value="${t}">${_dashTecMap[t]||t}</option>`).join('')
+    selT.dataset.init='1';selT.onchange=applyDashFilters
+  }
+  const selTy=$('fd-tipo')
+  if(selTy&&!selTy.dataset.init){
+    const opts=Object.keys(TIPO_ACC_LABELS).map(k=>`<option value="${k}">${TIPO_ACC_LABELS[k]}</option>`).join('')
+    selTy.innerHTML='<option value="">Tutte</option>'+opts
+    selTy.dataset.init='1';selTy.onchange=applyDashFilters
+  }
+  const selI=$('fd-ipc')
+  if(selI&&!selI.dataset.init){
+    selI.innerHTML='<option value="">Tutti i livelli</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun rilievo</option>'
+    selI.dataset.init='1';selI.onchange=applyDashFilters
+  }
+}
+
+function applyDashFilters(){
+  if(!_dashRaw)return
+  const fE=$('fd-eserc')?$('fd-eserc').value:''
+  const fT=$('fd-tec')?$('fd-tec').value:''
+  const fTy=$('fd-tipo')?$('fd-tipo').value:''
+  const fI=$('fd-ipc')?$('fd-ipc').value:''
+  const byTTI=x=>(!fT||String(x.tec)===fT)&&(!fTy||String(x.tipo)===fTy)&&(!fI||x.ipc===fI)
+  const FE=_dashRaw.filter(byTTI)              // per grafico esercizio (no filtro esercizio)
+  const F=FE.filter(x=>!fE||x.eserc===fE)      // dataset principale
+  _dashRenderKpi(F)
+  _dashRenderEsercizio(FE,fE)
+  _dashRenderMesi(F)
+  _dashRenderTecnico(F)
+  _dashRenderRlst(F)
+  _dashRenderIpc(F)
+  _dashRenderAccesso(F)
+  _dashRenderProd(F)
+  _dashRenderImprese(F)
+  _dashRenderRuolo(F)
+  _dashRenderTipoVis(F)
+  _dashRenderComuni(F)
+  _dashRenderTipInt(F)
+  _dashRenderTipOpe(F)
+  _dashRenderImporto(F)
+  _dashRenderCeiv(F)
+  _dashRenderMacro(fE,fT,fTy,fI)
+  if($('fd-count'))$('fd-count').textContent=F.length+' sopralluoghi mostrati su '+_dashRaw.length
+}
+
+function _grp(F,keyfn){const m={};F.forEach(x=>{const k=keyfn(x);if(k==null)return;m[k]=(m[k]||0)+1});return m}
+function _sortKeys(m){return Object.keys(m).sort((a,b)=>m[b]-m[a])}
+
+function _dashRenderKpi(F){
+  const n=F.length,sum=k=>F.reduce((a,x)=>a+x[k],0)
+  const am=F.filter(x=>x.ipc==='ALTO'||x.ipc==='MEDIO').length
+  const rl=F.filter(x=>x.rlst).length
+  const com=new Set(F.filter(x=>x.comune).map(x=>x.comune)).size
+  const pc=v=>n?(Math.round(v/n*1000)/10)+'%':'–'
+  $('k-sopr').textContent=n;$('k-ncplus').textContent=sum('ncp')
+  $('k-ipcam').textContent=am;$('k-ipcam-pct').textContent=pc(am)
+  $('k-rlst').textContent=rl;$('k-rlst-pct').textContent=pc(rl)
+  $('k-oss').textContent=sum('oss');$('k-comuni').textContent=com
+}
+
+function _dashRenderEsercizio(FE,selE){
+  const m=_grp(FE,x=>x.eserc);const L=Object.keys(m).sort()
+  _mkChart('ch-esercizio',{type:'bar',plugins:[datalabelPlugin],data:{labels:L.map(l=>'Es. '+l),datasets:[{data:L.map(l=>m[l]),backgroundColor:L.map(l=>l===selE?_DASH_C.orange:_DASH_C.grey),borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}})
+}
+
+function _dashRenderMesi(F){
+  const m={};F.forEach(x=>{if(!x.data)return;const k=x.data.slice(0,7);m[k]=(m[k]||0)+1})
+  const S=Object.keys(m).sort()
+  const N=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
+  _mkChart('ch-mesi',{type:'line',data:{labels:S.map(k=>{const p=k.split('-');return N[+p[1]-1]+' '+p[0].slice(2)}),datasets:[{label:'Visite',data:S.map(k=>m[k]),borderColor:_DASH_C.orange,backgroundColor:'rgba(231,80,15,.12)',fill:true,tension:.35,pointRadius:4,pointBackgroundColor:_DASH_C.orange,pointBorderColor:'#fff',pointBorderWidth:2}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}})
+}
+
+function _dashRenderTecnico(F){
+  const m=_grp(F,x=>_dashTecMap[x.tec]||'Non assegnato');const L=_sortKeys(m);const tot=F.length||1
+  _mkChart('ch-tecnico',{type:'doughnut',data:{labels:L,datasets:[{data:L.map(l=>m[l]),backgroundColor:L.map((_,i)=>_DASH_PIE[i%_DASH_PIE.length]),borderWidth:2}]},options:{plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:14,generateLabels(ch){return ch.data.labels.map((lb,i)=>({text:lb+' – '+ch.data.datasets[0].data[i]+' ('+Math.round(ch.data.datasets[0].data[i]/tot*100)+'%)',fillStyle:_DASH_PIE[i%_DASH_PIE.length],strokeStyle:'#fff',lineWidth:1,index:i}))}}}}}})
+}
+
+function _dashRenderRlst(F){
+  const si={},no={};F.forEach(x=>{const n=_dashTecMap[x.tec]||'Non assegnato';if(x.rlst)si[n]=(si[n]||0)+1;else no[n]=(no[n]||0)+1})
+  const L=Object.keys(Object.assign({},si,no)).sort((a,b)=>((si[b]||0)+(no[b]||0))-((si[a]||0)+(no[a]||0)))
+  _mkChart('ch-rlst',{type:'bar',data:{labels:L,datasets:[{label:'Con RLST',data:L.map(l=>si[l]||0),backgroundColor:_DASH_C.green,borderRadius:2},{label:'Senza RLST',data:L.map(l=>no[l]||0),backgroundColor:_DASH_C.grey,borderRadius:2}]},options:{indexAxis:'y',plugins:{legend:{position:'top'}},scales:{x:{stacked:true,beginAtZero:true},y:{stacked:true}}}})
+}
+
+function _dashRenderIpc(F){
+  const o={NR:0,BASSO:0,MEDIO:0,ALTO:0};F.forEach(x=>{o[x.ipc]=(o[x.ipc]||0)+1})
+  const defs=[['Nessun Rilievo','NR',_DASH_C.nr],['Basso','BASSO',_DASH_C.basso],['Medio','MEDIO',_DASH_C.medio],['Alto','ALTO',_DASH_C.alto]]
+  const tot=F.length||1
+  _mkChart('ch-ipc',{type:'doughnut',data:{labels:defs.map(d=>d[0]),datasets:[{data:defs.map(d=>o[d[1]]||0),backgroundColor:defs.map(d=>d[2]),borderWidth:2}]},options:{plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:14,generateLabels(ch){return ch.data.labels.map((lb,i)=>({text:lb+' — '+ch.data.datasets[0].data[i]+' ('+Math.round(ch.data.datasets[0].data[i]/tot*100)+'%)',fillStyle:defs[i][2],strokeStyle:'#fff',lineWidth:1,index:i}))}}}}}})
+}
+
+function _dashRenderAccesso(F){
+  const lab=n=>{if(!n||n<=0)return'Non ind.';if(n>=5)return'5°+';return n+'°'}
+  const ord=['1°','2°','3°','4°','5°+','Non ind.']
+  const g={};F.forEach(x=>{const k=lab(x.acc);(g[k]=g[k]||{NR:0,BASSO:0,MEDIO:0,ALTO:0})[x.ipc]++})
+  const L=ord.filter(k=>g[k])
+  _mkChart('ch-accesso',{type:'bar',data:{labels:L,datasets:[{label:'Nessun Rilievo',data:L.map(k=>g[k].NR),backgroundColor:_DASH_C.nr},{label:'Basso',data:L.map(k=>g[k].BASSO),backgroundColor:_DASH_C.basso},{label:'Medio',data:L.map(k=>g[k].MEDIO),backgroundColor:_DASH_C.medio},{label:'Alto',data:L.map(k=>g[k].ALTO),backgroundColor:_DASH_C.alto}]},options:{plugins:{legend:{position:'top'}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}})
+}
+
+function _dashRenderProd(F){
+  const m={};F.forEach(x=>{const id=x.tec||'—';const r=m[id]=m[id]||{vis:0,rlst:0,ncp:0,oss:0,am:0};r.vis++;if(x.rlst)r.rlst++;r.ncp+=x.ncp;r.oss+=x.oss;if(x.ipc==='ALTO'||x.ipc==='MEDIO')r.am++})
+  const rows=Object.keys(m).map(id=>Object.assign({n:_dashTecMap[id]||'Non assegnato'},m[id])).sort((a,b)=>b.vis-a.vis)
+  const pc=(a,b)=>b?(Math.round(a/b*1000)/10)+'%':'0%'
+  let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">Tecnico</th><th>Visite</th><th>Affianc. RLST</th><th>NC+ tot</th><th>Osservazioni</th><th>IPC Alto+Medio</th></tr></thead><tbody>'
+  rows.forEach(r=>{h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px">'+r.n+'</td><td>'+r.vis+'</td><td>'+r.rlst+' <span style="color:#7cab19">'+pc(r.rlst,r.vis)+'</span></td><td>'+r.ncp+'</td><td>'+r.oss+'</td><td>'+r.am+' <span style="color:#d68910">'+pc(r.am,r.vis)+'</span></td></tr>'})
+  if(!rows.length)h+='<tr><td colspan="6" style="padding:8px;color:#999">Nessun dato.</td></tr>'
+  h+='</tbody></table>';$('tbl-prod').innerHTML=h
+}
+
+async function _dashRenderMacro(fE,fT,fTy,fI){
+  let da=null,a=null
+  if(fE){const s=+fE.slice(0,4);da=s+'-10-01';a=(s+1)+'-09-30'}
+  const params={p_da:da,p_a:a,p_tecnico:fT||null,p_tipo:fTy?+fTy:null,p_ipc:fI||null}
+  const el=$('tbl-macro');if(!el)return
+  let data=null,err=null
+  try{const r=await sb.rpc('dash_macroaree',params);data=r.data;err=r.error}catch(e){err=e}
+  if(err){el.innerHTML='<div style="color:#999;font-size:12px">Dati macroaree non disponibili.</div>';console.warn('dash_macroaree:',err);return}
+  const by={};(data||[]).forEach(r=>by[r.zona]=r)
+  let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">Macroarea</th><th>NC+</th><th>NC−</th><th>OSS</th><th>Verif.</th></tr></thead><tbody>'
+  for(let z=1;z<=10;z++){const r=by[z]||{nc_plus:0,nc_minus:0,oss:0,ver:0};h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px">'+_DASH_MACRO[z]+'</td><td><b style="color:'+(r.nc_plus>0?'#e74c3c':'#bbb')+'">'+r.nc_plus+'</b></td><td>'+r.nc_minus+'</td><td>'+r.oss+'</td><td style="color:#999">'+r.ver+'</td></tr>'}
+  h+='</tbody></table>';el.innerHTML=h
+}
+
+function _dashRenderImprese(F){
+  const m={}
+  F.forEach(x=>{const k=x.impid||x.impnome;if(!k)return;const r=m[k]=m[k]||{nome:x.impnome||'—',vis:0,ncp:0,ncm:0,last:null,tec:{}};r.vis++;r.ncp+=x.ncp;r.ncm+=x.ncm;if(!r.last||x.data>r.last)r.last=x.data;const tn=_dashTecMap[x.tec]||'—';r.tec[tn]=(r.tec[tn]||0)+1})
+  const rows=Object.keys(m).map(k=>m[k]).filter(r=>r.vis>=2).sort((a,b)=>b.vis-a.vis).slice(0,20)
+  const fmt=d=>d?d.slice(0,10).split('-').reverse().join('/'):'—'
+  let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">#</th><th>Impresa</th><th>Visite</th><th>NC+</th><th>NC−</th><th>Tecnico prevalente</th><th>Ultima visita</th></tr></thead><tbody>'
+  rows.forEach((r,i)=>{const tt=Object.keys(r.tec).sort((a,b)=>r.tec[b]-r.tec[a])[0];h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px;color:#bbb">'+(i+1)+'</td><td><b>'+r.nome+'</b></td><td>'+r.vis+'</td><td><b style="color:'+(r.ncp>0?'#e74c3c':'#bbb')+'">'+r.ncp+'</b></td><td>'+r.ncm+'</td><td>'+(tt||'—')+' <span style="color:#aaa">('+(r.tec[tt]||0)+')</span></td><td>'+fmt(r.last)+'</td></tr>'})
+  if(!rows.length)h+='<tr><td colspan="7" style="padding:8px;color:#999">Nessuna impresa con più di una visita nel filtro corrente.</td></tr>'
+  h+='</tbody></table>';$('tbl-imprese').innerHTML=h
+}
+
+function _dashRenderRuolo(F){
+  const m=_grp(F,x=>(x.ruolo&&TIPO_IMP_OPT[x.ruolo])||'Non indicato');const L=_sortKeys(m)
+  _mkChart('ch-ruolo',{type:'bar',data:{labels:L,datasets:[{data:L.map(l=>m[l]),backgroundColor:_DASH_C.orange,borderRadius:3}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}})
+}
+
+function _dashRenderTipoVis(F){
+  const m=_grp(F,x=>(x.tipo&&TIPO_ACC_LABELS[x.tipo])||'Non indicato');const L=_sortKeys(m)
+  _mkChart('ch-tipovis',{type:'bar',data:{labels:L,datasets:[{data:L.map(l=>m[l]),backgroundColor:_DASH_C.grey,borderRadius:3}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}})
+}
+
+function _dashRenderComuni(F){
+  const m={};let tot=0;F.forEach(x=>{if(!x.comune)return;m[x.comune]=(m[x.comune]||0)+1;tot++})
+  const L=_sortKeys(m).slice(0,20)
+  let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">Comune</th><th>Visite</th><th>%</th></tr></thead><tbody>'
+  L.forEach(c=>{h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px">'+c+'</td><td>'+m[c]+'</td><td style="color:#888">'+(tot?Math.round(m[c]/tot*1000)/10:0)+'%</td></tr>'})
+  if(!L.length)h+='<tr><td colspan="3" style="padding:8px;color:#999">Nessun dato.</td></tr>'
+  h+='</tbody></table>';$('tbl-comuni').innerHTML=h
+}
+
+function _dashRenderTipInt(F){
+  const m=_grp(F,x=>(x.tipint&&TIP_INT_LABELS[x.tipint])||'Non indicato');const L=_sortKeys(m)
+  _mkChart('ch-tipint',{type:'bar',plugins:[datalabelPlugin],data:{labels:L,datasets:[{data:L.map(l=>m[l]),backgroundColor:_DASH_C.orange,borderRadius:3}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true},x:{ticks:{font:{size:10}}}}}})
+}
+
+function _dashRenderTipOpe(F){
+  const m=_grp(F,x=>(x.tipope&&TIP_OPE_LABELS[x.tipope])||'Non indicato');const L=_sortKeys(m)
+  _mkChart('ch-tipope',{type:'bar',plugins:[datalabelPlugin],data:{labels:L,datasets:[{data:L.map(l=>m[l]),backgroundColor:_DASH_C.grey,borderRadius:3}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true},x:{ticks:{font:{size:10}}}}}})
+}
+
+function _dashRenderImporto(F){
+  const m=_grp(F,x=>(x.importo&&_DASH_IMPORTO[x.importo])||'Non disponibile')
+  const order=Object.keys(_DASH_IMPORTO).map(k=>_DASH_IMPORTO[k]).concat(['Non disponibile'])
+  const seen={};const L=order.filter(l=>{if(seen[l]||!m[l])return false;seen[l]=1;return true})
+  _mkChart('ch-importo',{type:'bar',data:{labels:L,datasets:[{data:L.map(l=>m[l]),backgroundColor:_DASH_C.orange,borderRadius:3}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}})
+}
+
+function _dashRenderCeiv(F){
+  const m=_grp(F,x=>x.ceiv);const L=_sortKeys(m);const tot=F.length||1
+  _mkChart('ch-ceiv',{type:'doughnut',data:{labels:L,datasets:[{data:L.map(l=>m[l]),backgroundColor:L.map((_,i)=>_DASH_PIE[i%_DASH_PIE.length]),borderWidth:2}]},options:{plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:14,generateLabels(ch){return ch.data.labels.map((lb,i)=>({text:lb+' – '+ch.data.datasets[0].data[i]+' ('+Math.round(ch.data.datasets[0].data[i]/tot*100)+'%)',fillStyle:_DASH_PIE[i%_DASH_PIE.length],strokeStyle:'#fff',lineWidth:1,index:i}))}}}}}})
+}
+
 
 // ── MAPPA CANTIERI (dashboard) ──
 let _dashMap=null, _dashMapLayers=null
