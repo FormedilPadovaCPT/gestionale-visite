@@ -1554,7 +1554,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 <div class="modal-overlay hidden" id="modal-email-verbale">
   <div class="modal-box" style="max-width:500px">
     <h3 style="margin-bottom:10px;color:var(--grey);font-size:15px">📧 Invia verbale</h3>
-    <p style="font-size:12px;color:#666;margin-bottom:14px">Il PDF del verbale sarà generato e inviato automaticamente da <strong>cptpd@did.scuolaedilepadova.net</strong> ai seguenti destinatari.</p>
+    <p style="font-size:12px;color:#666;margin-bottom:14px">Il PDF del verbale sarà generato e inviato automaticamente da <strong>cptpd@did.formedilpadova.it</strong> ai seguenti destinatari.</p>
     <div id="email-verbale-list" style="margin-bottom:14px;max-height:220px;overflow-y:auto"></div>
     <div class="field" style="margin-bottom:14px">
       <label>Oggetto email</label>
@@ -1953,7 +1953,7 @@ async function onLogin(user){
   S.tecnico=tec
   $('lbl-user').textContent=tec?`${tec.tecnico_nome} ${tec.tecnico_cognome}`:user.email
   // Mostra tab Coordinatore solo per l'account admin
-  const isAdmin=user.email==='cptpd@did.scuolaedilepadova.net'
+  const isAdmin=user.email==='cptpd@did.formedilpadova.it'
   const navAdm=$('nav-admin')
   if(navAdm)navAdm.style.display=isAdmin?'':'none'
   await loadVoci()
@@ -3290,12 +3290,12 @@ $('btn-snap-exp').onclick=()=>{
 
 // ── TECNICI ───────────────────────────────────────────────────────────────────
 const TECNICI_LIST=[
-  {nome:'Arch. Marco Camuffo',     email:'marco.camuffo@did.scuolaedilepadova.net'},
-  {nome:'Arch. Nicola De Marco',   email:'nicola.demarco@did.scuolaedilepadova.net'},
-  {nome:'Arch. Tommaso Visentini', email:'tommaso.visentini@did.scuolaedilepadova.net'},
-  {nome:'Geom. Mirco Canova',      email:'mirco.canova@did.scuolaedilepadova.net'},
-  {nome:'Ing. Paolo Balladore',    email:'paolo.balladore@did.scuolaedilepadova.net'},
-  {nome:'P.I. Franco Caon',        email:'franco.caon@did.scuolaedilepadova.net'},
+  {nome:'Arch. Marco Camuffo',     email:'marco.camuffo@did.formedilpadova.it'},
+  {nome:'Arch. Nicola De Marco',   email:'nicola.demarco@did.formedilpadova.it'},
+  {nome:'Arch. Tommaso Visentini', email:'tommaso.visentini@did.formedilpadova.it'},
+  {nome:'Geom. Mirco Canova',      email:'mirco.canova@did.formedilpadova.it'},
+  {nome:'Ing. Paolo Balladore',    email:'paolo.balladore@did.formedilpadova.it'},
+  {nome:'P.I. Franco Caon',        email:'franco.caon@did.formedilpadova.it'},
 ]
 // Recupera o crea il record tecnico nel DB per una voce di TECNICI_LIST
 async function getOrCreateTecnicoId(t){
@@ -5862,7 +5862,7 @@ initAuth()
 // ══════════════════════════════════════════════════
 // ── ZONA RISERVATA COORDINATORE ──────────────────
 // ══════════════════════════════════════════════════
-const ADMIN_EMAIL = 'cptpd@did.scuolaedilepadova.net'
+const ADMIN_EMAIL = 'cptpd@did.formedilpadova.it'
 
 function admInit(){
   // Mostra email corrente nella zona admin
