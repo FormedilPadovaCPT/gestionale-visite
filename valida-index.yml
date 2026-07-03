@@ -1,0 +1,23 @@
+name: Valida index.html
+
+# Blocca il push se index.html risulta troncato o malformato.
+# Previene l'incidente del 02/06/2026 (upload di un file tagliato -> app in crash).
+
+on:
+  push:
+    paths:
+      - 'index.html'
+      - 'tools/valida_index.py'
+  workflow_dispatch:
+
+jobs:
+  valida:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Controllo integrita' index.html
+        run: python tools/valida_index.py index.html

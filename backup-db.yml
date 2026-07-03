@@ -1,0 +1,56 @@
+name: Backup DB (settimanale)
+
+# Esegue un dump logico del database (schemi public + planning), lo comprime
+# e lo CIFRA con AES256, poi lo carica come artifact scaricabile dai collaboratori
+# del repo. Gratuito. Nessun dato in chiaro viene salvato nel repository.
+#
+# Secret richiesti (Settings -> Secrets and variables -> Actions):
+#   SUPABASE_DB_URL     stringa di connessione Postgres (Supabase -> Project Settings
+#                       -> Database -> Connection string -> URI). Usare il pooler o
+#                       la connessione diretta. Contiene la password del DB.
+#   BACKUP_PASSPHRASE   passphrase con cui viene cifrato il backup (scegline una lunga).
+#
+# Ripristino di un backup:
+#   gpg --batch --passphrase '<BACKUP_PASSPHRASE>' -d backup_XXXX.sql.gz.gpg | gunzip > backup.sql
+#   psql '<SUPABASE_DB_URL>' -f backup.sql
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'   # ogni lunedi' alle 03:00 UTC
+  workflow_dispatch:       # avvio manuale dal tab Actions
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Installa client PostgreSQL 16
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+
+      - name: Dump + compressione + cifratura
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DB_URL:-}" ] || [ -z "${PASS:-}" ]; then
+            echo "Secret SUPABASE_DB_URL e/o BACKUP_PASSPHRASE mancanti."; exit 1
+          fi
+          TS=$(date +%Y%m%d_%H%M%S)
+          pg_dump "$DB_URL" --no-owner --no-privileges \
+            --schema=public --schema=planning \
+            | gzip -9 > "backup_${TS}.sql.gz"
+          gpg --batch --yes --symmetric --cipher-algo AES256 \
+            --passphrase "$PASS" "backup_${TS}.sql.gz"
+          rm -f "backup_${TS}.sql.gz"
+          echo "TS=${TS}" >> "$GITHUB_ENV"
+
+      - name: Carica il backup cifrato come artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ env.TS }}
+          path: 'backup_*.sql.gz.gpg'
+          retention-days: 90

@@ -1,0 +1,41 @@
+name: Promemoria ricontrolli
+
+# Ogni lunedì invia a ciascun tecnico il digest dei ricontrolli in scadenza sui
+# suoi cantieri (regola Formedil). Chiama la Edge Function promemoria-ricontrolli.
+#
+# PREREQUISITI (una tantum):
+#  1) In Supabase -> Edge Functions -> Secrets, crea CRON_SECRET con una stringa
+#     casuale lunga (es. generata con: openssl rand -hex 24).
+#  2) In GitHub -> Settings -> Secrets and variables -> Actions, crea il secret
+#     CRON_SECRET con LO STESSO valore.
+#
+# Anteprima senza inviare: Actions -> Promemoria ricontrolli -> Run workflow ->
+#   dryRun = true  (restituisce il conteggio per tecnico, non manda email).
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'      # lunedì 06:00 UTC (~07:00-08:00 Italia)
+  workflow_dispatch:
+    inputs:
+      dryRun:
+        description: 'Solo anteprima (non invia email)'
+        type: boolean
+        default: false
+
+jobs:
+  invia:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoca la funzione
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then echo "Secret CRON_SECRET mancante"; exit 1; fi
+          BASE="https://utdantrfugnmqsuujxbe.supabase.co/functions/v1/promemoria-ricontrolli"
+          Q=""
+          if [ "${{ inputs.dryRun }}" = "true" ]; then Q="?dryRun=1"; fi
+          echo "Chiamo $BASE$Q"
+          curl -fsS -X POST "$BASE$Q" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" | tee risultato.json
