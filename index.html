@@ -1107,6 +1107,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div style="display:grid;gap:8px;max-width:660px">
             <input id="avv-titolo" placeholder="Titolo (opzionale)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px">
             <textarea id="avv-testo" placeholder="Testo del messaggio…" rows="3" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px;font-family:inherit"></textarea>
+            <div style="font-size:12px"><label style="color:rgba(255,255,255,.55);display:block;margin-bottom:4px">Destinatari <span style="color:rgba(255,255,255,.35)">(nessuno = tutti i tecnici)</span></label><div id="avv-dest" style="display:flex;flex-wrap:wrap;gap:12px;background:rgba(255,255,255,.05);padding:8px;border-radius:6px"></div></div>
             <div class="adm-date-row">
               <div class="field" style="min-width:150px"><label>Priorità</label><select id="avv-prio"><option value="info">Info</option><option value="importante">Importante</option><option value="urgente">Urgente</option></select></div>
               <div class="field" style="min-width:150px"><label>Scade il (opzionale)</label><input type="date" id="avv-scade"></div>
@@ -5851,10 +5852,11 @@ async function loadAvvisi(){
   const box=$('avvisi-banner'); if(!box||!S.user) return
   const today=new Date().toISOString().slice(0,10)
   let avv=null; try{const r=await sb.from('avvisi').select('*').eq('attivo',true).order('created_at',{ascending:false});if(r.error)throw r.error;avv=r.data}catch(e){box.innerHTML='';return}
-  const attivi=(avv||[]).filter(a=>!a.scade_il||a.scade_il>=today)
+  const me=S.user.email
+  const attivi=(avv||[]).filter(a=>(!a.scade_il||a.scade_il>=today)&&(!a.destinatari||!a.destinatari.length||a.destinatari.includes(me)))
   if(!attivi.length){box.innerHTML='';return}
-  let letti=new Set(); try{const r=await sb.from('avvisi_letture').select('avviso_id').eq('email',S.user.email);(r.data||[]).forEach(x=>letti.add(x.avviso_id))}catch(e){}
-  const ST={urgente:['#c0392b','#fdecea','\U0001F534','Avviso urgente'],importante:['#e7500f','#fff3ee','\U0001F7E0','Avviso importante'],info:['#2980b9','#eef6fc','\U0001F535','Avviso']}
+  let letti=new Set(); try{const r=await sb.from('avvisi_letture').select('avviso_id').eq('email',me);(r.data||[]).forEach(x=>letti.add(x.avviso_id))}catch(e){}
+  const ST={urgente:['#c0392b','#fdecea','🔴','Avviso urgente'],importante:['#e7500f','#fff3ee','🟠','Avviso importante'],info:['#2980b9','#eef6fc','🔵','Avviso']}
   box.innerHTML=attivi.map(a=>{
     const st=ST[a.priorita]||ST.info; const gia=letti.has(a.id)
     return '<div style="border-left:4px solid '+st[0]+';background:'+st[1]+';border-radius:6px;padding:10px 14px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><div style="min-width:0"><strong style="color:'+st[0]+'">'+st[2]+' '+esc(a.titolo||st[3])+'</strong><div style="font-size:13px;color:#333;margin-top:3px;white-space:pre-wrap">'+esc(a.testo)+'</div></div>'+(gia?'<span style="font-size:11px;color:#27ae60;white-space:nowrap">✓ Letto</span>':'<button class="btn-outline btn-sm" style="white-space:nowrap" onclick="presaVisione(\''+a.id+'\',this)">Presa visione</button>')+'</div></div>'
@@ -5871,23 +5873,27 @@ async function admSaveAvviso(){
   if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
   const testo=($('avv-testo').value||'').trim()
   if(!testo){toast('Scrivi il testo dell’avviso','warn');$('avv-testo').focus();return}
-  const row={titolo:($('avv-titolo').value||'').trim()||null,testo:testo,priorita:$('avv-prio').value,scade_il:$('avv-scade').value||null,creato_da:S.user.email,attivo:true}
+  const dest=[...document.querySelectorAll('#avv-dest input:checked')].map(c=>c.value)
+  const row={titolo:($('avv-titolo').value||'').trim()||null,testo:testo,priorita:$('avv-prio').value,scade_il:$('avv-scade').value||null,destinatari:dest.length?dest:null,creato_da:S.user.email,attivo:true}
   const{error}=await sb.from('avvisi').insert(row)
   if(error){toast('Errore: '+error.message,'err');return}
   $('avv-titolo').value='';$('avv-testo').value='';$('avv-scade').value=''
+  document.querySelectorAll('#avv-dest input:checked').forEach(c=>c.checked=false)
   toast('Avviso pubblicato','ok'); admLoadAvvisi()
 }
 window.admSaveAvviso=admSaveAvviso
 async function admLoadAvvisi(){
   const box=$('adm-avvisi-list'); if(!box)return
+  const dbox=$('avv-dest'); if(dbox&&dbox.dataset.done!=='1'){dbox.innerHTML=(typeof TECNICI_LIST!=='undefined'?TECNICI_LIST:[]).map(t=>'<label style="color:#fff;font-size:12px;display:flex;align-items:center;gap:5px"><input type="checkbox" value="'+t.email+'"> '+esc(t.nome)+'</label>').join('');dbox.dataset.done='1'}
   const[{data:avv},{data:lett},{data:tecs}]=await Promise.all([
     sb.from('avvisi').select('*').order('created_at',{ascending:false}),
     sb.from('avvisi_letture').select('avviso_id'),
     sb.from('tecnici').select('tecnico_id').eq('elimina',0)
   ])
   const nTec=(tecs||[]).length||1; const cnt={};(lett||[]).forEach(l=>cnt[l.avviso_id]=(cnt[l.avviso_id]||0)+1)
+  const nomeDi=e=>{const t=(typeof TECNICI_LIST!=='undefined'?TECNICI_LIST:[]).find(x=>x.email===e);return t?t.nome:e}
   if(!avv||!avv.length){box.innerHTML='<div style="color:rgba(255,255,255,.5);font-size:12px">Nessun avviso pubblicato.</div>';return}
-  box.innerHTML='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="color:#95C22F;text-align:left"><th style="padding:5px">Avviso</th><th>Priorità</th><th>Letture</th><th>Stato</th><th></th></tr></thead><tbody>'+avv.map(a=>'<tr style="border-top:1px solid rgba(255,255,255,.08)"><td style="padding:5px;color:#fff">'+esc(a.titolo||a.testo.slice(0,45))+'</td><td style="text-align:center;color:rgba(255,255,255,.8)">'+a.priorita+'</td><td style="text-align:center;color:#fff">'+(cnt[a.id]||0)+'/'+nTec+'</td><td style="text-align:center">'+(a.attivo?'<span style="color:#95C22F">attivo</span>':'<span style="color:#888">spento</span>')+'</td><td style="text-align:right;white-space:nowrap"><button class="btn-outline btn-sm" onclick="admToggleAvviso(\''+a.id+'\','+a.attivo+')">'+(a.attivo?'Spegni':'Riattiva')+'</button> <button class="btn-outline btn-sm" onclick="admDeleteAvviso(\''+a.id+'\')">\U0001F5D1</button></td></tr>').join('')+'</tbody></table>'
+  box.innerHTML='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="color:#95C22F;text-align:left"><th style="padding:5px">Avviso</th><th>Destinatari</th><th>Priorità</th><th>Letture</th><th>Stato</th><th></th></tr></thead><tbody>'+avv.map(a=>{const mir=a.destinatari&&a.destinatari.length;const dn=mir?a.destinatari.length:nTec;const dl=mir?a.destinatari.map(nomeDi).join(', '):'Tutti';return '<tr style="border-top:1px solid rgba(255,255,255,.08)"><td style="padding:5px;color:#fff">'+esc(a.titolo||a.testo.slice(0,45))+'</td><td style="color:rgba(255,255,255,.7);max-width:170px">'+esc(dl)+'</td><td style="text-align:center;color:rgba(255,255,255,.8)">'+a.priorita+'</td><td style="text-align:center;color:#fff">'+(cnt[a.id]||0)+'/'+dn+'</td><td style="text-align:center">'+(a.attivo?'<span style="color:#95C22F">attivo</span>':'<span style="color:#888">spento</span>')+'</td><td style="text-align:right;white-space:nowrap"><button class="btn-outline btn-sm" onclick="admToggleAvviso(\''+a.id+'\','+a.attivo+')">'+(a.attivo?'Spegni':'Riattiva')+'</button> <button class="btn-outline btn-sm" onclick="admDeleteAvviso(\''+a.id+'\')">🗑</button></td></tr>'}).join('')+'</tbody></table>'
 }
 window.admLoadAvvisi=admLoadAvvisi
 async function admToggleAvviso(id,cur){ await sb.from('avvisi').update({attivo:!cur}).eq('id',id); admLoadAvvisi() }
@@ -5898,7 +5904,7 @@ async function admCopyLastMonth(){
   if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
   const mv=$('adm-target-mese')?.value
   if(!mv){toast('Seleziona il mese e clicca Carica','warn');return}
-  if(($('adm-target-wrap').style.display||'none')==='none'){toast('Prima clicca \U0001F4E5 Carica','warn');return}
+  if(($('adm-target-wrap').style.display||'none')==='none'){toast('Prima clicca 📥 Carica','warn');return}
   let[anno,mese]=mv.split('-').map(Number); let pm=mese-1,pa=anno; if(pm<1){pm=12;pa=anno-1}
   const{data:tgts}=await sb.from('target_visite_mensili').select('tecnico_id,max_visite').eq('anno',pa).eq('mese',pm)
   if(!tgts||!tgts.length){toast('Nessun target nel mese precedente','warn');return}
