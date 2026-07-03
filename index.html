@@ -1780,7 +1780,6 @@ window.show=show;window.hide=hide;
 
 // ── CHIUSURA MODAL: click fuori + Escape ──
 // I modal che richiedono una scelta obbligatoria non si chiudono con click/Escape
-const MODAL_NO_DISMISS=['modal-verbale']
 document.addEventListener('click',e=>{
   if(!e.target.classList.contains('modal-overlay'))return
   const id=e.target.id
@@ -3212,14 +3211,6 @@ $('btn-snap-exp').onclick=()=>{
 }
 
 // ── TECNICI ───────────────────────────────────────────────────────────────────
-const TECNICI_LIST=[
-  {nome:'Arch. Marco Camuffo',     email:'marco.camuffo@did.formedilpadova.it'},
-  {nome:'Arch. Nicola De Marco',   email:'nicola.demarco@did.formedilpadova.it'},
-  {nome:'Arch. Tommaso Visentini', email:'tommaso.visentini@did.formedilpadova.it'},
-  {nome:'Geom. Mirco Canova',      email:'mirco.canova@did.formedilpadova.it'},
-  {nome:'Ing. Paolo Balladore',    email:'paolo.balladore@did.formedilpadova.it'},
-  {nome:'P.I. Franco Caon',        email:'franco.caon@did.formedilpadova.it'},
-]
 // Recupera o crea il record tecnico nel DB per una voce di TECNICI_LIST
 async function getOrCreateTecnicoId(t){
   let{data}=await sb.from('tecnici').select('tecnico_id').eq('email',t.email).maybeSingle()
@@ -3728,7 +3719,7 @@ async function loadDash(){
     const p=arr.find(x=>x.is_principale)||arr[0]||null
     const c=r.cantieri||{}
     return{
-      data:r.data_visita,
+      vid:r.visita_id, data:r.data_visita,
       ipc:(['ALTO','MEDIO','BASSO'].indexOf(r.ipc)>=0?r.ipc:'NR'),
       rlst:!!r.rlst_sn, acc:+r.acc_cant||0, tec:r.tecnico_id, tipo:r.tipo_accesso,
       ncp:+r.ipc_nc_plus||0, ncm:+r.ipc_nc_minus||0, oss:+r.ipc_oss||0,
@@ -3781,6 +3772,7 @@ function applyDashFilters(){
   const byTTI=x=>(!fT||String(x.tec)===fT)&&(!fTy||String(x.tipo)===fTy)&&(!fI||x.ipc===fI)
   const FE=_dashRaw.filter(byTTI)              // per grafico esercizio (no filtro esercizio)
   const F=FE.filter(x=>!fE||x.eserc===fE)      // dataset principale
+  _dashVerReady=false
   _dashRenderKpi(F)
   _dashRenderEsercizio(FE,fE)
   _dashRenderMesi(F)
@@ -3798,6 +3790,7 @@ function applyDashFilters(){
   _dashRenderImporto(F)
   _dashRenderCeiv(F)
   _dashRenderMacro(fE,fT,fTy,fI)
+  _dashLoadVer(fE,fT,fTy,fI,F)
   if($('fd-count'))$('fd-count').textContent=F.length+' sopralluoghi mostrati su '+_dashRaw.length
 }
 
@@ -3885,14 +3878,24 @@ async function _dashRenderMacro(fE,fT,fTy,fI){
   h+='</tbody></table>';el.innerHTML=h
 }
 
+let _dashVerMap={},_dashVerReady=false
+async function _dashLoadVer(fE,fT,fTy,fI,F){
+  let da=null,a=null
+  if(fE){const y=+fE.slice(0,4);da=y+'-10-01';a=(y+1)+'-09-30'}
+  const params={p_da:da,p_a:a,p_tecnico:fT||null,p_tipo:fTy?+fTy:null,p_ipc:fI||null}
+  try{const r=await sb.rpc('dash_ver_visite',params);if(r.error)throw r.error;const m={};(r.data||[]).forEach(x=>{m[x.visita_id]=+x.ver||0});_dashVerMap=m}
+  catch(e){console.warn('dash_ver_visite:',e);_dashVerMap={}}
+  _dashVerReady=true
+  _dashRenderImprese(F);_dashRenderComuni(F)
+}
 function _dashRenderImprese(F){
   const m={}
-  F.forEach(x=>{const k=x.impid||x.impnome;if(!k)return;const r=m[k]=m[k]||{nome:x.impnome||'—',vis:0,ncp:0,ncm:0,last:null,tec:{}};r.vis++;r.ncp+=x.ncp;r.ncm+=x.ncm;if(!r.last||x.data>r.last)r.last=x.data;const tn=_dashTecMap[x.tec]||'—';r.tec[tn]=(r.tec[tn]||0)+1})
+  F.forEach(x=>{const k=x.impid||x.impnome;if(!k)return;const r=m[k]=m[k]||{nome:x.impnome||'—',vis:0,ncp:0,ncm:0,oss:0,ver:0,last:null,tec:{}};r.vis++;r.ncp+=x.ncp;r.ncm+=x.ncm;r.oss+=x.oss;r.ver+=(_dashVerMap[x.vid]||0);if(!r.last||x.data>r.last)r.last=x.data;const tn=_dashTecMap[x.tec]||'—';r.tec[tn]=(r.tec[tn]||0)+1})
   const rows=Object.keys(m).map(k=>m[k]).filter(r=>r.vis>=2).sort((a,b)=>b.vis-a.vis).slice(0,20)
   const fmt=d=>d?d.slice(0,10).split('-').reverse().join('/'):'—'
-  let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">#</th><th>Impresa</th><th>Visite</th><th>NC+</th><th>NC−</th><th>Tecnico prevalente</th><th>Ultima visita</th></tr></thead><tbody>'
-  rows.forEach((r,i)=>{const tt=Object.keys(r.tec).sort((a,b)=>r.tec[b]-r.tec[a])[0];h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px;color:#bbb">'+(i+1)+'</td><td><b>'+r.nome+'</b></td><td>'+r.vis+'</td><td><b style="color:'+(r.ncp>0?'#e74c3c':'#bbb')+'">'+r.ncp+'</b></td><td>'+r.ncm+'</td><td>'+(tt||'—')+' <span style="color:#aaa">('+(r.tec[tt]||0)+')</span></td><td>'+fmt(r.last)+'</td></tr>'})
-  if(!rows.length)h+='<tr><td colspan="7" style="padding:8px;color:#999">Nessuna impresa con più di una visita nel filtro corrente.</td></tr>'
+  let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">#</th><th>Impresa</th><th>Visite</th><th>NC+</th><th>NC−</th><th>OSS</th><th>VER</th><th>Tecnico prevalente</th><th>Ultima visita</th></tr></thead><tbody>'
+  rows.forEach((r,i)=>{const tt=Object.keys(r.tec).sort((a,b)=>r.tec[b]-r.tec[a])[0];h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px;color:#bbb">'+(i+1)+'</td><td><b>'+r.nome+'</b></td><td>'+r.vis+'</td><td><b style="color:'+(r.ncp>0?'#e74c3c':'#bbb')+'">'+r.ncp+'</b></td><td>'+r.ncm+'</td><td style="color:#c8a000">'+r.oss+'</td><td style="color:#27ae60">'+(_dashVerReady?r.ver:'...')+'</td><td>'+(tt||'—')+' <span style="color:#aaa">('+(r.tec[tt]||0)+')</span></td><td>'+fmt(r.last)+'</td></tr>'})
+  if(!rows.length)h+='<tr><td colspan="9" style="padding:8px;color:#999">Nessuna impresa con più di una visita nel filtro corrente.</td></tr>'
   h+='</tbody></table>';$('tbl-imprese').innerHTML=h
 }
 
@@ -3907,11 +3910,12 @@ function _dashRenderTipoVis(F){
 }
 
 function _dashRenderComuni(F){
-  const m={};let tot=0;F.forEach(x=>{if(!x.comune)return;m[x.comune]=(m[x.comune]||0)+1;tot++})
-  const L=_sortKeys(m).slice(0,20)
-  let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">Comune</th><th>Visite</th><th>%</th></tr></thead><tbody>'
-  L.forEach(c=>{h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px">'+c+'</td><td>'+m[c]+'</td><td style="color:#888">'+(tot?Math.round(m[c]/tot*1000)/10:0)+'%</td></tr>'})
-  if(!L.length)h+='<tr><td colspan="3" style="padding:8px;color:#999">Nessun dato.</td></tr>'
+  const m={};let tot=0
+  F.forEach(x=>{if(!x.comune)return;const r=m[x.comune]=m[x.comune]||{vis:0,ncp:0,ncm:0,oss:0,ver:0};r.vis++;r.ncp+=x.ncp;r.ncm+=x.ncm;r.oss+=x.oss;r.ver+=(_dashVerMap[x.vid]||0);tot++})
+  const L=Object.keys(m).sort((a,b)=>m[b].vis-m[a].vis).slice(0,20)
+  let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">Comune</th><th>Visite</th><th>%</th><th>NC+</th><th>NC−</th><th>OSS</th><th>VER</th></tr></thead><tbody>'
+  L.forEach(c=>{const r=m[c];h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px">'+c+'</td><td>'+r.vis+'</td><td style="color:#888">'+(tot?Math.round(r.vis/tot*1000)/10:0)+'%</td><td><b style="color:'+(r.ncp>0?'#e74c3c':'#bbb')+'">'+r.ncp+'</b></td><td>'+r.ncm+'</td><td style="color:#c8a000">'+r.oss+'</td><td style="color:#27ae60">'+(_dashVerReady?r.ver:'...')+'</td></tr>'})
+  if(!L.length)h+='<tr><td colspan="7" style="padding:8px;color:#999">Nessun dato.</td></tr>'
   h+='</tbody></table>';$('tbl-comuni').innerHTML=h
 }
 
@@ -3934,19 +3938,14 @@ function _dashRenderImporto(F){
 
 function _dashRenderCeiv(F){
   const m=_grp(F,x=>x.ceiv);const L=_sortKeys(m);const tot=F.length||1
-  _mkChart('ch-ceiv',{type:'doughnut',data:{labels:L,datasets:[{data:L.map(l=>m[l]),backgroundColor:L.map((_,i)=>_DASH_PIE[i%_DASH_PIE.length]),borderWidth:2}]},options:{plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:14,generateLabels(ch){return ch.data.labels.map((lb,i)=>({text:lb+' – '+ch.data.datasets[0].data[i]+' ('+Math.round(ch.data.datasets[0].data[i]/tot*100)+'%)',fillStyle:_DASH_PIE[i%_DASH_PIE.length],strokeStyle:'#fff',lineWidth:1,index:i}))}}}}}})
+  const _ceivCol=(lb,i)=>lb==='C.E.I.V.'?'#3D346A':_DASH_PIE[i%_DASH_PIE.length]
+  _mkChart('ch-ceiv',{type:'doughnut',data:{labels:L,datasets:[{data:L.map(l=>m[l]),backgroundColor:L.map((lb,i)=>_ceivCol(lb,i)),borderWidth:2}]},options:{plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:14,generateLabels(ch){return ch.data.labels.map((lb,i)=>({text:lb+' – '+ch.data.datasets[0].data[i]+' ('+Math.round(ch.data.datasets[0].data[i]/tot*100)+'%)',fillStyle:_ceivCol(lb,i),strokeStyle:'#fff',lineWidth:1,index:i}))}}}}}})
 }
 
 
 // ── MAPPA CANTIERI (dashboard) ──
 let _dashMap=null, _dashMapLayers=null
 let _dashMapRows=null, _dashMapOrder=['NR','BASSO','MEDIO','ALTO'], _dashMapIpcOn={NR:true,BASSO:true,MEDIO:true,ALTO:true}, _dashMapTec=''
-const _DM_IPC={
-  'NR':   {label:'Nessun rilievo', color:'#95C22F'},
-  'BASSO':{label:'Basso',          color:'#f2c200'},
-  'MEDIO':{label:'Medio',          color:'#e7500f'},
-  'ALTO': {label:'Alto',           color:'#e74c3c'}
-}
 async function loadDashMap(){
   if(typeof L==='undefined'){console.warn('Leaflet non caricato');return}
   const{data,error}=await sb.from('v_mappa_cantieri')
@@ -5854,269 +5853,6 @@ async function admLoadStats(){
 }
 
 // ── XSD EMBEDDED ─────────────────────────────────
-const XSD_FILES={
-  visita:{
-    nome:'SchemaVisita.xsd',
-    content:`<?xml version="1.0" encoding="utf-8"?>
-<xs:schema id="visita" xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  <xs:element name="visite">
-    <xs:complexType>
-      <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element name="visita">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="elimina" type="xs:short" minOccurs="0" maxOccurs="1" />
-              <xs:element name="nodoId" type="xs:string" minOccurs="0" maxOccurs="1" />
-              <xs:element name="visitaId" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="1"/><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereId" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="1"/><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="impresaId" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="1"/><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="tecnicoId" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="1"/><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="secondoTecnicoId" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="1"/><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="visitaImpresaRuolo" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="visitaImpresaEmailRefVis" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="128"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="visitaImpreseCantiereNum" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:minInclusive value="0"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="visitaLavoratoriCantiereNum" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:minInclusive value="0"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="visitaLavoratoriCantiereAutNum" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:minInclusive value="0"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="visitaTipo" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/><xs:enumeration value="4"/><xs:enumeration value="5"/><xs:enumeration value="6"/><xs:enumeration value="7"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="responsabileLavori" minOccurs="0" maxOccurs="1">
-                <xs:complexType>
-                  <xs:attribute name="cognomeResponsabileLavori" use="optional"><xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="128"/><xs:minLength value="2"/></xs:restriction></xs:simpleType></xs:attribute>
-                  <xs:attribute name="nomeResponsabileLavori" use="optional"><xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="128"/><xs:minLength value="2"/></xs:restriction></xs:simpleType></xs:attribute>
-                </xs:complexType>
-              </xs:element>
-              <xs:element name="coordinamento" minOccurs="0" maxOccurs="1">
-                <xs:complexType>
-                  <xs:attribute name="tipoPresenzaCoordinamento" use="optional"><xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/></xs:restriction></xs:simpleType></xs:attribute>
-                  <xs:attribute name="cognomeCoordinatoreFaseProgettazione" use="optional"><xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="128"/><xs:minLength value="2"/></xs:restriction></xs:simpleType></xs:attribute>
-                  <xs:attribute name="nomeCoordinatoreFaseProgettazione" use="optional"><xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="128"/><xs:minLength value="2"/></xs:restriction></xs:simpleType></xs:attribute>
-                  <xs:attribute name="cognomeCoordinatoreFaseEsecuzione" use="optional"><xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="128"/><xs:minLength value="2"/></xs:restriction></xs:simpleType></xs:attribute>
-                  <xs:attribute name="nomeCoordinatoreFaseEsecuzione" use="optional"><xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="128"/><xs:minLength value="2"/></xs:restriction></xs:simpleType></xs:attribute>
-                </xs:complexType>
-              </xs:element>
-              <xs:element name="visitaLavorazioni" minOccurs="0" maxOccurs="1">
-                <xs:complexType><xs:choice><xs:element name="visitaLavorazione" minOccurs="0" maxOccurs="unbounded"><xs:simpleType><xs:restriction base="xs:integer"/></xs:simpleType></xs:element></xs:choice></xs:complexType>
-              </xs:element>
-              <xs:element name="visitaFasiLavorazioneNotaGen" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="5000"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="visitaValutazioni" minOccurs="1" maxOccurs="1">
-                <xs:complexType>
-                  <xs:choice>
-                    <xs:element name="visitaValutazione" minOccurs="1" maxOccurs="1000">
-                      <xs:complexType>
-                        <xs:attribute name="visitaZonaId" type="xs:string" use="required"/>
-                        <xs:attribute name="visitaZonaEsito" use="optional"><xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/></xs:restriction></xs:simpleType></xs:attribute>
-                        <xs:attribute name="visitaZonaNote" use="optional"><xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="1000"/></xs:restriction></xs:simpleType></xs:attribute>
-                      </xs:complexType>
-                    </xs:element>
-                  </xs:choice>
-                </xs:complexType>
-              </xs:element>
-              <xs:element name="visitaData" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:date"><xs:minInclusive value="2016-10-01"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="visitaOraInizio" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:minInclusive value="0"/><xs:maxInclusive value="23"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="visitaMinutiInizio" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:minInclusive value="0"/><xs:maxInclusive value="59"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="visitaOraFine" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:minInclusive value="0"/><xs:maxInclusive value="23"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="visitaMinutiFine" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:minInclusive value="0"/><xs:maxInclusive value="59"/></xs:restriction></xs:simpleType>
-              </xs:element>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      </xs:choice>
-    </xs:complexType>
-  </xs:element>
-</xs:schema>`
-  },
-  cantiere:{
-    nome:'SchemaCantiere.xsd',
-    content:`<?xml version="1.0" encoding="utf-8"?>
-<xs:schema id="cantiere" xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  <xs:element name="cantieri">
-    <xs:complexType>
-      <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element name="cantiere">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="elimina" type="xs:short" minOccurs="0" maxOccurs="1" />
-              <xs:element name="nodoId" type="xs:string" minOccurs="0" maxOccurs="1" />
-              <xs:element name="cantiereId" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="1"/><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereIndirizzo" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="2"/><xs:maxLength value="200"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereCivico" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="1"/><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereEtichetta" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereCNCE" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereComuneCod" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:length value="6"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereCap" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="5"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereTipInt" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/><xs:enumeration value="4"/><xs:enumeration value="6"/><xs:enumeration value="7"/><xs:enumeration value="8"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereTipOpe" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/><xs:enumeration value="4"/><xs:enumeration value="5"/><xs:enumeration value="6"/><xs:enumeration value="7"/><xs:enumeration value="8"/><xs:enumeration value="9"/><xs:enumeration value="10"/><xs:enumeration value="11"/><xs:enumeration value="12"/><xs:enumeration value="13"/><xs:enumeration value="14"/><xs:enumeration value="15"/><xs:enumeration value="16"/><xs:enumeration value="17"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereTipOpeAltro" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="128"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereImporto" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/><xs:enumeration value="4"/><xs:enumeration value="5"/><xs:enumeration value="6"/><xs:enumeration value="7"/><xs:enumeration value="8"/><xs:enumeration value="9"/><xs:enumeration value="10"/><xs:enumeration value="11"/><xs:enumeration value="12"/><xs:enumeration value="13"/><xs:enumeration value="14"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereDurata" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/><xs:enumeration value="4"/><xs:enumeration value="5"/><xs:enumeration value="6"/><xs:enumeration value="7"/><xs:enumeration value="8"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="cantiereCommittenteId" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      </xs:choice>
-    </xs:complexType>
-  </xs:element>
-</xs:schema>`
-  },
-  impresa:{
-    nome:'SchemaImpresa.xsd',
-    content:`<?xml version="1.0" encoding="utf-8"?>
-<xs:schema id="impresa" xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  <xs:element name="imprese">
-    <xs:complexType>
-      <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element name="impresa">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="elimina" type="xs:short" minOccurs="0" maxOccurs="1" />
-              <xs:element name="nodoId" type="xs:string" minOccurs="0" maxOccurs="1" />
-              <xs:element name="impresaId" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="1"/><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="impresaNome" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="2"/><xs:maxLength value="256"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="impresaCF" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="16"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="impresaEmailRef" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="128"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="tipoIscrizioneCcia" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/><xs:enumeration value="4"/><xs:enumeration value="5"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="contrattoCcnl" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/><xs:enumeration value="4"/><xs:enumeration value="5"/><xs:enumeration value="6"/><xs:enumeration value="7"/><xs:enumeration value="8"/><xs:enumeration value="9"/><xs:enumeration value="10"/><xs:enumeration value="11"/><xs:enumeration value="12"/><xs:enumeration value="13"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="contrattoCcnlAltro" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="128"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="impresaCertificazioni" minOccurs="0" maxOccurs="1">
-                <xs:complexType><xs:choice><xs:element name="impresaCertificazione" minOccurs="0" maxOccurs="3"><xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/></xs:restriction></xs:simpleType></xs:element></xs:choice></xs:complexType>
-              </xs:element>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      </xs:choice>
-    </xs:complexType>
-  </xs:element>
-</xs:schema>`
-  },
-  committente:{
-    nome:'SchemaCommittente.xsd',
-    content:`<?xml version="1.0" encoding="utf-8"?>
-<xs:schema id="committente" xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  <xs:element name="committenti">
-    <xs:complexType>
-      <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element name="committente">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="elimina" type="xs:short" minOccurs="0" maxOccurs="1" />
-              <xs:element name="committenteId" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="1"/><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="committenteNome" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="2"/><xs:maxLength value="256"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="committenteTipo" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:short"><xs:enumeration value="1"/><xs:enumeration value="2"/><xs:enumeration value="3"/></xs:restriction></xs:simpleType>
-              </xs:element>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      </xs:choice>
-    </xs:complexType>
-  </xs:element>
-</xs:schema>`
-  },
-  tecnico:{
-    nome:'SchemaTecnico.xsd',
-    content:`<?xml version="1.0" encoding="utf-8"?>
-<xs:schema id="tecnico" xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  <xs:element name="tecnici">
-    <xs:complexType>
-      <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element name="tecnico">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="elimina" type="xs:short" minOccurs="0" maxOccurs="1" />
-              <xs:element name="tecnicoId" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="1"/><xs:maxLength value="50"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="tecnicoCognome" minOccurs="1" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:minLength value="1"/><xs:maxLength value="256"/></xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="tecnicoNome" minOccurs="0" maxOccurs="1">
-                <xs:simpleType><xs:restriction base="xs:string"><xs:maxLength value="256"/></xs:restriction></xs:simpleType>
-              </xs:element>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      </xs:choice>
-    </xs:complexType>
-  </xs:element>
-</xs:schema>`
-  }
-}
 
 function downloadXSD(key){
   if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
@@ -6630,18 +6366,6 @@ window.admGeneraReport = admGeneraReport
 // Struttura, ordine, criteri e tipi di grafico identici al report
 // nazionale CNCPT; veste grafica brand Formedil (cfr. Formedil Venezia).
 // ══════════════════════════════════════════════════════════════
-const OS_SUB={
-  IMP_LOG:'Logistica',IMP_IGS:'Apprestamenti igienico-sanitari',IMP_ELE:'Impianti elettrici',IMP_AGI:'Agibilità del cantiere',IMP_ORG:'Organizzazione del lavoro',IMP_SEG:'Segnaletica',
-  PLL_SCA:'Aree di scavo',PLL_DEM:'Aree di demolizione',PLL_PER:'Aree di pericolo',
-  SOL_GRU:'Gru',SOL_AUT:'Autogru',SOL_ARG:'Argano',SOL_PIA:'Piattaforme di lavoro elevabili',
-  ASU_ATT:'Attrezzature',ASU_SCA:'Scale',ASU_UTE:'Utensili',
-  MAC_MMT:'Macchine movimento terra',MAC_MMM:'Macchine movimentazione materiale',MAC_MAS:'Macchine stradali',
-  OPE_POF:'Ponteggi fissi',OPE_POS:'Ponteggi sospesi',OPE_POC:'Ponteggi su cavalletti',OPE_POT:'Ponti su ruote - trabattelli',OPE_DPC:'Altri DPC',
-  PIN_IND:'Indumenti di protezione',PIN_TES:'Protezione della testa',PIN_PIE:'Protezione dei piedi',PIN_MAN:'Protezione delle mani',PIN_UDI:"Protezione dell'udito",PIN_CAD:'Protezione contro la caduta dall’alto',PIN_OCC:'Protezione degli occhi',PIN_RES:'Protezione delle vie respiratorie',
-  DOC_GEN:'Generale',DOC_MA4:'Macchine e attrezzature (art. 71, c4)',DOC_MA8:'Macchine e attrezzature (art. 71, c8)',DOC_DPI:'DPI',DOC_ELE:'Impianto elettrico e di terra',DOC_PON:'Ponteggi',
-  SOG_FIG:'Nomine di figura di sistema',
-  FOR_BAS:'Formazione di base',FOR_FIG:'Figura di sistema',FOR_RIS:'Form./addes. Rischi specifici',FOR_ATM:'Form./addes. Attrezzature/macchine'
-}
 function osMeseEdile(m0){return (m0>=9)?(m0-9):(m0+3)}
 // Aggregazione codici importo 1-11 → 5 classi del report + nd
 function osImportoClass(code){
@@ -8120,26 +7844,6 @@ window.showRubricaDetail=showRubricaDetail
 
 // ── EXCEL EXPORT / IMPORT ──
 
-const _CHK_PREF={
-  'IMP_LOG':'Logistica','IMP_IGS':'Appr. igienico-sanitari',
-  'IMP_ELE':'Impianti elettrici','IMP_AGI':'Agibilita cantiere',
-  'IMP_ORG':'Organizzazione lavoro','IMP_SEG':'Segnaletica','IMP_CON':'Condizioni al contorno',
-  'PLL_SCA':'Aree di scavo','PLL_DEM':'Aree demolizione','PLL_OCA':'Altre aree pericolo','PLL_PER':'Opere in c.a.',
-  'SOL_GRU':'Gru','SOL_AUT':'Autogru','SOL_ARG':'Argano',
-  'SOL_PIA':'Piattaforme elevabili','SOL_ASO':'Altri sollevatori',
-  'ASU_ATT':'Attrezzature','ASU_SCA':'Scale','ASU_UTE':'Utensili',
-  'MAC_MAS':'Macchine mov. terra','MAC_MMM':'Macchine mov. materiale','MAC_MMT':'Macchine stradali',
-  'OPE_POF':'Ponteggi fissi','OPE_POS':'Ponteggi sospesi','OPE_POC':'Ponti su cavalletti',
-  'OPE_POT':'Trabattelli','OPE_DPC':'Altri DPC',
-  'PIN_IND':'Indumenti protezione','PIN_TES':'Protezione testa','PIN_PIE':'Protezione piedi',
-  'PIN_MAN':'Protezione mani','PIN_UDI':'Protezione udito',
-  'PIN_CAD':'Protezione caduta','PIN_OCC':'Protezione occhi','PIN_RES':'Protezione resp.',
-  'DOC_GEN':'Doc. generale','DOC_GEN_SOL':'Doc. sollevamento','DOC_MA4':'Doc. macchine',
-  'DOC_ELE':'Doc. imp. elettrico','DOC_PON':'Doc. ponteggi',
-  'SOG_FIG':'Nomine figure sistema',
-  'FOR_BAS':'Formazione base','FOR_FIG':'Form. figura sistema',
-  'FOR_RIS':'Form. rischi specifici','FOR_ATM':'Form. attrezzature'
-}
 function _chkMacroArea(c){return _CHK_PREF[c.substring(0,7)]||_CHK_PREF[c.substring(0,6)]||c.split('_').slice(0,2).join('_')}
 function _xlsxValLabel(v){
   if(!v||v==='NA')return 'N/A'
