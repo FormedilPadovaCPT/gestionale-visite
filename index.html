@@ -461,6 +461,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="stat-card"><div class="num" id="k-ncplus" style="color:var(--danger)">–</div><div class="pct" id="k-ncplus-pct" style="color:var(--danger)"></div><div class="lbl">NC+ totali</div></div>
         <div class="stat-card"><div class="num" id="k-ncminus" style="color:#e67e22">–</div><div class="lbl">NC- totali</div></div>
         <div class="stat-card"><div class="num" id="k-oss" style="color:#c8a000">–</div><div class="lbl">Osservazioni</div></div>
+        <div class="stat-card"><div class="num" id="k-ver" style="color:#27ae60">–</div><div class="lbl">Verifiche conformi</div></div>
         <div class="stat-card"><div class="num" id="k-ipcam" style="color:var(--warn)">–</div><div class="pct" id="k-ipcam-pct" style="color:var(--warn)"></div><div class="lbl">IPC Alto + Medio</div></div>
         <div class="stat-card"><div class="num" id="k-rlst" style="color:#95C22F">–</div><div class="pct" id="k-rlst-pct" style="color:#95C22F"></div><div class="lbl">Affiancamento RLST</div></div>
         <div class="stat-card"><div class="num" id="k-comuni" style="color:var(--grey)">–</div><div class="lbl">Comuni serviti</div></div>
@@ -4026,8 +4027,10 @@ async function _dashRenderMacro(fE,fT,fTy,fI){
   const el=$('tbl-macro');if(!el)return
   let data=null,err=null
   try{const r=await sb.rpc('dash_macroaree',params);data=r.data;err=r.error}catch(e){err=e}
-  if(err){el.innerHTML='<div style="color:#999;font-size:12px">Dati macroaree non disponibili.</div>';console.warn('dash_macroaree:',err);return}
+  if(err){el.innerHTML='<div style="color:#999;font-size:12px">Dati macroaree non disponibili.</div>';console.warn('dash_macroaree:',err);if($('k-ver'))$('k-ver').textContent='–';return}
   const by={};(data||[]).forEach(r=>by[r.zona]=r)
+  let _verTot=0;for(let z=1;z<=10;z++){_verTot+=(by[z]||{}).ver||0}
+  if($('k-ver'))$('k-ver').textContent=_verTot
   let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">Macroarea</th><th>NC+</th><th>NC−</th><th>OSS</th><th>Verif.</th></tr></thead><tbody>'
   for(let z=1;z<=10;z++){const r=by[z]||{nc_plus:0,nc_minus:0,oss:0,ver:0};h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px">'+_DASH_MACRO[z]+'</td><td><b style="color:'+(r.nc_plus>0?'#e74c3c':'#bbb')+'">'+r.nc_plus+'</b></td><td>'+r.nc_minus+'</td><td>'+r.oss+'</td><td style="color:#999">'+r.ver+'</td></tr>'}
   h+='</tbody></table>';el.innerHTML=h
