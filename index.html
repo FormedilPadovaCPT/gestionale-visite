@@ -5851,7 +5851,7 @@ window.loadTargetCard=loadTargetCard
 async function loadAvvisi(){
   const box=$('avvisi-banner'); if(!box||!S.user) return
   const today=new Date().toISOString().slice(0,10)
-  let avv=null; try{const r=await sb.from('avvisi').select('*').eq('attivo',true).order('created_at',{ascending:false});if(r.error)throw r.error;avv=r.data}catch(e){box.innerHTML='';return}
+  let avv=null; try{const r=await sb.from('avvisi').select('*').eq('attivo',true).eq('archiviato',false).order('created_at',{ascending:false});if(r.error)throw r.error;avv=r.data}catch(e){box.innerHTML='';return}
   const me=S.user.email
   const attivi=(avv||[]).filter(a=>(!a.scade_il||a.scade_il>=today)&&(!a.destinatari||!a.destinatari.length||a.destinatari.includes(me)))
   if(!attivi.length){box.innerHTML='';return}
@@ -5885,21 +5885,29 @@ window.admSaveAvviso=admSaveAvviso
 async function admLoadAvvisi(){
   const box=$('adm-avvisi-list'); if(!box)return
   const dbox=$('avv-dest'); if(dbox&&dbox.dataset.done!=='1'){dbox.innerHTML=(typeof TECNICI_LIST!=='undefined'?TECNICI_LIST:[]).map(t=>'<label style="color:#fff;font-size:12px;display:flex;align-items:center;gap:5px"><input type="checkbox" value="'+t.email+'"> '+esc(t.nome)+'</label>').join('');dbox.dataset.done='1'}
-  const[{data:avv},{data:lett},{data:tecs}]=await Promise.all([
+  const[{data:avvAll},{data:lett},{data:tecs}]=await Promise.all([
     sb.from('avvisi').select('*').order('created_at',{ascending:false}),
     sb.from('avvisi_letture').select('avviso_id'),
     sb.from('tecnici').select('tecnico_id').eq('elimina',0)
   ])
   const nTec=(tecs||[]).length||1; const cnt={};(lett||[]).forEach(l=>cnt[l.avviso_id]=(cnt[l.avviso_id]||0)+1)
   const nomeDi=e=>{const t=(typeof TECNICI_LIST!=='undefined'?TECNICI_LIST:[]).find(x=>x.email===e);return t?t.nome:e}
-  if(!avv||!avv.length){box.innerHTML='<div style="color:rgba(255,255,255,.5);font-size:12px">Nessun avviso pubblicato.</div>';return}
-  box.innerHTML='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="color:#95C22F;text-align:left"><th style="padding:5px">Avviso</th><th>Destinatari</th><th>Priorità</th><th>Letture</th><th>Stato</th><th></th></tr></thead><tbody>'+avv.map(a=>{const mir=a.destinatari&&a.destinatari.length;const dn=mir?a.destinatari.length:nTec;const dl=mir?a.destinatari.map(nomeDi).join(', '):'Tutti';return '<tr style="border-top:1px solid rgba(255,255,255,.08)"><td style="padding:5px;color:#fff">'+esc(a.titolo||a.testo.slice(0,45))+'</td><td style="color:rgba(255,255,255,.7);max-width:170px">'+esc(dl)+'</td><td style="text-align:center;color:rgba(255,255,255,.8)">'+a.priorita+'</td><td style="text-align:center;color:#fff">'+(cnt[a.id]||0)+'/'+dn+'</td><td style="text-align:center">'+(a.attivo?'<span style="color:#95C22F">attivo</span>':'<span style="color:#888">spento</span>')+'</td><td style="text-align:right;white-space:nowrap"><button class="btn-outline btn-sm" onclick="admToggleAvviso(\''+a.id+'\','+a.attivo+')">'+(a.attivo?'Spegni':'Riattiva')+'</button> <button class="btn-outline btn-sm" onclick="admDeleteAvviso(\''+a.id+'\')">🗑</button></td></tr>'}).join('')+'</tbody></table>'
+  const destLbl=a=>{const mir=a.destinatari&&a.destinatari.length;return mir?a.destinatari.map(nomeDi).join(', '):'Tutti'}
+  const denom=a=>(a.destinatari&&a.destinatari.length)?a.destinatari.length:nTec
+  const attivi=(avvAll||[]).filter(a=>!a.archiviato), arch=(avvAll||[]).filter(a=>a.archiviato)
+  let h=''
+  if(!attivi.length){h='<div style="color:rgba(255,255,255,.5);font-size:12px">Nessun avviso attivo.</div>'}
+  else{ h='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="color:#95C22F;text-align:left"><th style="padding:5px">Avviso</th><th>Destinatari</th><th>Priorità</th><th>Letture</th><th>Stato</th><th></th></tr></thead><tbody>'+attivi.map(a=>'<tr style="border-top:1px solid rgba(255,255,255,.08)"><td style="padding:5px;color:#fff">'+esc(a.titolo||a.testo.slice(0,45))+'</td><td style="color:rgba(255,255,255,.7);max-width:170px">'+esc(destLbl(a))+'</td><td style="text-align:center;color:rgba(255,255,255,.8)">'+a.priorita+'</td><td style="text-align:center;color:#fff">'+(cnt[a.id]||0)+'/'+denom(a)+'</td><td style="text-align:center">'+(a.attivo?'<span style="color:#95C22F">attivo</span>':'<span style="color:#888">spento</span>')+'</td><td style="text-align:right;white-space:nowrap"><button class="btn-outline btn-sm" onclick="admToggleAvviso(\''+a.id+'\','+a.attivo+')">'+(a.attivo?'Spegni':'Riattiva')+'</button> <button class="btn-outline btn-sm" onclick="admArchiveAvviso(\''+a.id+'\')">📁 Archivia</button></td></tr>').join('')+'</tbody></table>' }
+  if(arch.length){ h+='<details style="margin-top:12px"><summary style="cursor:pointer;color:rgba(255,255,255,.6);font-size:12px">📁 Archiviati ('+arch.length+')</summary><table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:6px;opacity:.75"><tbody>'+arch.map(a=>'<tr style="border-top:1px solid rgba(255,255,255,.08)"><td style="padding:5px;color:rgba(255,255,255,.8)">'+esc(a.titolo||a.testo.slice(0,45))+'</td><td style="color:rgba(255,255,255,.5)">'+esc(destLbl(a))+'</td><td style="text-align:center;color:rgba(255,255,255,.6)">'+(cnt[a.id]||0)+'/'+denom(a)+' letture</td><td style="text-align:right"><button class="btn-outline btn-sm" onclick="admRestoreAvviso(\''+a.id+'\')">Ripristina</button></td></tr>').join('')+'</tbody></table></details>' }
+  box.innerHTML=h
 }
 window.admLoadAvvisi=admLoadAvvisi
 async function admToggleAvviso(id,cur){ await sb.from('avvisi').update({attivo:!cur}).eq('id',id); admLoadAvvisi() }
 window.admToggleAvviso=admToggleAvviso
-async function admDeleteAvviso(id){ if(!confirm('Eliminare questo avviso?'))return; await sb.from('avvisi').delete().eq('id',id); admLoadAvvisi() }
-window.admDeleteAvviso=admDeleteAvviso
+async function admArchiveAvviso(id){ await sb.from('avvisi').update({archiviato:true}).eq('id',id); admLoadAvvisi() }
+window.admArchiveAvviso=admArchiveAvviso
+async function admRestoreAvviso(id){ await sb.from('avvisi').update({archiviato:false}).eq('id',id); admLoadAvvisi() }
+window.admRestoreAvviso=admRestoreAvviso
 async function admCopyLastMonth(){
   if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
   const mv=$('adm-target-mese')?.value
