@@ -2150,6 +2150,8 @@ async function initForm(snap=null){
   hideCantCard()
   ;['f-qual-ppre','f-tec-select','f-tec2-select'].forEach(id=>{const el=$(id);if(el)el.selectedIndex=0})
   ;['f-tec2-display','f-tec2-id','f-tec2-email'].forEach(id=>vSet(id,''))
+  // Pre-seleziona il tecnico loggato come Tecnico responsabile (dopo il reset dei select)
+  if(S.tecnico&&S.tecnico.email){ setTecnicoFromEmail(S.tecnico.email); vSet('f-tec-id',S.tecnico.tecnico_id||'') }
   // reset stage toggle a No
   const stageVisNo=$('f-stage-vis-no'); if(stageVisNo)stageVisNo.checked=true
   const stageVisH=$('f-stage-vis'); if(stageVisH)stageVisH.value=''
