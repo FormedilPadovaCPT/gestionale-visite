@@ -458,10 +458,11 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <!-- KPI -->
       <div class="stats-grid" id="dash-kpi">
         <div class="stat-card"><div class="num" id="k-sopr" style="color:var(--orange)">–</div><div class="lbl">Sopralluoghi</div></div>
-        <div class="stat-card"><div class="num" id="k-ncplus" style="color:var(--danger)">–</div><div class="lbl">NC+ totali</div></div>
+        <div class="stat-card"><div class="num" id="k-ncplus" style="color:var(--danger)">–</div><div class="pct" id="k-ncplus-pct" style="color:var(--danger)"></div><div class="lbl">NC+ totali</div></div>
+        <div class="stat-card"><div class="num" id="k-ncminus" style="color:#e67e22">–</div><div class="lbl">NC- totali</div></div>
+        <div class="stat-card"><div class="num" id="k-oss" style="color:#c8a000">–</div><div class="lbl">Osservazioni</div></div>
         <div class="stat-card"><div class="num" id="k-ipcam" style="color:var(--warn)">–</div><div class="pct" id="k-ipcam-pct" style="color:var(--warn)"></div><div class="lbl">IPC Alto + Medio</div></div>
         <div class="stat-card"><div class="num" id="k-rlst" style="color:#95C22F">–</div><div class="pct" id="k-rlst-pct" style="color:#95C22F"></div><div class="lbl">Affiancamento RLST</div></div>
-        <div class="stat-card"><div class="num" id="k-oss">–</div><div class="lbl">Osservazioni</div></div>
         <div class="stat-card"><div class="num" id="k-comuni" style="color:var(--grey)">–</div><div class="lbl">Comuni serviti</div></div>
       </div>
       <div class="card" id="card-target-mese" style="display:none;margin-bottom:14px">
@@ -3959,10 +3960,15 @@ function _dashRenderKpi(F){
   const rl=F.filter(x=>x.rlst).length
   const com=new Set(F.filter(x=>x.comune).map(x=>x.comune)).size
   const pc=v=>n?(Math.round(v/n*1000)/10)+'%':'–'
-  $('k-sopr').textContent=n;$('k-ncplus').textContent=sum('ncp')
+  const ncp=sum('ncp'),ncm=sum('ncm'),oss=sum('oss'),totRil=ncp+ncm+oss
+  const pcRil=v=>totRil?(Math.round(v/totRil*1000)/10)+'%':'–'
+  $('k-sopr').textContent=n
+  $('k-ncplus').textContent=ncp;$('k-ncplus-pct').textContent=pcRil(ncp)
+  $('k-ncminus').textContent=ncm
+  $('k-oss').textContent=oss
   $('k-ipcam').textContent=am;$('k-ipcam-pct').textContent=pc(am)
   $('k-rlst').textContent=rl;$('k-rlst-pct').textContent=pc(rl)
-  $('k-oss').textContent=sum('oss');$('k-comuni').textContent=com
+  $('k-comuni').textContent=com
 }
 
 function _dashRenderEsercizio(FE,selE){
