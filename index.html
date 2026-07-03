@@ -445,6 +445,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 
     <!-- DASHBOARD -->
     <section id="view-dashboard">
+      <div id="avvisi-banner"></div>
             <!-- FILTRI DASHBOARD -->
       <div class="card" id="dash-filtri" style="margin-bottom:14px">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
@@ -1087,6 +1088,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               <input type="month" id="adm-target-mese">
             </div>
             <button class="btn-primary" onclick="admLoadTarget()">📥 Carica</button>
+            <button class="btn-primary" style="background:#565c66;border-color:#565c66" onclick="admCopyLastMonth()">📋 Copia mese scorso</button>
           </div>
           <div id="adm-target-wrap" style="display:none;margin-top:12px">
             <table class="tgt-target-table">
@@ -1096,6 +1098,22 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <button class="btn-primary" style="margin-top:12px;background:#95C22F;border-color:#7aa527" onclick="admSaveTarget()">💾 Salva target</button>
             <span id="adm-target-status" style="font-size:12px;color:rgba(255,255,255,.6);margin-left:10px"></span>
           </div>
+        </div>
+
+        <!-- Bacheca avvisi -->
+        <div class="adm-section">
+          <div class="adm-section-title">📢 Bacheca avvisi ai tecnici</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:10px">Pubblica un messaggio che i tecnici vedranno in cima al cruscotto. Puoi impostare priorità e una scadenza; vedi quanti hanno preso visione.</p>
+          <div style="display:grid;gap:8px;max-width:660px">
+            <input id="avv-titolo" placeholder="Titolo (opzionale)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px">
+            <textarea id="avv-testo" placeholder="Testo del messaggio…" rows="3" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px;font-family:inherit"></textarea>
+            <div class="adm-date-row">
+              <div class="field" style="min-width:150px"><label>Priorità</label><select id="avv-prio"><option value="info">Info</option><option value="importante">Importante</option><option value="urgente">Urgente</option></select></div>
+              <div class="field" style="min-width:150px"><label>Scade il (opzionale)</label><input type="date" id="avv-scade"></div>
+              <button class="btn-primary" style="background:#95C22F;border-color:#7aa527" onclick="admSaveAvviso()">📢 Pubblica</button>
+            </div>
+          </div>
+          <div id="adm-avvisi-list" style="margin-top:14px"></div>
         </div>
 
         <!-- Report PDF -->
@@ -1924,7 +1942,7 @@ function navTo(view){
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
   if(view==='scadenze')loadScadenze().catch(e=>{console.error('loadScadenze:',e);toast('Errore scadenze: '+e.message,'err')})
-  if(view==='admin')admInit()
+  if(view==='admin'){admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
 }
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
   b.onclick=()=>{if(b.dataset.view==='form')initForm();navTo(b.dataset.view)}
@@ -3706,6 +3724,7 @@ async function loadDash(){
   ;(tecs||[]).forEach(t=>{_dashTecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()||t.tecnico_id})
   // card obiettivo mensile (non blocca la dashboard se fallisce)
   loadTargetCard&&loadTargetCard().catch(e=>console.warn('loadTargetCard:',e))
+  loadAvvisi&&loadAvvisi().catch(e=>console.warn('loadAvvisi:',e))
   // fetch storico completo (paginato) con cantiere + impresa principale
   const cols=`visita_id,data_visita,ipc,rlst_sn,acc_cant,tecnico_id,tipo_accesso,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantiere_id,impresa_id,cantieri(comune_nome,cantiere_tip_int,cantiere_tip_ope,cantiere_importo),visite_imprese_presenti(is_principale,tipo_imp,impresa_id,imprese(impresa_nome,cassa_edile))`
   let rows=[],from=0
@@ -4143,6 +4162,7 @@ async function loadScadenze(){
     const opts=idsConScad.map(id=>({id,nome:tecMap[id]||id})).sort((a,b)=>a.nome.localeCompare(b.nome,'it'))
     sel.innerHTML='<option value="">Tutti i tecnici</option>'+opts.map(o=>`<option value="${o.id}">${o.nome}</option>`).join('')
     if(prev&&idsConScad.includes(prev))sel.value=prev
+    else if(S.user&&S.user.email!==ADMIN_EMAIL&&S.tecnico&&idsConScad.includes(S.tecnico.tecnico_id))sel.value=S.tecnico.tecnico_id
     sel.onchange=renderScadenze
   }
   renderScadenze()
@@ -5820,10 +5840,73 @@ async function loadTargetCard(){
   rlstTxt.textContent=`${pctR}%`
   rlstBar.style.width=Math.min(100,pctR)+'%'
   rlstBar.style.background=pctR>=20?'#95C22F':'#e7500f'
+  if(maxV!=null&&tot<=maxV){const _gg=now.getDate(),_ggT=new Date(anno,mese,0).getDate(),_att=Math.round(maxV*_gg/_ggT);if(tot<_att){const _n=$('tgt-vis-note');_n.textContent=_n.textContent+' · Sei un po’ indietro sul ritmo (atteso ~'+_att+' a oggi).'}}
   rlstNote.textContent=tot===0?'Nessuna visita nel mese.':(pctR>=20?`✓ Obiettivo raggiunto — ${nRlst} su ${tot} in affiancamento RLST.`:`Servono almeno ${Math.max(0,Math.ceil(tot*0.2)-nRlst)} visite RLST in più (${nRlst}/${tot}).`)
   card.style.display='block'
 }
 window.loadTargetCard=loadTargetCard
+
+// ── BACHECA AVVISI ─────────────────────────────────────────────────
+async function loadAvvisi(){
+  const box=$('avvisi-banner'); if(!box||!S.user) return
+  const today=new Date().toISOString().slice(0,10)
+  let avv=null; try{const r=await sb.from('avvisi').select('*').eq('attivo',true).order('created_at',{ascending:false});if(r.error)throw r.error;avv=r.data}catch(e){box.innerHTML='';return}
+  const attivi=(avv||[]).filter(a=>!a.scade_il||a.scade_il>=today)
+  if(!attivi.length){box.innerHTML='';return}
+  let letti=new Set(); try{const r=await sb.from('avvisi_letture').select('avviso_id').eq('email',S.user.email);(r.data||[]).forEach(x=>letti.add(x.avviso_id))}catch(e){}
+  const ST={urgente:['#c0392b','#fdecea','\U0001F534','Avviso urgente'],importante:['#e7500f','#fff3ee','\U0001F7E0','Avviso importante'],info:['#2980b9','#eef6fc','\U0001F535','Avviso']}
+  box.innerHTML=attivi.map(a=>{
+    const st=ST[a.priorita]||ST.info; const gia=letti.has(a.id)
+    return '<div style="border-left:4px solid '+st[0]+';background:'+st[1]+';border-radius:6px;padding:10px 14px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><div style="min-width:0"><strong style="color:'+st[0]+'">'+st[2]+' '+esc(a.titolo||st[3])+'</strong><div style="font-size:13px;color:#333;margin-top:3px;white-space:pre-wrap">'+esc(a.testo)+'</div></div>'+(gia?'<span style="font-size:11px;color:#27ae60;white-space:nowrap">✓ Letto</span>':'<button class="btn-outline btn-sm" style="white-space:nowrap" onclick="presaVisione(\''+a.id+'\',this)">Presa visione</button>')+'</div></div>'
+  }).join('')
+}
+window.loadAvvisi=loadAvvisi
+async function presaVisione(id,btn){
+  try{await sb.from('avvisi_letture').upsert({avviso_id:id,email:S.user.email},{onConflict:'avviso_id,email'})
+    if(btn)btn.outerHTML='<span style="font-size:11px;color:#27ae60;white-space:nowrap">✓ Letto</span>'
+  }catch(e){toast('Errore: '+(e.message||e),'err')}
+}
+window.presaVisione=presaVisione
+async function admSaveAvviso(){
+  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
+  const testo=($('avv-testo').value||'').trim()
+  if(!testo){toast('Scrivi il testo dell’avviso','warn');$('avv-testo').focus();return}
+  const row={titolo:($('avv-titolo').value||'').trim()||null,testo:testo,priorita:$('avv-prio').value,scade_il:$('avv-scade').value||null,creato_da:S.user.email,attivo:true}
+  const{error}=await sb.from('avvisi').insert(row)
+  if(error){toast('Errore: '+error.message,'err');return}
+  $('avv-titolo').value='';$('avv-testo').value='';$('avv-scade').value=''
+  toast('Avviso pubblicato','ok'); admLoadAvvisi()
+}
+window.admSaveAvviso=admSaveAvviso
+async function admLoadAvvisi(){
+  const box=$('adm-avvisi-list'); if(!box)return
+  const[{data:avv},{data:lett},{data:tecs}]=await Promise.all([
+    sb.from('avvisi').select('*').order('created_at',{ascending:false}),
+    sb.from('avvisi_letture').select('avviso_id'),
+    sb.from('tecnici').select('tecnico_id').eq('elimina',0)
+  ])
+  const nTec=(tecs||[]).length||1; const cnt={};(lett||[]).forEach(l=>cnt[l.avviso_id]=(cnt[l.avviso_id]||0)+1)
+  if(!avv||!avv.length){box.innerHTML='<div style="color:rgba(255,255,255,.5);font-size:12px">Nessun avviso pubblicato.</div>';return}
+  box.innerHTML='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="color:#95C22F;text-align:left"><th style="padding:5px">Avviso</th><th>Priorità</th><th>Letture</th><th>Stato</th><th></th></tr></thead><tbody>'+avv.map(a=>'<tr style="border-top:1px solid rgba(255,255,255,.08)"><td style="padding:5px;color:#fff">'+esc(a.titolo||a.testo.slice(0,45))+'</td><td style="text-align:center;color:rgba(255,255,255,.8)">'+a.priorita+'</td><td style="text-align:center;color:#fff">'+(cnt[a.id]||0)+'/'+nTec+'</td><td style="text-align:center">'+(a.attivo?'<span style="color:#95C22F">attivo</span>':'<span style="color:#888">spento</span>')+'</td><td style="text-align:right;white-space:nowrap"><button class="btn-outline btn-sm" onclick="admToggleAvviso(\''+a.id+'\','+a.attivo+')">'+(a.attivo?'Spegni':'Riattiva')+'</button> <button class="btn-outline btn-sm" onclick="admDeleteAvviso(\''+a.id+'\')">\U0001F5D1</button></td></tr>').join('')+'</tbody></table>'
+}
+window.admLoadAvvisi=admLoadAvvisi
+async function admToggleAvviso(id,cur){ await sb.from('avvisi').update({attivo:!cur}).eq('id',id); admLoadAvvisi() }
+window.admToggleAvviso=admToggleAvviso
+async function admDeleteAvviso(id){ if(!confirm('Eliminare questo avviso?'))return; await sb.from('avvisi').delete().eq('id',id); admLoadAvvisi() }
+window.admDeleteAvviso=admDeleteAvviso
+async function admCopyLastMonth(){
+  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
+  const mv=$('adm-target-mese')?.value
+  if(!mv){toast('Seleziona il mese e clicca Carica','warn');return}
+  if(($('adm-target-wrap').style.display||'none')==='none'){toast('Prima clicca \U0001F4E5 Carica','warn');return}
+  let[anno,mese]=mv.split('-').map(Number); let pm=mese-1,pa=anno; if(pm<1){pm=12;pa=anno-1}
+  const{data:tgts}=await sb.from('target_visite_mensili').select('tecnico_id,max_visite').eq('anno',pa).eq('mese',pm)
+  if(!tgts||!tgts.length){toast('Nessun target nel mese precedente','warn');return}
+  const map={};tgts.forEach(t=>map[t.tecnico_id]=t.max_visite); let n=0
+  document.querySelectorAll('#adm-target-tbody input[data-tec]').forEach(i=>{if(map[i.dataset.tec]!=null){i.value=map[i.dataset.tec];n++}})
+  toast('Copiati '+n+' target dal mese precedente — ricordati di salvare','ok')
+}
+window.admCopyLastMonth=admCopyLastMonth
 
 async function admLoadStats(){
   if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
