@@ -1953,7 +1953,7 @@ async function onLogin(user){
   S.tecnico=tec
   $('lbl-user').textContent=tec?`${tec.tecnico_nome} ${tec.tecnico_cognome}`:user.email
   // Mostra tab Coordinatore solo per l'account admin
-  const isAdmin=user.email==='cptpd@did.formedilpadova.it'
+  const isAdmin=user.email==='cptpd@did.formedilpadova.it';window.__isCoord=isAdmin
   const navAdm=$('nav-admin')
   if(navAdm)navAdm.style.display=isAdmin?'':'none'
   await loadVoci()
@@ -8070,7 +8070,7 @@ async function showCantiereDetail(cantId){
     const{data:c,error}=await sb.from('cantieri').select(
       'cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,'+
       'cantiere_cnce,nodo_id,prot_int,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,'+
-      'cantiere_importo,cantiere_durata,data_ult,cantiere_comune_cod'
+      'cantiere_importo,cantiere_durata,data_ult,cantiere_comune_cod,cantiere_chiuso,data_chiusura,chiuso_da,motivo_chiusura'
     ).eq('cantiere_id',cantId).single()
     if(error||!c){toast('Cantiere non trovato'+(error?' – '+error.message:''),'err');hide('modal-qd');return}
     const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
@@ -8139,10 +8139,39 @@ async function showCantiereDetail(cantId){
     }
     $('qd-actions').innerHTML=''
     $('qd-actions').appendChild(btnNuova)
+    if(window.__isCoord){
+      if(c.cantiere_chiuso){
+        const _ci=document.createElement('span');_ci.style.cssText='font-size:12px;color:#c0392b;margin-left:8px;align-self:center';_ci.textContent='🔒 Chiuso il '+(c.data_chiusura?new Date(c.data_chiusura).toLocaleDateString('it-IT'):'')+(c.chiuso_da?' · '+c.chiuso_da:'');$('qd-actions').appendChild(_ci)
+        const _br=document.createElement('button');_br.className='btn-outline btn-sm';_br.style.marginLeft='8px';_br.textContent='↩️ Riapri';_br.onclick=()=>riapriCantiere(cantId,label);$('qd-actions').appendChild(_br)
+      }else{
+        const _bc=document.createElement('button');_bc.className='btn-warn btn-sm';_bc.style.marginLeft='8px';_bc.textContent='🔒 Chiudi cantiere (fine lavori)';_bc.onclick=()=>chiudiCantiere(cantId,label);$('qd-actions').appendChild(_bc)
+      }
+    }
   }catch(e){
     console.error('showCantiereDetail:',e)
     $('qd-body').innerHTML=`<div style="color:#c0392b;padding:12px">Errore: ${esc(e.message)}</div>`
   }
+}
+
+async function chiudiCantiere(cantId,label){
+  if(!confirm('Chiudere il cantiere "'+(label||cantId)+'" per fine lavori?\nTutte le visite collegate verranno chiuse automaticamente.'))return
+  try{
+    const{data,error}=await sb.rpc('chiudi_cantiere',{p_cantiere_id:cantId,p_motivo:'termini_lavori'})
+    if(error)throw error
+    toast('Cantiere chiuso \u00b7 '+((data&&data.visite_chiuse)||0)+' visite chiuse','ok')
+    hide('modal-qd')
+    if(typeof loadCantieri==='function'&&!$('view-cantieri')?.classList.contains('hidden'))loadCantieri()
+  }catch(e){toast('Errore: '+(e.message||e),'err')}
+}
+async function riapriCantiere(cantId,label){
+  if(!confirm('Riaprire il cantiere "'+(label||cantId)+'"?\nLe visite collegate verranno riaperte.'))return
+  try{
+    const{data,error}=await sb.rpc('riapri_cantiere',{p_cantiere_id:cantId})
+    if(error)throw error
+    toast('Cantiere riaperto','ok')
+    hide('modal-qd')
+    if(typeof loadCantieri==='function'&&!$('view-cantieri')?.classList.contains('hidden'))loadCantieri()
+  }catch(e){toast('Errore: '+(e.message||e),'err')}
 }
 
 // ══════════════════════════════════════════════════════════════
