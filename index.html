@@ -7566,11 +7566,128 @@ window.loadRubrica=loadRubrica
 $('rub-search')?.addEventListener('keydown',e=>{if(e.key==='Enter')loadRubrica()})
 
 // Funzioni usate da onclick inline nei modal – devono essere globali
+// ── NUOVA VISITA DI RITORNO (da un verbale esistente) ──
+// Ricostruisce lo snapshot completo di una visita dal DB (stessa logica di
+// exportSnapFromDB) SENZA scaricarlo: usato per precompilare una nuova visita.
+async function rebuildSnapFromDB(vid){
+  const{data:v}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*)`).eq('visita_id',vid).single()
+  if(!v)return null
+  const{data:chkRows}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
+  const{data:lavRows}=await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid)
+  const{data:impRows}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva)').eq('visita_id',vid).order('ordine')
+  const checklist={},note_checklist={}
+  ;(chkRows||[]).forEach(r=>{ if(r.valore)checklist[r.codice]=r.valore; if(r.nota)note_checklist[r.codice]=r.nota })
+  const imprese=(impRows||[]).map((im,i)=>({
+    impresa_id:im.impresa_id||'',impresa_nome:im.imprese?.impresa_nome||'',
+    piva:im.imprese?.piva||'',cf_imp:im.imprese?.impresa_cf||'',
+    att:im.att||'',nr_lav:+im.nr_lav||0,nr_lav_str:+im.nr_lav_str||0,is_principale:i===0
+  }))
+  const cant=v.cantieri||{}
+  return{
+    visita_id:vid,
+    nr_verbale_origine:v.nr_verbale||'',
+    data_visita:v.data_visita||null,ora_visita:v.ora_visita||null,ora_fine:v.ora_fine||null,
+    tipo_accesso:v.tipo_accesso||null,acc_cant:v.acc_cant||null,
+    rlst_sn:v.rlst_sn,stage_vis:v.stage_vis,nom_stage:v.nom_stage||null,
+    nom_ppre:v.nom_ppre||null,qual_ppre:v.qual_ppre||null,tel_ppre:v.tel_ppre||null,
+    tecnico_id:v.tecnico_id||null,tecnico_email:v.tecnici?.email||null,
+    tec_display:v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():null,
+    cantiere_id:v.cantiere_id||null,
+    cantiere_label:cant.cantiere_etichetta||`${cant.cantiere_indirizzo||''} ${cant.cantiere_civico||''}`.trim(),
+    cantiere_detail:'',prot_int:cant.prot_int||null,cnce:cant.cantiere_cnce||null,cod_uni:cant.nodo_id||null,
+    comm_tipo_sogg:v.comm_tipo_sogg||'PF',comm_tipo:v.comm_tipo||null,
+    comm_titolo:v.comm_titolo||null,comm_nome:v.comm_nome||null,comm_cog:v.comm_cog||null,
+    comm_cf:v.comm_cf||null,comm_email:v.comm_email||null,comm_tel:v.comm_tel||null,
+    comm_rag_soc:v.comm_rag_soc||null,comm_piva:v.comm_piva||null,
+    coord:v.coord||false,
+    rl_nome:v.resp_lav||null,rl_email:v.rl_email||null,rl_tel:v.rl_tel||null,
+    csp_nome:v.csp||null,csp_email:v.csp_email||null,csp_tel:v.csp_tel||null,
+    cse_nome:v.cse||null,cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
+    nr_imp:v.nr_imp||0,nr_ind:v.nr_ind||0,
+    nr_lavoratori:v.nr_lavoratori||0,nr_lavoratori_stranieri:v.nr_lavoratori_stranieri||0,
+    importo:v.importo||null,costi:v.costi||null,stato_lav:v.stato_lav||null,
+    imprese,checklist,note_checklist,
+    lavorazioni:(lavRows||[]).map(l=>({genere:l.genere,fase:l.fase,lavorazione:l.lavorazione})),
+    oss_tec:v.oss_tec||null,oss_int:v.oss_tec_int||null,
+    note_for_sn:v.note_for_sn||false,note_for_m:v.note_for_m||null,
+    segnalazione:v.segnalazione||false,data_ritorno:v.data_ritorno||null,
+    _rebuilt_from_db:true
+  }
+}
+
+// Mostra nel modal-qd la scelta su come precompilare la nuova visita
+function chiediNuovaVisitaRitorno(vid, nrVerb){
+  $('qd-title').textContent='➕ Nuova visita di ritorno'
+  $('qd-badges').innerHTML=''
+  $('qd-body').innerHTML=`
+    <p style="font-size:13px;color:#555;margin:0 0 14px">Come vuoi precompilare la nuova visita partendo dal verbale <strong>${nrVerb||''}</strong>?</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn-outline" style="text-align:left;padding:12px 14px;height:auto;white-space:normal;line-height:1.35" onclick="nuovaVisitaDaVerbale('${vid}','full')">
+        <div style="font-weight:700;color:var(--orange);font-size:14px">📋 Riparti da tutti i dati</div>
+        <div style="font-size:12px;color:#666;margin-top:3px">Copia imprese, committente, coordinatori, lavorazioni e rilievi del verbale. Ideale quando in cantiere è tutto invariato e devi solo registrare il ritorno.</div>
+      </button>
+      <button class="btn-outline" style="text-align:left;padding:12px 14px;height:auto;white-space:normal;line-height:1.35" onclick="nuovaVisitaDaVerbale('${vid}','cantiere')">
+        <div style="font-weight:700;color:var(--orange);font-size:14px">🏗️ Solo i dati del cantiere</div>
+        <div style="font-size:12px;color:#666;margin-top:3px">Copia solo il cantiere (indirizzo, CNCE, codice univoco, prot. int.). Da usare quando sono cambiate le imprese o le altre figure.</div>
+      </button>
+    </div>`
+  $('qd-actions').innerHTML=`<button class="btn-outline btn-sm" onclick="showVisitaDetail('${vid}')">← Indietro</button>`
+}
+
+// Crea una NUOVA visita (nuovo numero di verbale) a partire da un verbale esistente.
+// mode='full'     -> tutti i dati (imprese/committente/coordinatori/rilievi)
+// mode='cantiere' -> solo i dati del cantiere
+async function nuovaVisitaDaVerbale(vid, mode){
+  hide('modal-qd')
+  toast('Preparazione nuova visita…')
+  try{
+    if(mode==='cantiere'){
+      const{data:v}=await sb.from('visite').select('cantiere_id,cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico)').eq('visita_id',vid).single()
+      if(!v||!v.cantiere_id){toast('Cantiere non trovato','err');return}
+      const cid=v.cantiere_id
+      const c=v.cantieri||{}
+      const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
+      await initForm()
+      navTo('form')
+      vSet('f-cant-id',cid)
+      vSet('f-cant-search',label)
+      S.fd.cantiere_id=cid
+      const r=await sb.from('cantieri').select('*').eq('cantiere_id',cid).single()
+      if(r.data){
+        vSet('f-cnce',r.data.cantiere_cnce||'')
+        vSet('f-cod-uni',r.data.nodo_id||'')
+        vSet('f-prot-int',r.data.prot_int||'')
+        S.fd.comune_nome=r.data.comune_nome||''
+        S.fd.cantiere_indirizzo=r.data.cantiere_indirizzo||''
+        S.fd.cantiere_civico=r.data.cantiere_civico||''
+        renderCantCard(r.data)
+      }
+      await autoAccCant(cid)
+      toast('Nuova visita — dati del cantiere importati','ok')
+      return
+    }
+    // mode === 'full'
+    const snap=await rebuildSnapFromDB(vid)
+    if(!snap){toast('Visita non trovata','err');return}
+    const origNr=snap.nr_verbale_origine||''
+    // Rendi la visita NUOVA (INSERT, nuovo numero): niente visita_id, niente data/ora/rientro/accesso ereditati
+    delete snap.visita_id
+    snap.data_visita=null; snap.ora_visita=null; snap.ora_fine=null
+    snap.acc_cant=null; snap.data_ritorno=null
+    await initForm(snap)     // assegna un nuovo nr_verbale e la data odierna
+    navTo('form')
+    if(snap.cantiere_id) await autoAccCant(snap.cantiere_id)
+    toast('Nuova visita — tutti i dati importati dal verbale '+origNr,'ok')
+  }catch(e){toast('Errore: '+e.message,'err');console.error('nuovaVisitaDaVerbale:',e)}
+}
+
 window.genPDF=genPDF
 window.riapriBozza=riapriBozza
 window.inviEmailVerbaleFromList=inviEmailVerbaleFromList
 window.exportSnapFromDB=exportSnapFromDB
 window.showVisitaDetail=showVisitaDetail
+window.chiediNuovaVisitaRitorno=chiediNuovaVisitaRitorno
+window.nuovaVisitaDaVerbale=nuovaVisitaDaVerbale
 window.showCantiereDetail=showCantiereDetail
 
 // ══════════════════════════════════════════════════════════════
@@ -7669,6 +7786,7 @@ async function showVisitaDetail(vid){
     if(v.oss_tec?.trim()) html+=qdSec('Note tecnico')+`<div class="qd-note" style="border-color:#3498db;background:#f4f8ff">${esc(v.oss_tec)}</div>`
     $('qd-body').innerHTML=html
     const acts=[
+      `<button class="btn-primary btn-sm" onclick="chiediNuovaVisitaRitorno('${vid}','${(v.nr_verbale||'').replace(/'/g,'')}')">➕ Nuova visita di ritorno</button>`,
       `<button class="btn-primary btn-sm" onclick="genPDF('${vid}');hide('modal-qd')">📄 PDF</button>`,
       `<button class="btn-outline btn-sm" onclick="inviEmailVerbaleFromList('${vid}');hide('modal-qd')">📧 Email</button>`,
       `<button class="btn-outline btn-sm" onclick="exportSnapFromDB('${vid}');hide('modal-qd')">📤 Snapshot</button>`,
