@@ -940,7 +940,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <input type="text" id="q-search" placeholder="Verbale, cantiere, impresa…">
           <select id="q-ipc"><option value="">Tutti IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun Rilievo</option></select>
           <select id="q-stato"><option value="">Tutti stati</option><option value="bozza">Bozza</option><option value="definitivo">Definitivo</option></select>
-          <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button>
+          <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button><label id="q-elim-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer"><input type="checkbox" id="q-elim"> Mostra eliminate</label>
         </div>
         <div class="tbl-wrap">
           <table><thead><tr><th>Verbale</th><th>Data</th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th>Stato</th><th></th></tr></thead>
@@ -4233,7 +4233,12 @@ function renderScadenze(){
 async function loadLista(){
   const q=vGet('q-search').trim()
   const fi=vGet('q-ipc');const fs=vGet('q-stato')
-  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).eq('elimina',0).order('data_visita',{ascending:false}).limit(2000)
+  const _coord=!!window.__isCoord
+  const _ew=$('q-elim-wrap');if(_ew)_ew.style.display=_coord?'inline-flex':'none'
+  const _qe=$('q-elim');if(_qe&&!_qe.dataset.b){_qe.dataset.b='1';_qe.onchange=loadLista}
+  const _showElim=_coord&&_qe&&_qe.checked
+  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,elimina,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
+  if(!_showElim)qb=qb.eq('elimina',0)
   if(fi)qb=qb.eq('ipc',fi)
   if(fs)qb=qb.eq('stato',fs)
   const{data}=await qb
@@ -4258,18 +4263,27 @@ function vtRow(v){
   const cant=v.cantieri?.cantiere_etichetta||v.cantieri?.cantiere_indirizzo||'-'
   const ipc=v.ipc||'NR'
   const isBozza=(v.stato||'bozza')==='bozza'
-  return`<tr class="row-detail-hover" data-act="detail-visita" data-id="${v.visita_id}">
-    <td>${v.nr_verbale||'-'}</td><td>${fmtDate(v.data_visita)}</td>
+  const coord=!!window.__isCoord
+  const isElim=+v.elimina===1
+  const nr=(v.nr_verbale||'').replace(/"/g,'')
+  const detailBtn=`<button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Visualizza dettaglio">👁</button>`
+  let actions
+  if(isElim){
+    actions=detailBtn+(coord?`<button class="btn-warn btn-sm" data-act="restore" data-id="${v.visita_id}" data-nr="${nr}" title="Ripristina visita">↩️ Ripristina</button>`:'')
+  }else{
+    actions=detailBtn
+      +(isBozza?`<button class="btn-warn btn-sm" data-act="riapri" data-id="${v.visita_id}" title="Riapri bozza">✏️ Riapri</button>`:'')
+      +`<button class="btn-primary btn-sm" data-act="pdf" data-id="${v.visita_id}">PDF</button>`
+      +`<button class="btn-outline btn-sm" data-act="email" data-id="${v.visita_id}" title="Invia verbale via email">📧</button>`
+      +`<button class="btn-outline btn-sm" data-act="snap" data-id="${v.visita_id}">📤</button>`
+      +(coord?`<button class="btn-outline btn-sm" data-act="softdel" data-id="${v.visita_id}" data-nr="${nr}" title="Metti in eliminata" style="color:#c0392b">🗑</button>`:'')
+  }
+  return`<tr class="row-detail-hover" data-act="detail-visita" data-id="${v.visita_id}"${isElim?' style="opacity:.55"':''}>
+    <td>${v.nr_verbale||'-'}${isElim?' <span class="badge" style="background:#c0392b;color:#fff">eliminata</span>':''}</td><td>${fmtDate(v.data_visita)}</td>
     <td>${cant}</td><td>${v.imprese?.impresa_nome||'-'}</td>
     <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
     <td><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span></td>
-    <td><div class="tbl-actions">
-      <button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Visualizza dettaglio">👁</button>
-      ${isBozza?`<button class="btn-warn btn-sm" data-act="riapri" data-id="${v.visita_id}" title="Riapri bozza">✏️ Riapri</button>`:''}
-      <button class="btn-primary btn-sm" data-act="pdf" data-id="${v.visita_id}">PDF</button>
-      <button class="btn-outline btn-sm" data-act="email" data-id="${v.visita_id}" title="Invia verbale via email">📧</button>
-      <button class="btn-outline btn-sm" data-act="snap" data-id="${v.visita_id}">📤</button>
-    </div></td>
+    <td><div class="tbl-actions">${actions}</div></td>
   </tr>`
 }
 function bindRowActions(){
@@ -4277,11 +4291,27 @@ function bindRowActions(){
   document.querySelectorAll('[data-act="pdf"]').forEach(b=>b.onclick=e=>{e.stopPropagation();genPDF(b.dataset.id)})
   document.querySelectorAll('[data-act="email"]').forEach(b=>b.onclick=e=>{e.stopPropagation();inviEmailVerbaleFromList(b.dataset.id)})
   document.querySelectorAll('[data-act="snap"]').forEach(b=>b.onclick=e=>{e.stopPropagation();exportSnapFromDB(b.dataset.id)})
+  document.querySelectorAll('[data-act="softdel"]').forEach(b=>b.onclick=e=>{e.stopPropagation();softDeleteVisita(b.dataset.id,b.dataset.nr)})
+  document.querySelectorAll('[data-act="restore"]').forEach(b=>b.onclick=e=>{e.stopPropagation();restoreVisita(b.dataset.id,b.dataset.nr)})
   // Dettaglio visita: pulsante 👁 e doppio clic sulla riga
   document.querySelectorAll('[data-act="detail-visita"]').forEach(el=>{
     const handler=e=>{e.stopPropagation();showVisitaDetail(el.dataset.id)}
     if(el.tagName==='TR'){el.ondblclick=handler}else{el.onclick=handler}
   })
+}
+async function softDeleteVisita(id,nr){
+  if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
+  if(!confirm('Mettere la visita '+(nr||'')+' in stato "eliminata"?\n\nI dati restano nel database ma la visita sara esclusa da statistiche e conteggi. Potrai ripristinarla dal filtro "Mostra eliminate".'))return
+  const{error}=await sb.from('visite').update({elimina:1}).eq('visita_id',id)
+  if(error){toast('Errore: '+error.message,'err');return}
+  toast('Visita messa in eliminata','ok');loadLista()
+}
+async function restoreVisita(id,nr){
+  if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
+  if(!confirm('Ripristinare la visita '+(nr||'')+'? Tornera visibile e conteggiata nelle statistiche.'))return
+  const{error}=await sb.from('visite').update({elimina:0}).eq('visita_id',id)
+  if(error){toast('Errore: '+error.message,'err');return}
+  toast('Visita ripristinata','ok');loadLista()
 }
 $('btn-pdf').onclick=()=>{
   if(!S.savedId){toast('Salva prima la visita per generare il PDF','warn');return}
