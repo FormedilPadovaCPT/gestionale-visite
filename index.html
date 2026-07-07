@@ -5825,6 +5825,7 @@ async function admTogglePromemoria(cb){
   }catch(e){console.error('admTogglePromemoria:',e);toast('Errore nel salvataggio','err');cb.checked=!val;_admRenderPromStato(!val)}
 }
 
+window.admTogglePromemoria=admTogglePromemoria;window.admLoadPromemoria=admLoadPromemoria;
 // ── TARGET VISITE MENSILI (Coordinatore) ──
 function _meseRange(anno,mese){ // mese 1-12 → {da,a} inclusivi (YYYY-MM-DD)
   const da=`${anno}-${String(mese).padStart(2,'0')}-01`
