@@ -49,7 +49,7 @@ jobs:
           echo "TS=${TS}" >> "$GITHUB_ENV"
 
       - name: Carica il backup cifrato come artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: db-backup-${{ env.TS }}
           path: 'backup_*.sql.gz.gpg'
