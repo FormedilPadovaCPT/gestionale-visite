@@ -445,7 +445,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 
     <!-- DASHBOARD -->
     <section id="view-dashboard">
-      <div id="avvisi-banner"></div>
             <!-- FILTRI DASHBOARD -->
       <div class="card" id="dash-filtri" style="margin-bottom:14px">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
@@ -1088,7 +1087,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               <input type="month" id="adm-target-mese">
             </div>
             <button class="btn-primary" onclick="admLoadTarget()">📥 Carica</button>
-            <button class="btn-primary" style="background:#565c66;border-color:#565c66" onclick="admCopyLastMonth()">📋 Copia mese scorso</button>
           </div>
           <div id="adm-target-wrap" style="display:none;margin-top:12px">
             <table class="tgt-target-table">
@@ -1098,23 +1096,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <button class="btn-primary" style="margin-top:12px;background:#95C22F;border-color:#7aa527" onclick="admSaveTarget()">💾 Salva target</button>
             <span id="adm-target-status" style="font-size:12px;color:rgba(255,255,255,.6);margin-left:10px"></span>
           </div>
-        </div>
-
-        <!-- Bacheca avvisi -->
-        <div class="adm-section">
-          <div class="adm-section-title">📢 Bacheca avvisi ai tecnici</div>
-          <p style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:10px">Pubblica un messaggio che i tecnici vedranno in cima al cruscotto. Puoi impostare priorità e una scadenza; vedi quanti hanno preso visione.</p>
-          <div style="display:grid;gap:8px;max-width:660px">
-            <input id="avv-titolo" placeholder="Titolo (opzionale)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px">
-            <textarea id="avv-testo" placeholder="Testo del messaggio…" rows="3" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px;font-family:inherit"></textarea>
-            <div style="font-size:12px"><label style="color:rgba(255,255,255,.55);display:block;margin-bottom:4px">Destinatari <span style="color:rgba(255,255,255,.35)">(nessuno = tutti i tecnici)</span></label><div id="avv-dest" style="display:flex;flex-wrap:wrap;gap:12px;background:rgba(255,255,255,.05);padding:8px;border-radius:6px"></div></div>
-            <div class="adm-date-row">
-              <div class="field" style="min-width:150px"><label>Priorità</label><select id="avv-prio"><option value="info">Info</option><option value="importante">Importante</option><option value="urgente">Urgente</option></select></div>
-              <div class="field" style="min-width:150px"><label>Scade il (opzionale)</label><input type="date" id="avv-scade"></div>
-              <button class="btn-primary" style="background:#95C22F;border-color:#7aa527" onclick="admSaveAvviso()">📢 Pubblica</button>
-            </div>
-          </div>
-          <div id="adm-avvisi-list" style="margin-top:14px"></div>
         </div>
 
         <!-- Report PDF -->
@@ -1943,7 +1924,7 @@ function navTo(view){
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
   if(view==='scadenze')loadScadenze().catch(e=>{console.error('loadScadenze:',e);toast('Errore scadenze: '+e.message,'err')})
-  if(view==='admin'){admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
+  if(view==='admin')admInit()
 }
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
   b.onclick=()=>{if(b.dataset.view==='form')initForm();navTo(b.dataset.view)}
@@ -2169,8 +2150,6 @@ async function initForm(snap=null){
   hideCantCard()
   ;['f-qual-ppre','f-tec-select','f-tec2-select'].forEach(id=>{const el=$(id);if(el)el.selectedIndex=0})
   ;['f-tec2-display','f-tec2-id','f-tec2-email'].forEach(id=>vSet(id,''))
-  // Pre-seleziona il tecnico loggato come Tecnico responsabile (dopo il reset dei select)
-  if(S.tecnico&&S.tecnico.email){ setTecnicoFromEmail(S.tecnico.email); vSet('f-tec-id',S.tecnico.tecnico_id||'') }
   // reset stage toggle a No
   const stageVisNo=$('f-stage-vis-no'); if(stageVisNo)stageVisNo.checked=true
   const stageVisH=$('f-stage-vis'); if(stageVisH)stageVisH.value=''
@@ -3725,7 +3704,6 @@ async function loadDash(){
   ;(tecs||[]).forEach(t=>{_dashTecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()||t.tecnico_id})
   // card obiettivo mensile (non blocca la dashboard se fallisce)
   loadTargetCard&&loadTargetCard().catch(e=>console.warn('loadTargetCard:',e))
-  loadAvvisi&&loadAvvisi().catch(e=>console.warn('loadAvvisi:',e))
   // fetch storico completo (paginato) con cantiere + impresa principale
   const cols=`visita_id,data_visita,ipc,rlst_sn,acc_cant,tecnico_id,tipo_accesso,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantiere_id,impresa_id,cantieri(comune_nome,cantiere_tip_int,cantiere_tip_ope,cantiere_importo),visite_imprese_presenti(is_principale,tipo_imp,impresa_id,imprese(impresa_nome,cassa_edile))`
   let rows=[],from=0
@@ -4163,7 +4141,6 @@ async function loadScadenze(){
     const opts=idsConScad.map(id=>({id,nome:tecMap[id]||id})).sort((a,b)=>a.nome.localeCompare(b.nome,'it'))
     sel.innerHTML='<option value="">Tutti i tecnici</option>'+opts.map(o=>`<option value="${o.id}">${o.nome}</option>`).join('')
     if(prev&&idsConScad.includes(prev))sel.value=prev
-    else if(S.user&&S.user.email!==ADMIN_EMAIL&&S.tecnico&&idsConScad.includes(S.tecnico.tecnico_id))sel.value=S.tecnico.tecnico_id
     sel.onchange=renderScadenze
   }
   renderScadenze()
@@ -5841,86 +5818,10 @@ async function loadTargetCard(){
   rlstTxt.textContent=`${pctR}%`
   rlstBar.style.width=Math.min(100,pctR)+'%'
   rlstBar.style.background=pctR>=20?'#95C22F':'#e7500f'
-  if(maxV!=null&&tot<=maxV){const _gg=now.getDate(),_ggT=new Date(anno,mese,0).getDate(),_att=Math.round(maxV*_gg/_ggT);if(tot<_att){const _n=$('tgt-vis-note');_n.textContent=_n.textContent+' · Sei un po’ indietro sul ritmo (atteso ~'+_att+' a oggi).'}}
   rlstNote.textContent=tot===0?'Nessuna visita nel mese.':(pctR>=20?`✓ Obiettivo raggiunto — ${nRlst} su ${tot} in affiancamento RLST.`:`Servono almeno ${Math.max(0,Math.ceil(tot*0.2)-nRlst)} visite RLST in più (${nRlst}/${tot}).`)
   card.style.display='block'
 }
 window.loadTargetCard=loadTargetCard
-
-// ── BACHECA AVVISI ─────────────────────────────────────────────────
-async function loadAvvisi(){
-  const box=$('avvisi-banner'); if(!box||!S.user) return
-  const today=new Date().toISOString().slice(0,10)
-  let avv=null; try{const r=await sb.from('avvisi').select('*').eq('attivo',true).eq('archiviato',false).order('created_at',{ascending:false});if(r.error)throw r.error;avv=r.data}catch(e){box.innerHTML='';return}
-  const me=S.user.email
-  const attivi=(avv||[]).filter(a=>(!a.scade_il||a.scade_il>=today)&&(!a.destinatari||!a.destinatari.length||a.destinatari.includes(me)))
-  if(!attivi.length){box.innerHTML='';return}
-  let letti=new Set(); try{const r=await sb.from('avvisi_letture').select('avviso_id').eq('email',me);(r.data||[]).forEach(x=>letti.add(x.avviso_id))}catch(e){}
-  const ST={urgente:['#c0392b','#fdecea','🔴','Avviso urgente'],importante:['#e7500f','#fff3ee','🟠','Avviso importante'],info:['#2980b9','#eef6fc','🔵','Avviso']}
-  box.innerHTML=attivi.map(a=>{
-    const st=ST[a.priorita]||ST.info; const gia=letti.has(a.id)
-    return '<div style="border-left:4px solid '+st[0]+';background:'+st[1]+';border-radius:6px;padding:10px 14px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><div style="min-width:0"><strong style="color:'+st[0]+'">'+st[2]+' '+esc(a.titolo||st[3])+'</strong><div style="font-size:13px;color:#333;margin-top:3px;white-space:pre-wrap">'+esc(a.testo)+'</div></div>'+(gia?'<span style="font-size:11px;color:#27ae60;white-space:nowrap">✓ Letto</span>':'<button class="btn-outline btn-sm" style="white-space:nowrap" onclick="presaVisione(\''+a.id+'\',this)">Presa visione</button>')+'</div></div>'
-  }).join('')
-}
-window.loadAvvisi=loadAvvisi
-async function presaVisione(id,btn){
-  try{await sb.from('avvisi_letture').upsert({avviso_id:id,email:S.user.email},{onConflict:'avviso_id,email'})
-    if(btn)btn.outerHTML='<span style="font-size:11px;color:#27ae60;white-space:nowrap">✓ Letto</span>'
-  }catch(e){toast('Errore: '+(e.message||e),'err')}
-}
-window.presaVisione=presaVisione
-async function admSaveAvviso(){
-  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
-  const testo=($('avv-testo').value||'').trim()
-  if(!testo){toast('Scrivi il testo dell’avviso','warn');$('avv-testo').focus();return}
-  const dest=[...document.querySelectorAll('#avv-dest input:checked')].map(c=>c.value)
-  const row={titolo:($('avv-titolo').value||'').trim()||null,testo:testo,priorita:$('avv-prio').value,scade_il:$('avv-scade').value||null,destinatari:dest.length?dest:null,creato_da:S.user.email,attivo:true}
-  const{error}=await sb.from('avvisi').insert(row)
-  if(error){toast('Errore: '+error.message,'err');return}
-  $('avv-titolo').value='';$('avv-testo').value='';$('avv-scade').value=''
-  document.querySelectorAll('#avv-dest input:checked').forEach(c=>c.checked=false)
-  toast('Avviso pubblicato','ok'); admLoadAvvisi()
-}
-window.admSaveAvviso=admSaveAvviso
-async function admLoadAvvisi(){
-  const box=$('adm-avvisi-list'); if(!box)return
-  const dbox=$('avv-dest'); if(dbox&&dbox.dataset.done!=='1'){dbox.innerHTML=(typeof TECNICI_LIST!=='undefined'?TECNICI_LIST:[]).map(t=>'<label style="color:#fff;font-size:12px;display:flex;align-items:center;gap:5px"><input type="checkbox" value="'+t.email+'"> '+esc(t.nome)+'</label>').join('');dbox.dataset.done='1'}
-  const[{data:avvAll},{data:lett},{data:tecs}]=await Promise.all([
-    sb.from('avvisi').select('*').order('created_at',{ascending:false}),
-    sb.from('avvisi_letture').select('avviso_id'),
-    sb.from('tecnici').select('tecnico_id').eq('elimina',0)
-  ])
-  const nTec=(tecs||[]).length||1; const cnt={};(lett||[]).forEach(l=>cnt[l.avviso_id]=(cnt[l.avviso_id]||0)+1)
-  const nomeDi=e=>{const t=(typeof TECNICI_LIST!=='undefined'?TECNICI_LIST:[]).find(x=>x.email===e);return t?t.nome:e}
-  const destLbl=a=>{const mir=a.destinatari&&a.destinatari.length;return mir?a.destinatari.map(nomeDi).join(', '):'Tutti'}
-  const denom=a=>(a.destinatari&&a.destinatari.length)?a.destinatari.length:nTec
-  const attivi=(avvAll||[]).filter(a=>!a.archiviato), arch=(avvAll||[]).filter(a=>a.archiviato)
-  let h=''
-  if(!attivi.length){h='<div style="color:rgba(255,255,255,.5);font-size:12px">Nessun avviso attivo.</div>'}
-  else{ h='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="color:#95C22F;text-align:left"><th style="padding:5px">Avviso</th><th>Destinatari</th><th>Priorità</th><th>Letture</th><th>Stato</th><th></th></tr></thead><tbody>'+attivi.map(a=>'<tr style="border-top:1px solid rgba(255,255,255,.08)"><td style="padding:5px;color:#fff">'+esc(a.titolo||a.testo.slice(0,45))+'</td><td style="color:rgba(255,255,255,.7);max-width:170px">'+esc(destLbl(a))+'</td><td style="text-align:center;color:rgba(255,255,255,.8)">'+a.priorita+'</td><td style="text-align:center;color:#fff">'+(cnt[a.id]||0)+'/'+denom(a)+'</td><td style="text-align:center">'+(a.attivo?'<span style="color:#95C22F">attivo</span>':'<span style="color:#888">spento</span>')+'</td><td style="text-align:right;white-space:nowrap"><button class="btn-outline btn-sm" onclick="admToggleAvviso(\''+a.id+'\','+a.attivo+')">'+(a.attivo?'Spegni':'Riattiva')+'</button> <button class="btn-outline btn-sm" onclick="admArchiveAvviso(\''+a.id+'\')">📁 Archivia</button></td></tr>').join('')+'</tbody></table>' }
-  if(arch.length){ h+='<details style="margin-top:12px"><summary style="cursor:pointer;color:rgba(255,255,255,.6);font-size:12px">📁 Archiviati ('+arch.length+')</summary><table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:6px;opacity:.75"><tbody>'+arch.map(a=>'<tr style="border-top:1px solid rgba(255,255,255,.08)"><td style="padding:5px;color:rgba(255,255,255,.8)">'+esc(a.titolo||a.testo.slice(0,45))+'</td><td style="color:rgba(255,255,255,.5)">'+esc(destLbl(a))+'</td><td style="text-align:center;color:rgba(255,255,255,.6)">'+(cnt[a.id]||0)+'/'+denom(a)+' letture</td><td style="text-align:right"><button class="btn-outline btn-sm" onclick="admRestoreAvviso(\''+a.id+'\')">Ripristina</button></td></tr>').join('')+'</tbody></table></details>' }
-  box.innerHTML=h
-}
-window.admLoadAvvisi=admLoadAvvisi
-async function admToggleAvviso(id,cur){ await sb.from('avvisi').update({attivo:!cur}).eq('id',id); admLoadAvvisi() }
-window.admToggleAvviso=admToggleAvviso
-async function admArchiveAvviso(id){ await sb.from('avvisi').update({archiviato:true}).eq('id',id); admLoadAvvisi() }
-window.admArchiveAvviso=admArchiveAvviso
-async function admRestoreAvviso(id){ await sb.from('avvisi').update({archiviato:false}).eq('id',id); admLoadAvvisi() }
-window.admRestoreAvviso=admRestoreAvviso
-async function admCopyLastMonth(){
-  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
-  const mv=$('adm-target-mese')?.value
-  if(!mv){toast('Seleziona il mese e clicca Carica','warn');return}
-  if(($('adm-target-wrap').style.display||'none')==='none'){toast('Prima clicca 📥 Carica','warn');return}
-  let[anno,mese]=mv.split('-').map(Number); let pm=mese-1,pa=anno; if(pm<1){pm=12;pa=anno-1}
-  const{data:tgts}=await sb.from('target_visite_mensili').select('tecnico_id,max_visite').eq('anno',pa).eq('mese',pm)
-  if(!tgts||!tgts.length){toast('Nessun target nel mese precedente','warn');return}
-  const map={};tgts.forEach(t=>map[t.tecnico_id]=t.max_visite); let n=0
-  document.querySelectorAll('#adm-target-tbody input[data-tec]').forEach(i=>{if(map[i.dataset.tec]!=null){i.value=map[i.dataset.tec];n++}})
-  toast('Copiati '+n+' target dal mese precedente — ricordati di salvare','ok')
-}
-window.admCopyLastMonth=admCopyLastMonth
 
 async function admLoadStats(){
   if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
@@ -7566,128 +7467,11 @@ window.loadRubrica=loadRubrica
 $('rub-search')?.addEventListener('keydown',e=>{if(e.key==='Enter')loadRubrica()})
 
 // Funzioni usate da onclick inline nei modal – devono essere globali
-// ── NUOVA VISITA DI RITORNO (da un verbale esistente) ──
-// Ricostruisce lo snapshot completo di una visita dal DB (stessa logica di
-// exportSnapFromDB) SENZA scaricarlo: usato per precompilare una nuova visita.
-async function rebuildSnapFromDB(vid){
-  const{data:v}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*)`).eq('visita_id',vid).single()
-  if(!v)return null
-  const{data:chkRows}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
-  const{data:lavRows}=await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid)
-  const{data:impRows}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva)').eq('visita_id',vid).order('ordine')
-  const checklist={},note_checklist={}
-  ;(chkRows||[]).forEach(r=>{ if(r.valore)checklist[r.codice]=r.valore; if(r.nota)note_checklist[r.codice]=r.nota })
-  const imprese=(impRows||[]).map((im,i)=>({
-    impresa_id:im.impresa_id||'',impresa_nome:im.imprese?.impresa_nome||'',
-    piva:im.imprese?.piva||'',cf_imp:im.imprese?.impresa_cf||'',
-    att:im.att||'',nr_lav:+im.nr_lav||0,nr_lav_str:+im.nr_lav_str||0,is_principale:i===0
-  }))
-  const cant=v.cantieri||{}
-  return{
-    visita_id:vid,
-    nr_verbale_origine:v.nr_verbale||'',
-    data_visita:v.data_visita||null,ora_visita:v.ora_visita||null,ora_fine:v.ora_fine||null,
-    tipo_accesso:v.tipo_accesso||null,acc_cant:v.acc_cant||null,
-    rlst_sn:v.rlst_sn,stage_vis:v.stage_vis,nom_stage:v.nom_stage||null,
-    nom_ppre:v.nom_ppre||null,qual_ppre:v.qual_ppre||null,tel_ppre:v.tel_ppre||null,
-    tecnico_id:v.tecnico_id||null,tecnico_email:v.tecnici?.email||null,
-    tec_display:v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():null,
-    cantiere_id:v.cantiere_id||null,
-    cantiere_label:cant.cantiere_etichetta||`${cant.cantiere_indirizzo||''} ${cant.cantiere_civico||''}`.trim(),
-    cantiere_detail:'',prot_int:cant.prot_int||null,cnce:cant.cantiere_cnce||null,cod_uni:cant.nodo_id||null,
-    comm_tipo_sogg:v.comm_tipo_sogg||'PF',comm_tipo:v.comm_tipo||null,
-    comm_titolo:v.comm_titolo||null,comm_nome:v.comm_nome||null,comm_cog:v.comm_cog||null,
-    comm_cf:v.comm_cf||null,comm_email:v.comm_email||null,comm_tel:v.comm_tel||null,
-    comm_rag_soc:v.comm_rag_soc||null,comm_piva:v.comm_piva||null,
-    coord:v.coord||false,
-    rl_nome:v.resp_lav||null,rl_email:v.rl_email||null,rl_tel:v.rl_tel||null,
-    csp_nome:v.csp||null,csp_email:v.csp_email||null,csp_tel:v.csp_tel||null,
-    cse_nome:v.cse||null,cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
-    nr_imp:v.nr_imp||0,nr_ind:v.nr_ind||0,
-    nr_lavoratori:v.nr_lavoratori||0,nr_lavoratori_stranieri:v.nr_lavoratori_stranieri||0,
-    importo:v.importo||null,costi:v.costi||null,stato_lav:v.stato_lav||null,
-    imprese,checklist,note_checklist,
-    lavorazioni:(lavRows||[]).map(l=>({genere:l.genere,fase:l.fase,lavorazione:l.lavorazione})),
-    oss_tec:v.oss_tec||null,oss_int:v.oss_tec_int||null,
-    note_for_sn:v.note_for_sn||false,note_for_m:v.note_for_m||null,
-    segnalazione:v.segnalazione||false,data_ritorno:v.data_ritorno||null,
-    _rebuilt_from_db:true
-  }
-}
-
-// Mostra nel modal-qd la scelta su come precompilare la nuova visita
-function chiediNuovaVisitaRitorno(vid, nrVerb){
-  $('qd-title').textContent='➕ Nuova visita di ritorno'
-  $('qd-badges').innerHTML=''
-  $('qd-body').innerHTML=`
-    <p style="font-size:13px;color:#555;margin:0 0 14px">Come vuoi precompilare la nuova visita partendo dal verbale <strong>${nrVerb||''}</strong>?</p>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <button class="btn-outline" style="text-align:left;padding:12px 14px;height:auto;white-space:normal;line-height:1.35" onclick="nuovaVisitaDaVerbale('${vid}','full')">
-        <div style="font-weight:700;color:var(--orange);font-size:14px">📋 Riparti da tutti i dati</div>
-        <div style="font-size:12px;color:#666;margin-top:3px">Copia imprese, committente, coordinatori, lavorazioni e rilievi del verbale. Ideale quando in cantiere è tutto invariato e devi solo registrare il ritorno.</div>
-      </button>
-      <button class="btn-outline" style="text-align:left;padding:12px 14px;height:auto;white-space:normal;line-height:1.35" onclick="nuovaVisitaDaVerbale('${vid}','cantiere')">
-        <div style="font-weight:700;color:var(--orange);font-size:14px">🏗️ Solo i dati del cantiere</div>
-        <div style="font-size:12px;color:#666;margin-top:3px">Copia solo il cantiere (indirizzo, CNCE, codice univoco, prot. int.). Da usare quando sono cambiate le imprese o le altre figure.</div>
-      </button>
-    </div>`
-  $('qd-actions').innerHTML=`<button class="btn-outline btn-sm" onclick="showVisitaDetail('${vid}')">← Indietro</button>`
-}
-
-// Crea una NUOVA visita (nuovo numero di verbale) a partire da un verbale esistente.
-// mode='full'     -> tutti i dati (imprese/committente/coordinatori/rilievi)
-// mode='cantiere' -> solo i dati del cantiere
-async function nuovaVisitaDaVerbale(vid, mode){
-  hide('modal-qd')
-  toast('Preparazione nuova visita…')
-  try{
-    if(mode==='cantiere'){
-      const{data:v}=await sb.from('visite').select('cantiere_id,cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico)').eq('visita_id',vid).single()
-      if(!v||!v.cantiere_id){toast('Cantiere non trovato','err');return}
-      const cid=v.cantiere_id
-      const c=v.cantieri||{}
-      const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
-      await initForm()
-      navTo('form')
-      vSet('f-cant-id',cid)
-      vSet('f-cant-search',label)
-      S.fd.cantiere_id=cid
-      const r=await sb.from('cantieri').select('*').eq('cantiere_id',cid).single()
-      if(r.data){
-        vSet('f-cnce',r.data.cantiere_cnce||'')
-        vSet('f-cod-uni',r.data.nodo_id||'')
-        vSet('f-prot-int',r.data.prot_int||'')
-        S.fd.comune_nome=r.data.comune_nome||''
-        S.fd.cantiere_indirizzo=r.data.cantiere_indirizzo||''
-        S.fd.cantiere_civico=r.data.cantiere_civico||''
-        renderCantCard(r.data)
-      }
-      await autoAccCant(cid)
-      toast('Nuova visita — dati del cantiere importati','ok')
-      return
-    }
-    // mode === 'full'
-    const snap=await rebuildSnapFromDB(vid)
-    if(!snap){toast('Visita non trovata','err');return}
-    const origNr=snap.nr_verbale_origine||''
-    // Rendi la visita NUOVA (INSERT, nuovo numero): niente visita_id, niente data/ora/rientro/accesso ereditati
-    delete snap.visita_id
-    snap.data_visita=null; snap.ora_visita=null; snap.ora_fine=null
-    snap.acc_cant=null; snap.data_ritorno=null
-    await initForm(snap)     // assegna un nuovo nr_verbale e la data odierna
-    navTo('form')
-    if(snap.cantiere_id) await autoAccCant(snap.cantiere_id)
-    toast('Nuova visita — tutti i dati importati dal verbale '+origNr,'ok')
-  }catch(e){toast('Errore: '+e.message,'err');console.error('nuovaVisitaDaVerbale:',e)}
-}
-
 window.genPDF=genPDF
 window.riapriBozza=riapriBozza
 window.inviEmailVerbaleFromList=inviEmailVerbaleFromList
 window.exportSnapFromDB=exportSnapFromDB
 window.showVisitaDetail=showVisitaDetail
-window.chiediNuovaVisitaRitorno=chiediNuovaVisitaRitorno
-window.nuovaVisitaDaVerbale=nuovaVisitaDaVerbale
 window.showCantiereDetail=showCantiereDetail
 
 // ══════════════════════════════════════════════════════════════
@@ -7786,7 +7570,6 @@ async function showVisitaDetail(vid){
     if(v.oss_tec?.trim()) html+=qdSec('Note tecnico')+`<div class="qd-note" style="border-color:#3498db;background:#f4f8ff">${esc(v.oss_tec)}</div>`
     $('qd-body').innerHTML=html
     const acts=[
-      `<button class="btn-primary btn-sm" onclick="chiediNuovaVisitaRitorno('${vid}','${(v.nr_verbale||'').replace(/'/g,'')}')">➕ Nuova visita di ritorno</button>`,
       `<button class="btn-primary btn-sm" onclick="genPDF('${vid}');hide('modal-qd')">📄 PDF</button>`,
       `<button class="btn-outline btn-sm" onclick="inviEmailVerbaleFromList('${vid}');hide('modal-qd')">📧 Email</button>`,
       `<button class="btn-outline btn-sm" onclick="exportSnapFromDB('${vid}');hide('modal-qd')">📤 Snapshot</button>`,
