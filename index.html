@@ -2591,6 +2591,7 @@ $('btn-mc-comm-save').onclick=async()=>{
     nome=vGet('mc-comm-rag-soc').trim()
     if(!nome){toast('Ragione sociale obbligatoria','warn');$('mc-comm-rag-soc').focus();return}
     piva=vGet('mc-comm-piva').trim()||null
+    if(!piva){toast('Partita IVA obbligatoria per una persona giuridica (fa da identificativo)','warn');$('mc-comm-piva').focus();return}
     cf=vGet('mc-comm-cf-pg').trim()||piva
     email=vGet('mc-comm-email-pg').trim()||null
     tel=vGet('mc-comm-tel-pg').trim()||null
@@ -2600,13 +2601,14 @@ $('btn-mc-comm-save').onclick=async()=>{
     const tit=vGet('mc-comm-titolo').trim()
     nome=[tit,n,c].filter(Boolean).join(' ')
     cf=vGet('mc-comm-cf').trim()||null
+    if(!cf){toast('Codice fiscale obbligatorio per una persona fisica (fa da identificativo)','warn');$('mc-comm-cf').focus();return}
     piva=null
     email=vGet('mc-comm-email').trim()||null
     tel=vGet('mc-comm-tel').trim()||null
   }
   const tipoVal=document.querySelector('input[name="mc-tipo"]:checked')?.value||null
   const comm={
-    committente_id:uuid(),
+    committente_id:isPG?piva:cf,
     committente_nome:nome,
     tipo_sogg:isPG?'PG':'PF',
     committente_tipo:+tipoVal||null,
