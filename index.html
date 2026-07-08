@@ -516,7 +516,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="card">
         <h3>Mappa cantieri visitati &mdash; IPC ultima visita</h3>
         <div id="dash-map-filters" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0 10px;font-size:12px"></div>
-        <div id="dash-map" style="height:520px;width:100%;border-radius:8px;border:1px solid var(--line,#e3e3e6)"></div>
+        <div id="dash-map" style="height:520px;width:100%;border-radius:8px;border:1px solid var(--line,#e3e3e6);position:relative;z-index:0;isolation:isolate"></div>
         <div id="dash-map-note" style="font-size:11px;color:#999;margin-top:6px">I segnaposto con bordo tratteggiato sono al centro del comune (indirizzo non geolocalizzabile con precisione); gli altri sono geolocalizzati sull'indirizzo.</div>
       </div>
     </section>
@@ -964,7 +964,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <span id="cant-map-count" style="font-size:12px;color:#888"></span>
         </div>
         <div id="cant-map-filters" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"></div>
-        <div id="cant-map" style="height:440px;border-radius:8px;overflow:hidden;background:#eef1f4"></div>
+        <div id="cant-map" style="height:440px;border-radius:8px;overflow:hidden;background:#eef1f4;position:relative;z-index:0;isolation:isolate"></div>
         <div style="font-size:11px;color:#999;margin-top:6px">
           Cerchio pieno = posizione precisa &middot; bordo tratteggiato = posizione approssimata (centro comune) &middot; colore = scadenza lavori. I cantieri chiusi non compaiono.
         </div>
@@ -2616,6 +2616,13 @@ $('btn-mc-comm-save').onclick=async()=>{
     telefono:tel,
     elimina:0
   }
+  // Avviso se esistono gia committenti simili (evita doppioni)
+  const simili=await findSimiliCommittenti(nome,cf,piva)
+  if(simili.length){
+    const scelta=await _confirmSimiliCommittenti(simili)
+    if(scelta.action==='cancel')return
+    if(scelta.action==='use'){_useCommittenteEsistente(scelta.rec);return}
+  }
   const{error}=await sb.from('committenti').insert(comm)
   if(error){toast('Errore: '+error.message,'err');return}
   // Popola il form committente inline
@@ -2754,6 +2761,13 @@ $('btn-mi-save').onclick=async()=>{
     contratto_ccnl_altro:ccnlVal==='13'?vGet('mi-ccnl-altro').trim()||null:null,
     elimina:0
   }
+  // Avviso se esistono gia imprese simili (evita doppioni)
+  const simili=await findSimiliImprese(nome,piva,cf)
+  if(simili.length){
+    const scelta=await _confirmSimiliImprese(simili)
+    if(scelta.action==='cancel')return
+    if(scelta.action==='use'){_useImpresaEsistente(scelta.rec,_modalImpIdx);return}
+  }
   const{error}=await sb.from('imprese').insert(imp)
   if(error){toast('Errore salvataggio impresa: '+error.message,'err');return}
   // Salva certificazioni nella tabella dedicata
@@ -2863,6 +2877,119 @@ async function _useCantiereEsistente(c){
   renderCantCard(c)
   await autoAccCant(c.cantiere_id)
   toast('Cantiere esistente selezionato','ok')
+}
+
+// -- Anti-duplicato anagrafiche (imprese / committenti) - stessa logica dei cantieri --
+function _normAnag(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()}
+function _keyAnag(nome,stop){const toks=_normAnag(nome).split(' ').filter(w=>w.length>2&&!stop.has(w));return toks.sort((a,b)=>b.length-a.length)[0]||''}
+async function findSimiliImprese(nome,piva,cf){
+  const stop=new Set(['srl','srls','spa','snc','sas','sapa','soc','societa','cooperativa','coop','impresa','edile','edilizia','costruzioni','ditta','individuale','di','del','della','dei','delle'])
+  const key=_keyAnag(nome,stop)
+  const filters=[]
+  if(piva){filters.push(`piva.eq.${piva}`,`impresa_id.eq.${piva}`)}
+  if(cf){filters.push(`impresa_cf.eq.${cf}`)}
+  if(key){filters.push(`impresa_nome.ilike.%${key}%`)}
+  if(!filters.length)return[]
+  const{data}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,tipo_iscrizione_ccia,contratto_ccnl').eq('elimina',0).or(filters.join(',')).limit(25)
+  return data||[]
+}
+async function findSimiliCommittenti(nome,cf,piva){
+  const stop=new Set(['srl','srls','spa','snc','sas','soc','societa','cooperativa','coop','di','del','della','dei','delle','sig','sigra','dott','dr','ing','arch','geom','rag'])
+  const key=_keyAnag(nome,stop)
+  const filters=[]
+  if(cf){filters.push(`cf_piva.eq.${cf}`)}
+  if(piva){filters.push(`piva.eq.${piva}`)}
+  if(key){filters.push(`committente_nome.ilike.%${key}%`)}
+  if(!filters.length)return[]
+  const{data}=await sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,piva,email,telefono,tipo_sogg').eq('elimina',0).or(filters.join(',')).limit(25)
+  return data||[]
+}
+// Modal generico di scelta anagrafica simile
+function _confirmSimiliAnag(simili,cfg){
+  return new Promise(resolve=>{
+    const ov=document.createElement('div')
+    ov.className='modal-overlay';ov.style.zIndex='9999'
+    const rows=simili.map((s,i)=>{
+      const r=cfg.rowFn(s)
+      return `<div style="border:1px solid #e5e5e5;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:12px">`
+        +`<div style="font-size:13px;line-height:1.4">`
+        +`<div style="font-weight:600;color:#333">${esc(r.main||'(senza nome)')}</div>`
+        +(r.sub?`<div style="color:#666">${esc(r.sub)}</div>`:'')
+        +(r.extra?`<div style="color:#999;font-size:11px">${esc(r.extra)}</div>`:'')
+        +`</div>`
+        +`<button class="btn-primary" data-use="${i}" style="white-space:nowrap">Usa questo</button>`
+        +`</div>`
+    }).join('')
+    ov.innerHTML=`<div class="modal-box" style="max-width:580px">`
+      +`<h3>${esc(cfg.titolo)}</h3>`
+      +`<p style="font-size:13px;color:#555;margin:4px 0 12px">${cfg.descr}</p>`
+      +rows
+      +`<div class="modal-actions" style="margin-top:14px">`
+      +`<button class="btn-outline" data-act="cancel">Annulla</button>`
+      +`<button class="btn-outline" data-act="new" style="border-color:#e7500f;color:#e7500f">Crea nuovo comunque</button>`
+      +`</div></div>`
+    document.body.appendChild(ov)
+    const done=r=>{ov.remove();resolve(r)}
+    ov.querySelectorAll('button[data-use]').forEach(b=>b.onclick=()=>done({action:'use',rec:simili[+b.dataset.use]}))
+    ov.querySelector('[data-act=new]').onclick=()=>done({action:'new'})
+    ov.querySelector('[data-act=cancel]').onclick=()=>done({action:'cancel'})
+  })
+}
+function _confirmSimiliImprese(simili){
+  return _confirmSimiliAnag(simili,{
+    titolo:'Imprese simili gia presenti',
+    descr:`Risultano ${simili.length} impresa/e con dati simili. Puoi <b>usarne una esistente</b> (evita doppioni) oppure crearne una nuova.`,
+    rowFn:s=>({main:s.impresa_nome,sub:[s.piva?'P.IVA '+s.piva:'',(s.impresa_cf&&s.impresa_cf!==s.piva)?'CF '+s.impresa_cf:''].filter(Boolean).join(' · '),extra:[s.indirizzo,s.comune].filter(Boolean).join(' ')})
+  })
+}
+function _confirmSimiliCommittenti(simili){
+  return _confirmSimiliAnag(simili,{
+    titolo:'Committenti simili gia presenti',
+    descr:`Risultano ${simili.length} committente/i con dati simili. Puoi <b>usarne uno esistente</b> (evita doppioni) oppure crearne uno nuovo.`,
+    rowFn:s=>({main:s.committente_nome,sub:[s.cf_piva?'CF/P.IVA '+s.cf_piva:'',s.tipo_sogg==='PG'?'persona giuridica':'persona fisica'].filter(Boolean).join(' · '),extra:[s.email,s.telefono].filter(Boolean).join(' · ')})
+  })
+}
+// Usa un'impresa gia esistente al posto di crearne una nuova
+function _useImpresaEsistente(c,idx){
+  Object.assign(S.imprese[idx],{
+    impresa_id:c.impresa_id,
+    impresa_nome:c.impresa_nome||'',
+    piva:c.piva||'',
+    cf_imp:c.impresa_cf||'',
+    ind_imp:c.indirizzo||'',
+    com_imp:c.comune||'',
+    ceiv:c.cassa_edile||'',
+    tipo_ccia:c.tipo_iscrizione_ccia||'',
+    ccnl:c.contratto_ccnl||''
+  })
+  renderImpreseAccordion()
+  hide('modal-imp')
+  toast('Impresa esistente selezionata','ok')
+}
+// Usa un committente gia esistente al posto di crearne uno nuovo
+function _useCommittenteEsistente(c){
+  vSet('f-comm-id',c.committente_id)
+  vSet('f-comm-search',c.committente_nome||'')
+  const isPG=c.tipo_sogg==='PG'||!!c.piva
+  const pgRad=$('comm-radio-pg'),pfRad=$('comm-radio-pf')
+  if(isPG){
+    if(pgRad)pgRad.checked=true;toggleCommSogg('PG')
+    vSet('f-comm-rag-soc',c.committente_nome||'')
+    vSet('f-comm-piva',c.piva||'')
+    vSet('f-comm-cf-pg',c.cf_piva||'')
+    vSet('f-comm-email-pg',c.email||'')
+    vSet('f-comm-tel-pg',c.telefono||'')
+  }else{
+    if(pfRad)pfRad.checked=true;toggleCommSogg('PF')
+    vSet('f-comm-cf',c.cf_piva||'')
+    vSet('f-comm-email',c.email||'')
+    vSet('f-comm-tel',c.telefono||'')
+  }
+  if(c.committente_tipo)setCommTipo(String(c.committente_tipo))
+  renderCommCard(c)
+  setCommFieldsReadonly(true)
+  hide('modal-comm')
+  toast('Committente esistente selezionato','ok')
 }
 $('btn-mc-save').onclick=async()=>{
   const ind=vGet('mc-ind').trim();const civ=vGet('mc-civ').trim()
