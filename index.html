@@ -672,11 +672,16 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="card">
           <div class="sect-title">Cantiere *</div>
           <div class="field">
-            <label>Cerca cantiere</label>
+            <label>Comune</label>
+            <input type="text" id="f-cant-comune" placeholder="Es. Padova, Abano Terme…" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>Indirizzo cantiere (anche parziale)</label>
             <div class="autocomplete-wrap">
-              <input type="text" id="f-cant-search" placeholder="Indirizzo, etichetta, comune…" autocomplete="off">
+              <input type="text" id="f-cant-search" placeholder="Es. via Roma — doppio click = tutti i cantieri attivi" autocomplete="off">
               <div class="ac-list hidden" id="cant-list"></div>
             </div>
+            <div style="font-size:11px;color:#aaa;margin-top:3px">Ricerca per comune e/o indirizzo. I cantieri terminati sono esclusi.</div>
             <input type="hidden" id="f-cant-id">
             <div id="cant-detail" style="font-size:12px;color:var(--grey);margin-top:5px"></div>
             <div id="cant-quartiere" style="margin-top:4px"></div>
@@ -2180,7 +2185,7 @@ async function initForm(snap=null){
 
   // Clear all fields
   const clearIds=['f-nr-verb','f-ppre-titolo','f-ppre-nome','f-ppre-cog','f-qual-ppre','f-tel-ppre','f-nom-stage',
-    'f-acc-cant','f-cant-search','f-cant-id','f-prot-int','f-cnce','f-cod-uni','f-data-ult',
+    'f-acc-cant','f-cant-comune','f-cant-search','f-cant-id','f-prot-int','f-cnce','f-cod-uni','f-data-ult',
     'f-acc-cant2','f-comm-search','f-comm-id',
     'f-comm-titolo','f-comm-nome','f-comm-cog','f-comm-cf','f-comm-email','f-comm-tel',
     'f-comm-rag-soc','f-comm-piva','f-comm-cf-pg','f-comm-email-pg','f-comm-tel-pg',
@@ -2481,28 +2486,60 @@ function renderCantCard(c){
 function hideCantCard(){const card=$('cant-info-card');if(card){card.innerHTML='';card.classList.add('hidden')}}
 
 // ── AUTOCOMPLETE CANTIERE ──
-setupAC('f-cant-search','cant-list', async q=>{
-  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_cap,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id').eq('elimina',0).order('cantiere_indirizzo').limit(20)
-  if(q)qb=qb.or(`cantiere_indirizzo.ilike.%${q}%,cantiere_etichetta.ilike.%${q}%,comune_nome.ilike.%${q}%`)
-  const{data}=await qb
-  return(data||[]).map(c=>({id:c.cantiere_id,label:c.cantiere_etichetta||`${c.cantiere_indirizzo} ${c.cantiere_civico}`,detail:`${c.cantiere_indirizzo} ${c.cantiere_civico}${c.comune_nome?' – '+c.comune_nome:''}`,extra:c}))
-},async item=>{
-  vSet('f-cant-id',item.id)
-  $('cant-detail').textContent=item.detail||''
-  S.fd.cantiere_id=item.id
-  if(item.extra){
-    vSet('f-cnce',item.extra.cantiere_cnce||'')
-    vSet('f-cod-uni',item.extra.nodo_id||'')
-    vSet('f-data-ult',item.extra.data_ult||'')
-    vSet('f-acc-cant2',item.extra.acc_cant||'')
-    S.fd.comune_nome=item.extra.comune_nome||''
-    S.fd.cantiere_indirizzo=item.extra.cantiere_indirizzo||''
-    S.fd.cantiere_civico=item.extra.cantiere_civico||''
-    renderCantCard(item.extra)
+// -- RICERCA CANTIERE (comune + indirizzo, esclude terminati) --
+initCantSearch()
+function initCantSearch(){
+  const inA=$('f-cant-search'),inC=$('f-cant-comune'),lst=$('cant-list')
+  if(!inA||!lst)return
+  let tm=null
+  const onSel=async item=>{
+    inA.value=item.label
+    vSet('f-cant-id',item.id)
+    if($('cant-detail'))$('cant-detail').textContent=item.detail||''
+    S.fd.cantiere_id=item.id
+    if(item.extra){
+      vSet('f-cnce',item.extra.cantiere_cnce||'')
+      vSet('f-cod-uni',item.extra.nodo_id||'')
+      vSet('f-data-ult',item.extra.data_ult||'')
+      vSet('f-acc-cant2',item.extra.acc_cant||'')
+      S.fd.comune_nome=item.extra.comune_nome||''
+      S.fd.cantiere_indirizzo=item.extra.cantiere_indirizzo||''
+      S.fd.cantiere_civico=item.extra.cantiere_civico||''
+      renderCantCard(item.extra)
+    }
+    await autoAccCant(item.id)
   }
-  // Calcolo automatico n° accesso al cantiere = visite già registrate + 1
-  await autoAccCant(item.id)
-})
+  const fetchCant=async(qa,qc)=>{
+    let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id').eq('elimina',0).not('cantiere_chiuso','is',true).order('comune_nome').order('cantiere_indirizzo').limit(30)
+    if(qc)qb=qb.ilike('comune_nome',`%${qc}%`)
+    if(qa)qb=qb.or(`cantiere_indirizzo.ilike.%${qa}%,cantiere_etichetta.ilike.%${qa}%`)
+    const{data}=await qb
+    return(data||[]).map(c=>{
+      const ind=`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
+      const loc=[c.cantiere_cap,c.comune_nome].filter(Boolean).join(' ')
+      const et=c.cantiere_etichetta||''
+      const cu=c.nodo_id||''
+      const display=`<div style="font-weight:600;color:#333">${esc(et||ind||'(senza indirizzo)')}</div>`+
+        `<div style="font-size:12px;color:#666">${esc(ind||'—')}${loc?' · '+esc(loc):''}</div>`+
+        (cu?`<div style="font-size:11px;color:#999">Cod. univoco: ${esc(cu)}</div>`:'')
+      return{id:c.cantiere_id,label:et||ind,detail:`${ind}${c.comune_nome?' – '+c.comune_nome:''}`,display,extra:c}
+    })
+  }
+  const render=async(force)=>{
+    const qa=inA.value.trim(),qc=(inC?inC.value.trim():'')
+    if(!force&&qa.length<2&&qc.length<2){lst.classList.add('hidden');return}
+    const items=await fetchCant(qa,qc)
+    if(!items.length){lst.innerHTML='<div style="color:#aaa;font-style:italic">Nessun cantiere attivo trovato</div>';lst.classList.remove('hidden');setTimeout(()=>lst.classList.add('hidden'),1800);return}
+    lst.innerHTML=items.map((it,i)=>`<div data-i="${i}">${it.display}</div>`).join('')
+    lst.classList.remove('hidden')
+    lst.querySelectorAll('div[data-i]').forEach((d,i)=>{d.onclick=()=>{lst.classList.add('hidden');onSel(items[i])}})
+  }
+  const trig=()=>{clearTimeout(tm);tm=setTimeout(()=>render(false),280)}
+  inA.oninput=trig
+  if(inC)inC.oninput=trig
+  inA.ondblclick=()=>{clearTimeout(tm);render(true)}
+  document.addEventListener('click',e=>{if(!inA.contains(e.target)&&!lst.contains(e.target)&&!(inC&&inC.contains(e.target)))lst.classList.add('hidden')})
+}
 
 // Compila in automatico "Accesso n°" contando le visite già fatte sul cantiere.
 // Esclude la visita corrente (caso modifica/riapertura bozza).
