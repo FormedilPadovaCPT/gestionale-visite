@@ -2806,11 +2806,63 @@ async function findSimiliCantieri(ind,com,comCod){
   const toks=norm(ind).split(' ').filter(w=>w.length>2&&!stop.has(w))
   if(!toks.length)return[]
   const key=toks[toks.length-1]
-  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,cantiere_cnce,nodo_id,cantiere_chiuso').eq('elimina',0).ilike('cantiere_indirizzo',`%${key}%`).order('cantiere_chiuso').limit(25)
+  let qb=sb.from('cantieri').select('*').eq('elimina',0).ilike('cantiere_indirizzo',`%${key}%`).order('cantiere_chiuso').limit(25)
   if(comCod)qb=qb.eq('cantiere_comune_cod',comCod)
   else if(com)qb=qb.ilike('comune_nome',`%${com}%`)
   const{data}=await qb
   return data||[]
+}
+// Modal di scelta quando esistono cantieri simili: usa un esistente oppure crea nuovo
+function _confirmSimiliCantieri(simili){
+  return new Promise(resolve=>{
+    const ov=document.createElement('div')
+    ov.className='modal-overlay'
+    ov.style.zIndex='9999'
+    const rows=simili.map((s,i)=>{
+      const a=`${s.cantiere_indirizzo||''} ${s.cantiere_civico||''}`.trim()
+      const loc=[s.cantiere_cap,s.comune_nome].filter(Boolean).join(' ')
+      const ex=[s.cantiere_etichetta?'etichetta: '+esc(s.cantiere_etichetta):'',s.cantiere_cnce?'CNCE: '+esc(s.cantiere_cnce):'',s.nodo_id?'cod.univ.: '+esc(s.nodo_id):''].filter(Boolean).join(' · ')
+      return `<div style="border:1px solid #e5e5e5;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:12px">`
+        +`<div style="font-size:13px;line-height:1.4">`
+        +`<div style="font-weight:600;color:#333">${esc(a||'(senza indirizzo)')}${s.cantiere_chiuso?' <span style="color:#c0392b;font-weight:600">[TERMINATO]</span>':''}</div>`
+        +(loc?`<div style="color:#666">${esc(loc)}</div>`:'')
+        +(ex?`<div style="color:#999;font-size:11px">${ex}</div>`:'')
+        +`</div>`
+        +`<button class="btn-primary" data-use="${i}" style="white-space:nowrap">Usa questo</button>`
+        +`</div>`
+    }).join('')
+    ov.innerHTML=`<div class="modal-box" style="max-width:580px">`
+      +`<h3>Cantieri simili gia presenti</h3>`
+      +`<p style="font-size:13px;color:#555;margin:4px 0 12px">Nello stesso comune risultano ${simili.length} cantiere/i con indirizzo simile. Puoi <b>usarne uno esistente</b> per la visita, oppure crearne uno nuovo.</p>`
+      +rows
+      +`<div class="modal-actions" style="margin-top:14px">`
+      +`<button class="btn-outline" data-act="cancel">Annulla</button>`
+      +`<button class="btn-outline" data-act="new" style="border-color:#e7500f;color:#e7500f">Crea nuovo comunque</button>`
+      +`</div></div>`
+    document.body.appendChild(ov)
+    const done=r=>{ov.remove();resolve(r)}
+    ov.querySelectorAll('button[data-use]').forEach(b=>b.onclick=()=>done({action:'use',cant:simili[+b.dataset.use]}))
+    ov.querySelector('[data-act=new]').onclick=()=>done({action:'new'})
+    ov.querySelector('[data-act=cancel]').onclick=()=>done({action:'cancel'})
+  })
+}
+// Aggancia alla visita in corso un cantiere gia esistente (come selezione da ricerca)
+async function _useCantiereEsistente(c){
+  const ind=c.cantiere_indirizzo||'',civ=c.cantiere_civico||''
+  hide('modal-cant');window._editCantId=null;$('modal-cant-title').textContent='Nuovo cantiere'
+  vSet('f-cant-id',c.cantiere_id)
+  vSet('f-cant-search',c.cantiere_etichetta||`${ind} ${civ}`.trim())
+  if($('cant-detail'))$('cant-detail').textContent=`${ind} ${civ}`.trim()+(c.comune_nome?' – '+c.comune_nome:'')
+  S.fd.cantiere_id=c.cantiere_id
+  S.fd.cantiere_indirizzo=ind
+  S.fd.cantiere_civico=civ
+  S.fd.comune_nome=c.comune_nome||''
+  vSet('f-cnce',c.cantiere_cnce||'')
+  vSet('f-cod-uni',c.nodo_id||'')
+  vSet('f-data-ult',c.data_ult||'')
+  renderCantCard(c)
+  await autoAccCant(c.cantiere_id)
+  toast('Cantiere esistente selezionato','ok')
 }
 $('btn-mc-save').onclick=async()=>{
   const ind=vGet('mc-ind').trim();const civ=vGet('mc-civ').trim()
@@ -2843,14 +2895,10 @@ $('btn-mc-save').onclick=async()=>{
   // Avviso se esistono gia cantieri simili (evita inserimenti accidentali doppi)
   const simili=await findSimiliCantieri(ind,fields.comune_nome,fields.cantiere_comune_cod)
   if(simili.length){
-    const righe=simili.map(s=>{
-      const a=`${s.cantiere_indirizzo||''} ${s.cantiere_civico||''}`.trim()
-      const loc=[s.cantiere_cap,s.comune_nome].filter(Boolean).join(' ')
-      const ex=[s.cantiere_etichetta?'etichetta: '+s.cantiere_etichetta:'',s.cantiere_cnce?'CNCE: '+s.cantiere_cnce:'',s.nodo_id?'cod.univ.: '+s.nodo_id:''].filter(Boolean).join(' · ')
-      return `• ${a||'(senza indirizzo)'}${loc?' – '+loc:''}${s.cantiere_chiuso?'  [TERMINATO]':''}`+(ex?'\n     '+ex:'')
-    }).join('\n')
-    const msg=`ATTENZIONE: risultano gia ${simili.length} cantiere/i con lo stesso comune e un indirizzo simile:\n\n${righe}\n\nVuoi comunque procedere con l'inserimento di un NUOVO cantiere?`
-    if(!confirm(msg))return
+    const scelta=await _confirmSimiliCantieri(simili)
+    if(scelta.action==='cancel')return
+    if(scelta.action==='use'){await _useCantiereEsistente(scelta.cant);return}
+    // action==='new' -> prosegue con l'inserimento del nuovo cantiere
   }
   const c={...fields,cantiere_id:uuid(),elimina:0}
   const{error}=await sb.from('cantieri').insert(c)
