@@ -466,6 +466,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="stat-card"><div class="num" id="k-ipcam" style="color:var(--warn)">–</div><div class="pct" id="k-ipcam-pct" style="color:var(--warn)"></div><div class="lbl">IPC Alto + Medio</div></div>
         <div class="stat-card"><div class="num" id="k-rlst" style="color:#95C22F">–</div><div class="pct" id="k-rlst-pct" style="color:#95C22F"></div><div class="lbl">Affiancamento RLST</div></div>
         <div class="stat-card"><div class="num" id="k-comuni" style="color:var(--grey)">–</div><div class="lbl">Comuni serviti</div></div>
+        <div class="stat-card"><div class="num" id="k-cant" style="color:var(--orange)">–</div><div class="lbl">Cantieri visitati</div></div>
       </div>
       <div class="card" id="card-target-mese" style="display:none;margin-bottom:14px">
         <h3 style="margin-bottom:2px">🎯 Obiettivo mensile — <span id="tgt-tec-nome"></span> · <span id="tgt-mese-lbl" style="text-transform:capitalize"></span></h3>
@@ -3798,6 +3799,33 @@ const datalabelPlugin={id:'datalabel',afterDatasetsDraw(chart){
     })
   })
 }}
+// Totale in cima a ogni colonna impilata (conteggio visite per n° accesso)
+const stackTotalPlugin={id:'stackTotal',afterDatasetsDraw(chart){
+  const{ctx}=chart
+  const dss=chart.data.datasets
+  if(!dss.length)return
+  const labels=chart.data.labels||[]
+  labels.forEach((lb,i)=>{
+    let tot=0,topY=null
+    dss.forEach((ds,di)=>{
+      const meta=chart.getDatasetMeta(di)
+      if(meta.hidden)return
+      const v=+ds.data[i]||0
+      tot+=v
+      const bar=meta.data[i]
+      if(bar&&(topY===null||bar.y<topY))topY=bar.y
+    })
+    if(!tot||topY===null)return
+    const x=chart.getDatasetMeta(0).data[i].x
+    ctx.save()
+    ctx.font='bold 12px Segoe UI,sans-serif'
+    ctx.fillStyle='#333'
+    ctx.textAlign='center'
+    ctx.textBaseline='bottom'
+    ctx.fillText(tot,x,topY-3)
+    ctx.restore()
+  })
+}}
 
 // ══════════════════════════════════════════════════════════════
 // DASHBOARD report-style (visite in cantiere) — fetch unico storico
@@ -3833,7 +3861,7 @@ async function loadDash(){
     return{
       vid:r.visita_id, data:r.data_visita,
       ipc:(['ALTO','MEDIO','BASSO'].indexOf(r.ipc)>=0?r.ipc:'NR'),
-      rlst:!!r.rlst_sn, acc:+r.acc_cant||0, tec:r.tecnico_id, tipo:r.tipo_accesso,
+      rlst:!!r.rlst_sn, acc:+r.acc_cant||0, tec:r.tecnico_id, tipo:r.tipo_accesso, cid:r.cantiere_id||null,
       ncp:+r.ipc_nc_plus||0, ncm:+r.ipc_nc_minus||0, oss:+r.ipc_oss||0,
       comune:c.comune_nome||null, tipint:c.cantiere_tip_int||null, tipope:c.cantiere_tip_ope||null, importo:c.cantiere_importo||null,
       ruolo:(p&&p.tipo_imp)||null, ceiv:((p&&p.imprese&&p.imprese.cassa_edile)||'').trim()||'Altro',
@@ -3914,6 +3942,7 @@ function _dashRenderKpi(F){
   const am=F.filter(x=>x.ipc==='ALTO'||x.ipc==='MEDIO').length
   const rl=F.filter(x=>x.rlst).length
   const com=new Set(F.filter(x=>x.comune).map(x=>x.comune)).size
+  const cant=new Set(F.filter(x=>x.cid).map(x=>x.cid)).size
   const pc=v=>n?(Math.round(v/n*1000)/10)+'%':'–'
   const ncp=sum('ncp'),ncm=sum('ncm'),oss=sum('oss'),totRil=ncp+ncm+oss
   const pcRil=v=>totRil?(Math.round(v/totRil*1000)/10)+'%':'–'
@@ -3924,6 +3953,7 @@ function _dashRenderKpi(F){
   $('k-ipcam').textContent=am;$('k-ipcam-pct').textContent=pc(am)
   $('k-rlst').textContent=rl;$('k-rlst-pct').textContent=pc(rl)
   $('k-comuni').textContent=com
+  if($('k-cant'))$('k-cant').textContent=cant
 }
 
 function _dashRenderEsercizio(FE,selE){
@@ -3961,7 +3991,7 @@ function _dashRenderAccesso(F){
   const ord=['1°','2°','3°','4°','5°+','Non ind.']
   const g={};F.forEach(x=>{const k=lab(x.acc);(g[k]=g[k]||{NR:0,BASSO:0,MEDIO:0,ALTO:0})[x.ipc]++})
   const L=ord.filter(k=>g[k])
-  _mkChart('ch-accesso',{type:'bar',data:{labels:L,datasets:[{label:'Nessun Rilievo',data:L.map(k=>g[k].NR),backgroundColor:_DASH_C.nr},{label:'Basso',data:L.map(k=>g[k].BASSO),backgroundColor:_DASH_C.basso},{label:'Medio',data:L.map(k=>g[k].MEDIO),backgroundColor:_DASH_C.medio},{label:'Alto',data:L.map(k=>g[k].ALTO),backgroundColor:_DASH_C.alto}]},options:{plugins:{legend:{position:'top'}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}})
+  _mkChart('ch-accesso',{type:'bar',plugins:[stackTotalPlugin],data:{labels:L,datasets:[{label:'Nessun Rilievo',data:L.map(k=>g[k].NR),backgroundColor:_DASH_C.nr},{label:'Basso',data:L.map(k=>g[k].BASSO),backgroundColor:_DASH_C.basso},{label:'Medio',data:L.map(k=>g[k].MEDIO),backgroundColor:_DASH_C.medio},{label:'Alto',data:L.map(k=>g[k].ALTO),backgroundColor:_DASH_C.alto}]},options:{layout:{padding:{top:20}},plugins:{legend:{position:'top'}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}})
 }
 
 function _dashRenderProd(F){
