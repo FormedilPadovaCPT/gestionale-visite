@@ -2798,6 +2798,19 @@ function resetModalCantiere(){
 }
 $('btn-new-cant').onclick=()=>{hideCantCard();resetModalCantiere();show('modal-cant')}
 $('btn-mc-cancel').onclick=()=>{hide('modal-cant');window._editCantId=null;$('modal-cant-title').textContent='Nuovo cantiere'}
+// -- Controllo duplicati cantiere (stesso comune + indirizzo simile) --
+async function findSimiliCantieri(ind,com,comCod){
+  const stop=new Set(['via','viale','vle','piazza','pzza','pza','corso','cso','vicolo','largo','strada','str','localita','loc','borgo','contra','contrada','riviera','lungargine','passaggio','salita','calle','stradella','n','snc','del','della','dei','delle','di','da','san','santa','santo','ss'])
+  const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()
+  const toks=norm(ind).split(' ').filter(w=>w.length>2&&!stop.has(w))
+  if(!toks.length)return[]
+  const key=toks[toks.length-1]
+  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,cantiere_cnce,nodo_id,cantiere_chiuso').eq('elimina',0).ilike('cantiere_indirizzo',`%${key}%`).order('cantiere_chiuso').limit(25)
+  if(comCod)qb=qb.eq('cantiere_comune_cod',comCod)
+  else if(com)qb=qb.ilike('comune_nome',`%${com}%`)
+  const{data}=await qb
+  return data||[]
+}
 $('btn-mc-save').onclick=async()=>{
   const ind=vGet('mc-ind').trim();const civ=vGet('mc-civ').trim()
   if(!ind||!civ){toast('Indirizzo e civico obbligatori','warn');return}
@@ -2825,6 +2838,18 @@ $('btn-mc-save').onclick=async()=>{
     hide('modal-cant');toast('Cantiere aggiornato','ok')
     window._editCantId=null;$('modal-cant-title').textContent='Nuovo cantiere'
     admLoadCantieri();return
+  }
+  // Avviso se esistono gia cantieri simili (evita inserimenti accidentali doppi)
+  const simili=await findSimiliCantieri(ind,fields.comune_nome,fields.cantiere_comune_cod)
+  if(simili.length){
+    const righe=simili.map(s=>{
+      const a=`${s.cantiere_indirizzo||''} ${s.cantiere_civico||''}`.trim()
+      const loc=[s.cantiere_cap,s.comune_nome].filter(Boolean).join(' ')
+      const ex=[s.cantiere_etichetta?'etichetta: '+s.cantiere_etichetta:'',s.cantiere_cnce?'CNCE: '+s.cantiere_cnce:'',s.nodo_id?'cod.univ.: '+s.nodo_id:''].filter(Boolean).join(' · ')
+      return `• ${a||'(senza indirizzo)'}${loc?' – '+loc:''}${s.cantiere_chiuso?'  [TERMINATO]':''}`+(ex?'\n     '+ex:'')
+    }).join('\n')
+    const msg=`ATTENZIONE: risultano gia ${simili.length} cantiere/i con lo stesso comune e un indirizzo simile:\n\n${righe}\n\nVuoi comunque procedere con l'inserimento di un NUOVO cantiere?`
+    if(!confirm(msg))return
   }
   const c={...fields,cantiere_id:uuid(),elimina:0}
   const{error}=await sb.from('cantieri').insert(c)
