@@ -2519,9 +2519,11 @@ function initCantSearch(){
       const loc=[c.cantiere_cap,c.comune_nome].filter(Boolean).join(' ')
       const et=c.cantiere_etichetta||''
       const cu=c.nodo_id||''
+      const cnce=c.cantiere_cnce||''
+      const meta=[et?`Etichetta interna: ${esc(et)}`:'',cnce?`CNCE: ${esc(cnce)}`:'',cu?`Cod. univoco: ${esc(cu)}`:''].filter(Boolean).join(' · ')
       const display=`<div style="font-weight:600;color:#333">${esc(et||ind||'(senza indirizzo)')}</div>`+
         `<div style="font-size:12px;color:#666">${esc(ind||'—')}${loc?' · '+esc(loc):''}</div>`+
-        (cu?`<div style="font-size:11px;color:#999">Cod. univoco: ${esc(cu)}</div>`:'')
+        (meta?`<div style="font-size:11px;color:#999">${meta}</div>`:'')
       return{id:c.cantiere_id,label:et||ind,detail:`${ind}${c.comune_nome?' – '+c.comune_nome:''}`,display,extra:c}
     })
   }
