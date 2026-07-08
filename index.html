@@ -2509,6 +2509,7 @@ function initCantSearch(){
       renderCantCard(item.extra)
     }
     await autoAccCant(item.id)
+    await proponiCommittenteCantiere(item.id)
   }
   const fetchCant=async(qa,qc)=>{
     let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id').eq('elimina',0).not('cantiere_chiuso','is',true).order('comune_nome').order('cantiere_indirizzo').limit(30)
@@ -2562,6 +2563,38 @@ async function autoAccCant(cantId){
 }
 
 // ── MODAL NUOVO COMMITTENTE ──
+// Propone il committente indicato nel cantiere (CF/P.IVA caricato d'ufficio) chiedendo conferma
+async function proponiCommittenteCantiere(cantId){
+  try{
+    if(!cantId)return
+    const{data:c}=await sb.from('cantieri').select('cantiere_committente_id').eq('cantiere_id',cantId).maybeSingle()
+    const cid=String(c&&c.cantiere_committente_id||'').trim()
+    if(!cid)return
+    if(vGet('f-comm-id')===cid)return
+    const{data:co}=await sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,piva,email,telefono,tipo_sogg').eq('committente_id',cid).eq('elimina',0).maybeSingle()
+    if(co){
+      const lbl=co.tipo_sogg==='PG'?'P.IVA':'CF'
+      if(confirm(`Questo cantiere risulta associato al committente:\n\n${co.committente_nome}\n${lbl}: ${co.cf_piva||cid}\n\nImpostarlo come committente della visita?`)){
+        _useCommittenteEsistente(co)
+      }
+    }else{
+      const isPiva=/^\d{11}$/.test(cid)
+      if(confirm(`Il cantiere indica un committente (${isPiva?'P.IVA':'CF'}: ${cid}) non ancora presente in anagrafica.\n\nInserirlo ora?`)){
+        $('btn-new-comm').click()
+        if(isPiva){
+          const r=$('mc-sogg-pg');if(r)r.checked=true
+          if($('mc-pf-fields'))$('mc-pf-fields').classList.add('hidden')
+          if($('mc-pg-fields'))$('mc-pg-fields').classList.remove('hidden')
+          const nm=$('mc-comm-nome');if(nm)nm.value=''
+          vSet('mc-comm-piva',cid)
+        }else{
+          const r=$('mc-sogg-pf');if(r)r.checked=true
+          vSet('mc-comm-cf',cid)
+        }
+      }
+    }
+  }catch(e){console.error('proponiCommittenteCantiere:',e)}
+}
 $('btn-new-comm').onclick=()=>{
   // reset modal
   $('mc-sogg-pf').checked=true;$('mc-tipo-priv').checked=true
@@ -4665,6 +4698,7 @@ async function loadCantieri(q=''){
           renderCantCard(cd)
         }
         await autoAccCant(btn.dataset.cantId)
+        await proponiCommittenteCantiere(btn.dataset.cantId)
       },100)
     }
   })
