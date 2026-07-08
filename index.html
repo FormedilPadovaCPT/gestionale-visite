@@ -1340,6 +1340,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <select id="mc-importo"><option value="">–</option><option value="1">fino a 250.000</option><option value="2">da 250.001 a 500.000</option><option value="3">da 500.001 a 1.000.000</option><option value="4">da 1.000.001 a 1.500.000</option><option value="5">da 1.500.001 a 2.500.000</option><option value="6">da 2.500.001 a 3.500.000</option><option value="7">da 3.500.001 a 5.000.000</option><option value="8">da 5.000.001 a 10.000.000</option><option value="11">non disponibile</option></select></div>
     </div>
     <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma" maxlength="50"></div>
+    <div class="field"><label>Descrizione cantiere <span style="font-weight:400;font-size:11px;color:#aaa">(cosa si fa nel cantiere)</span></label><textarea id="mc-descr" rows="2" maxlength="500" placeholder="Es. Rifacimento copertura e coibentazione facciata…" style="width:100%;resize:vertical;font-family:inherit;font-size:14px;padding:8px;border:1px solid var(--border);border-radius:6px"></textarea></div>
     <div class="sect-title" style="margin-top:10px;font-size:11px;color:var(--grey)">Dati identificativi cantiere</div>
     <div class="row">
       <div class="field"><label>Codice CNCE</label><input type="text" id="mc-cnce" placeholder="Cod. CNCE" maxlength="50"></div>
@@ -2473,6 +2474,7 @@ function renderCantCard(c){
     ${row('Cod. univoco',c.nodo_id)}
     ${row('Data ult. lavori',dataUlt)}
     ${row('Etichetta',c.cantiere_etichetta)}
+    ${row('Descrizione',c.cantiere_descrizione)}
   `.trim()
   card.classList.remove('hidden')
 }
@@ -2746,7 +2748,7 @@ $('btn-mi-save').onclick=async()=>{
 
 // ── MODAL CANTIERE ──
 function resetModalCantiere(){
-  ;['mc-ind','mc-civ','mc-etich','mc-cap','mc-cnce','mc-cod-uni','mc-data-ult','mc-comune-cod','mc-tip-ope-altro'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  ;['mc-ind','mc-civ','mc-etich','mc-cap','mc-cnce','mc-cod-uni','mc-data-ult','mc-comune-cod','mc-tip-ope-altro','mc-descr'].forEach(id=>{const el=$(id);if(el)el.value=''})
   const com=$('mc-com');if(com)com.value=''
   const ti=$('mc-tip-int');if(ti)ti.value=''
   const to=$('mc-tip-ope');if(to)to.value=''
@@ -2775,6 +2777,7 @@ $('btn-mc-save').onclick=async()=>{
     data_ult:vGet('mc-data-ult')||null,
     cantiere_comune_cod:vGet('mc-comune-cod').trim()||null,
     cantiere_tip_ope_altro:vGet('mc-tip-ope-altro').trim()||null,
+    cantiere_descrizione:vGet('mc-descr').trim()||null,
   }
   // Modalità modifica (da coordinatore)
   if(window._editCantId){
@@ -4424,7 +4427,7 @@ function _cmColor(k){const s=_CM_SCAD.find(x=>x.k===k);return s?s.color:'#9aa0a6
 async function loadCantMap(){
   if(typeof L==='undefined'){console.warn('Leaflet non caricato');return}
   const{data,error}=await sb.from('cantieri')
-    .select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,lat,lng,geocode_status,cantiere_importo,cantiere_tip_ope,cantiere_tip_ope_altro,data_ult')
+    .select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,lat,lng,geocode_status,cantiere_importo,cantiere_tip_ope,cantiere_tip_ope_altro,data_ult,cantiere_descrizione')
     .eq('elimina',0).not('cantiere_chiuso','is',true).not('lat','is',null).limit(3000)
   if(error){console.error('loadCantMap:',error);return}
   const rows=(data||[]).filter(r=>r.lat!=null&&r.lng!=null).map(r=>({...r}))
@@ -4496,7 +4499,7 @@ function _cmRender(fit){
     const imp=d.cantiere_importo!=null?(IMP_LBL[d.cantiere_importo]||('Fascia '+d.cantiere_importo)):'–'
     const dult=d.data_ult?new Date(d.data_ult).toLocaleDateString('it-IT'):'–'
     m.bindPopup(
-      '<b>'+_cmEsc(label)+'</b><br>'+_cmEsc(d.comune_nome||'')+'<br><br>'+
+      '<b>'+_cmEsc(label)+'</b><br>'+_cmEsc(d.comune_nome||'')+'<br>'+(d.cantiere_descrizione?'<i style="color:#555">'+_cmEsc(d.cantiere_descrizione)+'</i><br>':'')+'<br>'+
       '<b>Tipo opera:</b> '+_cmEsc(ope)+'<br>'+
       '<b>Importo:</b> '+_cmEsc(imp)+'<br>'+
       '<b>Fine lavori:</b> '+dult+
@@ -7679,6 +7682,7 @@ async function admEditCantiere(cantId) {
   vSet('mc-cod-uni', c.nodo_id || '')
   vSet('mc-data-ult', c.data_ult || '')
   vSet('mc-comune-cod', c.cantiere_comune_cod || '')
+  vSet('mc-descr', c.cantiere_descrizione || '')
   vSet('mc-tip-ope-altro', c.cantiere_tip_ope_altro || '')
   const comSel = $('mc-com')
   if (comSel) {
@@ -8030,7 +8034,7 @@ async function showCantiereDetail(cantId){
     const{data:c,error}=await sb.from('cantieri').select(
       'cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,'+
       'cantiere_cnce,nodo_id,prot_int,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,'+
-      'cantiere_importo,cantiere_durata,data_ult,cantiere_comune_cod,cantiere_chiuso,data_chiusura,chiuso_da,motivo_chiusura'
+      'cantiere_importo,cantiere_durata,data_ult,cantiere_comune_cod,cantiere_chiuso,data_chiusura,chiuso_da,motivo_chiusura,cantiere_descrizione'
     ).eq('cantiere_id',cantId).single()
     if(error||!c){toast('Cantiere non trovato'+(error?' – '+error.message:''),'err');hide('modal-qd');return}
     const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
@@ -8045,6 +8049,7 @@ async function showCantiereDetail(cantId){
       ['Indirizzo',`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()],
       ['Comune',c.comune_nome],['CAP',c.cantiere_cap],['Etichetta',c.cantiere_etichetta],
     ])
+    if(c.cantiere_descrizione){html+=qdSec('Descrizione lavori')+'<div style="font-size:13px;line-height:1.5;padding:2px 0;white-space:pre-wrap">'+esc(c.cantiere_descrizione)+'</div>'}
     html+=qdSec('Dati tecnici')
     html+=qdDl([
       ['Tipo intervento',_TIP_INT[c.cantiere_tip_int]||''],
