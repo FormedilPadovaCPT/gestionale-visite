@@ -4558,7 +4558,7 @@ function vtRow(v){
     actions=detailBtn+(coord?`<button class="btn-warn btn-sm" data-act="restore" data-id="${v.visita_id}" data-nr="${nr}" title="Ripristina visita">↩️ Ripristina</button>`:'')
   }else{
     actions=detailBtn
-      +(isBozza?`<button class="btn-warn btn-sm" data-act="riapri" data-id="${v.visita_id}" title="Riapri bozza">✏️ Riapri</button>`:'')
+      +(isBozza?`<button class="btn-warn btn-sm" data-act="riapri" data-id="${v.visita_id}" title="Riapri bozza">✏️ Riapri</button>`:(coord?`<button class="btn-warn btn-sm" data-act="modvis" data-id="${v.visita_id}" title="Modifica visita (coordinatore)">✏️ Modifica</button>`:''))
       +`<button class="btn-primary btn-sm" data-act="pdf" data-id="${v.visita_id}">PDF</button>`
       +`<button class="btn-outline btn-sm" data-act="email" data-id="${v.visita_id}" title="Invia verbale via email">📧</button>`
       +`<button class="btn-outline btn-sm" data-act="snap" data-id="${v.visita_id}">📤</button>`
@@ -4574,6 +4574,7 @@ function vtRow(v){
 }
 function bindRowActions(){
   document.querySelectorAll('[data-act="riapri"]').forEach(b=>b.onclick=e=>{e.stopPropagation();riapriBozza(b.dataset.id)})
+  document.querySelectorAll('[data-act="modvis"]').forEach(b=>b.onclick=e=>{e.stopPropagation();modificaVisitaCoord(b.dataset.id)})
   document.querySelectorAll('[data-act="pdf"]').forEach(b=>b.onclick=e=>{e.stopPropagation();genPDF(b.dataset.id)})
   document.querySelectorAll('[data-act="email"]').forEach(b=>b.onclick=e=>{e.stopPropagation();inviEmailVerbaleFromList(b.dataset.id)})
   document.querySelectorAll('[data-act="snap"]').forEach(b=>b.onclick=e=>{e.stopPropagation();exportSnapFromDB(b.dataset.id)})
@@ -4598,6 +4599,12 @@ async function restoreVisita(id,nr){
   const{error}=await sb.from('visite').update({elimina:0}).eq('visita_id',id)
   if(error){toast('Errore: '+error.message,'err');return}
   toast('Visita ripristinata','ok');loadLista()
+}
+// Modifica di una visita gia definitiva (solo coordinatore): riusa il caricamento della bozza
+async function modificaVisitaCoord(vid){
+  if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
+  if(!confirm('Modificare questa visita gia definitiva?\n\nVerra ricaricata nel form di inserimento: dopo le correzioni ricordati di salvarla per aggiornare la visita.'))return
+  riapriBozza(vid)
 }
 $('btn-pdf').onclick=()=>{
   if(!S.savedId){toast('Salva prima la visita per generare il PDF','warn');return}
@@ -8291,6 +8298,7 @@ async function showVisitaDetail(vid){
       `<button class="btn-outline btn-sm" onclick="exportSnapFromDB('${vid}');hide('modal-qd')">📤 Snapshot</button>`,
     ]
     if(isBozza) acts.push(`<button class="btn-warn btn-sm" onclick="riapriBozza('${vid}');hide('modal-qd')">✏️ Riapri</button>`)
+    else if(window.__isCoord) acts.push(`<button class="btn-warn btn-sm" onclick="modificaVisitaCoord('${vid}');hide('modal-qd')">✏️ Modifica</button>`)
     $('qd-actions').innerHTML=acts.join('')
   }catch(e){ console.error('showVisitaDetail:',e); $('qd-body').innerHTML=`<div style="color:#c0392b;padding:12px">Errore: ${e.message}</div>` }
 }
