@@ -952,6 +952,17 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 
     <!-- LISTA CANTIERI -->
     <section id="view-cantieri" class="hidden">
+      <div class="card" id="cant-map-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <h3 style="margin:0">&#128506;&#65039; Mappa cantieri attivi</h3>
+          <span id="cant-map-count" style="font-size:12px;color:#888"></span>
+        </div>
+        <div id="cant-map-filters" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"></div>
+        <div id="cant-map" style="height:440px;border-radius:8px;overflow:hidden;background:#eef1f4"></div>
+        <div style="font-size:11px;color:#999;margin-top:6px">
+          Cerchio pieno = posizione precisa &middot; bordo tratteggiato = posizione approssimata (centro comune) &middot; colore = scadenza lavori. I cantieri chiusi non compaiono.
+        </div>
+      </div>
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <h3 style="margin:0">Elenco cantieri</h3>
@@ -1952,6 +1963,7 @@ function navTo(view){
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
+  if(view==='cantieri'&&typeof loadCantMap==='function')loadCantMap().catch(e=>console.error('loadCantMap:',e))
   if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
   if(view==='scadenze')loadScadenze().catch(e=>{console.error('loadScadenze:',e);toast('Errore scadenze: '+e.message,'err')})
   if(view==='admin'){admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
@@ -4384,6 +4396,120 @@ async function loadCantieri(q=''){
 $('btn-cerca-cant').onclick=()=>loadCantieri()
 $('q-cant').onkeydown=e=>{if(e.key==='Enter')loadCantieri()}
 $('btn-nuovo-cant-lista').onclick=()=>{resetModalCantiere();show('modal-cant')}
+
+
+// ══════════════════════════════════════════════════════════════
+// ── MAPPA CANTIERI ATTIVI (elenco cantieri) ──
+// ══════════════════════════════════════════════════════════════
+let _cmMap=null,_cmLayer=null,_cmRows=null
+const _CM_SCAD=[
+  {k:'scaduta',label:'Scaduta',color:'#c0392b'},
+  {k:'urg',label:'Entro 30 gg',color:'#e7500f'},
+  {k:'med',label:'Entro 90 gg',color:'#e6a417'},
+  {k:'ok',label:'Oltre 90 gg',color:'#27ae60'},
+  {k:'nd',label:'Senza data',color:'#9aa0a6'}
+]
+function _cmScad(dataUlt){
+  if(!dataUlt)return 'nd'
+  const oggi=new Date();oggi.setHours(0,0,0,0)
+  const d=new Date(dataUlt);if(isNaN(d))return 'nd'
+  const gg=Math.round((d-oggi)/86400000)
+  if(gg<0)return 'scaduta'
+  if(gg<=30)return 'urg'
+  if(gg<=90)return 'med'
+  return 'ok'
+}
+function _cmColor(k){const s=_CM_SCAD.find(x=>x.k===k);return s?s.color:'#9aa0a6'}
+
+async function loadCantMap(){
+  if(typeof L==='undefined'){console.warn('Leaflet non caricato');return}
+  const{data,error}=await sb.from('cantieri')
+    .select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,lat,lng,geocode_status,cantiere_importo,cantiere_tip_ope,cantiere_tip_ope_altro,data_ult')
+    .eq('elimina',0).not('cantiere_chiuso','is',true).not('lat','is',null).limit(3000)
+  if(error){console.error('loadCantMap:',error);return}
+  const rows=(data||[]).filter(r=>r.lat!=null&&r.lng!=null).map(r=>({...r}))
+
+  // spread a raggiera per marker a livello comune sovrapposti
+  const grp={}
+  rows.forEach(d=>{if(d.geocode_status==='comune'){const key=(+d.lat).toFixed(4)+','+(+d.lng).toFixed(4);(grp[key]=grp[key]||[]).push(d)}})
+  Object.values(grp).forEach(list=>{
+    if(list.length<2)return
+    const R=0.0016
+    list.forEach((d,i)=>{const a=2*Math.PI*i/list.length;d.lat=+d.lat+R*Math.cos(a);d.lng=+d.lng+R*Math.sin(a)/Math.cos(d.lat*Math.PI/180)})
+  })
+  _cmRows=rows
+
+  if(!_cmMap){
+    _cmMap=L.map('cant-map',{scrollWheelZoom:false}).setView([45.35,11.85],10)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(_cmMap)
+    _cmMap.on('click',()=>_cmMap.scrollWheelZoom.enable())
+  }
+  if(_cmLayer)_cmMap.removeLayer(_cmLayer)
+  _cmLayer=L.layerGroup().addTo(_cmMap)
+
+  _cmBuildFilters(rows)
+  _cmRender(true)
+  setTimeout(()=>_cmMap.invalidateSize(),250)
+}
+
+function _cmBuildFilters(rows){
+  const fdiv=$('cant-map-filters');if(!fdiv)return
+  const pill='padding:5px 10px;border:1px solid var(--border,#ddd);border-radius:20px;font-size:12px;cursor:pointer;background:#fff'
+  // Comuni presenti
+  const comuni=[...new Set(rows.map(r=>r.comune_nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'))
+  // Tipi opera presenti
+  const tOpe=[...new Set(rows.map(r=>r.cantiere_tip_ope).filter(v=>v!=null))].sort((a,b)=>a-b)
+  const hasNoOpe=rows.some(r=>r.cantiere_tip_ope==null)
+  // Importi presenti
+  const imps=[...new Set(rows.map(r=>r.cantiere_importo).filter(v=>v!=null))].sort((a,b)=>a-b)
+  const hasNoImp=rows.some(r=>r.cantiere_importo==null)
+
+  fdiv.innerHTML=''
+  const mkSel=(id,html)=>{const s=document.createElement('select');s.id=id;s.style.cssText=pill;s.innerHTML=html;s.addEventListener('change',()=>_cmRender(true));fdiv.appendChild(s);return s}
+  mkSel('cm-f-comune','<option value="">📍 Tutti i comuni</option>'+comuni.map(c=>`<option value="${_cmEsc(c)}">${_cmEsc(c)}</option>`).join(''))
+  mkSel('cm-f-opera','<option value="">🏗️ Tutti i tipi opera</option>'+tOpe.map(k=>`<option value="${k}">${_cmEsc(TIP_OPE_LABELS[k]||('Op. '+k))}</option>`).join('')+(hasNoOpe?'<option value="__nd">Non indicato</option>':''))
+  mkSel('cm-f-importo','<option value="">💶 Tutti gli importi</option>'+imps.map(k=>`<option value="${k}">${_cmEsc(IMP_LBL[k]||('Fascia '+k))}</option>`).join('')+(hasNoImp?'<option value="__nd">Non indicato</option>':''))
+  mkSel('cm-f-scad','<option value="">🗓️ Tutte le scadenze</option>'+_CM_SCAD.map(s=>`<option value="${s.k}">${s.label}</option>`).join(''))
+}
+function _cmEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+function _cmRender(fit){
+  if(!_cmMap||!_cmLayer||!_cmRows)return
+  _cmLayer.clearLayers()
+  const fCom=$('cm-f-comune')?.value||''
+  const fOpe=$('cm-f-opera')?.value||''
+  const fImp=$('cm-f-importo')?.value||''
+  const fSca=$('cm-f-scad')?.value||''
+  const bounds=[]
+  let n=0
+  _cmRows.forEach(d=>{
+    if(fCom&&d.comune_nome!==fCom)return
+    if(fOpe){if(fOpe==='__nd'){if(d.cantiere_tip_ope!=null)return}else if(String(d.cantiere_tip_ope)!==fOpe)return}
+    if(fImp){if(fImp==='__nd'){if(d.cantiere_importo!=null)return}else if(String(d.cantiere_importo)!==fImp)return}
+    const sk=_cmScad(d.data_ult)
+    if(fSca&&sk!==fSca)return
+    const approx=d.geocode_status==='comune'
+    const col=_cmColor(sk)
+    const m=L.circleMarker([d.lat,d.lng],{radius:7,color:approx?'#666':'#fff',weight:2,dashArray:approx?'3 2':null,fillColor:col,fillOpacity:0.9})
+    const label=d.cantiere_etichetta||`${d.cantiere_indirizzo||''} ${d.cantiere_civico||''}`.trim()||'(senza indirizzo)'
+    const ope=d.cantiere_tip_ope!=null?(TIP_OPE_LABELS[d.cantiere_tip_ope]||('Op. '+d.cantiere_tip_ope))+(d.cantiere_tip_ope_altro?' – '+d.cantiere_tip_ope_altro:''):'–'
+    const imp=d.cantiere_importo!=null?(IMP_LBL[d.cantiere_importo]||('Fascia '+d.cantiere_importo)):'–'
+    const dult=d.data_ult?new Date(d.data_ult).toLocaleDateString('it-IT'):'–'
+    m.bindPopup(
+      '<b>'+_cmEsc(label)+'</b><br>'+_cmEsc(d.comune_nome||'')+'<br><br>'+
+      '<b>Tipo opera:</b> '+_cmEsc(ope)+'<br>'+
+      '<b>Importo:</b> '+_cmEsc(imp)+'<br>'+
+      '<b>Fine lavori:</b> '+dult+
+      (approx?'<br><i style="color:#999">posizione approssimata (comune)</i>':'')+
+      '<br><br><button onclick="showCantiereDetail(\''+_cmEsc(d.cantiere_id)+'\')" style="background:var(--orange,#e7500f);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px">Apri scheda</button>'
+    )
+    m.addTo(_cmLayer)
+    bounds.push([d.lat,d.lng])
+    n++
+  })
+  const cnt=$('cant-map-count');if(cnt)cnt.textContent=n+' cantier'+(n===1?'e':'i')+' in mappa'
+  if(fit&&bounds.length)_cmMap.fitBounds(bounds,{padding:[30,30],maxZoom:13})
+}
 
 // ── EMAIL VERBALE DA ELENCO ──
 async function inviEmailVerbaleFromList(vid){
