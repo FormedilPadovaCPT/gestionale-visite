@@ -723,7 +723,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
                 <div class="ac-list hidden" id="comm-list"></div>
               </div>
               <button class="btn-outline btn-sm" id="btn-new-comm" type="button" style="white-space:nowrap;margin-top:1px">+ Nuovo</button>
-              <button class="btn-outline btn-sm" id="btn-clear-comm" type="button" style="white-space:nowrap;margin-top:1px;display:none;color:#c0392b;border-color:#c0392b" title="Deseleziona committente">✕ Deseleziona</button>
+              <button class="btn-outline btn-sm" id="btn-clear-comm" type="button" onclick="clearCommittente()" style="white-space:nowrap;margin-top:1px;display:none;color:#c0392b;border-color:#c0392b" title="Deseleziona committente">✕ Deseleziona</button>
             </div>
             <input type="hidden" id="f-comm-id">
           </div>
@@ -2629,6 +2629,8 @@ document.querySelectorAll('input[name="mc-sogg"]').forEach(r=>{
     $('mc-pg-fields').classList.toggle('hidden',!isPG)
   }
 })
+// Identificativo di ripiego (eccezionale) da nome/ragione sociale: MAIUSCOLO, senza spazi/accenti/punteggiatura
+function _idFallbackAnag(s){return String(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]/g,'')}
 $('btn-mc-comm-save').onclick=async()=>{
   const isPG=$('mc-sogg-pg').checked
   let nome,cf,piva,email,tel
@@ -2636,7 +2638,13 @@ $('btn-mc-comm-save').onclick=async()=>{
     nome=vGet('mc-comm-rag-soc').trim()
     if(!nome){toast('Ragione sociale obbligatoria','warn');$('mc-comm-rag-soc').focus();return}
     piva=vGet('mc-comm-piva').trim()||null
-    if(!piva){toast('Partita IVA obbligatoria per una persona giuridica (fa da identificativo)','warn');$('mc-comm-piva').focus();return}
+    if(!piva){
+      const _idfb=_idFallbackAnag(nome)
+      if(!_idfb){toast('Inserisci prima la ragione sociale','warn');$('mc-comm-rag-soc').focus();return}
+      if(!confirm('ATTENZIONE - inserimento eccezionale.\n\nStai salvando un committente SENZA Partita IVA. Senza P.IVA questo dato e inutile ai fini dell\'elaborazione da parte dell\'ufficio.\n\nSe procedi, come identificativo verra usata la ragione sociale senza spazi:\n\n'+_idfb+'\n\nProcedere comunque?')){$('mc-comm-piva').focus();return}
+      piva=_idfb
+      vSet('mc-comm-piva',_idfb)
+    }
     cf=vGet('mc-comm-cf-pg').trim()||piva
     email=vGet('mc-comm-email-pg').trim()||null
     tel=vGet('mc-comm-tel-pg').trim()||null
@@ -2646,7 +2654,13 @@ $('btn-mc-comm-save').onclick=async()=>{
     const tit=vGet('mc-comm-titolo').trim()
     nome=[tit,n,c].filter(Boolean).join(' ')
     cf=vGet('mc-comm-cf').trim()||null
-    if(!cf){toast('Codice fiscale obbligatorio per una persona fisica (fa da identificativo)','warn');$('mc-comm-cf').focus();return}
+    if(!cf){
+      const _idfb=_idFallbackAnag(n+c)
+      if(!_idfb){toast('Inserisci prima nome e cognome','warn');return}
+      if(!confirm('ATTENZIONE - inserimento eccezionale.\n\nStai salvando un committente SENZA codice fiscale. Senza CF questo dato e inutile ai fini dell\'elaborazione da parte dell\'ufficio.\n\nSe procedi, come identificativo verra usato il nominativo senza spazi:\n\n'+_idfb+'\n\nProcedere comunque?')){$('mc-comm-cf').focus();return}
+      cf=_idfb
+      vSet('mc-comm-cf',_idfb)
+    }
     piva=null
     email=vGet('mc-comm-email').trim()||null
     tel=vGet('mc-comm-tel').trim()||null
@@ -2744,10 +2758,7 @@ function clearCommittente(){
   hideCommCard()
 }
 
-document.addEventListener('DOMContentLoaded',()=>{
-  const btnClear=$('btn-clear-comm')
-  if(btnClear)btnClear.onclick=()=>{clearCommittente()}
-})
+{const btnClear=$('btn-clear-comm');if(btnClear)btnClear.onclick=()=>{clearCommittente()}}
 
 // ── AUTOCOMPLETE COMMITTENTE ──
 setupAC('f-comm-search','comm-list', async q=>{
