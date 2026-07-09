@@ -1251,6 +1251,14 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div id="adm-cant-empty" class="hidden" style="text-align:center;padding:16px;color:rgba(255,255,255,.35);font-size:13px">Nessun cantiere trovato</div>
         </div>
 
+        <!-- Riaggancio cantieri senza CNCE -->
+        <div class="adm-section">
+          <div class="adm-section-title">🔗 Riaggancio cantieri senza CNCE</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:12px">Cantieri creati dai tecnici senza codice CNCE: il sistema cerca il cantiere codificato simile a cui spostare le visite. Le visite vengono riagganciate e il cantiere provvisorio archiviato.</p>
+          <button class="btn-primary btn-sm" onclick="admCaricaRiaggancio()">🔍 Trova cantieri senza CNCE</button>
+          <div id="adm-riaggancio-list" style="margin-top:12px"></div>
+        </div>
+
         <!-- Download file XSD -->
         <div class="adm-section">
           <div class="adm-section-title">Schema XSD – Osservatorio visite</div>
@@ -8073,6 +8081,49 @@ async function admLoadCantieri() {
   } catch(e) { toast('Errore: ' + e.message, 'err') }
 }
 
+// Riaggancio cantieri senza CNCE a cantiere codificato simile (solo coordinatore)
+async function admCaricaRiaggancio(){
+  if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
+  const wrap=$('adm-riaggancio-list');if(!wrap)return
+  wrap.innerHTML='<div style="color:rgba(255,255,255,.4);font-size:13px;padding:8px">Caricamento…</div>'
+  const{data:senza,error}=await sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,cantiere_comune_cod').eq('elimina',0).is('cantiere_cnce',null).order('comune_nome')
+  if(error){wrap.innerHTML='<div style="color:#e67e22;font-size:13px">Errore: '+esc(error.message)+'</div>';return}
+  const rows=senza||[]
+  if(!rows.length){wrap.innerHTML='<div style="color:rgba(255,255,255,.4);font-size:13px;padding:8px">Nessun cantiere senza CNCE. ✔</div>';return}
+  let html=''
+  for(const c of rows){
+    const{count:nv}=await sb.from('visite').select('visita_id',{count:'exact',head:true}).eq('cantiere_id',c.cantiere_id).eq('elimina',0)
+    let simili=[]
+    try{simili=(await findSimiliCantieri(c.cantiere_indirizzo||'',c.comune_nome,c.cantiere_comune_cod)).filter(s=>s.cantiere_id!==c.cantiere_id&&s.cantiere_cnce)}catch(e){}
+    const ind=[c.cantiere_indirizzo,c.cantiere_civico].filter(Boolean).join(' ')
+    html+=`<div style="border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 12px;margin-bottom:10px">`
+      +`<div style="font-size:13px;color:#fff;font-weight:600">${esc(ind||'(senza indirizzo)')} <span style="color:rgba(255,255,255,.5);font-weight:400">— ${esc(c.comune_nome||'')}</span></div>`
+      +`<div style="font-size:11px;color:rgba(255,255,255,.45);margin-bottom:6px">${nv||0} visita/e collegate${c.cantiere_etichetta?' · '+esc(c.cantiere_etichetta):''}</div>`
+    if(!simili.length){
+      html+=`<div style="font-size:12px;color:rgba(255,255,255,.4)">Nessun cantiere CNCE simile trovato in questo comune.</div>`
+    }else{
+      html+=simili.map(s=>{
+        const si=[s.cantiere_indirizzo,s.cantiere_civico].filter(Boolean).join(' ')
+        return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08)">`
+          +`<div style="font-size:12px;color:rgba(255,255,255,.8)">${esc(si||'(senza indirizzo)')} — <span style="color:#e7a417">CNCE ${esc(s.cantiere_cnce)}</span>${s.cantiere_etichetta?' · '+esc(s.cantiere_etichetta):''}</div>`
+          +`<button class="btn-primary btn-sm" onclick="admRiaggancia('${c.cantiere_id}','${s.cantiere_id}',${nv||0})" style="white-space:nowrap">Riaggancia qui</button>`
+          +`</div>`
+      }).join('')
+    }
+    html+=`</div>`
+  }
+  wrap.innerHTML=html
+}
+async function admRiaggancia(sourceId,targetId,nv){
+  if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
+  if(!confirm('Spostare '+nv+' visita/e sul cantiere CNCE e archiviare il cantiere provvisorio senza codice?\n\nOperazione reversibile: il cantiere resta recuperabile dalle eliminate.'))return
+  const{error:e1}=await sb.from('visite').update({cantiere_id:targetId}).eq('cantiere_id',sourceId)
+  if(e1){toast('Errore spostamento visite: '+e1.message,'err');return}
+  const{error:e2}=await sb.from('cantieri').update({elimina:1}).eq('cantiere_id',sourceId)
+  if(e2){toast('Visite spostate, ma cantiere non archiviato: '+e2.message,'warn')}
+  else toast('Riaggancio completato','ok')
+  admCaricaRiaggancio()
+}
 async function admEditCantiere(cantId) {
   const { data: c, error } = await sb.from('cantieri').select('*').eq('cantiere_id', cantId).single()
   if (error || !c) { toast('Cantiere non trovato', 'err'); return }
