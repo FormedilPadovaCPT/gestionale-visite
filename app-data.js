@@ -49,7 +49,7 @@ const ISTAT_PD={
   'Granze':'028042','Legnaro':'028046','Limena':'028047','Loreggia':'028049',
   'Lozzo Atestino':'028050','Masi':'028053','Massanzago':'028054',
   'Megliadino San Fidenzio':'028057','Megliadino San Vitale':'028058','Merlara':'028059',
-  'Mestrino':'028060','Monselice':'028061','Montagnana':'028062','Montegrotto Terme':'028063',
+  'Mestrino':'028052','Monselice':'028061','Montagnana':'028062','Montegrotto Terme':'028063',
   'Motta':'028065','Noventa Padovana':'028066','Ospedaletto Euganeo':'028067','Padova':'028060',
   'Pernumia':'028069','Piacenza d\'Adige':'028070','Piazzola sul Brenta':'028071',
   'Piombino Dese':'028072','Piove di Sacco':'028073','Polverara':'028074','Ponso':'028075',
@@ -75,7 +75,7 @@ const CEIV_OPT=['C.E.I.V.','EDILCASSA VENETO','CASSA EDILE BELLUNO','CASSA EDILE
 const IMP_LBL={1:'fino a 250.000 €',2:'250.001 – 500.000 €',3:'500.001 – 1.000.000 €',4:'1.000.001 – 1.500.000 €',5:'1.500.001 – 2.500.000 €',6:'2.500.001 – 3.500.000 €',7:'3.500.001 – 5.000.000 €',8:'5.000.001 – 10.000.000 €',11:'non disponibile'}
 const TIP_INT_LABELS={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',6:'Ripristino',7:'Restauro',8:'Manutenzione'}
 const TIP_OPE_LABELS={1:'Industriale',2:'Civile',3:'Commerciale',4:'Agricola',5:'Stradale',6:'Idraulica',7:'Gallerie',8:'Scolastica',9:'Ospedaliera',10:'Sportiva',11:'Ricettiva',12:'Residenziale',13:'Pubbl. utilità',14:'Bonifiche',15:'Impianti',16:'Altro',17:'Infrastrutture'}
-const DURATA_LABELS={1:'< 30 giorni',2:'30–90 giorni',3:'3–6 mesi',4:'6–12 mesi',5:'> 12 mesi',6:'N/D',7:'Indefinita',8:'Pluriennale'}
+const DURATA_LABELS={1:'Fino a 1 mese',2:'Da 1 a 3 mesi',3:'Da 3 a 12 mesi',4:'Da 12 a 24 mesi',5:'Da 24 a 36 mesi',6:'Da 36 a 48 mesi',7:'Oltre 48 mesi',8:'Non presente'}
 const TIPO_ACC_LABELS={1:'Su segnalazione',2:'Su richiesta',3:'Protocolli di intesa',4:'RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT'}
 const RPT_PALETTE=['#e7500f','#95C22F','#565c66','#3498db','#9b59b6','#e67e22','#1abc9c','#e74c3c','#f39c12','#2980b9']
 const _DASH_C={alto:'#e74c3c',medio:'#f39c12',basso:'#f1c40f',nr:'#95C22F',orange:'#e7500f',grey:'#565c66',green:'#95C22F'}

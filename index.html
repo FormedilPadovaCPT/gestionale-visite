@@ -867,6 +867,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <p style="font-size:12px;color:#888;margin-bottom:12px">
             Impresa 1 è l'impresa principale (quella dell'Osservatorio). Aggiungi le altre presenti.
           </p>
+          <div id="imp-proposte"></div>
           <div id="imp-accordion-list"></div>
           <button class="btn-outline btn-sm" id="btn-add-imp" style="margin-top:8px">+ Aggiungi impresa</button>
         </div>
@@ -1342,7 +1343,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <div class="field hidden" id="mc-tip-ope-altro-wrap"><label>Specificare tipo opera</label><input type="text" id="mc-tip-ope-altro" maxlength="128" placeholder="Descrivere il tipo di opera..."></div>
     <div class="row">
       <div class="field"><label>Durata cantiere</label>
-        <select id="mc-durata"><option value="">–</option><option value="1">&lt; 30 giorni</option><option value="2">da 30 a 90 giorni</option><option value="3">da 3 a 6 mesi</option><option value="4">da 6 a 12 mesi</option><option value="5">&gt; 12 mesi</option></select></div>
+        <select id="mc-durata"><option value="">–</option><option value="1">Fino a 1 mese</option><option value="2">Da 1 a 3 mesi</option><option value="3">Da 3 a 12 mesi</option><option value="4">Da 12 a 24 mesi</option><option value="5">Da 24 a 36 mesi</option><option value="6">Da 36 a 48 mesi</option><option value="7">Oltre 48 mesi</option><option value="8">Non presente</option></select></div>
       <div class="field"><label>Importo lavori (€)</label>
         <select id="mc-importo"><option value="">–</option><option value="1">fino a 250.000</option><option value="2">da 250.001 a 500.000</option><option value="3">da 500.001 a 1.000.000</option><option value="4">da 1.000.001 a 1.500.000</option><option value="5">da 1.500.001 a 2.500.000</option><option value="6">da 2.500.001 a 3.500.000</option><option value="7">da 3.500.001 a 5.000.000</option><option value="8">da 5.000.001 a 10.000.000</option><option value="11">non disponibile</option></select></div>
     </div>
@@ -1353,7 +1354,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>Codice CNCE</label><input type="text" id="mc-cnce" placeholder="Cod. CNCE" maxlength="50"></div>
       <div class="field"><label>Codice univoco cantiere</label><input type="text" id="mc-cod-uni" placeholder="Codice univoco" maxlength="50"></div>
     </div>
-    <div class="field"><label>Data prevista ultimazione lavori</label><input type="date" id="mc-data-ult"></div>
+    <div class="field"><label>Data inizio lavori</label><input type="date" id="mc-data-inizio" onchange="_autoDurataCantiere()"></div>
+    <div class="field"><label>Data prevista ultimazione lavori</label><input type="date" id="mc-data-ult" onchange="_autoDurataCantiere()"></div>
     <div class="modal-actions">
       <button class="btn-outline" id="btn-mc-cancel">Annulla</button>
       <button class="btn-primary" id="btn-mc-save">Salva</button>
@@ -2387,6 +2389,7 @@ function renderImpreseAccordion(){
     const tiEl=$(`im-tipo-${idx}`)
     if(tiEl)tiEl.onchange=()=>S.imprese[idx].tipo_imp=tiEl.value
   })
+  caricaProposteImprese()
 }
 
 function impreseAccordionHTML(im,idx){
@@ -2509,6 +2512,7 @@ function initCantSearch(){
       S.fd.cantiere_civico=item.extra.cantiere_civico||''
       renderCantCard(item.extra)
       proponiImportoCantiere(item.extra.cantiere_importo)
+      caricaProposteImprese(true)
     }
     await autoAccCant(item.id)
     await proponiCommittenteCantiere(item.id)
@@ -2566,6 +2570,67 @@ async function autoAccCant(cantId){
 
 // ── MODAL NUOVO COMMITTENTE ──
 // Propone il committente indicato nel cantiere (CF/P.IVA caricato d'ufficio) chiedendo conferma
+// Proposte imprese collegate al CNCE del cantiere (tabella cantiere_imprese_previste)
+let _proposteCnce=null
+async function caricaProposteImprese(force){
+  const wrap=$('imp-proposte');if(!wrap)return
+  const cnce=(vGet('f-cnce')||'').trim()
+  if(!cnce){wrap.innerHTML='';_proposteCnce=null;return}
+  if(cnce===_proposteCnce&&!force)return
+  _proposteCnce=cnce
+  const{data,error}=await sb.from('cantiere_imprese_previste').select('impresa_cf,impresa_nome,note').eq('cnce',cnce).order('impresa_nome')
+  if(error){wrap.innerHTML='';return}
+  const gia=new Set(S.imprese.map(im=>String(im.impresa_id||'').toUpperCase()))
+  const list=(data||[]).filter(r=>!gia.has(String(r.impresa_cf||'').toUpperCase()))
+  if(!list.length){wrap.innerHTML='';return}
+  wrap.innerHTML=`<div style="margin:0 0 10px;padding:10px 12px;border:1px dashed #e7500f;border-radius:8px;background:#fff7f0">`
+    +`<div style="font-weight:600;color:#e7500f;font-size:13px;margin-bottom:6px">🏢 Imprese previste per questo cantiere (CNCE ${esc(cnce)})</div>`
+    +`<div style="font-size:12px;color:#777;margin-bottom:8px">Elenco caricato d'ufficio. Aggiungi quelle effettivamente presenti in cantiere.</div>`
+    +list.map((r,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-top:1px solid #f0e0d5">`
+      +`<div style="font-size:13px"><b>${esc(r.impresa_nome||'(senza nome)')}</b> <span style="color:#999">${esc(r.impresa_cf||'')}</span>${r.note?`<div style="color:#999;font-size:11px">${esc(r.note)}</div>`:''}</div>`
+      +`<button class="btn-outline btn-sm" data-prop="${i}" style="white-space:nowrap;border-color:#e7500f;color:#e7500f">+ Aggiungi</button>`
+      +`</div>`).join('')
+    +`</div>`
+  wrap.querySelectorAll('button[data-prop]').forEach(b=>b.onclick=()=>aggiungiImpresaProposta(list[+b.dataset.prop]))
+}
+async function aggiungiImpresaProposta(r){
+  const cf=String(r.impresa_cf||'').trim()
+  if(!cf)return
+  if(S.imprese.some(im=>String(im.impresa_id||'').toUpperCase()===cf.toUpperCase())){toast('Impresa gia presente nella scheda','warn');return}
+  let{data:imp}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,tipo_iscrizione_ccia,contratto_ccnl').eq('impresa_id',cf).eq('elimina',0).maybeSingle()
+  if(!imp){
+    const nuova={impresa_id:cf,impresa_nome:r.impresa_nome||cf,impresa_cf:cf,piva:/^\d{11}$/.test(cf)?cf:null,elimina:0}
+    const{error}=await sb.from('imprese').insert(nuova)
+    if(error&&!/duplicate|already exists|violates unique/i.test(error.message||'')){toast('Errore creazione impresa: '+error.message,'err');return}
+    imp={impresa_id:cf,impresa_nome:nuova.impresa_nome,impresa_cf:cf,piva:nuova.piva,indirizzo:null,comune:null,cassa_edile:null,tipo_iscrizione_ccia:null,contratto_ccnl:null}
+  }
+  const row={impresa_id:imp.impresa_id,impresa_nome:imp.impresa_nome||'',piva:imp.piva||'',cf_imp:imp.impresa_cf||'',ind_imp:imp.indirizzo||'',com_imp:imp.comune||'',att:'',capo_nome:'',capo_cog:'',badge:'',pat:'',note_fasilav:'',tipo_imp:'',certif:[],ceiv:imp.cassa_edile||'',tipo_ccia:imp.tipo_iscrizione_ccia||'',ccnl:imp.contratto_ccnl||'',stage_imp:'',is_principale:false,nr_lav:0,nr_lav_str:0}
+  if(S.imprese.length&&!S.imprese[0].impresa_id){Object.assign(S.imprese[0],row)}
+  else{S.imprese.push(row)}
+  renderImpreseAccordion()
+  caricaProposteImprese(true)
+  toast('Impresa aggiunta: '+(row.impresa_nome||cf),'ok')
+}
+// Calcolo fascia durata (1-7) da data inizio e ultimazione, stessa logica del DB
+function _fasciaDurata(inizio,ult){
+  if(!inizio||!ult)return ''
+  const di=new Date(inizio),du=new Date(ult)
+  if(isNaN(di)||isNaN(du)||du<di)return ''
+  let mesi=(du.getFullYear()-di.getFullYear())*12+(du.getMonth()-di.getMonth())
+  if(du.getDate()>di.getDate())mesi+=1
+  if(mesi<=1)return '1'
+  if(mesi<=3)return '2'
+  if(mesi<=12)return '3'
+  if(mesi<=24)return '4'
+  if(mesi<=36)return '5'
+  if(mesi<=48)return '6'
+  return '7'
+}
+function _autoDurataCantiere(){
+  const du=$('mc-durata');if(!du||du.value)return
+  const f=_fasciaDurata($('mc-data-inizio')?.value,$('mc-data-ult')?.value)
+  if(f){du.value=f;du.style.background='#eef9f0';du.title='Proposto da data inizio/ultimazione. Modificabile.'}
+}
 // Propone la fascia 'Importo lavori' dal dato del cantiere, se presente e non gia scelta
 function proponiImportoCantiere(imp){
   const el=$('f-importo');if(!el)return
@@ -2860,7 +2925,7 @@ $('btn-mi-save').onclick=async()=>{
 
 // ── MODAL CANTIERE ──
 function resetModalCantiere(){
-  ;['mc-ind','mc-civ','mc-etich','mc-cap','mc-cnce','mc-cod-uni','mc-data-ult','mc-comune-cod','mc-tip-ope-altro','mc-descr'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  ;['mc-ind','mc-civ','mc-etich','mc-cap','mc-cnce','mc-cod-uni','mc-data-inizio','mc-data-ult','mc-comune-cod','mc-tip-ope-altro','mc-descr'].forEach(id=>{const el=$(id);if(el)el.value=''})
   const com=$('mc-com');if(com)com.value=''
   const ti=$('mc-tip-int');if(ti)ti.value=''
   const to=$('mc-tip-ope');if(to)to.value=''
@@ -2934,6 +2999,7 @@ async function _useCantiereEsistente(c){
   vSet('f-data-ult',c.data_ult||'')
   renderCantCard(c)
   proponiImportoCantiere(c.cantiere_importo)
+  caricaProposteImprese(true)
   await autoAccCant(c.cantiere_id)
   toast('Cantiere esistente selezionato','ok')
 }
@@ -3066,6 +3132,7 @@ $('btn-mc-save').onclick=async()=>{
     cantiere_cnce:vGet('mc-cnce').trim()||null,
     nodo_id:vGet('mc-cod-uni').trim()||null,
     data_ult:vGet('mc-data-ult')||null,
+    data_inizio_lavori:vGet('mc-data-inizio')||null,
     cantiere_comune_cod:vGet('mc-comune-cod').trim()||null,
     cantiere_tip_ope_altro:vGet('mc-tip-ope-altro').trim()||null,
     cantiere_descrizione:vGet('mc-descr').trim()||null,
@@ -4721,6 +4788,7 @@ async function loadCantieri(q=''){
           S.fd.cantiere_civico=cd.cantiere_civico||''
           renderCantCard(cd)
           proponiImportoCantiere(cd.cantiere_importo)
+          caricaProposteImprese(true)
         }
         await autoAccCant(btn.dataset.cantId)
         await proponiCommittenteCantiere(btn.dataset.cantId)
@@ -8018,6 +8086,7 @@ async function admEditCantiere(cantId) {
   vSet('mc-cnce', c.cantiere_cnce || '')
   vSet('mc-cod-uni', c.nodo_id || '')
   vSet('mc-data-ult', c.data_ult || '')
+  vSet('mc-data-inizio', c.data_inizio_lavori || '')
   vSet('mc-comune-cod', c.cantiere_comune_cod || '')
   vSet('mc-descr', c.cantiere_descrizione || '')
   vSet('mc-tip-ope-altro', c.cantiere_tip_ope_altro || '')
