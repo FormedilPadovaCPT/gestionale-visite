@@ -723,7 +723,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
                 <div class="ac-list hidden" id="comm-list"></div>
               </div>
               <button class="btn-outline btn-sm" id="btn-new-comm" type="button" style="white-space:nowrap;margin-top:1px">+ Nuovo</button>
-              <button class="btn-sm" id="btn-clear-comm" type="button" style="white-space:nowrap;margin-top:1px;display:none" title="Deseleziona committente">✕</button>
+              <button class="btn-outline btn-sm" id="btn-clear-comm" type="button" style="white-space:nowrap;margin-top:1px;display:none;color:#c0392b;border-color:#c0392b" title="Deseleziona committente">✕ Deseleziona</button>
             </div>
             <input type="hidden" id="f-comm-id">
           </div>
@@ -825,6 +825,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               <option value="3">500.001 – 1.000.000 €</option><option value="4">1.000.001 – 1.500.000 €</option>
               <option value="5">1.500.001 – 2.500.000 €</option><option value="6">2.500.001 – 3.500.000 €</option>
               <option value="7">3.500.001 – 5.000.000 €</option><option value="8">5.000.001 – 10.000.000 €</option>
+              <option value="9">10.000.001 – 15.000.000 €</option><option value="10">Oltre 15.000.000 €</option>
               <option value="11">Non disponibile</option>
             </select>
           </div>
@@ -2507,6 +2508,7 @@ function initCantSearch(){
       S.fd.cantiere_indirizzo=item.extra.cantiere_indirizzo||''
       S.fd.cantiere_civico=item.extra.cantiere_civico||''
       renderCantCard(item.extra)
+      proponiImportoCantiere(item.extra.cantiere_importo)
     }
     await autoAccCant(item.id)
     await proponiCommittenteCantiere(item.id)
@@ -2564,6 +2566,16 @@ async function autoAccCant(cantId){
 
 // ── MODAL NUOVO COMMITTENTE ──
 // Propone il committente indicato nel cantiere (CF/P.IVA caricato d'ufficio) chiedendo conferma
+// Propone la fascia 'Importo lavori' dal dato del cantiere, se presente e non gia scelta
+function proponiImportoCantiere(imp){
+  const el=$('f-importo');if(!el)return
+  if(imp==null||String(imp).trim()==='')return
+  if(el.value)return
+  if(!el.querySelector('option[value="'+imp+'"]'))return
+  el.value=String(imp)
+  el.style.background='#eef9f0'
+  el.title='Proposto automaticamente dal dato del cantiere. Modificabile se necessario.'
+}
 async function proponiCommittenteCantiere(cantId){
   try{
     if(!cantId)return
@@ -2910,6 +2922,7 @@ async function _useCantiereEsistente(c){
   vSet('f-cod-uni',c.nodo_id||'')
   vSet('f-data-ult',c.data_ult||'')
   renderCantCard(c)
+  proponiImportoCantiere(c.cantiere_importo)
   await autoAccCant(c.cantiere_id)
   toast('Cantiere esistente selezionato','ok')
 }
@@ -4696,6 +4709,7 @@ async function loadCantieri(q=''){
           S.fd.cantiere_indirizzo=cd.cantiere_indirizzo||''
           S.fd.cantiere_civico=cd.cantiere_civico||''
           renderCantCard(cd)
+          proponiImportoCantiere(cd.cantiere_importo)
         }
         await autoAccCant(btn.dataset.cantId)
         await proponiCommittenteCantiere(btn.dataset.cantId)
