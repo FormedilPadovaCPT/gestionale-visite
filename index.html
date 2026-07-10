@@ -445,6 +445,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 
     <!-- DASHBOARD -->
     <section id="view-dashboard">
+      <div id="dash-segnala-wrap" style="margin-bottom:14px"><button class="btn-primary" id="btn-segnala-dash" style="width:100%;padding:12px;font-size:15px;border-radius:10px">&#128205; Segnala cantiere (GPS)</button></div>
       <div id="avvisi-banner"></div>
             <!-- FILTRI DASHBOARD -->
       <div class="card" id="dash-filtri" style="margin-bottom:14px">
@@ -948,6 +949,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <input type="text" id="q-search" placeholder="Verbale, cantiere, impresa…">
           <select id="q-ipc"><option value="">Tutti IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun Rilievo</option></select>
           <select id="q-stato"><option value="">Tutti stati</option><option value="bozza">Bozza</option><option value="definitivo">Definitivo</option></select>
+          <select id="q-tec"><option value="">Tutti i tecnici</option></select>
           <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button><label id="q-elim-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer"><input type="checkbox" id="q-elim"> Mostra eliminate</label>
         </div>
         <div class="tbl-wrap">
@@ -1943,6 +1945,7 @@ async function onLogin(user){
   S.viewer=!!(_roleRow&&_roleRow.ruolo==='viewer'&&_roleRow.stato==='attivo')
   if(S.viewer){
     S.tecnico=null
+    S.viewerNome=_roleRow.nome||null
     $('lbl-user').textContent=(_roleRow.nome||user.email)+' — sola lettura'
     document.querySelector('nav')?.classList.add('hidden')
     document.body.classList.add('viewer-mode')
@@ -4179,6 +4182,11 @@ async function loadDash(){
   const{data:tecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome')
   _dashTecMap={}
   ;(tecs||[]).forEach(t=>{_dashTecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()||t.tecnico_id})
+  // per il tecnico la card obiettivo va in alto: sotto gli avvisi, prima dei filtri
+  if(S.tecnico&&!window.__isCoord){
+    const _ct=$('card-target-mese'),_df=$('dash-filtri')
+    if(_ct&&_df&&_df.parentNode&&_ct.nextElementSibling!==_df)_df.parentNode.insertBefore(_ct,_df)
+  }
   // card obiettivo mensile (non blocca la dashboard se fallisce)
   loadTargetCard&&loadTargetCard().catch(e=>console.warn('loadTargetCard:',e))
   loadAvvisi&&loadAvvisi().catch(e=>console.warn('loadAvvisi:',e))
@@ -4226,6 +4234,7 @@ function _dashFillSelectors(){
     const tids=Array.from(new Set(_dashRaw.map(x=>x.tec).filter(Boolean)))
     tids.sort((a,b)=>(_dashTecMap[a]||'').localeCompare(_dashTecMap[b]||''))
     selT.innerHTML='<option value="">Tutti i tecnici</option>'+tids.map(t=>`<option value="${t}">${_dashTecMap[t]||t}</option>`).join('')
+    if(S.tecnico&&!window.__isCoord&&tids.includes(S.tecnico.tecnico_id))selT.value=S.tecnico.tecnico_id
     selT.dataset.init='1';selT.onchange=applyDashFilters
   }
   const selTy=$('fd-tipo')
@@ -4684,10 +4693,23 @@ async function loadLista(){
   const _ew=$('q-elim-wrap');if(_ew)_ew.style.display=_coord?'inline-flex':'none'
   const _qe=$('q-elim');if(_qe&&!_qe.dataset.b){_qe.dataset.b='1';_qe.onchange=loadLista}
   const _showElim=_coord&&_qe&&_qe.checked
+  // filtro tecnico: popolato una volta, preimpostato sul proprio per i tecnici
+  const _qt=$('q-tec')
+  if(_qt&&!_qt.dataset.init){
+    _qt.dataset.init='1'
+    try{
+      const{data:tt}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome').order('tecnico_cognome')
+      _qt.innerHTML='<option value="">Tutti i tecnici</option>'+(tt||[]).map(t=>`<option value="${t.tecnico_id}">${((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()||t.tecnico_id}</option>`).join('')
+      if(S.tecnico&&!_coord&&(tt||[]).some(t=>t.tecnico_id===S.tecnico.tecnico_id))_qt.value=S.tecnico.tecnico_id
+    }catch(_e){}
+    _qt.onchange=loadLista
+  }
   let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,elimina,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
   if(!_showElim)qb=qb.eq('elimina',0)
   if(fi)qb=qb.eq('ipc',fi)
   if(fs)qb=qb.eq('stato',fs)
+  const _ft=_qt?_qt.value:''
+  if(_ft)qb=qb.or(`tecnico_id.eq.${_ft},tecnico2_id.eq.${_ft}`)
   const{data}=await qb
   let vs=data||[]
   // Ordina per data visita (più recente sopra) e, a parità di data,
@@ -5008,6 +5030,7 @@ function apriSegnalaCantiere(){
   },{enableHighAccuracy:true,timeout:15000,maximumAge:0})
 }
 $('btn-segnala-cant').onclick=apriSegnalaCantiere
+if($('btn-segnala-dash'))$('btn-segnala-dash').onclick=apriSegnalaCantiere
 $('segn-annulla').onclick=()=>hide('modal-segn')
 $('segn-foto').addEventListener('change',e=>{
   const f=e.target.files&&e.target.files[0]
@@ -5039,7 +5062,7 @@ async function salvaSegnalazione(){
   if(!_segnPos){toast('Posizione GPS non ancora rilevata','warn');return}
   const btn=$('segn-salva');btn.disabled=true;btn.textContent='⏳ Salvataggio…'
   try{
-    const tecNome=S.tecnico?`${S.tecnico.tecnico_nome||''} ${S.tecnico.tecnico_cognome||''}`.trim():null
+    const tecNome=S.tecnico?`${S.tecnico.tecnico_nome||''} ${S.tecnico.tecnico_cognome||''}`.trim():(S.viewerNome||null)
     const{data:row,error}=await sb.from('segnalazioni_cantiere').insert({
       lat:_segnPos.lat,lng:_segnPos.lng,accuracy_m:Math.round(_segnPos.acc||0),
       note:$('segn-note').value.trim()||null,
@@ -5072,7 +5095,7 @@ async function salvaSegnalazione(){
     }
     hide('modal-segn')
     toast('Segnalazione salvata ✓','ok')
-    loadCantMap().catch(()=>{})
+    if(_cmMap)loadCantMap().catch(()=>{})
   }catch(e){
     console.error('salvaSegnalazione:',e)
     toast('Errore salvataggio segnalazione: '+(e.message||e),'err')
