@@ -1002,8 +1002,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <option value="">Tutte le categorie</option>
             <option value="impresa">🏢 Imprese</option>
             <option value="committente">👤 Committenti</option>
+            <option value="persona">👥 Figure di cantiere</option>
             <option value="tecnico">👷 Tecnici</option>
           </select>
+          <button class="btn-outline btn-sm" id="rub-dedup-btn" style="display:none" onclick="apriDedupPersone()">🧹 Duplicati persone</button>
         </div>
         <div id="rub-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">
           <p style="color:#aaa;font-size:13px;grid-column:1/-1">Digita nella barra di ricerca per trovare un contatto.</p>
@@ -1130,6 +1132,35 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <button class="btn-primary" style="margin-top:12px;background:#95C22F;border-color:#7aa527" onclick="admSaveTarget()">💾 Salva target</button>
             <span id="adm-target-status" style="font-size:12px;color:rgba(255,255,255,.6);margin-left:10px"></span>
           </div>
+        </div>
+
+        <!-- Campagne informative -->
+        <div class="adm-section">
+          <div class="adm-section-title">📣 Campagna informativa (coda verbale / email)</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:10px">Prepara testo, una o due immagini ed eventuali link (es. campagna colpo di calore). Nel periodo indicato viene accodata automaticamente al PDF del verbale e/o alla mail; al momento dell'invio si può comunque cambiare o escludere.</p>
+          <div style="display:grid;gap:8px;max-width:660px">
+            <input id="cmp-titolo" placeholder="Titolo campagna *" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px">
+            <textarea id="cmp-testo" placeholder="Testo (opzionale)…" rows="3" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px;font-family:inherit"></textarea>
+            <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:rgba(255,255,255,.7)">
+              <label>Immagine 1&nbsp;<input type="file" id="cmp-img1" accept="image/*"></label>
+              <label>Immagine 2&nbsp;<input type="file" id="cmp-img2" accept="image/*"></label>
+            </div>
+            <div id="cmp-img-prev" style="display:flex;gap:8px"></div>
+            <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px">
+              <input id="cmp-l1-label" placeholder="Testo link 1 (es. ordinanza n°58)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px">
+              <input id="cmp-l1-url" placeholder="https://…" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px">
+              <input id="cmp-l2-label" placeholder="Testo link 2" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px">
+              <input id="cmp-l2-url" placeholder="https://…" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px">
+            </div>
+            <div class="adm-date-row">
+              <div class="field" style="min-width:140px"><label>Attiva dal</label><input type="date" id="cmp-dal"></div>
+              <div class="field" style="min-width:140px"><label>Fino al</label><input type="date" id="cmp-al"></div>
+              <div class="field" style="min-width:180px"><label>Posizione predefinita</label><select id="cmp-pos"><option value="verbale">Coda del verbale PDF</option><option value="email">Corpo della mail</option><option value="entrambi">Verbale + mail</option></select></div>
+              <button class="btn-primary" style="background:#95C22F;border-color:#7aa527" onclick="admSalvaCampagna()">💾 Salva campagna</button>
+            </div>
+            <div id="cmp-status" style="font-size:12px;color:rgba(255,255,255,.6)"></div>
+          </div>
+          <div id="adm-campagne-list" style="margin-top:14px"></div>
         </div>
 
         <!-- Bacheca avvisi -->
@@ -1332,6 +1363,44 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 </div>
 
 <!-- MODAL CANTIERE -->
+<!-- ── MODAL MODIFICA PERSONA (rubrica) ── -->
+<div class="modal-overlay hidden" id="modal-persona">
+  <div class="modal-box" style="max-width:540px">
+    <h3>👥 Scheda persona</h3>
+    <div class="row">
+      <div class="field" style="flex:1"><label>Titolo</label><select id="mp-titolo"><option value="">–</option><option>Sig.</option><option>Sig.ra</option><option>Dott.</option><option>Dott.ssa</option><option>Geom.</option><option>P.I.</option><option>Ing.</option><option>Arch.</option><option>Avv.</option><option>Prof.</option><option>Rag.</option></select></div>
+      <div class="field" style="flex:2"><label>Nome</label><input type="text" id="mp-nome"></div>
+      <div class="field" style="flex:2"><label>Cognome *</label><input type="text" id="mp-cognome"></div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:1"><label>Codice fiscale <span id="mp-cf-note" style="font-weight:400;font-size:10px;color:#aaa"></span></label><input type="text" id="mp-cf" maxlength="16" style="text-transform:uppercase"></div>
+      <div class="field" style="flex:1"><label>Qualifica</label><input type="text" id="mp-qualifica"></div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:1"><label>Email (predefinita)</label><input type="email" id="mp-email"></div>
+      <div class="field" style="flex:1"><label>Telefono (predefinito)</label><input type="text" id="mp-telefono"></div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:1"><label>Email 2</label><input type="email" id="mp-email2"></div>
+      <div class="field" style="flex:1"><label>Email 3</label><input type="email" id="mp-email3"></div>
+      <div class="field" style="flex:1"><label>Telefono 2</label><input type="text" id="mp-telefono2"></div>
+    </div>
+    <div id="mp-ruoli" style="font-size:12px;color:#888;margin:4px 0 10px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn-secondary btn-sm" onclick="hide('modal-persona')">Annulla</button>
+      <button class="btn-primary btn-sm" id="mp-salva">Salva</button>
+    </div>
+  </div>
+</div>
+<!-- ── MODAL DUPLICATI PERSONE (coordinatore) ── -->
+<div class="modal-overlay hidden" id="modal-dedup">
+  <div class="modal-box" style="max-width:720px">
+    <h3>🧹 Duplicati persone</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:10px">Gruppi con lo stesso nome e cognome (anche invertiti). Scegli la scheda principale e premi Unisci: i contatti mancanti vengono recuperati dalle altre schede, che finiscono nel cestino.</p>
+    <div id="dedup-list" style="max-height:420px;overflow:auto"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn-secondary btn-sm" onclick="hide('modal-dedup')">Chiudi</button></div>
+  </div>
+</div>
 <!-- ── MODAL SEGNALA CANTIERE (mobile GPS) ── -->
 <div class="modal-overlay hidden" id="modal-segn">
   <div class="modal-box" style="max-width:480px">
@@ -1420,8 +1489,13 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       </div>
     </div>
     <div class="row">
-      <div class="field"><label>Email</label><input type="email" id="mi-email" placeholder="info@…"></div>
-      <div class="field"><label>Telefono</label><input type="tel" id="mi-tel" placeholder="+39…"></div>
+      <div class="field"><label>Email (predefinita)</label><input type="email" id="mi-email" placeholder="info@…"></div>
+      <div class="field"><label>Telefono (predefinito)</label><input type="tel" id="mi-tel" placeholder="+39…"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Email 2</label><input type="email" id="mi-email2"></div>
+      <div class="field"><label>Email 3</label><input type="email" id="mi-email3"></div>
+      <div class="field"><label>Telefono 2</label><input type="tel" id="mi-tel2"></div>
     </div>
     <div class="sect-title" style="margin-top:10px">Dati societari / Contratto</div>
     <div class="row">
@@ -1522,13 +1596,18 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     </div>
     <div class="row">
       <div class="field">
-        <label>Email</label>
+        <label>Email (predefinita)</label>
         <input type="email" id="ei-email" placeholder="info@…">
       </div>
       <div class="field">
-        <label>Telefono</label>
+        <label>Telefono (predefinito)</label>
         <input type="tel" id="ei-tel" placeholder="+39…">
       </div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Email 2</label><input type="email" id="ei-email2"></div>
+      <div class="field"><label>Email 3</label><input type="email" id="ei-email3"></div>
+      <div class="field"><label>Telefono 2</label><input type="tel" id="ei-tel2"></div>
     </div>
     <div class="sect-title" style="margin-top:10px">Dati societari / Contratto</div>
     <div class="row">
@@ -1648,6 +1727,15 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <h3 style="margin-bottom:10px;color:var(--grey);font-size:15px">📧 Invia verbale</h3>
     <p style="font-size:12px;color:#666;margin-bottom:14px">Il PDF del verbale sarà generato e inviato automaticamente da <strong>cptpd@did.formedilpadova.it</strong> ai seguenti destinatari.</p>
     <div id="email-verbale-list" style="margin-bottom:14px;max-height:220px;overflow-y:auto"></div>
+    <div id="ev-campagna-wrap" style="display:none;margin-bottom:12px;padding:8px 10px;background:#fff3ee;border-radius:8px;font-size:12px">
+      📣 Campagna attiva: <b id="ev-campagna-nome"></b><br>
+      Inserisci in: <select id="ev-campagna-pos" style="margin-top:4px;padding:3px 6px;border-radius:6px;border:1px solid #ddd;font-size:12px">
+        <option value="entrambi">verbale PDF + mail</option>
+        <option value="verbale">solo verbale PDF</option>
+        <option value="email">solo mail</option>
+        <option value="no">non inserire questa volta</option>
+      </select>
+    </div>
     <div class="field" style="margin-bottom:14px">
       <label>Oggetto email</label>
       <input type="text" id="email-verbale-oggetto" placeholder="Verbale sopralluogo…">
@@ -2016,7 +2104,7 @@ function navTo(view){
   if(view==='cantieri'&&typeof loadCantMap==='function')loadCantMap().catch(e=>console.error('loadCantMap:',e))
   if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
   if(view==='scadenze')loadScadenze().catch(e=>{console.error('loadScadenze:',e);toast('Errore scadenze: '+e.message,'err')})
-  if(view==='admin'){admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
+  if(view==='admin'){admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e));admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e))}
 }
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
   b.onclick=()=>{if(b.dataset.view==='form')initForm();navTo(b.dataset.view)}
@@ -2384,7 +2472,7 @@ function renderImpreseAccordion(){
       // pre-compila ragione sociale dal testo cercato
       const searchVal=$(`im-search-${_modalImpIdx}`)?.value||''
       const nomeEl=$('mi-nome');if(nomeEl)nomeEl.value=searchVal
-      ;['mi-piva','mi-cf','mi-ind','mi-com','mi-email','mi-tel','mi-badge','mi-pat','mi-ceiv','mi-tipo-ccia','mi-ccnl','mi-ccnl-altro'].forEach(id=>{const el=$(id);if(el)el.value=''})
+      ;['mi-piva','mi-cf','mi-ind','mi-com','mi-email','mi-email2','mi-email3','mi-tel','mi-tel2','mi-badge','mi-pat','mi-ceiv','mi-tipo-ccia','mi-ccnl','mi-ccnl-altro'].forEach(id=>{const el=$(id);if(el)el.value=''})
       ;[1,2,3,4,5].forEach(c=>{const el=$(`mi-cert-${c}`);if(el)el.checked=false})
       const stageNo=document.querySelector('input[name="mi-stage"][value="no"]');if(stageNo)stageNo.checked=true
       const ccnlWrap=$('mi-ccnl-altro-wrap');if(ccnlWrap)ccnlWrap.classList.add('hidden')
@@ -2918,6 +3006,10 @@ $('btn-mi-save').onclick=async()=>{
     indirizzo:vGet('mi-ind').trim()||null,
     comune:vGet('mi-com').trim()||null,
     impresa_email_ref:vGet('mi-email').trim()||null,
+    impresa_telefono:vGet('mi-tel').trim()||null,
+    impresa_email2:vGet('mi-email2').trim()||null,
+    impresa_email3:vGet('mi-email3').trim()||null,
+    impresa_telefono2:vGet('mi-tel2').trim()||null,
     cassa_edile:vGet('mi-ceiv')||null,
     tipo_iscrizione_ccia:vGet('mi-tipo-ccia')||null,
     contratto_ccnl:ccnlVal==='13'?'13':ccnlVal,
@@ -3415,6 +3507,7 @@ async function saveVisita(stato){
 
     show('btn-pdf')
     show('btn-email-verbale')
+    upsertPersoneVisita().catch(_e=>console.warn('upsertPersone:',_e))
     toast(`Visita salvata come ${stato==='bozza'?'bozza':'definitivo'}`, 'ok')
   }catch(e){toast('Errore: '+e.message,'err');console.error(e)}
 }
@@ -3683,6 +3776,11 @@ async function getOrCreateTecnicoId(t){
 }
 function populateTecnicoSelect(){
   const sel=$('f-tec-select'); if(!sel)return
+  // il tecnico loggato entra in tendina anche se non è nell'elenco ufficiale
+  // (es. account di prova o nuovi assunti non ancora in TECNICI_LIST)
+  if(S.tecnico&&S.tecnico.email&&!TECNICI_LIST.some(t=>t.email===S.tecnico.email)){
+    TECNICI_LIST.push({nome:`${S.tecnico.tecnico_nome||''} ${S.tecnico.tecnico_cognome||''}`.trim()||S.tecnico.email,email:S.tecnico.email})
+  }
   while(sel.options.length>1) sel.remove(1)
   TECNICI_LIST.forEach((t,i)=>{
     const o=document.createElement('option'); o.value=i; o.textContent=t.nome; sel.appendChild(o)
@@ -4661,7 +4759,14 @@ async function loadScadenze(){
     const opts=idsConScad.map(id=>({id,nome:tecMap[id]||id})).sort((a,b)=>a.nome.localeCompare(b.nome,'it'))
     sel.innerHTML='<option value="">Tutti i tecnici</option>'+opts.map(o=>`<option value="${o.id}">${o.nome}</option>`).join('')
     if(prev&&idsConScad.includes(prev))sel.value=prev
-    else if(S.user&&S.user.email!==ADMIN_EMAIL&&S.tecnico&&idsConScad.includes(S.tecnico.tecnico_id))sel.value=S.tecnico.tecnico_id
+    else if(S.user&&S.user.email!==ADMIN_EMAIL&&S.tecnico){
+      // il proprio tecnico è sempre selezionabile, anche se oggi non ha scadenze
+      if(!idsConScad.includes(S.tecnico.tecnico_id)){
+        const _nm=((S.tecnico.tecnico_cognome||'')+' '+(S.tecnico.tecnico_nome||'')).trim()||S.tecnico.tecnico_id
+        sel.innerHTML+=`<option value="${S.tecnico.tecnico_id}">${_nm}</option>`
+      }
+      sel.value=S.tecnico.tecnico_id
+    }
     sel.onchange=renderScadenze
   }
   renderScadenze()
@@ -5169,6 +5274,382 @@ window.segnApriAggancio=segnApriAggancio
 window.segnAggancia=segnAggancia
 window.segnScarta=segnScarta
 
+// ══════════════════════════════════════════════════════════════
+// ── ANAGRAFICA PERSONE (rubrica + autocomplete form) ──
+// ══════════════════════════════════════════════════════════════
+const _PERS_RUOLI={presente:'Presente in visita',rl:'Resp. lavori',csp:'CSP',cse:'CSE'}
+
+// ── scheda persona (modifica) ──
+let _mpId=null
+async function editPersona(id){
+  const{data:r,error}=await sb.from('persone').select('*').eq('persona_id',id).single()
+  if(error||!r){toast('Persona non trovata','err');return}
+  _mpId=id
+  vSet('mp-titolo',r.titolo||'');vSet('mp-nome',r.nome||'');vSet('mp-cognome',r.cognome||'')
+  vSet('mp-cf',r.cf||'');vSet('mp-qualifica',r.qualifica||'');vSet('mp-email',r.email||'');vSet('mp-telefono',r.telefono||'')
+  vSet('mp-email2',r.email2||'');vSet('mp-email3',r.email3||'');vSet('mp-telefono2',r.telefono2||'')
+  const coord=!!window.__isCoord
+  $('mp-cf').disabled=!coord
+  $('mp-cf-note').textContent=coord?'':'(modificabile solo dal coordinatore)'
+  $('mp-ruoli').textContent='Ruoli visti nelle visite: '+((r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')||'–')
+  show('modal-persona')
+}
+$('mp-salva').onclick=async()=>{
+  if(!_mpId)return
+  const cog=vGet('mp-cognome').trim()
+  if(!cog){toast('Il cognome è obbligatorio','warn');return}
+  const upd={titolo:vGet('mp-titolo')||null,nome:vGet('mp-nome').trim()||null,cognome:cog,
+    qualifica:vGet('mp-qualifica').trim()||null,email:vGet('mp-email').trim()||null,telefono:vGet('mp-telefono').trim()||null,
+    email2:vGet('mp-email2').trim()||null,email3:vGet('mp-email3').trim()||null,telefono2:vGet('mp-telefono2').trim()||null,
+    updated_at:new Date().toISOString(),updated_by:S.user?.email||null}
+  if(window.__isCoord)upd.cf=vGet('mp-cf').trim().toUpperCase()||null
+  const{error}=await sb.from('persone').update(upd).eq('persona_id',_mpId)
+  if(error){toast('Errore salvataggio: '+error.message,'err');return}
+  hide('modal-persona');toast('Persona aggiornata ✓','ok')
+  loadRubrica()
+}
+
+// ── duplicati (solo coordinatore) ──
+let _dedupData=null
+window._dedupKeys={}
+async function apriDedupPersone(){
+  if(!window.__isCoord){toast('Funzione riservata al coordinatore','err');return}
+  const{data,error}=await sb.from('persone').select('*').eq('elimina',0).limit(5000)
+  if(error){toast('Errore: '+error.message,'err');return}
+  const groups={}
+  ;(data||[]).forEach(r=>{
+    const a=(r.nome||'').trim().toLowerCase(),b=(r.cognome||'').trim().toLowerCase()
+    if(!a&&!b)return
+    const k=[a,b].sort().join('|')
+    ;(groups[k]=groups[k]||[]).push(r)
+  })
+  const dupli=Object.entries(groups).filter(([,v])=>v.length>1)
+  _dedupData={};window._dedupKeys={}
+  const box=$('dedup-list')
+  if(!dupli.length){
+    box.innerHTML='<div style="color:#27ae60;padding:14px">✅ Nessun duplicato trovato (stesso nome e cognome).</div>'
+  }else{
+    box.innerHTML=dupli.map(([k,rows],gi)=>{
+      const kid='g'+gi
+      _dedupData[kid]=rows;window._dedupKeys[kid]=k
+      return `<div style="border:1px solid #eee;border-radius:8px;padding:10px;margin-bottom:10px">
+        <div style="font-weight:700;margin-bottom:6px">${esc((rows[0].cognome||'')+' '+(rows[0].nome||''))} <span style="color:#888;font-weight:400">(${rows.length} schede)</span></div>
+        ${rows.map(r=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:12px;cursor:pointer">
+          <input type="radio" name="ded-${kid}" value="${r.persona_id}" style="margin-top:2px">
+          <span style="flex:1">${esc([r.titolo,r.nome,r.cognome].filter(Boolean).join(' '))} · ${esc(r.qualifica||'–')} · ${esc(r.email||'no email')} · ${esc(r.telefono||'no tel')} · CF: ${esc(r.cf||'–')} · ${(r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')}</span>
+        </label>`).join('')}
+        <button class="btn-primary btn-sm" style="margin-top:6px" onclick="dedupMerge('${kid}')">Unisci sul selezionato</button>
+      </div>`
+    }).join('')
+  }
+  show('modal-dedup')
+}
+async function dedupMerge(kid){
+  const rows=(_dedupData&&_dedupData[kid])||[]
+  const sel=document.querySelector(`input[name="ded-${kid}"]:checked`)
+  if(!sel){toast('Seleziona prima la scheda principale del gruppo','warn');return}
+  const master=rows.find(r=>r.persona_id===sel.value)
+  const others=rows.filter(r=>r.persona_id!==sel.value)
+  if(!master||!others.length)return
+  if(!confirm(`Unire ${others.length} sched${others.length===1?'a':'e'} su "${[master.titolo,master.nome,master.cognome].filter(Boolean).join(' ')}"?`))return
+  const upd={}
+  ;['titolo','cf','email','email2','email3','telefono','telefono2','qualifica'].forEach(f=>{
+    if(!master[f]){const v=others.map(o=>o[f]).find(Boolean);if(v)upd[f]=v}
+  })
+  const ruoli=new Set(master.ruoli||[]);others.forEach(o=>(o.ruoli||[]).forEach(x=>ruoli.add(x)))
+  if(ruoli.size!==(master.ruoli||[]).length)upd.ruoli=[...ruoli]
+  if(Object.keys(upd).length){
+    upd.updated_at=new Date().toISOString();upd.updated_by=S.user?.email||null
+    const{error}=await sb.from('persone').update(upd).eq('persona_id',master.persona_id)
+    if(error){toast('Errore aggiornamento: '+error.message,'err');return}
+  }
+  const{error:e2}=await sb.from('persone').update({elimina:1,updated_at:new Date().toISOString(),updated_by:S.user?.email||null}).in('persona_id',others.map(o=>o.persona_id))
+  if(e2){toast('Errore eliminazione doppioni: '+e2.message,'err');return}
+  toast('Schede unite ✓','ok')
+  apriDedupPersone()
+}
+
+// ── autocomplete persone nel form visita ──
+function attachPersonAC(cfg){
+  const list=document.createElement('div')
+  list.className='hidden'
+  list.style.cssText='position:absolute;z-index:9999;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.15);max-height:220px;overflow:auto;min-width:260px;font-size:13px'
+  document.body.appendChild(list)
+  let items=[]
+  const hideL=()=>list.classList.add('hidden')
+  const showAt=el=>{const r=el.getBoundingClientRect();list.style.left=(r.left+window.scrollX)+'px';list.style.top=(r.bottom+window.scrollY+2)+'px';list.classList.remove('hidden')}
+  const pick=r=>{
+    const set=(id,v)=>{const el=$(id);if(el&&v)el.value=v}
+    if(cfg.titolo&&r.titolo){const s=$(cfg.titolo);if(s&&[...s.options].some(o=>o.value===r.titolo||o.text===r.titolo))s.value=r.titolo}
+    set(cfg.nome,r.nome);set(cfg.cog,r.cognome)
+    if(cfg.email){
+      set(cfg.email,r.email||r.email2||r.email3)
+      const el=$(cfg.email)
+      if(el){let dl=document.getElementById(cfg.email+'-dl');if(!dl){dl=document.createElement('datalist');dl.id=cfg.email+'-dl';document.body.appendChild(dl);el.setAttribute('list',dl.id)}
+        dl.innerHTML=[r.email,r.email2,r.email3].filter(Boolean).map(x=>`<option value="${esc(x)}">`).join('')}
+    }
+    if(cfg.tel){
+      set(cfg.tel,r.telefono||r.telefono2)
+      const el=$(cfg.tel)
+      if(el){let dl=document.getElementById(cfg.tel+'-dl');if(!dl){dl=document.createElement('datalist');dl.id=cfg.tel+'-dl';document.body.appendChild(dl);el.setAttribute('list',dl.id)}
+        dl.innerHTML=[r.telefono,r.telefono2].filter(Boolean).map(x=>`<option value="${esc(x)}">`).join('')}
+    }
+    if(cfg.qual&&r.qualifica){const s=$(cfg.qual);if(s&&[...s.options].some(o=>o.value===r.qualifica||o.text===r.qualifica))s.value=r.qualifica}
+    hideL()
+  }
+  const onInput=async ev=>{
+    const q=ev.target.value.trim()
+    if(q.length<2){hideL();return}
+    let data=null
+    try{const r=await sb.from('persone').select('*').eq('elimina',0).or(`nome.ilike.*${q}*,cognome.ilike.*${q}*`).order('cognome',{ascending:true,nullsFirst:false}).limit(8);data=r.data}catch(_e){}
+    items=data||[]
+    if(!items.length){hideL();return}
+    list.innerHTML=items.map((r,i)=>`<div data-i="${i}" style="padding:7px 10px;cursor:pointer;border-bottom:1px solid #f2f2f2" onmouseenter="this.style.background='#fff3ee'" onmouseleave="this.style.background=''">${esc([r.titolo,r.nome,r.cognome].filter(Boolean).join(' '))}${r.qualifica?' <span style="color:#999;font-size:11px">('+esc(r.qualifica)+')</span>':''}${r.telefono||r.email?'<br><span style="color:#999;font-size:11px">'+esc([r.telefono,r.email].filter(Boolean).join(' · '))+'</span>':''}</div>`).join('')
+    ;[...list.children].forEach(d=>d.onmousedown=e=>{e.preventDefault();pick(items[+d.dataset.i])})
+    showAt(ev.target)
+  }
+  ;[cfg.nome,cfg.cog].forEach(id=>{
+    const el=$(id);if(!el)return
+    el.addEventListener('input',onInput)
+    el.addEventListener('blur',()=>setTimeout(hideL,180))
+    el.setAttribute('autocomplete','off')
+  })
+}
+attachPersonAC({nome:'f-ppre-nome',cog:'f-ppre-cog',titolo:'f-ppre-titolo',tel:'f-tel-ppre',qual:'f-qual-ppre'})
+attachPersonAC({nome:'f-rl-nome',cog:'f-rl-cog',titolo:'f-rl-titolo',email:'f-rl-email',tel:'f-rl-tel'})
+attachPersonAC({nome:'f-csp-nome',cog:'f-csp-cog',titolo:'f-csp-titolo',email:'f-csp-email',tel:'f-csp-tel'})
+attachPersonAC({nome:'f-cse-nome',cog:'f-cse-cog',titolo:'f-cse-titolo',email:'f-cse-email',tel:'f-cse-tel'})
+
+// ── aggiorna l'anagrafica quando si salva una visita ──
+async function upsertPersoneVisita(){
+  const specs=[
+    {t:'f-ppre-titolo',n:'f-ppre-nome',c:'f-ppre-cog',tel:'f-tel-ppre',q:'f-qual-ppre',ruolo:'presente'},
+    {t:'f-rl-titolo',n:'f-rl-nome',c:'f-rl-cog',em:'f-rl-email',tel:'f-rl-tel',ruolo:'rl'},
+    {t:'f-csp-titolo',n:'f-csp-nome',c:'f-csp-cog',em:'f-csp-email',tel:'f-csp-tel',ruolo:'csp'},
+    {t:'f-cse-titolo',n:'f-cse-nome',c:'f-cse-cog',em:'f-cse-email',tel:'f-cse-tel',ruolo:'cse'}
+  ]
+  for(const s of specs){
+    const nome=(vGet(s.n)||'').trim(),cog=(vGet(s.c)||'').trim()
+    if(!nome&&!cog)continue
+    if((nome+cog).length<4)continue
+    const titolo=(vGet(s.t)||'').trim()||null
+    const email=s.em?(vGet(s.em)||'').trim()||null:null
+    const tel=s.tel?(vGet(s.tel)||'').trim()||null:null
+    const qual=s.q?(vGet(s.q)||'').trim()||null:null
+    try{
+      let qb=sb.from('persone').select('persona_id,titolo,email,email2,email3,telefono,telefono2,qualifica,ruoli').eq('elimina',0).limit(1)
+      qb=nome?qb.ilike('nome',nome):qb.is('nome',null)
+      qb=cog?qb.ilike('cognome',cog):qb.is('cognome',null)
+      const{data:ex}=await qb
+      if(ex&&ex.length){
+        const r=ex[0],upd={}
+        if(titolo&&!r.titolo)upd.titolo=titolo
+        const _ems=[r.email,r.email2,r.email3].map(x=>(x||'').trim().toLowerCase())
+        if(email&&!_ems.includes(email.toLowerCase())){
+          if(!r.email)upd.email=email
+          else if(!r.email2)upd.email2=email
+          else if(!r.email3)upd.email3=email
+        }
+        const _tls=[r.telefono,r.telefono2].map(x=>(x||'').replace(/\s/g,''))
+        if(tel&&!_tls.includes(tel.replace(/\s/g,''))){
+          if(!r.telefono)upd.telefono=tel
+          else if(!r.telefono2)upd.telefono2=tel
+        }
+        if(qual&&!r.qualifica)upd.qualifica=qual
+        if(!(r.ruoli||[]).includes(s.ruolo))upd.ruoli=[...(r.ruoli||[]),s.ruolo]
+        if(Object.keys(upd).length){
+          upd.updated_at=new Date().toISOString();upd.updated_by=S.user?.email||null
+          await sb.from('persone').update(upd).eq('persona_id',r.persona_id)
+        }
+      }else{
+        await sb.from('persone').insert({titolo,nome:nome||null,cognome:cog||null,email,telefono:tel,qualifica:qual,ruoli:[s.ruolo],updated_by:S.user?.email||null})
+      }
+    }catch(_e){console.warn('upsertPersone:',_e)}
+  }
+}
+// ── invio verbale: destinatari con scelta email alternativa ──
+function _evRenderList(){
+  const emails=window._evEmails||[]
+  const box=$('email-verbale-list');if(!box)return
+  box.innerHTML=emails.map((e,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #eee;font-size:13px">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--grey);min-width:72px;letter-spacing:.4px">${esc(e.ruolo)}</span>
+      <span style="flex:1;color:#333">${esc(e.nome)}</span>
+      ${(e.alt&&e.alt.length>1)
+        ?`<select onchange="window._evEmails[${i}].email=this.value" title="Questo contatto ha più email: scegli a quale inviare" style="color:var(--orange);font-size:12px;max-width:240px;border:1px solid #f0d9cc;border-radius:6px;padding:2px 4px;background:#fffaf7">${e.alt.map(a=>`<option value="${esc(a)}"${a===e.email?' selected':''}>${esc(a)}</option>`).join('')}</select>`
+        :`<span style="color:var(--orange);font-size:12px">${esc(e.email)}</span>`}
+    </div>`).join('')
+}
+async function _evArricchisciAlt(emails){
+  try{
+    // imprese: email alternative dall'anagrafica
+    const impIds=[...new Set(emails.filter(e=>e.ruolo==='Impresa'&&e.impresa_id).map(e=>e.impresa_id))]
+    const impMap={}
+    if(impIds.length){
+      const{data}=await sb.from('imprese').select('impresa_id,impresa_email_ref,impresa_email2,impresa_email3').in('impresa_id',impIds)
+      ;(data||[]).forEach(r=>{impMap[r.impresa_id]=[r.impresa_email_ref,r.impresa_email2,r.impresa_email3].map(x=>(x||'').trim()).filter(Boolean)})
+    }
+    // figure (RL/CSP/CSE): email alternative dalla rubrica persone (match su una delle 3 email)
+    const figEmails=[...new Set(emails.filter(e=>['RL','CSP','CSE'].includes(e.ruolo)&&e.email).map(e=>e.email.trim().toLowerCase()))]
+    const persAlt={}
+    if(figEmails.length){
+      const orExpr=figEmails.map(em=>`email.ilike.${em},email2.ilike.${em},email3.ilike.${em}`).join(',')
+      const{data}=await sb.from('persone').select('email,email2,email3').eq('elimina',0).or(orExpr).limit(60)
+      ;(data||[]).forEach(r=>{
+        const set=[r.email,r.email2,r.email3].map(x=>(x||'').trim()).filter(Boolean)
+        set.forEach(em=>{persAlt[em.toLowerCase()]=set})
+      })
+    }
+    emails.forEach(e=>{
+      let alt=null
+      if(e.ruolo==='Impresa'&&e.impresa_id&&impMap[e.impresa_id])alt=impMap[e.impresa_id]
+      else if(['RL','CSP','CSE'].includes(e.ruolo)&&e.email&&persAlt[e.email.trim().toLowerCase()])alt=persAlt[e.email.trim().toLowerCase()]
+      if(alt&&alt.length){
+        const uniq=[...new Set([e.email,...alt].map(x=>(x||'').trim()).filter(Boolean))]
+        if(uniq.length>1)e.alt=uniq
+      }
+    })
+  }catch(_e){console.warn('email alternative:',_e)}
+  return emails
+}
+window.editPersona=editPersona
+window.apriDedupPersone=apriDedupPersone
+window.dedupMerge=dedupMerge
+
+// ══════════════════════════════════════════════════════════════
+// ── CAMPAGNE INFORMATIVE (coda verbale / email) ──
+// ══════════════════════════════════════════════════════════════
+async function getCampagnaAttiva(force){
+  if(!force&&window._campagnaCache!==undefined)return window._campagnaCache
+  try{
+    const today=new Date().toISOString().slice(0,10)
+    const{data}=await sb.from('campagne').select('*').eq('attivo',true)
+      .or(`dal.is.null,dal.lte.${today}`).or(`al.is.null,al.gte.${today}`)
+      .order('created_at',{ascending:false}).limit(1)
+    window._campagnaCache=(data&&data[0])||null
+  }catch(_e){window._campagnaCache=null}
+  return window._campagnaCache
+}
+async function _evSetupCampagna(){
+  const wrap=$('ev-campagna-wrap');if(!wrap)return
+  const c=await getCampagnaAttiva()
+  if(!c){wrap.style.display='none';return}
+  $('ev-campagna-nome').textContent=c.titolo||''
+  $('ev-campagna-pos').value=c.posizione||'verbale'
+  wrap.style.display='block'
+}
+async function _evCampagnaPayload(){
+  const wrap=$('ev-campagna-wrap')
+  if(!wrap||wrap.style.display==='none')return null
+  const pos=$('ev-campagna-pos').value
+  if(pos!=='email'&&pos!=='entrambi')return null
+  const c=await getCampagnaAttiva()
+  if(!c)return null
+  return {titolo:c.titolo,testo:c.testo,img1_url:c.img1_url,img2_url:c.img2_url,
+    link1_label:c.link1_label,link1_url:c.link1_url,link2_label:c.link2_label,link2_url:c.link2_url}
+}
+
+// ── gestione campagne (Zona Coordinatore) ──
+let _cmpEditId=null,_cmpImg1Url=null,_cmpImg2Url=null
+async function _cmpUpload(file){
+  const b64=await _segnComprimiFoto(file)
+  const bin=Uint8Array.from(atob(b64),c=>c.charCodeAt(0))
+  const path=`campagna_${Date.now()}_${Math.random().toString(36).slice(2,6)}.jpg`
+  const{error}=await sb.storage.from('campagne').upload(path,bin,{contentType:'image/jpeg'})
+  if(error)throw error
+  return sb.storage.from('campagne').getPublicUrl(path).data.publicUrl
+}
+function _cmpResetForm(){
+  _cmpEditId=null;_cmpImg1Url=null;_cmpImg2Url=null
+  ;['cmp-titolo','cmp-testo','cmp-l1-label','cmp-l1-url','cmp-l2-label','cmp-l2-url','cmp-dal','cmp-al'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  const p=$('cmp-pos');if(p)p.value='verbale'
+  ;['cmp-img1','cmp-img2'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  const pv=$('cmp-img-prev');if(pv)pv.innerHTML=''
+}
+async function admSalvaCampagna(){
+  if(!window.__isCoord){toast('Funzione riservata al coordinatore','err');return}
+  const titolo=vGet('cmp-titolo').trim()
+  if(!titolo){toast('Il titolo della campagna è obbligatorio','warn');return}
+  const st=$('cmp-status');if(st)st.textContent='⏳ Salvataggio…'
+  try{
+    let img1=_cmpImg1Url,img2=_cmpImg2Url
+    const f1=$('cmp-img1')?.files?.[0],f2=$('cmp-img2')?.files?.[0]
+    if(f1){if(st)st.textContent='⏳ Carico immagine 1…';img1=await _cmpUpload(f1)}
+    if(f2){if(st)st.textContent='⏳ Carico immagine 2…';img2=await _cmpUpload(f2)}
+    const row={titolo,testo:vGet('cmp-testo').trim()||null,
+      img1_url:img1||null,img2_url:img2||null,
+      link1_label:vGet('cmp-l1-label').trim()||null,link1_url:vGet('cmp-l1-url').trim()||null,
+      link2_label:vGet('cmp-l2-label').trim()||null,link2_url:vGet('cmp-l2-url').trim()||null,
+      dal:vGet('cmp-dal')||null,al:vGet('cmp-al')||null,
+      posizione:vGet('cmp-pos')||'verbale',created_by:S.user?.email||null}
+    let error
+    if(_cmpEditId){({error}=await sb.from('campagne').update(row).eq('id',_cmpEditId))}
+    else{({error}=await sb.from('campagne').insert(row))}
+    if(error)throw error
+    if(st)st.textContent=''
+    toast('Campagna salvata ✓','ok')
+    _cmpResetForm()
+    window._campagnaCache=undefined
+    admLoadCampagne()
+  }catch(e){
+    if(st)st.textContent=''
+    toast('Errore salvataggio campagna: '+(e.message||e),'err')
+  }
+}
+async function admLoadCampagne(){
+  const box=$('adm-campagne-list');if(!box)return
+  const{data}=await sb.from('campagne').select('*').order('created_at',{ascending:false}).limit(30)
+  const today=new Date().toISOString().slice(0,10)
+  const POS={verbale:'verbale PDF',email:'mail',entrambi:'verbale + mail'}
+  box.innerHTML=(data||[]).map(c=>{
+    let stato,col
+    if(!c.attivo){stato='spenta';col='#888'}
+    else if(c.dal&&c.dal>today){stato='in partenza il '+fmtDate(c.dal);col='#f39c12'}
+    else if(c.al&&c.al<today){stato='scaduta';col='#c0392b'}
+    else{stato='ATTIVA ORA';col='#95C22F'}
+    const per=[c.dal?fmtDate(c.dal):'sempre',c.al?fmtDate(c.al):'senza fine'].join(' → ')
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.1);font-size:12px;color:rgba(255,255,255,.85)">
+      <span style="font-weight:700;flex:1">${esc(c.titolo)}</span>
+      <span style="color:rgba(255,255,255,.5)">${per} · ${POS[c.posizione]||c.posizione}${c.img1_url?' · 🖼':''}${c.img2_url?'🖼':''}</span>
+      <span style="font-weight:700;color:${col}">${stato}</span>
+      <button class="btn-outline btn-sm" onclick="admEditCampagna('${c.id}')" title="Modifica">✏️</button>
+      <button class="btn-outline btn-sm" onclick="admToggleCampagna('${c.id}',${c.attivo?'false':'true'})" title="${c.attivo?'Spegni':'Riattiva'}">${c.attivo?'⏻':'▶'}</button>
+      <button class="btn-outline btn-sm" onclick="admEliminaCampagna('${c.id}')" title="Elimina">🗑</button>
+    </div>`
+  }).join('')||'<div style="color:rgba(255,255,255,.4);font-size:12px;padding:8px">Nessuna campagna creata.</div>'
+}
+async function admEditCampagna(id){
+  const{data:c}=await sb.from('campagne').select('*').eq('id',id).single()
+  if(!c)return
+  _cmpEditId=id;_cmpImg1Url=c.img1_url||null;_cmpImg2Url=c.img2_url||null
+  vSet('cmp-titolo',c.titolo||'');vSet('cmp-testo',c.testo||'')
+  vSet('cmp-l1-label',c.link1_label||'');vSet('cmp-l1-url',c.link1_url||'')
+  vSet('cmp-l2-label',c.link2_label||'');vSet('cmp-l2-url',c.link2_url||'')
+  vSet('cmp-dal',c.dal||'');vSet('cmp-al',c.al||'');vSet('cmp-pos',c.posizione||'verbale')
+  const pv=$('cmp-img-prev')
+  if(pv)pv.innerHTML=[c.img1_url,c.img2_url].filter(Boolean).map(u=>`<img src="${esc(u)}" style="height:60px;border-radius:6px">`).join('')||''
+  toast('Campagna caricata nel modulo: modifica e premi Salva','ok')
+}
+async function admToggleCampagna(id,att){
+  const{error}=await sb.from('campagne').update({attivo:att==='true'||att===true}).eq('id',id)
+  if(error){toast('Errore: '+error.message,'err');return}
+  window._campagnaCache=undefined
+  admLoadCampagne()
+}
+async function admEliminaCampagna(id){
+  if(!confirm('Eliminare definitivamente questa campagna?'))return
+  const{error}=await sb.from('campagne').delete().eq('id',id)
+  if(error){toast('Errore: '+error.message,'err');return}
+  window._campagnaCache=undefined
+  toast('Campagna eliminata','ok')
+  admLoadCampagne()
+}
+window.admSalvaCampagna=admSalvaCampagna
+window.admLoadCampagne=admLoadCampagne
+window.admEditCampagna=admEditCampagna
+window.admToggleCampagna=admToggleCampagna
+window.admEliminaCampagna=admEliminaCampagna
+
 // ── EMAIL VERBALE DA ELENCO ──
 async function inviEmailVerbaleFromList(vid){
   toast('Caricamento dati visita…')
@@ -5182,7 +5663,7 @@ async function inviEmailVerbaleFromList(vid){
     tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome)
   `).eq('visita_id',vid).single()
   if(error||!v){toast('Visita non trovata','err');return}
-  const{data:impRows}=await sb.from('visite_imprese_presenti').select('imprese(impresa_nome,impresa_email_ref)').eq('visita_id',vid).order('ordine')
+  const{data:impRows}=await sb.from('visite_imprese_presenti').select('impresa_id,imprese(impresa_nome,impresa_email_ref)').eq('visita_id',vid).order('ordine')
   // Secondo tecnico (se presente)
   let _eTec2=''
   if(v.tecnico2_id){
@@ -5203,19 +5684,16 @@ async function inviEmailVerbaleFromList(vid){
   if(v.cse_email?.trim())emails.push({ruolo:'CSE',nome:v.cse||'CSE',email:v.cse_email.trim()})
   ;(impRows||[]).forEach((im,idx)=>{
     const ev=(im.imprese?.impresa_email_ref||'').trim()
-    if(ev)emails.push({ruolo:'Impresa',nome:im.imprese?.impresa_nome||`Impresa ${idx+1}`,email:ev})
+    if(ev)emails.push({ruolo:'Impresa',nome:im.imprese?.impresa_nome||`Impresa ${idx+1}`,email:ev,impresa_id:im.impresa_id||null})
   })
   emails.push({ruolo:'CPT',nome:'Formedil Padova – Area Sicurezza',email:'cpt@formedilpadova.it'})
 
   if(!emails.length){toast('Nessun indirizzo email presente per questa visita','warn');return}
 
   // Render lista destinatari
-  $('email-verbale-list').innerHTML=emails.map(e=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #eee;font-size:13px">
-      <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--grey);min-width:72px;letter-spacing:.4px">${e.ruolo}</span>
-      <span style="flex:1;color:#333">${e.nome}</span>
-      <span style="color:var(--orange);font-size:12px">${e.email}</span>
-    </div>`).join('')
+  window._evEmails=emails
+  _evRenderList()
+  _evArricchisciAlt(emails).then(()=>_evRenderList()).catch(()=>{})
 
   // Dati strutturati per oggetto, corpo e _evContext
   const _eInd=[v.cantieri?.cantiere_indirizzo,v.cantieri?.cantiere_civico].filter(Boolean).join(' ')
@@ -5275,7 +5753,7 @@ Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle per
   btnInvia.disabled=false; btnInvia.textContent='📤 Invia ora'
   const evStatus=$('email-verbale-status')
   evStatus.textContent=''; evStatus.style.color=''
-  show('modal-email-verbale')
+  _evSetupCampagna();show('modal-email-verbale')
 }
 
 // ── EMAIL VERBALE ──
@@ -5310,19 +5788,16 @@ function inviEmailVerbale(){
   // Imprese – email verbale override
   S.imprese.forEach((im,idx)=>{
     const ev=(im.email_verbale||vGet(`im-email_verbale-${idx}`)||'').trim()
-    if(ev) emails.push({ruolo:'Impresa',nome:im.impresa_nome||`Impresa ${idx+1}`,email:ev})
+    if(ev) emails.push({ruolo:'Impresa',nome:im.impresa_nome||`Impresa ${idx+1}`,email:ev,impresa_id:im.impresa_id||null})
   })
   emails.push({ruolo:'CPT',nome:'Formedil Padova – Area Sicurezza',email:'cpt@formedilpadova.it'})
 
   if(!emails.length){toast('Nessun indirizzo email presente tra le figure della visita','warn');return}
 
   // Render lista destinatari
-  $('email-verbale-list').innerHTML=emails.map(e=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #eee;font-size:13px">
-      <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--grey);min-width:72px;letter-spacing:.4px">${e.ruolo}</span>
-      <span style="flex:1;color:#333">${e.nome}</span>
-      <span style="color:var(--orange);font-size:12px">${e.email}</span>
-    </div>`).join('')
+  window._evEmails=emails
+  _evRenderList()
+  _evArricchisciAlt(emails).then(()=>_evRenderList()).catch(()=>{})
 
   // Dati strutturati per oggetto, corpo e _evContext
   const nrVerb=vGet('f-verbale')||''
@@ -5390,7 +5865,7 @@ Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle per
   const evStatus=$('email-verbale-status')
   evStatus.textContent=''
   evStatus.style.color=''
-  show('modal-email-verbale')
+  _evSetupCampagna();show('modal-email-verbale')
 }
 
 $('btn-email-verbale').onclick=inviEmailVerbale
@@ -5416,9 +5891,12 @@ $('btn-ev-invia').onclick=async()=>{
     const token=session?.access_token
 
     // 1. Genera PDF come base64
+    const _cmpW=$('ev-campagna-wrap')
+    window._campagnaTarget=(_cmpW&&_cmpW.style.display!=='none')?$('ev-campagna-pos').value:undefined
     const pdfDataUri=await genPDF(vid,'base64')
     if(!pdfDataUri) throw new Error('Generazione PDF fallita')
     const pdfBase64=pdfDataUri.includes(',')?pdfDataUri.split(',')[1]:pdfDataUri
+    window._campagnaTarget=undefined
 
     btn.textContent='⏳ Upload PDF su Drive…'
 
@@ -5464,6 +5942,7 @@ $('btn-ev-invia').onclick=async()=>{
           comune: window._evContext?.comune||'',
           cantIndirizzo: window._evContext?.cantIndirizzo||'',
           dataVisita: window._evContext?.dataVisita||'',
+          campagna: await _evCampagnaPayload(),
           driveFileId: upData.drive_file_id,
           fileName: (function(){const _ev=window._evContext||{};const _c=s=>(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim();const _cd=(_ev.nr_verbale||vGet('f-verbale')||'').replace(/\D/g,'').slice(-4);const _nm=[`Verb_${_cd}`,_c(_ev.impresa).slice(0,30).trim(),_c(_ev.comune),_c(_ev.tecnico),(_ev.dataVisita||'').replace(/\//g,'-')].filter(Boolean).join(' - ')+'.pdf';return _cd?_nm:upData.file_name})()
         })
@@ -6417,6 +6896,55 @@ async function genPDF(vid, output='save'){
     }else{
       await _drawFirma(tecNome,tecEmail,L,W)
     }
+    // ── CAMPAGNA INFORMATIVA (coda verbale) ──
+    try{
+      const _cmp=await getCampagnaAttiva()
+      const _cmpPos=(window._campagnaTarget!==undefined&&window._campagnaTarget!==null)?window._campagnaTarget:(_cmp?_cmp.posizione:null)
+      if(_cmp&&(_cmpPos==='verbale'||_cmpPos==='entrambi')){
+        const _PH=doc.internal.pageSize.getHeight()
+        if(y>_PH-70){doc.addPage();y=16}else{ln(10)}
+        hLine(ORANGE,0.6);ln(8)
+        setFont('bold',12,ORANGE)
+        const _ttl=doc.splitTextToSize(_cmp.titolo||'',W)
+        doc.text(_ttl,L,y);y+=_ttl.length*5.5+3
+        if(_cmp.testo){
+          setFont('normal',9,[40,40,40])
+          const _tl=doc.splitTextToSize(_cmp.testo,W)
+          if(y+_tl.length*4.5>_PH-20){doc.addPage();y=16}
+          doc.text(_tl,L,y);y+=_tl.length*4.5+5
+        }
+        for(const _iu of [_cmp.img1_url,_cmp.img2_url].filter(Boolean)){
+          try{
+            const _r=await fetch(_iu);if(!_r.ok)continue
+            const _b=await _r.blob()
+            const _d=await new Promise(res=>{const fr=new FileReader();fr.onload=e=>res(e.target.result);fr.readAsDataURL(_b)})
+            const _im=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=_d})
+            let _w=W,_h=_w*_im.height/_im.width
+            const _maxH=_PH-36
+            if(_h>_maxH){_h=_maxH;_w=_h*_im.width/_im.height}
+            if(y+_h>_PH-18){doc.addPage();y=16}
+            const _fmt=_d.slice(0,30).includes('png')?'PNG':'JPEG'
+            doc.addImage(_d,_fmt,L+(W-_w)/2,y,_w,_h)
+            y+=_h+5
+          }catch(_ei){console.warn('img campagna PDF:',_ei)}
+        }
+        const _lnks=[[_cmp.link1_label,_cmp.link1_url],[_cmp.link2_label,_cmp.link2_url]].filter(x=>x[1])
+        if(_lnks.length){
+          if(y>_PH-16){doc.addPage();y=16}
+          setFont('normal',9,[37,99,235])
+          let _lx=L
+          _lnks.forEach(([_lb,_url])=>{
+            const _t=_lb||_url
+            doc.textWithLink(_t,_lx,y,{url:_url})
+            const _tw=doc.getTextWidth(_t)
+            doc.setDrawColor(37,99,235);doc.setLineWidth(0.2);doc.line(_lx,y+1,_lx+_tw,y+1)
+            _lx+=_tw+16
+          })
+          y+=8
+        }
+      }
+    }catch(_ec){console.warn('campagna PDF:',_ec)}
+
     ln(22)
     hLine([220,220,220],0.2);ln(4)
     setFont('normal',7,[180,180,180])
@@ -6689,6 +7217,11 @@ window.admSaveTarget=admSaveTarget
 async function loadTargetCard(){
   const card=$('card-target-mese')
   if(!card)return
+  // per il tecnico (non coordinatore) la card va sopra i selettori della dashboard
+  if(S.tecnico&&!window.__isCoord){
+    const _df=$('dash-filtri')
+    if(_df&&_df.parentNode&&card.nextElementSibling!==_df)_df.parentNode.insertBefore(card,_df)
+  }
   const tec=S.tecnico
   if(!tec?.tecnico_id){card.style.display='none';return}
   const now=new Date()
@@ -8216,6 +8749,9 @@ async function admEditImpresa(impresaId) {
     vSet('ei-com',  imp.comune || '')
     vSet('ei-email',imp.impresa_email_ref || '')
     vSet('ei-tel',  imp.impresa_telefono || '')
+    vSet('ei-email2',imp.impresa_email2 || '')
+    vSet('ei-email3',imp.impresa_email3 || '')
+    vSet('ei-tel2', imp.impresa_telefono2 || '')
 
     // CEIV
     const ceivSel = $('ei-ceiv')
@@ -8260,6 +8796,9 @@ async function admSaveEditImpresa() {
     comune:       vGet('ei-com').trim() || null,
     impresa_email_ref: vGet('ei-email').trim() || null,
     impresa_telefono:  vGet('ei-tel').trim() || null,
+    impresa_email2: vGet('ei-email2').trim() || null,
+    impresa_email3: vGet('ei-email3').trim() || null,
+    impresa_telefono2: vGet('ei-tel2').trim() || null,
     cassa_edile:  vGet('ei-ceiv') || null,
     tipo_iscrizione_ccia: vGet('ei-tipo-ccia') || null,
     contratto_ccnl: isAltro ? 'ALTRO' : ccnlVal,
@@ -8412,6 +8951,7 @@ window.clearCommittente = clearCommittente
 // ══════════════════════════════════════════════════════════════
 
 async function loadRubrica(){
+  const _db=$('rub-dedup-btn');if(_db)_db.style.display=window.__isCoord?'':'none'
   const q=($('rub-search')?.value||'').trim().toLowerCase()
   const cat=$('rub-cat')?.value||''
   const res=$('rub-results')
@@ -8427,7 +8967,7 @@ async function loadRubrica(){
   // ── IMPRESE ──
   if(!cat||cat==='impresa'){
     let qb=sb.from('imprese').select('impresa_id,impresa_nome,piva,impresa_cf,comune,indirizzo,impresa_email_ref,impresa_telefono,contratto_ccnl,tipo_iscrizione_ccia,cassa_edile').eq('elimina',0).limit(50)
-    if(q)qb=qb.or(`impresa_nome.ilike.*${q}*,piva.ilike.*${q}*,impresa_cf.ilike.*${q}*,impresa_email_ref.ilike.*${q}*,impresa_telefono.ilike.*${q}*,comune.ilike.*${q}*`)
+    if(q)qb=qb.or(`impresa_nome.ilike.*${q}*,piva.ilike.*${q}*,impresa_cf.ilike.*${q}*,impresa_email_ref.ilike.*${q}*,impresa_email2.ilike.*${q}*,impresa_email3.ilike.*${q}*,impresa_telefono.ilike.*${q}*,impresa_telefono2.ilike.*${q}*,comune.ilike.*${q}*`)
     const{data}=await qb
     ;(data||[]).forEach(r=>{
       const sub=[r.comune,r.piva].filter(Boolean).join(' · ')
@@ -8454,6 +8994,24 @@ async function loadRubrica(){
         r.telefono?`<a href="tel:${esc(r.telefono)}" style="color:var(--orange)">${esc(r.telefono)}</a>`:'',
       ].filter(Boolean)
       cards.push(rubCard('👤','committente',r.committente_id,esc(r.committente_nome||'–'),sub,extra))
+    })
+  }
+
+  // ── PERSONE (figure di cantiere) ──
+  if(!cat||cat==='persona'){
+    let qb=sb.from('persone').select('*').eq('elimina',0).order('cognome',{ascending:true,nullsFirst:false}).limit(60)
+    if(q)qb=qb.or(`nome.ilike.*${q}*,cognome.ilike.*${q}*,cf.ilike.*${q}*,email.ilike.*${q}*,email2.ilike.*${q}*,email3.ilike.*${q}*,telefono.ilike.*${q}*,telefono2.ilike.*${q}*,qualifica.ilike.*${q}*`)
+    const{data}=await qb
+    ;(data||[]).forEach(r=>{
+      const nomev=[r.titolo,r.nome,r.cognome].filter(Boolean).join(' ')
+      const sub=[(r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', '),r.cf].filter(Boolean).join(' · ')
+      const extra=[
+        r.qualifica?esc(r.qualifica):'',
+        r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:'',
+        r.telefono?`<a href="tel:${esc(r.telefono)}" style="color:var(--orange)">${esc(r.telefono)}</a>`:'',
+        `<a href="javascript:void(0)" onclick="event.stopPropagation();editPersona('${r.persona_id}')" style="color:var(--grey)">✏️ Modifica</a>`
+      ].filter(Boolean)
+      cards.push(rubCard('👥','persona',r.persona_id,esc(nomev||'–'),esc(sub),extra))
     })
   }
 
@@ -8872,6 +9430,28 @@ async function showRubricaDetail(tipo, id){
   $('rub-detail-actions').innerHTML=''
   show('modal-rub-detail')
   try{
+    if(tipo==='persona'){
+      const{data:r,error}=await sb.from('persone').select('*').eq('persona_id',id).single()
+      if(error||!r){toast('Persona non trovata','err');hide('modal-rub-detail');return}
+      $('rub-detail-title').textContent=`👥 ${[r.titolo,r.nome,r.cognome].filter(Boolean).join(' ')}`
+      $('rub-detail-badge').innerHTML=`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#f3e8f8;color:#8e44ad">PERSONA</span>`
+      let html=qdSec('Anagrafica')
+      html+=qdDl([
+        ['Titolo',r.titolo],['Nome',r.nome],['Cognome',r.cognome],['Codice fiscale',r.cf],
+        ['Qualifica',r.qualifica],
+        ['Ruoli',(r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')],
+        ['Email (predef.)',r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:''],
+        ['Email 2',r.email2?`<a href="mailto:${esc(r.email2)}" style="color:var(--orange)">${esc(r.email2)}</a>`:''],
+        ['Email 3',r.email3?`<a href="mailto:${esc(r.email3)}" style="color:var(--orange)">${esc(r.email3)}</a>`:''],
+        ['Telefono (predef.)',r.telefono?`<a href="tel:${esc(r.telefono)}" style="color:var(--orange)">${esc(r.telefono)}</a>`:''],
+        ['Telefono 2',r.telefono2?`<a href="tel:${esc(r.telefono2)}" style="color:var(--orange)">${esc(r.telefono2)}</a>`:''],
+      ])
+      $('rub-detail-body').innerHTML=html
+      const be=document.createElement('button');be.className='btn-primary btn-sm';be.textContent='✏️ Modifica'
+      be.onclick=()=>{hide('modal-rub-detail');editPersona(id)}
+      $('rub-detail-actions').appendChild(be)
+      return
+    }
     if(tipo==='impresa'){
       const{data:r,error}=await sb.from('imprese').select('*').eq('impresa_id',id).single()
       if(error||!r){toast('Impresa non trovata','err');hide('modal-rub-detail');return}
@@ -8881,8 +9461,11 @@ async function showRubricaDetail(tipo, id){
       html+=qdDl([
         ['Ragione sociale',r.impresa_nome],['P.IVA',r.piva],['Cod. Fiscale',r.impresa_cf],
         ['Indirizzo',r.indirizzo],['Comune',r.comune],['CAP',r.cap],
-        ['Email',r.impresa_email_ref?`<a href="mailto:${esc(r.impresa_email_ref)}" style="color:var(--orange)">${esc(r.impresa_email_ref)}</a>`:''],
-        ['Telefono',r.impresa_telefono?`<a href="tel:${esc(r.impresa_telefono)}" style="color:var(--orange)">${esc(r.impresa_telefono)}</a>`:''],
+        ['Email (predef.)',r.impresa_email_ref?`<a href="mailto:${esc(r.impresa_email_ref)}" style="color:var(--orange)">${esc(r.impresa_email_ref)}</a>`:''],
+        ['Email 2',r.impresa_email2?`<a href="mailto:${esc(r.impresa_email2)}" style="color:var(--orange)">${esc(r.impresa_email2)}</a>`:''],
+        ['Email 3',r.impresa_email3?`<a href="mailto:${esc(r.impresa_email3)}" style="color:var(--orange)">${esc(r.impresa_email3)}</a>`:''],
+        ['Telefono (predef.)',r.impresa_telefono?`<a href="tel:${esc(r.impresa_telefono)}" style="color:var(--orange)">${esc(r.impresa_telefono)}</a>`:''],
+        ['Telefono 2',r.impresa_telefono2?`<a href="tel:${esc(r.impresa_telefono2)}" style="color:var(--orange)">${esc(r.impresa_telefono2)}</a>`:''],
         ['PEC',r.pec],['Sito web',r.sito_web],
       ])
       html+=qdSec('Dati contrattuali / CCIA')
