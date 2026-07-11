@@ -1180,6 +1180,24 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div id="adm-avvisi-list" style="margin-top:14px"></div>
         </div>
 
+        <!-- ── ESTRAZIONE CEIV (cantieri con codice CNCE) ── -->
+        <div class="adm-section">
+          <div class="adm-section-title">📤 Estrazione CEIV – cantieri con codice CNCE</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:10px">Estrae le visite effettuate nei cantieri il cui codice inizia con “CNCE”. Produce i due file per C.E.I.V.: <strong>Excel</strong> (una riga per visita) e <strong>PDF</strong> (raggruppato per codice univoco cantiere). Lasciando vuote le date estrae tutto lo storico. Puoi anche inviarli direttamente via email.</p>
+          <div class="adm-date-row">
+            <div class="field" style="min-width:150px"><label>Dal</label><input type="date" id="ceiv-dal"></div>
+            <div class="field" style="min-width:150px"><label>Al</label><input type="date" id="ceiv-al"></div>
+            <button class="btn-primary" style="background:#27ae60;border-color:#1e8449" onclick="ceivEsportaExcel()">📊 Esporta Excel</button>
+            <button class="btn-primary" style="background:#e7500f;border-color:#c43f0a" onclick="ceivEsportaPdf()">📄 Esporta PDF</button>
+          </div>
+          <div class="adm-date-row" style="margin-top:10px">
+            <div class="field" style="flex:1;min-width:220px"><label>Email CEIV (destinatario)</label><input type="email" id="ceiv-mail-to" placeholder="es. cantieri@ceivpadova.it" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff" oninput="this.style.color='#fff'"></div>
+            <div class="field" style="min-width:200px"><label>In copia a (opz.)</label><input type="email" id="ceiv-mail-cc" placeholder="cc facoltativo" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff" oninput="this.style.color='#fff'"></div>
+            <button class="btn-primary" style="background:#565c66;border-color:#565c66" onclick="ceivInviaMail()">✉️ Invia a CEIV</button>
+          </div>
+          <div id="ceiv-status" style="font-size:12px;color:rgba(255,255,255,.6);margin-top:8px"></div>
+        </div>
+
         <!-- Report PDF -->
         <div class="adm-section">
           <div class="adm-section-title">📄 Report statistico</div>
@@ -9766,6 +9784,262 @@ async function admEsportaExcel(){
   }finally{btn.disabled=false;btn.textContent='Esporta Excel'}
 }
 document.getElementById('btn-adm-excel-exp')?.addEventListener('click',admEsportaExcel)
+
+/* ===== CEIV core + wrappers (estrazione cantieri CNCE) ===== */
+// CEIV core – logica pura condivisa (browser + Node test)
+(function (root) {
+  const CEIV_IPC_LBL = { ALTO: 'Alto', MEDIO: 'Medio', BASSO: 'Basso', NR: 'Nessun Rilievo' };
+  const _num = (x) => (x === null || x === undefined || x === '' ? 0 : Number(x) || 0);
+  const _fmtDate = (d) => {
+    if (!d) return '';
+    const s = String(d).slice(0, 10);
+    const [y, m, g] = s.split('-');
+    return g ? `${g}/${m}/${y}` : s;
+  };
+  function normalizeRows(visRows, vipByVisita) {
+    return (visRows || []).map((v) => {
+      const c = v.cantieri || {}, t = v.tecnici || {}, ip = v.imprese || {};
+      let pres = (vipByVisita[v.visita_id] || []).slice();
+      pres.sort((a, b) => (b.is_principale ? 1 : 0) - (a.is_principale ? 1 : 0) || (a.ordine || 0) - (b.ordine || 0));
+      let imprese = pres.map((p) => ({
+        nome: (p.imprese && p.imprese.impresa_nome) || '',
+        piva: (p.imprese && p.imprese.piva) || '',
+        mail: (p.imprese && p.imprese.impresa_email_ref) || '',
+        nlav: (p.nr_lav === null || p.nr_lav === undefined) ? '' : p.nr_lav,
+      }));
+      if (!imprese.length && (ip.impresa_nome || ip.piva)) {
+        imprese = [{ nome: ip.impresa_nome || '', piva: ip.piva || '', mail: ip.impresa_email_ref || '', nlav: v.nr_lavoratori == null ? '' : v.nr_lavoratori }];
+      }
+      const nDipImp = v.nr_lavoratori == null ? '' : v.nr_lavoratori;
+      const otherLav = imprese.slice(1).reduce((s, x) => s + _num(x.nlav), 0);
+      const lavTot = (_num(nDipImp) || _num(imprese[0] && imprese[0].nlav)) + otherLav;
+      const tecnico = [t.tecnico_nome, t.tecnico_cognome].filter(Boolean).join(' ');
+      const committente = v.comm_rag_soc || [v.comm_nome, v.comm_cog].filter(Boolean).join(' ') || '';
+      const indirizzo = [c.cantiere_indirizzo, c.cantiere_civico].filter(Boolean).join(' ');
+      return {
+        cnce: c.cantiere_cnce || '', data: v.data_visita || '', tecnico,
+        acc: v.acc_cant || '', indirizzo, comune: c.comune_nome || '',
+        nrImp: v.nr_imp == null ? 0 : v.nr_imp, nrInd: v.nr_ind == null ? 0 : v.nr_ind,
+        lavTot, nDipImp, verbale: v.nr_verbale || '',
+        ipc: CEIV_IPC_LBL[v.ipc] || v.ipc || '',
+        committente, commPiva: v.comm_piva || v.comm_cf || '', imprese,
+      };
+    });
+  }
+  const Q_HEADER = ['ks_CodCEIV', 'Data sopralluogo', '12', '13', '16', '17', '25', '26', '27',
+    '35', '36', '40', '54', '57',
+    'IVA1', 'Lav1', 'Mail1', 'IVA2', 'Lav2', 'Mail2', 'IVA3', 'Lav3', 'Mail3', 'IVA4', 'Lav4', 'Mail4',
+    'Ragione Sociale Impresa'];
+  function buildExcelAoa(data) {
+    const sorted = data.slice().sort((a, b) =>
+      (a.cnce || '').localeCompare(b.cnce || '') || (b.data || '').localeCompare(a.data || ''));
+    const aoa = [Q_HEADER.slice()];
+    sorted.forEach((r) => {
+      const im = r.imprese || [];
+      const p1 = im[0] || {}, s = im.slice(1);
+      const sub = (i) => s[i] || {};
+      aoa.push([
+        r.cnce, _fmtDate(r.data), r.tecnico, r.acc, r.indirizzo, r.comune,
+        r.nrImp, r.nrInd, r.lavTot,
+        p1.nome || '', p1.piva || '', p1.nlav === undefined ? '' : p1.nlav, r.verbale, r.ipc,
+        sub(0).piva || '', sub(0).nlav ?? '', sub(0).mail || '',
+        sub(1).piva || '', sub(1).nlav ?? '', sub(1).mail || '',
+        sub(2).piva || '', sub(2).nlav ?? '', sub(2).mail || '',
+        sub(3).piva || '', sub(3).nlav ?? '', sub(3).mail || '',
+        r.committente,
+      ]);
+    });
+    return aoa;
+  }
+  const Q_COLW = [16, 12, 20, 5, 26, 16, 5, 5, 6, 28, 14, 5, 14, 14, 14, 5, 22, 14, 5, 22, 14, 5, 22, 14, 5, 22, 28];
+  function drawPdf(doc, data, dalFmt, alFmt) {
+    const PW = 210, M = 12, BOT = 282;
+    const groups = {};
+    data.forEach((r) => { (groups[r.cnce] = groups[r.cnce] || []).push(r); });
+    const keys = Object.keys(groups).sort((a, b) => {
+      const ca = (groups[a][0].comune || ''), cb = (groups[b][0].comune || '');
+      return ca.localeCompare(cb) || a.localeCompare(b);
+    });
+    keys.forEach((k) => groups[k].sort((a, b) => (b.data || '').localeCompare(a.data || '')));
+    let page = 0;
+    const header = () => {
+      page++;
+      doc.setFillColor(231, 80, 15); doc.rect(0, 0, PW, 15, 'F');
+      doc.setTextColor(255, 255, 255); doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+      doc.text('FORMEDIL PADOVA – Area Sicurezza e Salute', 6, 9.5);
+      doc.text(`Periodo: ${dalFmt} – ${alFmt}`, 204, 9.5, { align: 'right' });
+      doc.setTextColor(40, 40, 40); doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+      doc.text('LISTA VISITE CANTIERI DA LISTA C.E.I.V.', 105, 23, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+    };
+    const footer = () => {
+      doc.setDrawColor(231, 80, 15); doc.setLineWidth(0.3); doc.line(M, 290, PW - M, 290);
+      doc.setFontSize(7); doc.setTextColor(160, 160, 160); doc.setFont('helvetica', 'normal');
+      doc.text('Formedil Padova – Estrazione C.E.I.V. cantieri con codice CNCE – uso interno', 105, 293.5, { align: 'center' });
+      doc.text(String(page), 204, 293.5);
+    };
+    header(); footer(); let y = 30;
+    const need = (h) => { if (y + h > BOT) { doc.addPage(); header(); footer(); y = 30; } };
+    const kv = (segs) => {
+      need(5);
+      let x = M;
+      doc.setFontSize(8.3);
+      segs.forEach(([lab, val]) => {
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(86, 92, 102);
+        doc.text(lab + ' ', x, y); x += doc.getTextWidth(lab + ' ');
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30);
+        const vs = String(val ?? '');
+        doc.text(vs, x, y); x += doc.getTextWidth(vs) + 3;
+      });
+      y += 4.6;
+    };
+    const wrap = (lab, val) => {
+      doc.setFontSize(8.3);
+      doc.setFont('helvetica', 'bold'); const labW = doc.getTextWidth(lab + ' ');
+      doc.setFont('helvetica', 'normal');
+      const lines = doc.splitTextToSize(String(val ?? ''), PW - M * 2 - labW);
+      need(4.6 * Math.max(1, lines.length));
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(86, 92, 102);
+      doc.text(lab + ' ', M, y);
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30);
+      lines.forEach((ln, i) => { doc.text(ln, M + (i === 0 ? labW : 0), y); if (i < lines.length - 1) y += 4.6; });
+      y += 4.6;
+    };
+    keys.forEach((k) => {
+      need(9);
+      doc.setFillColor(245, 238, 232); doc.rect(M, y - 3.4, PW - M * 2, 6.4, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.2); doc.setTextColor(231, 80, 15);
+      doc.text('Codice univoco cantiere ' + k, M + 1.5, y + 1);
+      y += 6.2;
+      groups[k].forEach((r) => {
+        need(30);
+        kv([['Ragione Sociale', r.committente], ['P. IVA', r.commPiva], ['Verbale n°', r.verbale]]);
+        const princ = (r.imprese[0] && r.imprese[0].nome) || '';
+        wrap('Ragione Sociale Impr', princ.toUpperCase());
+        kv([['Data sopralluogo', _fmtDate(r.data)], ['Tecnico', r.tecnico], ['IPC', r.ipc], ['Accesso n°', r.acc]]);
+        wrap('Indirizzo cantiere', (r.indirizzo || '') + '        Comune cantiere ' + (r.comune || ''));
+        kv([['N imprese', r.nrImp], ['N. ditte individuali', r.nrInd], ['Lavoratori tot', r.lavTot], ["N dip. dell'impresa", r.nDipImp]]);
+        const sub = r.imprese.slice(1, 5);
+        if (sub.length) {
+          kv([['P.IVA Impresa1', sub[0] ? (sub[0].piva || '–') : ''], ['N. lav 1', sub[0] ? (sub[0].nlav ?? '') : ''],
+              ['P.IVA Impresa2', sub[1] ? (sub[1].piva || '–') : ''], ['N. lav 2', sub[1] ? (sub[1].nlav ?? '') : '']]);
+          if (sub[2] || sub[3]) {
+            kv([['P.IVA Impresa3', sub[2] ? (sub[2].piva || '–') : ''], ['N. lav 3', sub[2] ? (sub[2].nlav ?? '') : ''],
+                ['P.IVA Impresa4', sub[3] ? (sub[3].piva || '–') : ''], ['N. lav 4', sub[3] ? (sub[3].nlav ?? '') : '']]);
+          }
+        }
+        need(2);
+        doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.2); doc.line(M, y - 1.5, PW - M, y - 1.5);
+        y += 1.5;
+      });
+      y += 2;
+    });
+    return doc;
+  }
+  const api = { normalizeRows, buildExcelAoa, drawPdf, Q_HEADER, Q_COLW, CEIV_IPC_LBL, _fmtDate };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.CEIVCORE = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+
+// ═══════════════════════════════════════════════════════════════
+//  ESTRAZIONE CEIV – wrapper UI (usa window.CEIVCORE, sb, XLSX, jspdf)
+// ═══════════════════════════════════════════════════════════════
+function _ceivStatus(msg, err){ const el=$('ceiv-status'); if(el){ el.textContent=msg||''; el.style.color=err?'#e74c3c':'rgba(255,255,255,.6)'; } }
+function _ceivPeriodo(){
+  const dal=($('ceiv-dal')?.value)||'', al=($('ceiv-al')?.value)||'';
+  return { dal: dal||'1900-01-01', al: al||today(), etichetta: (dal?fmtDate(dal):'inizio') + ' – ' + (al?fmtDate(al):fmtDate(today())) };
+}
+async function _ceivFetch(dal, al){
+  const { data:vis, error } = await sb.from('visite')
+    .select('visita_id,nr_verbale,data_visita,ipc,acc_cant,nr_imp,nr_ind,nr_lavoratori,impresa_id,comm_rag_soc,comm_piva,comm_cf,comm_nome,comm_cog,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri!inner(cantiere_cnce,cantiere_indirizzo,cantiere_civico,comune_nome),imprese!visite_impresa_id_fkey(impresa_nome,piva,impresa_email_ref)')
+    .gte('data_visita', dal).lte('data_visita', al).eq('elimina', 0)
+    .ilike('cantieri.cantiere_cnce', 'cnce%')
+    .order('data_visita', { ascending:false });
+  if(error) throw error;
+  const rows = vis||[];
+  const byVis = {};
+  const ids = rows.map(r=>r.visita_id);
+  for(let i=0;i<ids.length;i+=100){
+    const { data:bb, error:e2 } = await sb.from('visite_imprese_presenti')
+      .select('visita_id,ordine,is_principale,nr_lav,imprese!visite_imprese_presenti_impresa_id_fkey(impresa_nome,piva,impresa_email_ref)')
+      .in('visita_id', ids.slice(i,i+100));
+    if(e2) throw e2;
+    (bb||[]).forEach(r=>{ (byVis[r.visita_id]=byVis[r.visita_id]||[]).push(r); });
+  }
+  return window.CEIVCORE.normalizeRows(rows, byVis);
+}
+function _ceivFname(kind, ext){
+  const p=_ceivPeriodo();
+  const d=(p.dal==='1900-01-01'?'tutto':p.dal)+'_'+p.al;
+  return `CEIV_Cantieri_CNCE_${kind}_${d}.${ext}`;
+}
+function _ceivBuildWb(data){
+  const aoa = window.CEIVCORE.buildExcelAoa(data);
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = window.CEIVCORE.Q_COLW.map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws, 'CantieriCNCE');
+  return wb;
+}
+function _ceivBuildDoc(data, p){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  window.CEIVCORE.drawPdf(doc, data, (p.dal==='1900-01-01'?'inizio':fmtDate(p.dal)), fmtDate(p.al));
+  return doc;
+}
+async function ceivEsportaExcel(){
+  if(!window.__isCoord){ toast('Funzione riservata al coordinatore','err'); return; }
+  const p=_ceivPeriodo(); _ceivStatus('⏳ Estrazione dati…');
+  try{
+    const data = await _ceivFetch(p.dal, p.al);
+    if(!data.length){ _ceivStatus('Nessuna visita su cantieri con codice CNCE nel periodo.', true); toast('Nessuna visita trovata','warn'); return; }
+    XLSX.writeFile(_ceivBuildWb(data), _ceivFname('Q','xlsx'));
+    _ceivStatus(`✓ Excel generato: ${data.length} visite.`);
+    toast('Excel CEIV scaricato ✓','ok');
+  }catch(e){ console.error('ceivEsportaExcel',e); _ceivStatus('Errore: '+(e.message||e), true); toast('Errore: '+(e.message||e),'err'); }
+}
+async function ceivEsportaPdf(){
+  if(!window.__isCoord){ toast('Funzione riservata al coordinatore','err'); return; }
+  const p=_ceivPeriodo(); _ceivStatus('⏳ Estrazione dati…');
+  try{
+    const data = await _ceivFetch(p.dal, p.al);
+    if(!data.length){ _ceivStatus('Nessuna visita su cantieri con codice CNCE nel periodo.', true); toast('Nessuna visita trovata','warn'); return; }
+    _ceivBuildDoc(data, p).save(_ceivFname('R','pdf'));
+    _ceivStatus(`✓ PDF generato: ${data.length} visite.`);
+    toast('PDF CEIV scaricato ✓','ok');
+  }catch(e){ console.error('ceivEsportaPdf',e); _ceivStatus('Errore: '+(e.message||e), true); toast('Errore: '+(e.message||e),'err'); }
+}
+async function ceivInviaMail(){
+  if(!window.__isCoord){ toast('Funzione riservata al coordinatore','err'); return; }
+  const to=($('ceiv-mail-to')?.value||'').trim();
+  const cc=($('ceiv-mail-cc')?.value||'').trim();
+  if(!to){ _ceivStatus('Inserisci l’email del destinatario CEIV.', true); toast('Manca l’email CEIV','warn'); return; }
+  const p=_ceivPeriodo(); _ceivStatus('⏳ Estrazione dati…');
+  try{
+    const data = await _ceivFetch(p.dal, p.al);
+    if(!data.length){ _ceivStatus('Nessuna visita su cantieri con codice CNCE nel periodo.', true); toast('Nessuna visita trovata','warn'); return; }
+    _ceivStatus('⏳ Generazione allegati…');
+    const xlsxB64 = XLSX.write(_ceivBuildWb(data), { type:'base64', bookType:'xlsx' });
+    const pdfB64 = _ceivBuildDoc(data, p).output('datauristring').split(',')[1];
+    _ceivStatus('⏳ Invio email a CEIV…');
+    const { data:res, error } = await sb.functions.invoke('send-ceiv', { body:{
+      to:[to], cc: cc?[cc]:[], periodo: p.etichetta, nRighe: data.length,
+      attachments:[
+        { name:_ceivFname('Q','xlsx'), b64:xlsxB64, mime:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+        { name:_ceivFname('R','pdf'),  b64:pdfB64,  mime:'application/pdf' },
+      ] } });
+    if(error) throw error;
+    if(res && res.error) throw new Error(res.error);
+    _ceivStatus(`✓ Email inviata a ${to} (${data.length} visite).`);
+    toast('Email CEIV inviata ✓','ok');
+  }catch(e){ console.error('ceivInviaMail',e); _ceivStatus('Errore invio: '+(e.message||e), true); toast('Errore invio: '+(e.message||e),'err'); }
+}
+window.ceivEsportaExcel=ceivEsportaExcel;
+window.ceivEsportaPdf=ceivEsportaPdf;
+window.ceivInviaMail=ceivInviaMail;
+
+
 
 let _xlsxPending=null
 function _parseXlsxSnap(wb){
