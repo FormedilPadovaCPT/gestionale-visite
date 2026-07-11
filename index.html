@@ -9783,7 +9783,7 @@ async function admEsportaExcel(){
     if(msgEl){msgEl.textContent='Errore: '+e.message;msgEl.style.display='block';msgEl.style.color='#e74c3c'}
   }finally{btn.disabled=false;btn.textContent='Esporta Excel'}
 }
-document.getElementById('btn-adm-excel-exp')?.addEventListener('click',admEsportaExcel)
+document.getElementById('btn-adm-excel-exp')?.addEventListener('click',admEsportaExcel);
 
 /* ===== CEIV core + wrappers (estrazione cantieri CNCE) ===== */
 // CEIV core – logica pura condivisa (browser + Node test)
