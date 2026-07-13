@@ -39,6 +39,9 @@ jobs:
           if [ -z "${DB_URL:-}" ] || [ -z "${PASS:-}" ]; then
             echo "Secret SUPABASE_DB_URL e/o BACKUP_PASSPHRASE mancanti."; exit 1
           fi
+          # Il runner ha gia' la 16 nel PATH: forziamo il pg_dump della 17
+          export PATH="/usr/lib/postgresql/17/bin:$PATH"
+          pg_dump --version
           TS=$(date +%Y%m%d_%H%M%S)
           pg_dump "$DB_URL" --no-owner --no-privileges \
             --schema=public --schema=planning \
