@@ -725,6 +725,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               </div>
               <button class="btn-outline btn-sm" id="btn-new-comm" type="button" style="white-space:nowrap;margin-top:1px">+ Nuovo</button>
               <button class="btn-outline btn-sm" id="btn-clear-comm" type="button" onclick="clearCommittente()" style="white-space:nowrap;margin-top:1px;display:none;color:#c0392b;border-color:#c0392b" title="Deseleziona committente">✕ Deseleziona</button>
+              <button class="btn-outline btn-sm" id="btn-edit-comm" type="button" onclick="editCommittente()" style="white-space:nowrap;margin-top:1px;display:none" title="Completa o correggi i dati del committente">✏️ Modifica</button>
+              <button class="btn-outline btn-sm" id="btn-save-comm" type="button" onclick="salvaCommittente()" style="white-space:nowrap;margin-top:1px;display:none;color:#1e8449;border-color:#1e8449" title="Salva le modifiche al committente">💾 Salva</button>
             </div>
             <input type="hidden" id="f-comm-id">
           </div>
@@ -770,7 +772,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <input type="hidden" id="f-comm-tipo">
           <div class="sect-title">Figure di coordinamento</div>
           <div class="row">
-            <div class="field"><label><span class="check-inline"><input type="checkbox" id="f-coord"> Presenza di coordinamento in cantiere</span></label></div>
+            <div class="field"><label><span class="check-inline"><input type="checkbox" id="f-coord" checked> Presenza di coordinamento in cantiere</span></label></div>
           </div>
           <div class="figura-coord-box">
             <div class="figura-title">Responsabile dei lavori (RL)</div>
@@ -2356,7 +2358,8 @@ async function initForm(snap=null){
   $('field-nom-stage').style.display='none'
   const rlstNo=$('f-rlst-no'); if(rlstNo)rlstNo.checked=true
   const rlstH=$('f-rlst'); if(rlstH)rlstH.value=''
-  ;['f-privacy','f-coord','f-note-for-sn','f-segnalazione'].forEach(id=>cSet(id,false))
+  ;['f-privacy','f-note-for-sn','f-segnalazione'].forEach(id=>cSet(id,false))
+  cSet('f-coord',true) // coordinamento presente di default
   ;['f-nr-lav','f-nr-lav-str','f-nr-imp','f-nr-ind'].forEach(id=>vSet(id,'0'))
 
   buildLavChecks()
@@ -2956,6 +2959,9 @@ function setCommFieldsReadonly(on){
   const btnNew=$('btn-new-comm'),btnClear=$('btn-clear-comm')
   if(btnNew)btnNew.style.display=on?'none':'inline-flex'
   if(btnClear)btnClear.style.display=on?'inline-flex':'none'
+  const btnEdit=$('btn-edit-comm'),btnSave=$('btn-save-comm')
+  if(btnEdit)btnEdit.style.display=(on&&vGet('f-comm-id'))?'inline-flex':'none'
+  if(btnSave)btnSave.style.display='none'
   const altWrap=$('comm-email-alt-wrap')
   if(altWrap)altWrap.classList.toggle('hidden',!on)
 }
@@ -2970,6 +2976,47 @@ function clearCommittente(){
 }
 
 {const btnClear=$('btn-clear-comm');if(btnClear)btnClear.onclick=()=>{clearCommittente()}}
+
+// ── MODIFICA COMMITTENTE SELEZIONATO (completa i dati mancanti) ──
+function editCommittente(){
+  if(!vGet('f-comm-id')){toast('Nessun committente selezionato','err');return}
+  setCommFieldsReadonly(false)
+  const btnNew=$('btn-new-comm'); if(btnNew)btnNew.style.display='none'
+  const btnEdit=$('btn-edit-comm'); if(btnEdit)btnEdit.style.display='none'
+  const btnSave=$('btn-save-comm'); if(btnSave)btnSave.style.display='inline-flex'
+  toast('Completa i campi mancanti e premi 💾 Salva','ok')
+}
+async function salvaCommittente(){
+  const cid=vGet('f-comm-id')
+  if(!cid){toast('Nessun committente selezionato','err');return}
+  const isPG=!!($('comm-radio-pg')&&$('comm-radio-pg').checked)
+  let nome,email,tel,piva
+  if(isPG){
+    nome=vGet('f-comm-rag-soc').trim()
+    piva=vGet('f-comm-piva').replace(/\D/g,'')
+    email=vGet('f-comm-email-pg').trim()
+    tel=vGet('f-comm-tel-pg').trim()
+  }else{
+    nome=[vGet('f-comm-nome').trim(),vGet('f-comm-cog').trim()].filter(Boolean).join(' ')
+    piva=''
+    email=vGet('f-comm-email').trim()
+    tel=vGet('f-comm-tel').trim()
+  }
+  if(!nome){toast(isPG?'Ragione sociale obbligatoria':'Nome e cognome obbligatori','err');return}
+  // NB: committente_id e cf_piva NON si toccano (sono la chiave del committente)
+  const upd={committente_nome:nome,email:email||null,telefono:tel||null,tipo_sogg:isPG?'PG':'PF',updated_at:new Date().toISOString()}
+  if(piva&&piva.length===11)upd.piva=piva
+  const tipoNum=parseInt(vGet('f-comm-tipo'),10)
+  if(tipoNum===1||tipoNum===2)upd.committente_tipo=tipoNum
+  const{error}=await sb.from('committenti').update(upd).eq('committente_id',cid)
+  if(error){toast('Errore salvataggio: '+error.message,'err');return}
+  const{data:c}=await sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,piva,email,telefono,tipo_sogg').eq('committente_id',cid).maybeSingle()
+  if(c){renderCommCard(c);vSet('f-comm-search',c.committente_nome||'')}
+  setCommFieldsReadonly(true)
+  toast('Dati committente aggiornati','ok')
+}
+window.editCommittente=editCommittente
+window.salvaCommittente=salvaCommittente
 
 // ── AUTOCOMPLETE COMMITTENTE ──
 setupAC('f-comm-search','comm-list', async q=>{
