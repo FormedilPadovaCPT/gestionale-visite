@@ -1496,8 +1496,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <div class="sect-title">Dati anagrafici</div>
     <div class="field"><label>Ragione sociale *</label><input type="text" id="mi-nome" placeholder="Ragione sociale…"></div>
     <div class="row">
-      <div class="field"><label>Partita IVA *</label><input type="text" id="mi-piva" placeholder="IT…" style="border-color:var(--orange)"></div>
-      <div class="field"><label>Codice fiscale</label><input type="text" id="mi-cf" placeholder="CF…"></div>
+      <div class="field"><label>Partita IVA</label><input type="text" id="mi-piva" placeholder="IT…"></div>
+      <div class="field"><label>Codice fiscale *</label><input type="text" id="mi-cf" placeholder="CF… (identificativo impresa)" style="border-color:var(--orange);text-transform:uppercase"></div>
     </div>
     <div class="row">
       <div class="field"><label>Indirizzo sede</label><input type="text" id="mi-ind" placeholder="Via/Piazza…"></div>
@@ -3011,16 +3011,22 @@ $('mi-ccnl')?.addEventListener('change',function(){
 })
 $('btn-mi-save').onclick=async()=>{
   const nome=vGet('mi-nome').trim()
-  const piva=vGet('mi-piva').trim()
+  const piva=vGet('mi-piva').trim()||null
   if(!nome){toast('Ragione sociale obbligatoria','warn');$('mi-nome').focus();return}
-  if(!piva){toast('Partita IVA obbligatoria','warn');$('mi-piva').focus();return}
-  const cf=vGet('mi-cf').trim()||null
+  let cf=vGet('mi-cf').trim().toUpperCase()||null
+  let impId=cf
+  if(!cf){
+    const _idfb=_idFallbackAnag(nome)
+    if(!_idfb){toast('Inserisci prima la ragione sociale','warn');$('mi-nome').focus();return}
+    if(!confirm('ATTENZIONE - inserimento eccezionale.\n\nStai salvando un\'impresa SENZA codice fiscale. Il CF e l\'identificativo dell\'impresa: senza, il dato e inutile ai fini dell\'elaborazione da parte dell\'ufficio.\n\nSe procedi, come identificativo verra usata la ragione sociale senza spazi:\n\n'+_idfb+'\n\nProcedere comunque?')){$('mi-cf').focus();return}
+    impId=_idfb
+  }
   const ccnlVal=vGet('mi-ccnl')||null
   const imp={
-    impresa_id:piva,
+    impresa_id:impId,
     impresa_nome:nome,
-    impresa_cf:cf||piva,
-    piva:piva||null,
+    impresa_cf:cf,
+    piva:piva,
     indirizzo:vGet('mi-ind').trim()||null,
     comune:vGet('mi-com').trim()||null,
     impresa_email_ref:vGet('mi-email').trim()||null,
@@ -3046,7 +3052,7 @@ $('btn-mi-save').onclick=async()=>{
   // Salva certificazioni nella tabella dedicata
   const certif=[1,2,3,4,5].filter(c=>$(`mi-cert-${c}`)?.checked)
   if(certif.length){
-    const certRows=certif.map(c=>({impresa_id:piva,certificazione:c}))
+    const certRows=certif.map(c=>({impresa_id:impId,certificazione:c}))
     const{error:errCert}=await sb.from('imprese_certificazioni').insert(certRows)
     if(errCert)toast('Avviso: certificazioni non salvate – '+errCert.message,'warn')
   }
@@ -3162,7 +3168,7 @@ async function findSimiliImprese(nome,piva,cf){
   const key=_keyAnag(nome,stop)
   const filters=[]
   if(piva){filters.push(`piva.eq.${piva}`,`impresa_id.eq.${piva}`)}
-  if(cf){filters.push(`impresa_cf.eq.${cf}`)}
+  if(cf){filters.push(`impresa_cf.eq.${cf}`,`impresa_id.eq.${cf}`)}
   if(key){filters.push(`impresa_nome.ilike.%${key}%`)}
   if(!filters.length)return[]
   const{data}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,tipo_iscrizione_ccia,contratto_ccnl').eq('elimina',0).or(filters.join(',')).limit(25)
