@@ -9528,7 +9528,7 @@ async function showRubricaDetail(tipo, id){
       const btnEdit=document.createElement('button')
       btnEdit.className='btn-outline btn-sm'
       btnEdit.textContent='✏️ Modifica impresa'
-      btnEdit.onclick=()=>{ hide('modal-rub-detail'); openEditImpresa && openEditImpresa(id) }
+      btnEdit.onclick=()=>{ hide('modal-rub-detail'); admEditImpresa(id) }
       $('rub-detail-actions').appendChild(btnEdit)
     }
     else if(tipo==='committente'){
