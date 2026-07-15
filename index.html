@@ -2514,7 +2514,7 @@ function renderImpreseAccordion(){
       let qb=sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva').eq('elimina',0).order('impresa_nome').limit(20)
       if(q)qb=qb.or(`impresa_nome.ilike.%${q}%,impresa_cf.ilike.%${q}%,piva.ilike.%${q}%`)
       const{data}=await qb
-      return(data||[]).map(i=>({id:i.impresa_id,label:`${i.impresa_nome}${i.impresa_cf?' – '+i.impresa_cf:''}`,piva:i.piva||''}))
+      return(data||[]).map(i=>({id:i.impresa_id,label:`${i.impresa_nome}${i.impresa_cf?' – '+i.impresa_cf:''}`,piva:i.piva||'',cf:i.impresa_cf||''}))
     },item=>{
       S.imprese[idx].impresa_id=item.id
       S.imprese[idx].impresa_nome=item.label.split(' – ')[0]
