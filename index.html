@@ -447,7 +447,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 
     <!-- DASHBOARD -->
     <section id="view-dashboard">
-      <div id="dash-segnala-wrap" style="margin-bottom:14px"><button class="btn-primary" id="btn-segnala-dash" style="width:100%;padding:12px;font-size:15px;border-radius:10px">&#128205; Segnala cantiere (GPS)</button></div>
+      <div id="dash-segnala-wrap" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" id="btn-segnala-dash" style="flex:2;min-width:220px;padding:12px;font-size:15px;border-radius:10px">&#128205; Segnala un cantiere attivo</button><button id="btn-servizi-cpt" style="flex:1;min-width:180px;padding:12px;font-size:15px;border-radius:10px;background:#95C22F;border:1px solid #7aa527;color:#fff;font-weight:600;cursor:pointer" onclick="window.open('https://formedilpadovacpt.github.io/servizi/','_blank')">Vai ai servizi CPT ↗</button></div>
       <div id="avvisi-banner"></div>
             <!-- FILTRI DASHBOARD -->
       <div class="card" id="dash-filtri" style="margin-bottom:14px">
@@ -969,7 +969,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="card" id="cant-map-card">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <h3 style="margin:0">&#128506;&#65039; Mappa cantieri attivi</h3>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span id="cant-map-count" style="font-size:12px;color:#888"></span><button class="btn-primary btn-sm" id="btn-segnala-cant">&#128205; Segnala cantiere</button></div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span id="cant-map-count" style="font-size:12px;color:#888"></span><button class="btn-primary btn-sm" id="btn-segnala-cant">&#128205; Segnala un cantiere attivo</button><button class="btn-sm" style="background:#95C22F;border:1px solid #7aa527;color:#fff;font-weight:600;cursor:pointer;border-radius:var(--radius);padding:6px 12px" onclick="window.open('https://formedilpadovacpt.github.io/servizi/','_blank')">Vai ai servizi CPT ↗</button></div>
         </div>
         <div id="cant-map-filters" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"></div>
         <div id="cant-map" style="height:440px;border-radius:8px;overflow:hidden;background:#eef1f4;position:relative;z-index:0;isolation:isolate"></div>
