@@ -5138,6 +5138,15 @@ async function loadCantMap(){
     const _nv={};(_vv||[]).forEach(v=>{if(v.cantiere_id)_nv[v.cantiere_id]=(_nv[v.cantiere_id]||0)+1})
     rows.forEach(r=>r.n_visite=_nv[r.cantiere_id]||0)
   }catch(_e){rows.forEach(r=>r.n_visite=0)}
+  // zona: per Padova usa il quartiere ricavato dallo stradario ufficiale
+  rows.forEach(r=>{
+    let zk=r.comune_nome||''
+    if(/^padova$/i.test(zk)){
+      const q=(typeof quartierePadova==='function')?quartierePadova(r.cantiere_indirizzo||'',zk):null
+      if(q&&q.nome)zk='PADOVA - '+q.nome
+    }
+    r.zona_key=zk
+  })
 
   _cmBuildFilters(rows)
   _cmRender(true)
@@ -5148,7 +5157,7 @@ function _cmBuildFilters(rows){
   const fdiv=$('cant-map-filters');if(!fdiv)return
   const pill='padding:5px 10px;border:1px solid var(--border,#ddd);border-radius:20px;font-size:12px;cursor:pointer;background:#fff;width:auto;flex:0 1 auto;min-width:0;max-width:220px'
   // Comuni presenti
-  const comuni=[...new Set(rows.map(r=>r.comune_nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'))
+  const comuni=[...new Set(rows.map(r=>r.zona_key||r.comune_nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'))
   // Tipi opera presenti
   const tOpe=[...new Set(rows.map(r=>r.cantiere_tip_ope).filter(v=>v!=null))].sort((a,b)=>a-b)
   const hasNoOpe=rows.some(r=>r.cantiere_tip_ope==null)
@@ -5212,7 +5221,7 @@ function _cmRender(fit){
     if(fOrig==='segn')return
     if(fVis==='si'&&!(d.n_visite>0))return
     if(fVis==='no'&&d.n_visite>0)return
-    if(fComSet&&!fComSet.has(d.comune_nome))return
+    if(fComSet&&!fComSet.has(d.zona_key||d.comune_nome))return
     if(fOpe){if(fOpe==='__nd'){if(d.cantiere_tip_ope!=null)return}else if(String(d.cantiere_tip_ope)!==fOpe)return}
     if(fImp){if(fImp==='__nd'){if(d.cantiere_importo!=null)return}else if(String(d.cantiere_importo)!==fImp)return}
     const sk=_cmScad(d.data_ult)
