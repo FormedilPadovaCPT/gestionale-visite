@@ -218,13 +218,13 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 .check-inline input{width:auto;cursor:pointer}
 .hidden{display:none!important}
 /* ── ZONA RISERVATA COORDINATORE ── */
-#view-admin .adm-wrap{background:linear-gradient(160deg,#1a1f2e 0%,#232839 100%);border-radius:var(--radius);padding:20px;color:#fff}
-#view-admin .adm-header{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.1)}
-#view-admin .adm-header .adm-icon{font-size:28px;background:rgba(231,80,15,.2);width:50px;height:50px;display:flex;align-items:center;justify-content:center;border-radius:10px;flex-shrink:0}
-#view-admin .adm-header h2{font-size:16px;font-weight:700;color:#fff;margin-bottom:3px}
-#view-admin .adm-header p{font-size:11px;color:rgba(255,255,255,.4);font-family:monospace}
+#view-admin .adm-wrap,#view-segreteria .adm-wrap{background:linear-gradient(160deg,#1a1f2e 0%,#232839 100%);border-radius:var(--radius);padding:20px;color:#fff}
+#view-admin .adm-header,#view-segreteria .adm-header{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.1)}
+#view-admin .adm-header .adm-icon,#view-segreteria .adm-header .adm-icon{font-size:28px;background:rgba(231,80,15,.2);width:50px;height:50px;display:flex;align-items:center;justify-content:center;border-radius:10px;flex-shrink:0}
+#view-admin .adm-header h2,#view-segreteria .adm-header h2{font-size:16px;font-weight:700;color:#fff;margin-bottom:3px}
+#view-admin .adm-header p,#view-segreteria .adm-header p{font-size:11px;color:rgba(255,255,255,.4);font-family:monospace}
 .adm-section{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:16px;margin-bottom:14px}
-#view-admin tr:hover td{background:rgba(149,194,47,.18)!important;color:#fff}
+#view-admin tr:hover td,#view-segreteria tr:hover td{background:rgba(149,194,47,.18)!important;color:#fff}
 .adm-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:#95C22F;margin-bottom:12px;display:flex;align-items:center;gap:7px}
 .adm-section-title::before{content:'';display:inline-block;width:3px;height:12px;background:#95C22F;border-radius:2px}
 .adm-date-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
@@ -1109,7 +1109,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="adm-section">
           <div class="adm-section-title">📢 Bacheca avvisi ai tecnici</div>
           <p style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:10px">Pubblica un messaggio che i tecnici vedranno in cima al cruscotto. Puoi impostare priorità e una scadenza; vedi quanti hanno preso visione.</p>
-          <div style="display:grid;gap:8px;max-width:660px">
+          <div style="display:grid;gap:8px;max-width:1100px">
             <input id="avv-titolo" placeholder="Titolo (opzionale)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px">
             <textarea id="avv-testo" placeholder="Testo del messaggio…" rows="3" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px;font-family:inherit"></textarea>
             <div style="font-size:12px"><label style="color:rgba(255,255,255,.55);display:block;margin-bottom:4px">Destinatari <span style="color:rgba(255,255,255,.35)">(nessuno = tutti i tecnici)</span></label><div id="avv-dest" style="display:flex;flex-wrap:wrap;gap:12px;background:rgba(255,255,255,.05);padding:8px;border-radius:6px"></div></div>
@@ -7412,7 +7412,7 @@ async function admSaveAvviso(){
 window.admSaveAvviso=admSaveAvviso
 async function admLoadAvvisi(){
   const box=$('adm-avvisi-list'); if(!box)return
-  const dbox=$('avv-dest'); if(dbox&&dbox.dataset.done!=='1'){dbox.innerHTML=(typeof TECNICI_LIST!=='undefined'?TECNICI_LIST:[]).map(t=>'<label style="color:#fff;font-size:12px;display:flex;align-items:center;gap:5px"><input type="checkbox" value="'+t.email+'"> '+esc(t.nome)+'</label>').join('');dbox.dataset.done='1'}
+  const dbox=$('avv-dest'); if(dbox&&dbox.dataset.done!=='1'){dbox.innerHTML=(typeof TECNICI_LIST!=='undefined'?TECNICI_LIST:[]).map(t=>'<label style="color:#fff;font-size:12px;display:flex;align-items:center;gap:5px;white-space:nowrap"><input type="checkbox" value="'+t.email+'"> '+esc(t.nome)+'</label>').join('');dbox.dataset.done='1'}
   const[{data:avvAll},{data:lett},{data:tecs}]=await Promise.all([
     sb.from('avvisi').select('*').order('created_at',{ascending:false}),
     sb.from('avvisi_letture').select('avviso_id'),
