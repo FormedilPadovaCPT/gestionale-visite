@@ -238,7 +238,7 @@ const TECNICI_LIST=[
   {nome:'Arch. Marco Camuffo',     email:'marco.camuffo@did.formedilpadova.it'},
   {nome:'Arch. Nicola De Marco',   email:'nicola.demarco@did.formedilpadova.it'},
   {nome:'Arch. Tommaso Visentini', email:'tommaso.visentini@did.formedilpadova.it'},
-  {nome:'Geom. Mirco Canova',      email:'mirco.canova@did.formedilpadova.it'},
+  {nome:'Geom. Amedeo Bordina',    email:'amedeo.bordina@did.formedilpadova.it'},
   {nome:'Ing. Paolo Balladore',    email:'paolo.balladore@did.formedilpadova.it'},
   {nome:'P.I. Franco Caon',        email:'franco.caon@did.formedilpadova.it'},
 ]
