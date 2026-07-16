@@ -5158,7 +5158,37 @@ function _cmBuildFilters(rows){
 
   fdiv.innerHTML=''
   const mkSel=(id,html)=>{const s=document.createElement('select');s.id=id;s.style.cssText=pill;s.innerHTML=html;s.addEventListener('change',()=>_cmRender(true));fdiv.appendChild(s);return s}
-  mkSel('cm-f-comune','<option value="">📍 Tutti i comuni</option>'+comuni.map(c=>`<option value="${_cmEsc(c)}">${_cmEsc(c)}</option>`).join(''))
+  // multi-selezione comuni con checkbox + "La mia zona"
+  if(!(window.__cmComSel instanceof Set))window.__cmComSel=new Set()
+  window.__cmComSel=new Set([...window.__cmComSel].filter(c=>comuni.includes(c)))
+  const cwrap=document.createElement('div');cwrap.style.cssText='position:relative;flex:0 1 auto'
+  const cbtn=document.createElement('button');cbtn.type='button';cbtn.id='cm-f-comune-btn';cbtn.style.cssText=pill+';white-space:nowrap'
+  const cpanel=document.createElement('div');cpanel.id='cm-f-comune-panel';cpanel.style.cssText='position:absolute;top:calc(100% + 4px);left:0;z-index:1200;background:#fff;border:1px solid var(--border,#ddd);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:8px;display:none;max-height:280px;overflow:auto;min-width:230px'
+  const cLbl=()=>{const n=window.__cmComSel.size;cbtn.textContent=n?('📍 '+(n===1?[...window.__cmComSel][0]:n+' comuni')+' ▾'):'📍 Tutti i comuni ▾'}
+  const cRows=()=>{
+    cpanel.innerHTML='<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">'
+      +'<button type="button" data-cm="zona" style="background:#e7500f;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;width:auto">⭐ La mia zona</button>'
+      +'<button type="button" data-cm="none" style="background:#eee;color:#333;border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;width:auto">Azzera</button></div>'
+      +comuni.map(c=>'<label style="display:flex;gap:7px;align-items:center;font-size:12px;padding:3px 2px;cursor:pointer;white-space:nowrap"><input type="checkbox" data-com="'+_cmEsc(c)+'"'+(window.__cmComSel.has(c)?' checked':'')+' style="width:auto"> '+_cmEsc(c)+'</label>').join('')
+    cpanel.querySelectorAll('input[data-com]').forEach(cb=>cb.onchange=()=>{cb.checked?window.__cmComSel.add(cb.dataset.com):window.__cmComSel.delete(cb.dataset.com);cLbl();_cmRender(true)})
+    cpanel.querySelector('[data-cm="none"]').onclick=()=>{window.__cmComSel.clear();cRows();cLbl();_cmRender(true)}
+    cpanel.querySelector('[data-cm="zona"]').onclick=async()=>{
+      try{
+        const{data:z,error:ez}=await sb.from('tecnici_zone').select('comune_nome').eq('email',((S.user&&S.user.email)||'').toLowerCase())
+        if(ez)throw ez
+        const zc=(z||[]).map(r=>r.comune_nome).filter(c=>comuni.includes(c))
+        const zTot=(z||[]).length
+        if(!zTot){toast('Nessuna zona configurata per il tuo account: chiedi alla segreteria','warn');return}
+        if(!zc.length){toast('Nessun cantiere attivo in mappa nei comuni della tua zona','warn')}
+        window.__cmComSel=new Set(zc);cRows();cLbl();_cmRender(true)
+      }catch(e){toast('Errore zona: '+(e.message||e),'err')}
+    }
+  }
+  cbtn.onclick=e=>{e.stopPropagation();cpanel.style.display=cpanel.style.display==='none'?'block':'none'}
+  cpanel.onclick=e=>e.stopPropagation()
+  if(!window.__cmComDoc){window.__cmComDoc=true;document.addEventListener('click',()=>{const p=$('cm-f-comune-panel');if(p)p.style.display='none'})}
+  cRows();cLbl()
+  cwrap.appendChild(cbtn);cwrap.appendChild(cpanel);fdiv.appendChild(cwrap)
   mkSel('cm-f-opera','<option value="">🏗️ Tutti i tipi opera</option>'+tOpe.map(k=>`<option value="${k}">${_cmEsc(TIP_OPE_LABELS[k]||('Op. '+k))}</option>`).join('')+(hasNoOpe?'<option value="__nd">Non indicato</option>':''))
   mkSel('cm-f-importo','<option value="">💶 Tutti gli importi</option>'+imps.map(k=>`<option value="${k}">${_cmEsc(IMP_LBL[k]||('Fascia '+k))}</option>`).join('')+(hasNoImp?'<option value="__nd">Non indicato</option>':''))
   mkSel('cm-f-scad','<option value="">🗓️ Tutte le scadenze</option>'+_CM_SCAD.map(s=>`<option value="${s.k}">${s.label}</option>`).join(''))
@@ -5170,7 +5200,7 @@ function _cmEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</
 function _cmRender(fit){
   if(!_cmMap||!_cmLayer||!_cmRows)return
   _cmLayer.clearLayers()
-  const fCom=$('cm-f-comune')?.value||''
+  const fComSet=(window.__cmComSel instanceof Set&&window.__cmComSel.size)?window.__cmComSel:null
   const fOpe=$('cm-f-opera')?.value||''
   const fImp=$('cm-f-importo')?.value||''
   const fSca=$('cm-f-scad')?.value||''
@@ -5182,7 +5212,7 @@ function _cmRender(fit){
     if(fOrig==='segn')return
     if(fVis==='si'&&!(d.n_visite>0))return
     if(fVis==='no'&&d.n_visite>0)return
-    if(fCom&&d.comune_nome!==fCom)return
+    if(fComSet&&!fComSet.has(d.comune_nome))return
     if(fOpe){if(fOpe==='__nd'){if(d.cantiere_tip_ope!=null)return}else if(String(d.cantiere_tip_ope)!==fOpe)return}
     if(fImp){if(fImp==='__nd'){if(d.cantiere_importo!=null)return}else if(String(d.cantiere_importo)!==fImp)return}
     const sk=_cmScad(d.data_ult)
@@ -5208,7 +5238,7 @@ function _cmRender(fit){
     n++
   })
   // ── segnalazioni da tecnici (pin fuxia) ──
-  if(fOrig!=='cnce'&&!fCom&&!fOpe&&!fImp&&!fSca&&!fVis&&Array.isArray(_cmSegn)){
+  if(fOrig!=='cnce'&&!fComSet&&!fOpe&&!fImp&&!fSca&&!fVis&&Array.isArray(_cmSegn)){
     _cmSegn.forEach(s=>{
       if(s.lat==null||s.lng==null)return
       const m=L.circleMarker([s.lat,s.lng],{radius:8,color:'#fff',weight:2,fillColor:'#d5008f',fillOpacity:0.95})
