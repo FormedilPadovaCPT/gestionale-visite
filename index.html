@@ -591,6 +591,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
                 <option value="4">Indicata da RLS/RLST</option>
                 <option value="6">Cantiere qualità</option>
                 <option value="7">Indicata dal CPT</option>
+                <option value="8">Adesione servizio visite in serie</option>
+                <option value="9">Visita STAGE/ASL</option>
+                <option value="10">Per attività di Asseverazione</option>
               </select>
             </div>
             <div class="field" style="flex:0 0 150px">
@@ -6411,7 +6414,7 @@ async function genPDF(vid, output='save'){
 
     // Lookup maps
     const TIPO_ACC={1:'Su segnalazione',2:'Su richiesta',3:'Per protocolli di intesa',4:'Indicata da RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT'}
-    const TIP_INT={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento'}
+    const TIP_INT={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',5:'Altro'}
     const TIP_OPE={1:'Industriale',2:'Civile',3:'Commerciale',5:'Stradale',8:'Scolastica',16:'Altro'}
     const IMP_LBL={1:'fino a 250.000',2:'da 250.001 a 500.000',3:'da 500.001 a 1.000.000',4:'da 1.000.001 a 1.500.000',5:'da 1.500.001 a 2.500.000',6:'da 2.500.001 a 3.500.000',7:'da 3.500.001 a 5.000.000',8:'da 5.000.001 a 10.000.000',11:'non disponibile'}
     const DUR_LBL={1:'< 30 giorni',2:'da 30 a 90 giorni',3:'da 3 a 6 mesi',4:'da 6 a 12 mesi',5:'> 12 mesi'}
