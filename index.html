@@ -5708,17 +5708,25 @@ async function _evCampagnaPayload(){
 }
 
 // ── gestione campagne (Zona Coordinatore) ──
-let _cmpEditId=null,_cmpImg1Url=null,_cmpImg2Url=null
+let _cmpEditId=null,_cmpImg1Url=null,_cmpImg2Url=null,_cmpImg1Fid=null,_cmpImg2Fid=null
 async function _cmpUpload(file){
+  // v2: le immagini campagna vanno su Google Drive (cartella "Campagne CPT"), non su Supabase Storage
   const b64=await _segnComprimiFoto(file)
-  const bin=Uint8Array.from(atob(b64),c=>c.charCodeAt(0))
-  const path=`campagna_${Date.now()}_${Math.random().toString(36).slice(2,6)}.jpg`
-  const{error}=await sb.storage.from('campagne').upload(path,bin,{contentType:'image/jpeg'})
-  if(error)throw error
-  return sb.storage.from('campagne').getPublicUrl(path).data.publicUrl
+  const{data:{session}}=await sb.auth.getSession()
+  const token=session?.access_token
+  if(!token)throw new Error('Sessione scaduta, effettua il login')
+  const nome=`campagna_${Date.now()}_${Math.random().toString(36).slice(2,6)}.jpg`
+  const res=await fetch(`${SB_URL}/functions/v1/upload-foto`,{
+    method:'POST',
+    headers:{Authorization:`Bearer ${token}`,apikey:SB_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({contesto:'campagna',nome_file:nome,mime_type:'image/jpeg',image_base64:b64})
+  })
+  const up=await res.json()
+  if(!res.ok||up.error||!up.drive_file_id)throw new Error(up.error||'Upload Drive fallito')
+  return{url:up.thumb_url||up.drive_url,file_id:up.drive_file_id}
 }
 function _cmpResetForm(){
-  _cmpEditId=null;_cmpImg1Url=null;_cmpImg2Url=null
+  _cmpEditId=null;_cmpImg1Url=null;_cmpImg2Url=null;_cmpImg1Fid=null;_cmpImg2Fid=null
   ;['cmp-titolo','cmp-testo','cmp-l1-label','cmp-l1-url','cmp-l2-label','cmp-l2-url','cmp-dal','cmp-al'].forEach(id=>{const el=$(id);if(el)el.value=''})
   const p=$('cmp-pos');if(p)p.value='verbale'
   ;['cmp-img1','cmp-img2'].forEach(id=>{const el=$(id);if(el)el.value=''})
@@ -5730,12 +5738,12 @@ async function admSalvaCampagna(){
   if(!titolo){toast('Il titolo della campagna è obbligatorio','warn');return}
   const st=$('cmp-status');if(st)st.textContent='⏳ Salvataggio…'
   try{
-    let img1=_cmpImg1Url,img2=_cmpImg2Url
+    let img1=_cmpImg1Url,img2=_cmpImg2Url,fid1=_cmpImg1Fid,fid2=_cmpImg2Fid
     const f1=$('cmp-img1')?.files?.[0],f2=$('cmp-img2')?.files?.[0]
-    if(f1){if(st)st.textContent='⏳ Carico immagine 1…';img1=await _cmpUpload(f1)}
-    if(f2){if(st)st.textContent='⏳ Carico immagine 2…';img2=await _cmpUpload(f2)}
+    if(f1){if(st)st.textContent='⏳ Carico immagine 1…';const u1=await _cmpUpload(f1);img1=u1.url;fid1=u1.file_id}
+    if(f2){if(st)st.textContent='⏳ Carico immagine 2…';const u2=await _cmpUpload(f2);img2=u2.url;fid2=u2.file_id}
     const row={titolo,testo:vGet('cmp-testo').trim()||null,
-      img1_url:img1||null,img2_url:img2||null,
+      img1_url:img1||null,img2_url:img2||null,img1_file_id:fid1||null,img2_file_id:fid2||null,
       link1_label:vGet('cmp-l1-label').trim()||null,link1_url:vGet('cmp-l1-url').trim()||null,
       link2_label:vGet('cmp-l2-label').trim()||null,link2_url:vGet('cmp-l2-url').trim()||null,
       dal:vGet('cmp-dal')||null,al:vGet('cmp-al')||null,
@@ -5779,13 +5787,13 @@ async function admLoadCampagne(){
 async function admEditCampagna(id){
   const{data:c}=await sb.from('campagne').select('*').eq('id',id).single()
   if(!c)return
-  _cmpEditId=id;_cmpImg1Url=c.img1_url||null;_cmpImg2Url=c.img2_url||null
+  _cmpEditId=id;_cmpImg1Url=c.img1_url||null;_cmpImg2Url=c.img2_url||null;_cmpImg1Fid=c.img1_file_id||null;_cmpImg2Fid=c.img2_file_id||null
   vSet('cmp-titolo',c.titolo||'');vSet('cmp-testo',c.testo||'')
   vSet('cmp-l1-label',c.link1_label||'');vSet('cmp-l1-url',c.link1_url||'')
   vSet('cmp-l2-label',c.link2_label||'');vSet('cmp-l2-url',c.link2_url||'')
   vSet('cmp-dal',c.dal||'');vSet('cmp-al',c.al||'');vSet('cmp-pos',c.posizione||'verbale')
   const pv=$('cmp-img-prev')
-  if(pv)pv.innerHTML=[c.img1_url,c.img2_url].filter(Boolean).map(u=>`<img src="${esc(u)}" style="height:60px;border-radius:6px">`).join('')||''
+  if(pv)pv.innerHTML=[c.img1_url,c.img2_url].filter(Boolean).map(u=>`<img src="${esc(u)}" referrerpolicy="no-referrer" style="height:60px;border-radius:6px">`).join('')||''
   toast('Campagna caricata nel modulo: modifica e premi Salva','ok')
 }
 async function admToggleCampagna(id,att){
@@ -7071,11 +7079,26 @@ async function genPDF(vid, output='save'){
           if(y+_tl.length*4.5>_PH-20){doc.addPage();y=16}
           doc.text(_tl,L,y);y+=_tl.length*4.5+5
         }
-        for(const _iu of [_cmp.img1_url,_cmp.img2_url].filter(Boolean)){
+        for(const [_iu,_ifid] of [[_cmp.img1_url,_cmp.img1_file_id],[_cmp.img2_url,_cmp.img2_file_id]].filter(x=>x[0]||x[1])){
           try{
-            const _r=await fetch(_iu);if(!_r.ok)continue
-            const _b=await _r.blob()
-            const _d=await new Promise(res=>{const fr=new FileReader();fr.onload=e=>res(e.target.result);fr.readAsDataURL(_b)})
+            let _d=null
+            if(_ifid){
+              try{
+                const{data:{session:_ss}}=await sb.auth.getSession()
+                const _tk=_ss?.access_token
+                if(_tk){
+                  const _dr=await fetch(`${SB_URL}/functions/v1/upload-foto`,{method:'POST',headers:{Authorization:`Bearer ${_tk}`,apikey:SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({download:true,file_id:_ifid})})
+                  const _dd=await _dr.json()
+                  if(_dd.ok&&_dd.base64)_d='data:image/jpeg;base64,'+_dd.base64
+                }
+              }catch(_ed){console.warn('download img campagna Drive:',_ed)}
+            }
+            if(!_d){
+              if(!_iu)continue
+              const _r=await fetch(_iu);if(!_r.ok)continue
+              const _b=await _r.blob()
+              _d=await new Promise(res=>{const fr=new FileReader();fr.onload=e=>res(e.target.result);fr.readAsDataURL(_b)})
+            }
             const _im=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=_d})
             let _w=W,_h=_w*_im.height/_im.width
             const _maxH=_PH-36
