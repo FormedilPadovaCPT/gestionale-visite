@@ -1332,6 +1332,14 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div id="adm-riaggancio-list" style="margin-top:12px"></div>
         </div>
 
+        <!-- Controllo duplicati CNCE -->
+        <div class="adm-section">
+          <div class="adm-section-title">🧬 Controllo duplicati CNCE</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:12px">Cerca cantieri attivi che condividono lo stesso codice CNCE. Per ogni gruppo scegli il cantiere da mantenere: visite e segnalazioni degli altri vengono spostate su di esso, i campi mancanti completati e i doppioni archiviati.</p>
+          <button class="btn-primary btn-sm" onclick="sgrCercaDupCnce()">🔍 Cerca duplicati CNCE</button>
+          <div id="sgr-dupcnce-list" style="margin-top:12px"></div>
+        </div>
+
         <!-- Download file XSD -->
         <div class="adm-section">
           <div class="adm-section-title">Schema XSD – Osservatorio visite</div>
@@ -7498,6 +7506,65 @@ function downloadXSD(key){
 // Esponi al global scope (necessario per onclick inline in moduli ES)
 window.admLoadStats = admLoadStats
 window.downloadXSD  = downloadXSD
+
+// ── CONTROLLO DUPLICATI CNCE (Segreteria) ──
+async function sgrCercaDupCnce(){
+  if(!window.__isSegreteria){toast('Funzione riservata alla segreteria','err');return}
+  const box=$('sgr-dupcnce-list');if(!box)return
+  box.innerHTML='<div style="color:rgba(255,255,255,.5);font-size:12px">Ricerca in corso…</div>'
+  const{data,error}=await sb.from('cantieri').select('cantiere_id,cantiere_cnce,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,created_at').eq('elimina',0).ilike('cantiere_cnce','CNCE%').limit(10000)
+  if(error){box.innerHTML='';toast('Errore: '+error.message,'err');return}
+  const grp={}
+  ;(data||[]).forEach(c=>{const k=(c.cantiere_cnce||'').replace(/\s+/g,'').toUpperCase();if(!k)return;(grp[k]=grp[k]||[]).push(c)})
+  const dupli=Object.entries(grp).filter(([,v])=>v.length>1)
+  if(!dupli.length){box.innerHTML='<div style="color:#95C22F;font-size:13px">✔ Nessun duplicato CNCE tra i cantieri attivi.</div>';return}
+  const ids=dupli.flatMap(([,v])=>v.map(c=>c.cantiere_id))
+  const{data:vs}=await sb.from('visite').select('cantiere_id').in('cantiere_id',ids).eq('elimina',0)
+  const nv={};(vs||[]).forEach(v=>nv[v.cantiere_id]=(nv[v.cantiere_id]||0)+1)
+  window.__dupCnceGroups={}
+  box.innerHTML='<div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:8px">'+dupli.length+' gruppo/i di duplicati trovati.</div>'+dupli.map(([k,rows],gi)=>{
+    rows.sort((a,b)=>(nv[b.cantiere_id]||0)-(nv[a.cantiere_id]||0)||String(a.created_at||'').localeCompare(String(b.created_at||'')))
+    window.__dupCnceGroups[gi]=rows.map(c=>c.cantiere_id)
+    return '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px;margin-bottom:10px">'
+      +'<div style="font-size:12px;font-weight:700;color:#e7500f;margin-bottom:6px">'+esc(k)+' — '+rows.length+' cantieri</div>'
+      +rows.map((c,i)=>'<label style="display:flex;gap:8px;align-items:center;font-size:12px;color:#fff;padding:3px 0;cursor:pointer">'
+        +'<input type="radio" name="dupk'+gi+'" value="'+esc(c.cantiere_id)+'"'+(i===0?' checked':'')+'>'
+        +'<span>'+esc(c.cantiere_etichetta||((c.cantiere_indirizzo||'')+' '+(c.cantiere_civico||'')).trim()||'(senza indirizzo)')+' · '+esc(c.comune_nome||'–')
+        +' · visite: '+(nv[c.cantiere_id]||0)+' · id '+esc(c.cantiere_id)+'</span></label>').join('')
+      +'<button class="btn-primary btn-sm" style="margin-top:6px;background:#95C22F;border-color:#7aa527" onclick="sgrFondiDupCnce('+gi+',\''+esc(k)+'\')">🔗 Fondi sul selezionato</button>'
+      +'<span id="dupst'+gi+'" style="font-size:11px;color:rgba(255,255,255,.6);margin-left:8px"></span>'
+      +'</div>'
+  }).join('')
+}
+async function sgrFondiDupCnce(gi,cnce){
+  if(!window.__isSegreteria){toast('Funzione riservata alla segreteria','err');return}
+  const ids=(window.__dupCnceGroups||{})[gi]||[]
+  const keeper=document.querySelector('input[name="dupk'+gi+'"]:checked')?.value
+  if(!keeper||!ids.includes(keeper)){toast('Seleziona il cantiere da mantenere','warn');return}
+  const losers=ids.filter(id=>id!==keeper)
+  if(!losers.length)return
+  if(!confirm('Fondere '+losers.length+' doppione/i di '+cnce+' sul cantiere selezionato?\nVisite e segnalazioni verranno spostate, i doppioni archiviati.'))return
+  const st=$('dupst'+gi);if(st)st.textContent='Fusione…'
+  try{
+    const{data:all}=await sb.from('cantieri').select('*').in('cantiere_id',ids)
+    const k=(all||[]).find(c=>c.cantiere_id===keeper)
+    const FIELDS=['cantiere_committente_id','cantiere_importo','cantiere_durata','cantiere_tip_int','cantiere_tip_ope','cantiere_tip_ope_altro','cantiere_cap','cantiere_comune_cod','comune_nome','data_ult','data_inizio_lavori','lat','lng','nodo_id','cantiere_descrizione']
+    const upd={}
+    FIELDS.forEach(f=>{
+      if(k&&(k[f]==null||k[f]==='')){
+        const src=(all||[]).find(c=>c.cantiere_id!==keeper&&c[f]!=null&&c[f]!=='')
+        if(src)upd[f]=src[f]
+      }
+    })
+    if(Object.keys(upd).length){const r0=await sb.from('cantieri').update(upd).eq('cantiere_id',keeper);if(r0.error)throw r0.error}
+    let r=await sb.from('visite').update({cantiere_id:keeper}).in('cantiere_id',losers);if(r.error)throw r.error
+    r=await sb.from('segnalazioni_cantiere').update({cantiere_id:keeper}).in('cantiere_id',losers);if(r.error)throw r.error
+    r=await sb.from('cantieri').update({elimina:1}).in('cantiere_id',losers);if(r.error)throw r.error
+    toast('Fusione completata: '+losers.length+' doppione/i archiviati','ok')
+    sgrCercaDupCnce()
+  }catch(e){console.error('sgrFondiDupCnce:',e);if(st)st.textContent='';toast('Errore fusione: '+(e.message||e),'err')}
+}
+window.sgrCercaDupCnce=sgrCercaDupCnce;window.sgrFondiDupCnce=sgrFondiDupCnce
 
 // ══════════════════════════════════════════════════════════════════
 // REPORT PDF COORDINATORE
