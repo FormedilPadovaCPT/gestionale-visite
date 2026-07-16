@@ -439,7 +439,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="rubrica">📒 Rubrica</button>
     <button data-view="import">📥 Importa</button>
     <button data-view="scadenze">⏰ Scadenze</button>
+    <button id="nav-assev" style="display:none;background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600" onclick="window.open('https://webapp-asseverazione-git-main-asseverazione.vercel.app/dashboard','_blank')">✅ Asseverazione</button>
     <button data-view="admin" id="nav-admin" style="display:none">🔐 Coordinatore</button>
+    <button data-view="segreteria" id="nav-segreteria" style="display:none">🗂️ Segreteria</button>
   </nav>
   <main>
 
@@ -1103,6 +1105,37 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
         </div>
 
+        <!-- Bacheca avvisi -->
+        <div class="adm-section">
+          <div class="adm-section-title">📢 Bacheca avvisi ai tecnici</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:10px">Pubblica un messaggio che i tecnici vedranno in cima al cruscotto. Puoi impostare priorità e una scadenza; vedi quanti hanno preso visione.</p>
+          <div style="display:grid;gap:8px;max-width:660px">
+            <input id="avv-titolo" placeholder="Titolo (opzionale)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px">
+            <textarea id="avv-testo" placeholder="Testo del messaggio…" rows="3" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px;font-family:inherit"></textarea>
+            <div style="font-size:12px"><label style="color:rgba(255,255,255,.55);display:block;margin-bottom:4px">Destinatari <span style="color:rgba(255,255,255,.35)">(nessuno = tutti i tecnici)</span></label><div id="avv-dest" style="display:flex;flex-wrap:wrap;gap:12px;background:rgba(255,255,255,.05);padding:8px;border-radius:6px"></div></div>
+            <div class="adm-date-row">
+              <div class="field" style="min-width:150px"><label>Priorità</label><select id="avv-prio"><option value="info">Info</option><option value="importante">Importante</option><option value="urgente">Urgente</option></select></div>
+              <div class="field" style="min-width:150px"><label>Scade il (opzionale)</label><input type="date" id="avv-scade"></div>
+              <button class="btn-primary" style="background:#95C22F;border-color:#7aa527" onclick="admSaveAvviso()">📢 Pubblica</button>
+            </div>
+          </div>
+          <div id="adm-avvisi-list" style="margin-top:14px"></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ══ ZONA SEGRETERIA ══ -->
+    <section id="view-segreteria" class="hidden">
+      <div class="adm-wrap">
+        <div class="adm-header">
+          <div class="adm-icon">🗂️</div>
+          <div>
+            <h2>Zona Segreteria</h2>
+            <p id="sgr-email-label">Accesso riservato</p>
+          </div>
+        </div>
+
         <!-- Promemoria ricontrolli (interruttore) -->
         <div class="adm-section">
           <div class="adm-section-title">🔔 Promemoria ricontrolli (email automatica del lunedì)</div>
@@ -1165,23 +1198,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div id="adm-campagne-list" style="margin-top:14px"></div>
         </div>
 
-        <!-- Bacheca avvisi -->
-        <div class="adm-section">
-          <div class="adm-section-title">📢 Bacheca avvisi ai tecnici</div>
-          <p style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:10px">Pubblica un messaggio che i tecnici vedranno in cima al cruscotto. Puoi impostare priorità e una scadenza; vedi quanti hanno preso visione.</p>
-          <div style="display:grid;gap:8px;max-width:660px">
-            <input id="avv-titolo" placeholder="Titolo (opzionale)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px">
-            <textarea id="avv-testo" placeholder="Testo del messaggio…" rows="3" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:8px;font-family:inherit"></textarea>
-            <div style="font-size:12px"><label style="color:rgba(255,255,255,.55);display:block;margin-bottom:4px">Destinatari <span style="color:rgba(255,255,255,.35)">(nessuno = tutti i tecnici)</span></label><div id="avv-dest" style="display:flex;flex-wrap:wrap;gap:12px;background:rgba(255,255,255,.05);padding:8px;border-radius:6px"></div></div>
-            <div class="adm-date-row">
-              <div class="field" style="min-width:150px"><label>Priorità</label><select id="avv-prio"><option value="info">Info</option><option value="importante">Importante</option><option value="urgente">Urgente</option></select></div>
-              <div class="field" style="min-width:150px"><label>Scade il (opzionale)</label><input type="date" id="avv-scade"></div>
-              <button class="btn-primary" style="background:#95C22F;border-color:#7aa527" onclick="admSaveAvviso()">📢 Pubblica</button>
-            </div>
-          </div>
-          <div id="adm-avvisi-list" style="margin-top:14px"></div>
-        </div>
-
         <!-- ── ESTRAZIONE CEIV (cantieri con codice CNCE) ── -->
         <div class="adm-section">
           <div class="adm-section-title">📤 Estrazione CEIV – cantieri con codice CNCE</div>
@@ -1204,6 +1220,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="adm-section">
           <div class="adm-section-title">📄 Report statistico</div>
           <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:10px">Genera un report PDF con statistiche aggregate per il periodo selezionato: distribuzione IPC, tipologie, macro aree della checklist e distribuzione territoriale.</p>
+          <div class="adm-date-row" style="margin-bottom:10px">
+            <div class="field" style="min-width:140px"><label>Data inizio</label><input type="date" id="sgr-dal"></div>
+            <div class="field" style="min-width:140px"><label>Data fine</label><input type="date" id="sgr-al"></div>
+          </div>
           <button class="btn-primary" onclick="admGeneraReport()" style="background:#95C22F;border-color:#7aa527">📄 Genera Report PDF</button>
           <div style="margin:8px 0 4px"><label style="font-size:11px;color:rgba(255,255,255,.6)">Anno edile (ott→set): </label><select onchange="osSetAnnoEdile(this.value)" style="padding:4px 8px;border-radius:6px;background:#1d2433;color:#fff;border:1px solid rgba(255,255,255,.2)"><option value="">— intervallo libero —</option><option value="2023">2023-2024</option><option value="2024">2024-2025</option><option value="2025">2025-2026</option><option value="2026">2026-2027</option><option value="2027">2027-2028</option><option value="2028">2028-2029</option></select></div>
           <button class="btn-primary" onclick="admGeneraReportOsservatorio()" style="background:#e7500f;border-color:#c43f0a;margin-top:8px">📑 Report Osservatorio (1:1, 19 pagine)</button>
@@ -2075,9 +2095,16 @@ async function onLogin(user){
   S.tecnico=tec
   $('lbl-user').textContent=tec?`${tec.tecnico_nome} ${tec.tecnico_cognome}`:user.email
   // Mostra tab Coordinatore solo per l'account admin
-  const isAdmin=user.email==='cptpd@did.formedilpadova.it';window.__isCoord=isAdmin
+  const _uem=(user.email||'').toLowerCase()
+  const isSegreteria=_uem==='cptpd@did.formedilpadova.it'
+  const isCoordPage=isSegreteria||_uem==='nicola.demarco@did.formedilpadova.it'
+  window.__isCoord=isSegreteria;window.__isSegreteria=isSegreteria
   const navAdm=$('nav-admin')
-  if(navAdm)navAdm.style.display=isAdmin?'':'none'
+  if(navAdm)navAdm.style.display=isCoordPage?'':'none'
+  const navSgr=$('nav-segreteria')
+  if(navSgr)navSgr.style.display=isSegreteria?'':'none'
+  const navAsv=$('nav-assev')
+  if(navAsv)navAsv.style.display=ASSEV_EMAILS.includes(_uem)?'':'none'
   await loadVoci()
   showScr('app')
   populateTecnicoSelect()
@@ -2115,7 +2142,7 @@ function showScr(n){
 }
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','cantieri','rubrica','import','scadenze','admin'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','rubrica','import','scadenze','admin','segreteria'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
@@ -2124,7 +2151,8 @@ function navTo(view){
   if(view==='cantieri'&&typeof loadCantMap==='function')loadCantMap().catch(e=>console.error('loadCantMap:',e))
   if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
   if(view==='scadenze')loadScadenze().catch(e=>{console.error('loadScadenze:',e);toast('Errore scadenze: '+e.message,'err')})
-  if(view==='admin'){admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e));admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e))}
+  if(view==='admin'){admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
+  if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e))}
 }
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
   b.onclick=()=>{if(b.dataset.view==='form')initForm();navTo(b.dataset.view)}
@@ -7198,6 +7226,10 @@ initAuth()
 // ── ZONA RISERVATA COORDINATORE ──────────────────
 // ══════════════════════════════════════════════════
 const ADMIN_EMAIL = 'cptpd@did.formedilpadova.it'
+const COORD_EMAIL = 'nicola.demarco@did.formedilpadova.it'
+const COORD_PAGE_EMAILS = [ADMIN_EMAIL, COORD_EMAIL]
+const ASSEV_EMAILS = ['tommaso.visentini@did.formedilpadova.it','nicola.demarco@did.formedilpadova.it','paolo.balladore@did.formedilpadova.it']
+const isCoordPageUser = () => !!(S.user && COORD_PAGE_EMAILS.includes((S.user.email||'').toLowerCase()))
 
 function admInit(){
   // Mostra email corrente nella zona admin
@@ -7209,10 +7241,20 @@ function admInit(){
   const dal=$('adm-dal'),al=$('adm-al')
   if(dal&&!dal.value)dal.value=`${y}-01-01`
   if(al&&!al.value)al.value=today.toISOString().split('T')[0]
+}
+function sgrInit(){
+  const lbl=$('sgr-email-label')
+  if(lbl&&S.user)lbl.textContent='Connesso come '+S.user.email
+  const today=new Date()
+  const y=today.getFullYear()
+  const dal=$('sgr-dal'),al=$('sgr-al')
+  if(dal&&!dal.value)dal.value=`${y}-01-01`
+  if(al&&!al.value)al.value=today.toISOString().split('T')[0]
   const tm=$('adm-target-mese')
   if(tm&&!tm.value)tm.value=`${y}-${String(today.getMonth()+1).padStart(2,'0')}`
   admLoadPromemoria()
 }
+window.sgrInit=sgrInit
 
 function _admRenderPromStato(attivo){
   var st=$('adm-prom-status');
@@ -7356,7 +7398,7 @@ async function presaVisione(id,btn){
 }
 window.presaVisione=presaVisione
 async function admSaveAvviso(){
-  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
+  if(!isCoordPageUser()){toast('Accesso negato','err');return}
   const testo=($('avv-testo').value||'').trim()
   if(!testo){toast('Scrivi il testo dell’avviso','warn');$('avv-testo').focus();return}
   const dest=[...document.querySelectorAll('#avv-dest input:checked')].map(c=>c.value)
@@ -7409,7 +7451,7 @@ async function admCopyLastMonth(){
 window.admCopyLastMonth=admCopyLastMonth
 
 async function admLoadStats(){
-  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
+  if(!isCoordPageUser()){toast('Accesso negato','err');return}
   const dal=($('adm-dal')?.value)||''
   const al=($('adm-al')?.value)||''
   if(!dal||!al){toast('Seleziona entrambe le date','err');return}
@@ -7613,8 +7655,8 @@ function rptPageHeader(doc,title,dalFmt,alFmt){
 
 async function admGeneraReport(){
   if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
-  const dal=($('adm-dal')?.value)||''
-  const al=($('adm-al')?.value)||''
+  const dal=($('sgr-dal')?.value)||''
+  const al=($('sgr-al')?.value)||''
   if(!dal||!al){toast('Seleziona entrambe le date prima di generare il report','err');return}
   toast('Elaborazione report in corso…','ok')
   try{
@@ -8236,8 +8278,8 @@ function oxTbl(doc,opt){
 // ══════════ FUNZIONE PRINCIPALE ══════════
 async function admGeneraReportOsservatorio(){
   if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
-  const dal=($('adm-dal')?.value)||''
-  const al=($('adm-al')?.value)||''
+  const dal=($('sgr-dal')?.value)||''
+  const al=($('sgr-al')?.value)||''
   if(!dal||!al){toast('Seleziona entrambe le date prima di generare il report','err');return}
   toast('Elaborazione report Osservatorio in corso…','ok')
   try{
@@ -8742,7 +8784,7 @@ window.admGeneraReportOsservatorio = admGeneraReportOsservatorio
 function osSetAnnoEdile(y){
   if(!y)return
   y=parseInt(y,10)
-  const dal=$('adm-dal'),al=$('adm-al')
+  const dal=$('sgr-dal'),al=$('sgr-al')
   if(dal)dal.value=y+'-10-01'
   if(al)al.value=(y+1)+'-09-30'
 }
