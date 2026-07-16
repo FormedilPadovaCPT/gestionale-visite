@@ -5132,6 +5132,13 @@ async function loadCantMap(){
   if(_cmLayer)_cmMap.removeLayer(_cmLayer)
   _cmLayer=L.layerGroup().addTo(_cmMap)
 
+  // conteggio visite per cantiere (per filtro e popup)
+  try{
+    const{data:_vv}=await sb.from('visite').select('cantiere_id').eq('elimina',0).limit(10000)
+    const _nv={};(_vv||[]).forEach(v=>{if(v.cantiere_id)_nv[v.cantiere_id]=(_nv[v.cantiere_id]||0)+1})
+    rows.forEach(r=>r.n_visite=_nv[r.cantiere_id]||0)
+  }catch(_e){rows.forEach(r=>r.n_visite=0)}
+
   _cmBuildFilters(rows)
   _cmRender(true)
   setTimeout(()=>_cmMap.invalidateSize(),250)
@@ -5156,6 +5163,7 @@ function _cmBuildFilters(rows){
   mkSel('cm-f-importo','<option value="">💶 Tutti gli importi</option>'+imps.map(k=>`<option value="${k}">${_cmEsc(IMP_LBL[k]||('Fascia '+k))}</option>`).join('')+(hasNoImp?'<option value="__nd">Non indicato</option>':''))
   mkSel('cm-f-scad','<option value="">🗓️ Tutte le scadenze</option>'+_CM_SCAD.map(s=>`<option value="${s.k}">${s.label}</option>`).join(''))
   mkSel('cm-f-orig','<option value="">🏷️ Origine: tutti</option><option value="cnce">Cantieri CNCE/CEIV</option><option value="segn">Segnalati da tecnici</option>')
+  mkSel('cm-f-visite','<option value="">👷 Visite: tutti</option><option value="si">Con visite</option><option value="no">Senza visite</option>')
 }
 function _cmEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 
@@ -5167,10 +5175,13 @@ function _cmRender(fit){
   const fImp=$('cm-f-importo')?.value||''
   const fSca=$('cm-f-scad')?.value||''
   const fOrig=$('cm-f-orig')?.value||''
+  const fVis=$('cm-f-visite')?.value||''
   const bounds=[]
   let n=0,nSeg=0
   _cmRows.forEach(d=>{
     if(fOrig==='segn')return
+    if(fVis==='si'&&!(d.n_visite>0))return
+    if(fVis==='no'&&d.n_visite>0)return
     if(fCom&&d.comune_nome!==fCom)return
     if(fOpe){if(fOpe==='__nd'){if(d.cantiere_tip_ope!=null)return}else if(String(d.cantiere_tip_ope)!==fOpe)return}
     if(fImp){if(fImp==='__nd'){if(d.cantiere_importo!=null)return}else if(String(d.cantiere_importo)!==fImp)return}
@@ -5187,6 +5198,7 @@ function _cmRender(fit){
       '<b>'+_cmEsc(label)+'</b><br>'+_cmEsc(d.comune_nome||'')+'<br>'+(d.cantiere_descrizione?'<i style="color:#555">'+_cmEsc(d.cantiere_descrizione)+'</i><br>':'')+'<br>'+
       '<b>Tipo opera:</b> '+_cmEsc(ope)+'<br>'+
       '<b>Importo:</b> '+_cmEsc(imp)+'<br>'+
+      '<b>Visite effettuate:</b> '+(d.n_visite||0)+'<br>'+
       '<b>Fine lavori:</b> '+dult+
       (approx?'<br><i style="color:#999">posizione approssimata (comune)</i>':'')+
       '<br><br><button onclick="showCantiereDetail(\''+_cmEsc(d.cantiere_id)+'\')" style="background:var(--orange,#e7500f);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px">Apri scheda</button>'
@@ -5196,7 +5208,7 @@ function _cmRender(fit){
     n++
   })
   // ── segnalazioni da tecnici (pin fuxia) ──
-  if(fOrig!=='cnce'&&!fCom&&!fOpe&&!fImp&&!fSca&&Array.isArray(_cmSegn)){
+  if(fOrig!=='cnce'&&!fCom&&!fOpe&&!fImp&&!fSca&&!fVis&&Array.isArray(_cmSegn)){
     _cmSegn.forEach(s=>{
       if(s.lat==null||s.lng==null)return
       const m=L.circleMarker([s.lat,s.lng],{radius:8,color:'#fff',weight:2,fillColor:'#d5008f',fillOpacity:0.95})
