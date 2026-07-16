@@ -983,7 +983,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <button class="btn-primary btn-sm" id="btn-nuovo-cant-lista">+ Nuovo cantiere</button>
         </div>
         <div class="search-bar">
-          <input type="text" id="q-cant" placeholder="Indirizzo, comune, etichetta…" style="flex:1">
+          <input type="text" id="q-cant" placeholder="Indirizzo, comune, etichetta o codice CNCE…" style="flex:1">
           <button class="btn-primary btn-sm" id="btn-cerca-cant">Cerca</button>
         </div>
         <div class="tbl-wrap">
@@ -2697,7 +2697,7 @@ function initCantSearch(){
   const fetchCant=async(qa,qc)=>{
     let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id').eq('elimina',0).not('cantiere_chiuso','is',true).order('comune_nome').order('cantiere_indirizzo').limit(30)
     if(qc)qb=qb.ilike('comune_nome',`%${qc}%`)
-    if(qa)qb=qb.or(`cantiere_indirizzo.ilike.%${qa}%,cantiere_etichetta.ilike.%${qa}%`)
+    if(qa)qb=qb.or(`cantiere_indirizzo.ilike.%${qa}%,cantiere_etichetta.ilike.%${qa}%,cantiere_cnce.ilike.%${qa}%`)
     const{data}=await qb
     return(data||[]).map(c=>{
       const ind=`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
@@ -5002,7 +5002,7 @@ $('btn-pdf').onclick=()=>{
 async function loadCantieri(q=''){
   const qStr=q||vGet('q-cant')?.trim()||''
   let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina').eq('elimina',0).order('updated_at',{ascending:false}).limit(200)
-  if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*`)
+  if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*`)
   const{data,error}=await qb
   if(error){toast('Errore caricamento cantieri: '+error.message,'err');return}
   const rows=data||[]
@@ -9492,7 +9492,11 @@ async function showCantiereDetail(cantId){
           S.fd.cantiere_indirizzo=r.data.cantiere_indirizzo||''
           S.fd.cantiere_civico=r.data.cantiere_civico||''
           renderCantCard(r.data)
+          proponiImportoCantiere(r.data.cantiere_importo)
+          caricaProposteImprese(true)
         }
+        await autoAccCant(cid)
+        await proponiCommittenteCantiere(cid)
       },100)
     }
     $('qd-actions').innerHTML=''
