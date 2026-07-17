@@ -2692,6 +2692,8 @@ async function _renderCantCardExtra(c){
       const{data:co}=await sb.from('committenti').select('committente_nome,tipo_sogg,cf_piva,piva').eq('committente_id',ccid).eq('elimina',0).maybeSingle()
       if(co)html+=row('Committente',`${esc(co.committente_nome||'–')} <span style="color:#999">${esc(co.cf_piva||co.piva||ccid)}</span>`)
       else html+=row('Committente',`<span style="color:#999">${esc(ccid)} — non in anagrafica</span>`)
+    }else{
+      html+=row('Committente','<span style="color:#999">non indicato nel cantiere</span>')
     }
     const nomi=new Map()
     if(c.cantiere_cnce){
