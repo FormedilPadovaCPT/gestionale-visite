@@ -9162,29 +9162,54 @@ async function admCaricaRiaggancio(){
   if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
   const wrap=$('adm-riaggancio-list');if(!wrap)return
   wrap.innerHTML='<div style="color:rgba(255,255,255,.4);font-size:13px;padding:8px">Caricamento…</div>'
-  const{data:senza,error}=await sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,cantiere_comune_cod').eq('elimina',0).is('cantiere_cnce',null).order('comune_nome')
+  const{data:senza,error}=await sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,cantiere_comune_cod,cantiere_committente_id').eq('elimina',0).is('cantiere_cnce',null).order('comune_nome')
   if(error){wrap.innerHTML='<div style="color:#e67e22;font-size:13px">Errore: '+esc(error.message)+'</div>';return}
   const rows=senza||[]
   if(!rows.length){wrap.innerHTML='<div style="color:rgba(255,255,255,.4);font-size:13px;padding:8px">Nessun cantiere senza CNCE. ✔</div>';return}
+  // cache committenti per confronto (id = CF o P.IVA)
+  const _cc=new Map()
+  const commInfo=async id=>{
+    const cid=String(id||'').trim()
+    if(!cid)return null
+    const key=cid.toUpperCase()
+    if(_cc.has(key))return _cc.get(key)
+    let v={id:key,nome:null,cod:cid}
+    try{
+      const{data:co}=await sb.from('committenti').select('committente_nome,cf_piva,piva').eq('committente_id',cid).eq('elimina',0).maybeSingle()
+      if(co)v={id:key,nome:co.committente_nome||null,cod:co.cf_piva||co.piva||cid}
+    }catch(_e){}
+    _cc.set(key,v);return v
+  }
+  const commHtml=co=>co
+    ?`👤 ${esc(co.nome||('cod. '+co.cod))} <span style="color:rgba(255,255,255,.35);font-family:monospace;font-size:10px">${esc(co.cod)}</span>`
+    :`<span style="color:rgba(255,255,255,.3)">👤 committente non indicato</span>`
   let html=''
   for(const c of rows){
     const{count:nv}=await sb.from('visite').select('visita_id',{count:'exact',head:true}).eq('cantiere_id',c.cantiere_id).eq('elimina',0)
     let simili=[]
     try{simili=(await findSimiliCantieri(c.cantiere_indirizzo||'',c.comune_nome,c.cantiere_comune_cod)).filter(s=>s.cantiere_id!==c.cantiere_id&&s.cantiere_cnce)}catch(e){}
     const ind=[c.cantiere_indirizzo,c.cantiere_civico].filter(Boolean).join(' ')
+    const srcCo=await commInfo(c.cantiere_committente_id)
     html+=`<div ondblclick="if(event.target.closest('button'))return;showCantiereDetail('${c.cantiere_id}')" title="Doppio clic per la scheda completa del cantiere" style="border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 12px;margin-bottom:10px;cursor:pointer">`
       +`<div style="font-size:13px;color:#fff;font-weight:600">${esc(ind||'(senza indirizzo)')} <span style="color:rgba(255,255,255,.5);font-weight:400">— ${esc(c.comune_nome||'')}</span></div>`
+      +`<div style="font-size:12px;color:rgba(255,255,255,.65)">${commHtml(srcCo)}</div>`
       +`<div style="font-size:11px;color:rgba(255,255,255,.45);margin-bottom:6px">${nv||0} visita/e collegate${c.cantiere_etichetta?' · '+esc(c.cantiere_etichetta):''}</div>`
     if(!simili.length){
       html+=`<div style="font-size:12px;color:rgba(255,255,255,.4)">Nessun cantiere CNCE simile trovato in questo comune.</div>`
     }else{
-      html+=simili.map(s=>{
+      for(const s of simili){
         const si=[s.cantiere_indirizzo,s.cantiere_civico].filter(Boolean).join(' ')
-        return `<div ondblclick="event.stopPropagation();if(event.target.closest('button'))return;showCantiereDetail('${s.cantiere_id}')" title="Doppio clic per la scheda completa del cantiere" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08);cursor:pointer">`
-          +`<div style="font-size:12px;color:rgba(255,255,255,.8)">${esc(si||'(senza indirizzo)')} — <span style="color:#e7a417">CNCE ${esc(s.cantiere_cnce)}</span>${s.cantiere_etichetta?' · '+esc(s.cantiere_etichetta):''}</div>`
+        const sCo=await commInfo(s.cantiere_committente_id)
+        const stesso=!!(srcCo&&sCo&&srcCo.id===sCo.id)
+        const cmp=stesso?`<span style="color:#2ecc71;font-weight:600">✓ stesso committente</span> · ${commHtml(sCo)}`:commHtml(sCo)
+        html+=`<div ondblclick="event.stopPropagation();if(event.target.closest('button'))return;showCantiereDetail('${s.cantiere_id}')" title="Doppio clic per la scheda completa del cantiere" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08);cursor:pointer${stesso?';background:rgba(46,204,113,.07)':''}">`
+          +`<div style="min-width:0">`
+          +`<div style="font-size:12px;color:rgba(255,255,255,.8)">${esc(si||'(senza indirizzo)')} — <span style="color:#e7a417">CNCE ${esc(s.cantiere_cnce)}</span>${s.cantiere_etichetta?' · '+esc(s.cantiere_etichetta):''}${s.cantiere_chiuso?' · <span style="color:#e74c3c">chiuso</span>':''}</div>`
+          +`<div style="font-size:11px;color:rgba(255,255,255,.55)">${cmp}</div>`
+          +`</div>`
           +`<button class="btn-primary btn-sm" onclick="admRiaggancia('${c.cantiere_id}','${s.cantiere_id}',${nv||0})" style="white-space:nowrap">Riaggancia qui</button>`
           +`</div>`
-      }).join('')
+      }
     }
     html+=`</div>`
   }
