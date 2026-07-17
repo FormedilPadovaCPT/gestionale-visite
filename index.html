@@ -2673,8 +2673,46 @@ function renderCantCard(c){
     ${row('Data ult. lavori',dataUlt)}
     ${row('Etichetta',c.cantiere_etichetta)}
     ${row('Descrizione',c.cantiere_descrizione)}
+    <div id="cant-card-extra" data-cant="${c.cantiere_id||''}"></div>
   `.trim()
   card.classList.remove('hidden')
+  _renderCantCardExtra(c)
+}
+// Completa la scheda cantiere con committente e imprese associate (async, non blocca il form)
+async function _renderCantCardExtra(c){
+  try{
+    if(!c||!c.cantiere_id)return
+    const cid=String(c.cantiere_id)
+    const chk=()=>{const b=$('cant-card-extra');return(b&&b.dataset.cant===cid)?b:null}
+    if(!chk())return
+    const row=(label,val)=>val?`<div><b style="color:#565c66;min-width:130px;display:inline-block">${label}</b> ${val}</div>`:''
+    let html=''
+    const ccid=String(c.cantiere_committente_id||'').trim()
+    if(ccid){
+      const{data:co}=await sb.from('committenti').select('committente_nome,tipo_sogg,cf_piva,piva').eq('committente_id',ccid).eq('elimina',0).maybeSingle()
+      if(co)html+=row('Committente',`${esc(co.committente_nome||'–')} <span style="color:#999">${esc(co.cf_piva||co.piva||ccid)}</span>`)
+      else html+=row('Committente',`<span style="color:#999">${esc(ccid)} — non in anagrafica</span>`)
+    }
+    const nomi=new Map()
+    if(c.cantiere_cnce){
+      const{data:prev}=await sb.from('cantiere_imprese_previste').select('impresa_nome').eq('cnce',c.cantiere_cnce)
+      ;(prev||[]).forEach(p=>{const n=(p.impresa_nome||'').trim();if(n)nomi.set(n.toUpperCase(),n)})
+    }
+    const{data:vids}=await sb.from('visite').select('visita_id').eq('cantiere_id',cid).eq('elimina',0).limit(100)
+    const _ids=(vids||[]).map(v=>v.visita_id)
+    if(_ids.length){
+      const{data:vip}=await sb.from('visite_imprese_presenti').select('imprese(impresa_nome)').in('visita_id',_ids)
+      ;(vip||[]).forEach(r=>{const n=(r.imprese?.impresa_nome||'').trim();if(n)nomi.set(n.toUpperCase(),n)})
+    }
+    if(nomi.size){
+      const arr=[...nomi.values()].sort((a,b)=>a.localeCompare(b))
+      const MAX=6
+      const shown=arr.slice(0,MAX).map(esc).join(' · ')+(arr.length>MAX?` <span style="color:#999">+${arr.length-MAX} altre</span>`:'')
+      html+=row('Imprese ('+arr.length+')',shown)
+    }
+    const box=chk()
+    if(box)box.innerHTML=html
+  }catch(e){console.error('_renderCantCardExtra:',e)}
 }
 function hideCantCard(){const card=$('cant-info-card');if(card){card.innerHTML='';card.classList.add('hidden')}}
 
