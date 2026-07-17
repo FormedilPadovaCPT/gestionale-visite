@@ -9134,7 +9134,7 @@ async function admCaricaRiaggancio(){
     let simili=[]
     try{simili=(await findSimiliCantieri(c.cantiere_indirizzo||'',c.comune_nome,c.cantiere_comune_cod)).filter(s=>s.cantiere_id!==c.cantiere_id&&s.cantiere_cnce)}catch(e){}
     const ind=[c.cantiere_indirizzo,c.cantiere_civico].filter(Boolean).join(' ')
-    html+=`<div style="border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 12px;margin-bottom:10px">`
+    html+=`<div ondblclick="if(event.target.closest('button'))return;showCantiereDetail('${c.cantiere_id}')" title="Doppio clic per la scheda completa del cantiere" style="border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 12px;margin-bottom:10px;cursor:pointer">`
       +`<div style="font-size:13px;color:#fff;font-weight:600">${esc(ind||'(senza indirizzo)')} <span style="color:rgba(255,255,255,.5);font-weight:400">— ${esc(c.comune_nome||'')}</span></div>`
       +`<div style="font-size:11px;color:rgba(255,255,255,.45);margin-bottom:6px">${nv||0} visita/e collegate${c.cantiere_etichetta?' · '+esc(c.cantiere_etichetta):''}</div>`
     if(!simili.length){
@@ -9142,7 +9142,7 @@ async function admCaricaRiaggancio(){
     }else{
       html+=simili.map(s=>{
         const si=[s.cantiere_indirizzo,s.cantiere_civico].filter(Boolean).join(' ')
-        return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08)">`
+        return `<div ondblclick="event.stopPropagation();if(event.target.closest('button'))return;showCantiereDetail('${s.cantiere_id}')" title="Doppio clic per la scheda completa del cantiere" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08);cursor:pointer">`
           +`<div style="font-size:12px;color:rgba(255,255,255,.8)">${esc(si||'(senza indirizzo)')} — <span style="color:#e7a417">CNCE ${esc(s.cantiere_cnce)}</span>${s.cantiere_etichetta?' · '+esc(s.cantiere_etichetta):''}</div>`
           +`<button class="btn-primary btn-sm" onclick="admRiaggancia('${c.cantiere_id}','${s.cantiere_id}',${nv||0})" style="white-space:nowrap">Riaggancia qui</button>`
           +`</div>`
@@ -9554,7 +9554,7 @@ async function showCantiereDetail(cantId){
     const{data:c,error}=await sb.from('cantieri').select(
       'cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,'+
       'cantiere_cnce,nodo_id,prot_int,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,'+
-      'cantiere_importo,cantiere_durata,data_ult,cantiere_comune_cod,cantiere_chiuso,data_chiusura,chiuso_da,motivo_chiusura,cantiere_descrizione'
+      'cantiere_importo,cantiere_durata,data_ult,cantiere_comune_cod,cantiere_chiuso,data_chiusura,chiuso_da,motivo_chiusura,cantiere_descrizione,cantiere_committente_id'
     ).eq('cantiere_id',cantId).single()
     if(error||!c){toast('Cantiere non trovato'+(error?' – '+error.message:''),'err');hide('modal-qd');return}
     const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
@@ -9578,6 +9578,68 @@ async function showCantiereDetail(cantId){
       ['Ultimazione',c.data_ult?fmtDate(c.data_ult):''],
       ['CNCE',c.cantiere_cnce],['Codice univoco',c.nodo_id],['Prot. int.',c.prot_int],
     ])
+    // ── Committente ──
+    try{
+      const ccid=String(c.cantiere_committente_id||'').trim()
+      if(ccid){
+        const{data:co}=await sb.from('committenti').select('committente_id,committente_nome,tipo_sogg,cf_piva,piva,email,telefono').eq('committente_id',ccid).eq('elimina',0).maybeSingle()
+        html+=qdSec('Committente')
+        if(co){
+          html+=qdDl([
+            ['Nome',co.committente_nome],
+            [co.tipo_sogg==='PG'?'P.IVA':'CF',co.cf_piva||co.piva||ccid],
+            ['Email',co.email],['Telefono',co.telefono],
+          ])
+        }else{
+          html+='<div style="font-size:13px;color:#888;padding:2px 0">Codice '+esc(ccid)+' — non presente in anagrafica</div>'
+        }
+      }
+    }catch(_e){}
+    // ── Imprese associate ──
+    try{
+      const impMap=new Map()
+      const{data:vids}=await sb.from('visite').select('visita_id').eq('cantiere_id',cantId).eq('elimina',0)
+      const _ids=(vids||[]).map(v=>v.visita_id)
+      if(_ids.length){
+        const{data:vip}=await sb.from('visite_imprese_presenti').select('impresa_id,is_principale,imprese(impresa_nome,piva,impresa_cf)').in('visita_id',_ids)
+        ;(vip||[]).forEach(r=>{
+          if(!r.impresa_id)return
+          const prev=impMap.get(r.impresa_id)
+          if(prev){prev.n++;prev.princ=prev.princ||!!r.is_principale}
+          else impMap.set(r.impresa_id,{nome:r.imprese?.impresa_nome||'–',cod:r.imprese?.piva||r.imprese?.impresa_cf||'',princ:!!r.is_principale,n:1})
+        })
+      }
+      if(impMap.size){
+        html+=qdSec('Imprese rilevate nelle visite ('+impMap.size+')')
+        html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><tbody>'
+        ;[...impMap.values()].sort((a,b)=>(b.princ-a.princ)||a.nome.localeCompare(b.nome)).forEach(im=>{
+          html+='<tr style="border-top:1px solid #f0f0f0">'
+            +'<td style="padding:5px 6px">'+esc(im.nome)+(im.princ?' <span class="badge" style="font-size:10px;background:#e7f3e8;color:#27ae60">principale</span>':'')+'</td>'
+            +'<td style="padding:5px 6px;color:#888;font-family:monospace">'+esc(im.cod||'–')+'</td>'
+            +'<td style="padding:5px 6px;color:#888;text-align:right;white-space:nowrap">'+im.n+' visita/e</td>'
+          +'</tr>'
+        })
+        html+='</tbody></table>'
+      }
+      if(c.cantiere_cnce){
+        const{data:prevs}=await sb.from('cantiere_imprese_previste').select('impresa_cf,impresa_nome,note').eq('cnce',c.cantiere_cnce).order('impresa_nome')
+        if(prevs&&prevs.length){
+          html+=qdSec('Imprese previste CNCE ('+prevs.length+')')
+          html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><tbody>'
+          prevs.forEach(p=>{
+            html+='<tr style="border-top:1px solid #f0f0f0">'
+              +'<td style="padding:5px 6px">'+esc(p.impresa_nome||'–')+'</td>'
+              +'<td style="padding:5px 6px;color:#888;font-family:monospace">'+esc(p.impresa_cf||'–')+'</td>'
+              +'<td style="padding:5px 6px;color:#888">'+esc(p.note||'')+'</td>'
+            +'</tr>'
+          })
+          html+='</tbody></table>'
+        }
+      }
+      if(!impMap.size&&!c.cantiere_cnce){
+        html+=qdSec('Imprese')+'<div style="color:#aaa;font-size:13px;padding:6px 0">Nessuna impresa associata</div>'
+      }
+    }catch(_e){console.error('scheda imprese:',_e)}
     if(visite&&visite.length){
       html+=qdSec(`Ultime visite (${visite.length})`)
       html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr>'
