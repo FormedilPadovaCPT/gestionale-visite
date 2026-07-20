@@ -959,15 +959,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <select id="q-tec"><option value="">Tutti i tecnici</option></select>
           <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button><label id="q-elim-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer"><input type="checkbox" id="q-elim"> Mostra eliminate</label>
         </div>
-        <div id="lista-cnt" style="display:none;gap:28px;flex-wrap:wrap;align-items:center;margin:2px 0 10px;padding:8px 16px;background:#fafafa;border:1px solid #eee;border-radius:8px">
-          <div style="text-align:center;min-width:52px"><div style="font-size:11px;font-weight:600;color:#999;letter-spacing:.5px">NC+</div><div id="lc-ncp" style="font-size:20px;font-weight:700;color:#bbb">&ndash;</div></div>
-          <div style="text-align:center;min-width:52px"><div style="font-size:11px;font-weight:600;color:#999;letter-spacing:.5px">NC&minus;</div><div id="lc-ncm" style="font-size:20px;font-weight:700;color:#bbb">&ndash;</div></div>
-          <div style="text-align:center;min-width:52px"><div style="font-size:11px;font-weight:600;color:#999;letter-spacing:.5px">OSS</div><div id="lc-oss" style="font-size:20px;font-weight:700;color:#bbb">&ndash;</div></div>
-          <div style="text-align:center;min-width:52px"><div style="font-size:11px;font-weight:600;color:#999;letter-spacing:.5px">VER</div><div id="lc-ver" style="font-size:20px;font-weight:700;color:#bbb">&ndash;</div></div>
-          <div style="font-size:11px;color:#aaa;margin-left:auto">rilievi delle visite elencate</div>
         </div>
         <div class="tbl-wrap">
-          <table><thead><tr><th>Verbale</th><th>Data</th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th>Stato</th><th></th></tr></thead>
+          <table><thead><tr><th>Verbale</th><th>Data</th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th style="font-size:11px;white-space:nowrap">NC+ / NC&minus; / OSS / VER</th><th>Stato</th><th></th></tr></thead>
           <tbody id="tbody-lista"></tbody></table>
         </div>
         <div id="lista-empty" class="hidden" style="text-align:center;padding:24px;color:#aaa">Nessuna visita trovata</div>
@@ -4999,31 +4993,35 @@ async function loadLista(){
   const tbody=$('tbody-lista')
   if(!vs.length){tbody.innerHTML='';show('lista-empty')}
   else{hide('lista-empty');tbody.innerHTML=vs.map(v=>vtRow(v)).join('');bindRowActions()}
-  _listaRenderCnt(vs)
+  _listaLoadVer()
 }
-// contatori NC+/NC-/OSS/VER sull'elenco visite mostrato (stile dashboard)
-let _listaVerMap=null,_listaVerLoading=false,_listaLastVs=[]
-function _listaRenderCnt(vs){
-  const box=$('lista-cnt');if(!box)return
-  box.style.display='flex';_listaLastVs=vs
-  const sum=k=>vs.reduce((a,v)=>a+(+v[k]||0),0)
-  const set=(id,val,col)=>{const e=$(id);if(e){e.textContent=val;e.style.color=val>0?col:'#bbb'}}
-  set('lc-ncp',sum('ipc_nc_plus'),'#e74c3c')
-  set('lc-ncm',sum('ipc_nc_minus'),'#e67e22')
-  set('lc-oss',sum('ipc_oss'),'#b9770e')
-  if(_listaVerMap){
-    set('lc-ver',vs.reduce((a,v)=>a+(_listaVerMap[v.visita_id]||0),0),'#27ae60')
-  }else{
-    const e=$('lc-ver');if(e){e.textContent='\u2026';e.style.color='#bbb'}
-    if(!_listaVerLoading){
-      _listaVerLoading=true
-      sb.rpc('dash_ver_visite',{p_da:null,p_a:null,p_tecnico:null,p_tipo:null,p_ipc:null}).then(r=>{
-        if(r.error)throw r.error
-        const m={};(r.data||[]).forEach(x=>{m[x.visita_id]=+x.ver||0});_listaVerMap=m
-        set('lc-ver',_listaLastVs.reduce((a,v)=>a+(m[v.visita_id]||0),0),'#27ae60')
-      }).catch(err=>{console.warn('ver lista:',err);const e2=$('lc-ver');if(e2)e2.textContent='\u2013'})
-    }
-  }
+// rilievi NC+/NC-/OSS/VER per singola visita nell'elenco
+let _listaVerMap=null,_listaVerLoading=false
+function _lcVal(n,col){n=+n||0;return `<span style="color:${n>0?col:'#bbb'};font-weight:700">${n}</span>`}
+function _lcCell(v){
+  const ver=_listaVerMap?(_listaVerMap[v.visita_id]||0):null
+  const vhtml=ver===null?`<span class="lc-ver" data-vid="${v.visita_id}" style="color:#bbb;font-weight:700">\u2026</span>`:_lcVal(ver,'#27ae60')
+  return `<td style="white-space:nowrap;font-size:12px" title="NC+ / NC\u2212 / OSS / VER">${_lcVal(v.ipc_nc_plus,'#e74c3c')} / ${_lcVal(v.ipc_nc_minus,'#e67e22')} / ${_lcVal(v.ipc_oss,'#b9770e')} / ${vhtml}</td>`
+}
+function _lcFillVer(){
+  if(!_listaVerMap)return
+  document.querySelectorAll('#tbody-lista .lc-ver').forEach(e=>{
+    const n=_listaVerMap[e.dataset.vid]||0
+    e.textContent=n;e.style.color=n>0?'#27ae60':'#bbb'
+  })
+}
+function _listaLoadVer(){
+  if(_listaVerMap){_lcFillVer();return}
+  if(_listaVerLoading)return
+  _listaVerLoading=true
+  sb.rpc('dash_ver_visite',{p_da:null,p_a:null,p_tecnico:null,p_tipo:null,p_ipc:null}).then(r=>{
+    if(r.error)throw r.error
+    const m={};(r.data||[]).forEach(x=>{m[x.visita_id]=+x.ver||0});_listaVerMap=m
+    _lcFillVer()
+  }).catch(err=>{
+    console.warn('ver lista:',err);_listaVerLoading=false
+    document.querySelectorAll('#tbody-lista .lc-ver').forEach(e=>{e.textContent='\u2013'})
+  })
 }
 $('btn-cerca').onclick=loadLista
 $('q-search').onkeydown=e=>{if(e.key==='Enter')loadLista()}
@@ -5051,6 +5049,7 @@ function vtRow(v){
     <td>${v.nr_verbale||'-'}${isElim?' <span class="badge" style="background:#c0392b;color:#fff">eliminata</span>':''}</td><td>${fmtDate(v.data_visita)}</td>
     <td>${cant}</td><td>${v.imprese?.impresa_nome||'-'}</td>
     <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
+    ${_lcCell(v)}
     <td><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span></td>
     <td><div class="tbl-actions">${actions}</div></td>
   </tr>`
