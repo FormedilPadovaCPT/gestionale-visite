@@ -173,10 +173,11 @@ const PREF_LBL={
   'FOR_RIS':'Rischi specifici','FOR_ATM':'Attrezzature e macchine'
 }
 
+// Colorazione ufficiale esiti checklist: VER verde, OSS giallo, NC- arancione, NC+ rosso
 const CHK_COLORS={
-  ncp:'#d50000',  // NC+  rosso vivo
-  ncm:'#e7500f',  // NC-  arancio Formedil
-  oss:'#c8a000',  // OSS  giallo ocra
+  ncp:'#E02B20',  // NC+  rosso
+  ncm:'#ED7D31',  // NC-  arancione
+  oss:'#FFC000',  // OSS  giallo
   ver:'#95C22F',  // VER  verde Formedil
   na :'#565c66'   // NA   grigio Formedil
 }

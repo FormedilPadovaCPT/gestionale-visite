@@ -7800,9 +7800,18 @@ function rptDonut({data,labels,colors,title,w=380,h=240,maxLbl=19}){
 // Horizontal bar chart → dataURL
 function rptBar({data,labels,colors,title,w=460,h}){
   const n=data.length||1
-  const barH=20,gap=5,padT=22,padB=6,padL=128,padR=30
+  const padT=22,padB=6,padL=128,padR=30
+  let barH=20,gap=5
   const autoH=padT+n*(barH+gap)+padB
   const ch=h||Math.max(80,Math.min(autoH,280))
+  // se l'altezza e' imposta, comprimo barre e interlinea per farle stare tutte nel riquadro
+  const avail=ch-padT-padB
+  if(n*(barH+gap)>avail){
+    const pitch=avail/n
+    gap=Math.min(5,pitch*.25)
+    barH=Math.max(2,pitch-gap)
+  }
+  const lblF=Math.max(6,Math.min(10,barH*.62))
   const{canvas,ctx}=_mkCanvas(w,ch)
   const maxV=Math.max(...data.map(v=>v||0),1)
   ctx.fillStyle='#333333';ctx.font='bold 11px Arial';ctx.textAlign='center'
@@ -7813,11 +7822,11 @@ function rptBar({data,labels,colors,title,w=460,h}){
     const bLen=bw*((v||0)/maxV)
     ctx.fillStyle=colors&&colors[i]?colors[i]:RPT_PALETTE[i%RPT_PALETTE.length]
     if(bLen>0)ctx.fillRect(padL,y,bLen,barH)
-    ctx.fillStyle='#444444';ctx.font='10px Arial';ctx.textAlign='right'
-    ctx.fillText(((labels&&labels[i])||'').substring(0,22),padL-5,y+barH/2+4)
+    ctx.fillStyle='#444444';ctx.font=lblF.toFixed(1)+'px Arial';ctx.textAlign='right'
+    ctx.fillText(((labels&&labels[i])||'').substring(0,26),padL-5,y+barH/2+lblF*.36)
     if(v){
-      ctx.fillStyle='#222222';ctx.font='bold 9.5px Arial';ctx.textAlign='left'
-      ctx.fillText(v,padL+bLen+3,y+barH/2+4)
+      ctx.fillStyle='#222222';ctx.font='bold '+(lblF*.95).toFixed(1)+'px Arial';ctx.textAlign='left'
+      ctx.fillText(v,padL+bLen+3,y+barH/2+lblF*.36)
     }
   })
   return canvas.toDataURL()
@@ -7893,8 +7902,9 @@ async function admGeneraReport(){
       .select([
         'visita_id','data_visita','ipc','tipo_accesso','rlst_sn',
         'nom_ppre','qual_ppre','cantiere_id','tecnico_id','tecnico2_id',
+        'nr_lavoratori','nr_imp','nr_ind','comm_tipo','comm_tipo_sogg',
         'tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome)',
-        'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_durata,comune_nome)'
+        'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_durata,cantiere_importo,comune_nome,committenti(committente_tipo))'
       ].join(','))
       .gte('data_visita',dal).lte('data_visita',al).eq('elimina',0)
     if(e1)throw e1
@@ -7980,6 +7990,30 @@ async function admGeneraReport(){
       const du=v.cantieri?.cantiere_durata;if(du)durataMap[du]=(durataMap[du]||0)+1
     })
 
+    // Importo lavori / lavoratori / imprese / ditte individuali / tipo visita / committente
+    const importoMap={},commMap={'Pubblico':0,'Privato':0,'Non indicato':0}
+    const tipVisMap={'Segnalazione o indicata da enti':0,'Concordata con l\u2019impresa':0,'Altro / non indicato':0}
+    const clsLav=[[1,1,'1'],[2,3,'2-3'],[4,5,'4-5'],[6,10,'6-10'],[11,20,'11-20'],[21,9999,'oltre 20']]
+    const clsImp=[[1,1,'1'],[2,2,'2'],[3,3,'3'],[4,5,'4-5'],[6,9999,'6 o piu\u2019']]
+    const clsInd=[[0,0,'nessuna'],[1,1,'1'],[2,2,'2'],[3,3,'3'],[4,9999,'4 o piu\u2019']]
+    const mkCls=cls=>{const m={};cls.forEach(([,,l])=>m[l]=0);return m}
+    const lavMap=mkCls(clsLav),impMap=mkCls(clsImp),indMap=mkCls(clsInd)
+    let lavTot=0,lavN=0
+    const putCls=(m,cls,v)=>{const c=cls.find(([a,b])=>v>=a&&v<=b);if(c)m[c[2]]++}
+    visite.forEach(v=>{
+      const im=v.cantieri?.cantiere_importo
+      const kImp=im||11
+      importoMap[kImp]=(importoMap[kImp]||0)+1
+      const ct=v.cantieri?.committenti?.committente_tipo||v.comm_tipo
+      commMap[ct===1?'Pubblico':(ct===2?'Privato':'Non indicato')]++
+      const ta=+(v.tipo_accesso||0)
+      tipVisMap[[1,3,4,7].includes(ta)?'Segnalazione o indicata da enti':([2,5,6].includes(ta)?'Concordata con l\u2019impresa':'Altro / non indicato')]++
+      if(v.nr_lavoratori!=null&&v.nr_lavoratori!==''){const x=+v.nr_lavoratori;if(x>0){putCls(lavMap,clsLav,x);lavTot+=x;lavN++}}
+      if(v.nr_imp!=null&&v.nr_imp!=='')putCls(impMap,clsImp,+v.nr_imp)
+      if(v.nr_ind!=null&&v.nr_ind!=='')putCls(indMap,clsInd,+v.nr_ind)
+    })
+    const lavMedia=lavN?(lavTot/lavN):0
+
     // Comuni (top 12)
     const comMap={}
     visite.forEach(v=>{const c=v.cantieri?.comune_nome;if(c)comMap[c]=(comMap[c]||0)+1})
@@ -8025,7 +8059,8 @@ async function admGeneraReport(){
       {v:nTec,l:'Tecnici',c:[149,194,47]},
       {v:nAlto,l:'IPC Alto',c:[192,57,43]},
       {v:nMedio,l:'IPC Medio',c:[230,126,34]},
-      {v:nBasso,l:'IPC Basso',c:[39,174,96]}
+      {v:nBasso,l:'IPC Basso',c:[39,174,96]},
+      {v:nNR,l:'Nessun Rilievo',c:[134,142,150]}
     ]
     const kw=CW/kpis.length
     kpis.forEach((k,i)=>{
@@ -8034,8 +8069,8 @@ async function admGeneraReport(){
       doc.setTextColor(255,255,255)
       doc.setFontSize(15);doc.setFont('helvetica','bold')
       doc.text(String(k.v),kx+kw/2,y+10,{align:'center'})
-      doc.setFontSize(7);doc.setFont('helvetica','normal')
-      doc.text(k.l,kx+kw/2,y+15,{align:'center'})
+      doc.setFontSize(kw<27?6:7);doc.setFont('helvetica','normal')
+      doc.text(k.l,kx+kw/2,y+15,{align:'center',maxWidth:kw-2})
     })
     doc.setTextColor(40,40,40)
     y+=21
@@ -8162,7 +8197,64 @@ async function admGeneraReport(){
 
     footer(2)
 
-    // ════ PAGINA 3 – Analisi macro aree ════
+    // ════ PAGINA 3 – Caratteristiche dei cantieri visitati ════
+    doc.addPage()
+    rptPageHeader(doc,'CARATTERISTICHE DEI CANTIERI E DELLE VISITE',dalFmt,alFmt)
+    y=28
+
+    // Importo lavori (sinistra) + Durata cantiere gia' a pag.2: qui Lavoratori (destra)
+    const impKeys=Object.keys(importoMap).map(Number).sort((a,b)=>a-b)
+    if(impKeys.length){
+      const impImg=rptBar({data:impKeys.map(k=>importoMap[k]),
+        labels:impKeys.map(k=>_DASH_IMPORTO[k]||('Classe '+k)),
+        colors:RPT_PALETTE,title:'Importo lavori (\u20ac)',w:460,h:180})
+      addImg(impImg,M,y,half-2,52)
+    }
+    const lavKeys=Object.keys(lavMap).filter(k=>lavMap[k])
+    if(lavKeys.length){
+      const lavImg=rptBar({data:lavKeys.map(k=>lavMap[k]),labels:lavKeys,
+        colors:RPT_PALETTE,title:'Lavoratori rilevati in cantiere',w:460,h:180})
+      addImg(lavImg,M+half+2,y,half-2,52)
+    }
+    y+=54
+    doc.setFontSize(8);doc.setFont('helvetica','italic');doc.setTextColor(120,125,132)
+    doc.text(`Media lavoratori per visita: ${lavMedia.toFixed(1)} (su ${lavN} visite con dato)`,M+half+2+half/2,y,{align:'center'})
+    doc.setTextColor(40,40,40);doc.setFont('helvetica','normal')
+    y+=6
+
+    // Numero imprese presenti + numero ditte individuali
+    const impPKeys=Object.keys(impMap).filter(k=>impMap[k])
+    if(impPKeys.length){
+      const ipImg=rptBar({data:impPKeys.map(k=>impMap[k]),labels:impPKeys,
+        colors:RPT_PALETTE,title:'Numero imprese presenti',w:460,h:170})
+      addImg(ipImg,M,y,half-2,48)
+    }
+    const indKeys=Object.keys(indMap).filter(k=>indMap[k])
+    if(indKeys.length){
+      const idImg=rptBar({data:indKeys.map(k=>indMap[k]),labels:indKeys,
+        colors:RPT_PALETTE,title:'Ditte individuali presenti',w:460,h:170})
+      addImg(idImg,M+half+2,y,half-2,48)
+    }
+    y+=54
+
+    // Tipologia di visita + tipologia di committente (ciambelle)
+    const tvKeys=Object.keys(tipVisMap).filter(k=>tipVisMap[k])
+    if(tvKeys.length){
+      const tvImg=rptDonut({data:tvKeys.map(k=>tipVisMap[k]),labels:tvKeys,
+        colors:['#e7500f','#95C22F','#565c66'],title:'Tipologia di visita',w:380,h:240,maxLbl:30})
+      addImg(tvImg,M,y,half-2,60)
+    }
+    const ctKeys=Object.keys(commMap).filter(k=>commMap[k])
+    if(ctKeys.length){
+      const ctImg=rptDonut({data:ctKeys.map(k=>commMap[k]),labels:ctKeys,
+        colors:ctKeys.map(k=>k==='Pubblico'?'#3498db':(k==='Privato'?'#e7500f':'#95a5a6')),
+        title:'Tipologia di committente',w:380,h:240,maxLbl:30})
+      addImg(ctImg,M+half+2,y,half-2,60)
+    }
+
+    footer(3)
+
+    // ════ PAGINA 4 – Analisi macro aree ════
     doc.addPage()
     rptPageHeader(doc,'ANALISI PER MACRO AREE DELLA CHECKLIST',dalFmt,alFmt)
     y=28
@@ -8185,7 +8277,7 @@ async function admGeneraReport(){
       addImg(chartImg,x,cy2,colW-2,rowH-2)
     }
 
-    footer(3)
+    footer(4)
 
     // ── Salva ──
     const fname=`Report_Visite_${dal}_${al}.pdf`
