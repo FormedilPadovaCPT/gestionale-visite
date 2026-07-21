@@ -963,7 +963,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button><label id="q-elim-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer"><input type="checkbox" id="q-elim"> Mostra eliminate</label>
         </div>
         <div class="tbl-wrap">
-          <table><thead><tr><th>Verbale</th><th>Data</th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th style="font-size:11px;white-space:nowrap">NC+ / NC&minus; / OSS / VER</th><th>Stato</th><th></th></tr></thead>
+          <table><thead><tr><th id="th-nr" style="cursor:pointer;user-select:none" title="Ordina per numero verbale">Verbale <span class="sort-ind" id="si-nr"></span></th><th id="th-data" style="cursor:pointer;user-select:none" title="Ordina per data visita">Data <span class="sort-ind" id="si-data"></span></th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th style="font-size:11px;white-space:nowrap">NC+ / NC&minus; / OSS / VER</th><th>Stato</th><th></th></tr></thead>
           <tbody id="tbody-lista"></tbody></table>
         </div>
         <div id="lista-empty" class="hidden" style="text-align:center;padding:24px;color:#aaa">Nessuna visita trovata</div>
@@ -4992,14 +4992,21 @@ async function loadLista(){
   if(_ft)qb=qb.or(`tecnico_id.eq.${_ft},tecnico2_id.eq.${_ft}`)
   const{data}=await qb
   let vs=data||[]
-  // Ordina per data visita (più recente sopra) e, a parità di data,
-  // per numero di verbale decrescente (verbale più alto sopra).
+  // Ordinamento scelto dall'utente (clic sulle intestazioni Verbale / Data).
+  // Default: data piu' recente sopra e, a parita' di data, verbale piu' alto sopra.
   const _nrVal=s=>{const m=String(s||'').match(/(\d+)\s*$/);return m?parseInt(m[1],10):0}
+  const _dir=_listaSort.dir==='asc'?1:-1
   vs.sort((a,b)=>{
-    const da=a.data_visita||'',db=b.data_visita||''
-    if(da!==db)return da<db?1:-1
-    return _nrVal(b.nr_verbale)-_nrVal(a.nr_verbale)
+    if(_listaSort.key==='nr'){
+      const na=_nrVal(a.nr_verbale),nb=_nrVal(b.nr_verbale)
+      if(na!==nb)return(na-nb)*_dir
+      return String(a.nr_verbale||'').localeCompare(String(b.nr_verbale||''))*_dir
+    }
+    const da=a.data_visita||'',dbb=b.data_visita||''
+    if(da!==dbb)return(da<dbb?-1:1)*_dir
+    return(_nrVal(a.nr_verbale)-_nrVal(b.nr_verbale))*_dir
   })
+  _listaSortInd()
   if(q){const ql=q.toLowerCase();vs=vs.filter(v=>v.nr_verbale?.toLowerCase().includes(ql)||v.cantieri?.cantiere_indirizzo?.toLowerCase().includes(ql)||v.cantieri?.cantiere_etichetta?.toLowerCase().includes(ql)||v.imprese?.impresa_nome?.toLowerCase().includes(ql))}
   const tbody=$('tbody-lista')
   if(!vs.length){tbody.innerHTML='';show('lista-empty')}
@@ -5034,6 +5041,24 @@ function _listaLoadVer(){
     document.querySelectorAll('#tbody-lista .lc-ver').forEach(e=>{e.textContent='\u2013'})
   })
 }
+// ordinamento elenco visite: data (default) o numero verbale, crescente/decrescente
+let _listaSort={key:'data',dir:'desc'}
+function _listaSortInd(){
+  const a=$('si-nr'),b=$('si-data')
+  const fr=_listaSort.dir==='asc'?'\u25B2':'\u25BC'
+  if(a)a.textContent=_listaSort.key==='nr'?fr:''
+  if(b)b.textContent=_listaSort.key==='data'?fr:''
+  const c=$('th-nr'),d=$('th-data')
+  if(c)c.style.color=_listaSort.key==='nr'?'var(--orange)':''
+  if(d)d.style.color=_listaSort.key==='data'?'var(--orange)':''
+}
+function _listaSetSort(k){
+  if(_listaSort.key===k)_listaSort.dir=_listaSort.dir==='asc'?'desc':'asc'
+  else _listaSort={key:k,dir:'desc'}
+  loadLista()
+}
+$('th-nr')&&($('th-nr').onclick=()=>_listaSetSort('nr'))
+$('th-data')&&($('th-data').onclick=()=>_listaSetSort('data'))
 $('btn-cerca').onclick=loadLista
 $('q-search').onkeydown=e=>{if(e.key==='Enter')loadLista()}
 
@@ -6893,6 +6918,19 @@ async function genPDF(vid, output='save'){
     setFont('bold',8,WHITE);doc.text('Verifiche effettuate',L+2,y+4.3)
     y+=8
 
+    // Note di fine sottoarea: nei verbali importati la nota non sta sulla singola
+    // voce ma in coda alla sottoarea (voci con is_nota, codici *_N / *_M)
+    const noteByPref={}
+    ;(S.voci||[]).filter(vv=>vv.is_nota).forEach(vv=>{
+      const r=chkMap[vv.codice]||{}
+      const txt=(r.nota||'').trim()
+      if(!txt)return
+      const p=vv.prefisso||'_'
+      const z=vv.zona_osserv
+      if(!noteByPref[z])noteByPref[z]={}
+      noteByPref[z][p]=(noteByPref[z][p]?noteByPref[z][p]+' ':'')+txt
+    })
+
     // Raggruppa per zona e prefisso
     const vociByZona={}
     ;(S.voci||[]).filter(vv=>!vv.is_nota).forEach(vv=>{
@@ -6912,7 +6950,7 @@ async function genPDF(vid, output='save'){
       // Verifica se la zona ha almeno un rilievo valorizzato
       const zonaHasRows=Object.values(prefissi).some(voci=>
         voci.some(vv=>{const r=chkMap[vv.codice]||{};return r.valore&&r.valore!=='NA'})
-      )
+      )||Object.keys(noteByPref[zona]||{}).length>0
       if(!zonaHasRows) continue
 
       // Intestazione zona (sfondo grigio)
@@ -6947,7 +6985,16 @@ async function genPDF(vid, output='save'){
           }
         }
 
-        if(!rows.length) continue  // nessun rilievo in questo sottogruppo → salta
+        // nota di sottoarea (verbali importati): va stampata anche senza rilievi
+        const notaPref=(noteByPref[zona]||{})[pref]||''
+        if(notaPref){
+          rows.push([{
+            content:'Nota: '+notaPref,
+            colSpan:3,
+            styles:{fontSize:6.8,fontStyle:'italic',textColor:[70,70,70],fillColor:[247,247,247],cellPadding:{top:1.5,bottom:1.5,left:4,right:2}}
+          }])
+        }
+        if(!rows.length) continue  // nessun rilievo ne' nota in questo sottogruppo → salta
 
         doc.autoTable({startY:y,
           head:[[{content:prefLbl,colSpan:3,styles:{halign:'left',fontStyle:'bold'}}]],
