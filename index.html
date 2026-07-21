@@ -992,9 +992,15 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <input type="text" id="q-cant" placeholder="Indirizzo, comune, etichetta o codice CNCE…" style="flex:1">
           <button class="btn-primary btn-sm" id="btn-cerca-cant">Cerca</button>
         </div>
+        <div id="giro-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#fff4ee;border:1px solid var(--orange,#e7500f);border-radius:8px;padding:8px 12px;margin-bottom:10px">
+          <span id="giro-count" style="font-size:13px;font-weight:600"></span>
+          <button class="btn-primary btn-sm" onclick="_giroVai()">🧭 Giro a tappe sul navigatore</button>
+          <button class="btn-outline btn-sm" onclick="_giroClear()">Deseleziona tutto</button>
+          <span style="font-size:11px;color:#888;flex-basis:100%">Spunta i cantieri da visitare: il giro parte dalla tua posizione e viene ordinato sul percorso più breve (max 10 tappe). La selezione resta anche cambiando ricerca.</span>
+        </div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>Etichetta / Indirizzo</th><th>Comune</th><th>Prot. Int.</th><th>CNCE</th><th>Visite</th><th></th></tr></thead>
+            <thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th>Etichetta / Indirizzo</th><th>Comune</th><th>Prot. Int.</th><th>CNCE</th><th>Visite</th><th></th></tr></thead>
             <tbody id="tbody-cantieri"></tbody>
           </table>
         </div>
@@ -5159,7 +5165,7 @@ $('btn-pdf').onclick=()=>{
 // ── LISTA CANTIERI ──
 async function loadCantieri(q=''){
   const qStr=q||vGet('q-cant')?.trim()||''
-  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina').eq('elimina',0).order('updated_at',{ascending:false}).limit(200)
+  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina,lat,lng,geocode_status').eq('elimina',0).order('updated_at',{ascending:false}).limit(200)
   if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*`)
   const{data,error}=await qb
   if(error){toast('Errore caricamento cantieri: '+error.message,'err');return}
@@ -5177,6 +5183,7 @@ async function loadCantieri(q=''){
     const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
     const nVisite=countMap[c.cantiere_id]||0
     return`<tr class="row-detail-hover" data-act="detail-cantiere" data-id="${c.cantiere_id}">
+      <td onclick="event.stopPropagation()" ondblclick="event.stopPropagation()"><input type="checkbox" class="giro-chk" data-id="${c.cantiere_id}" data-lat="${c.lat??''}" data-lng="${c.lng??''}" data-addr="${esc(((c.cantiere_indirizzo||'')+' '+(c.cantiere_civico||'')).trim()+(c.comune_nome?', '+c.comune_nome:''))}" data-label="${esc(label)}" ${_giroSel.has(c.cantiere_id)?'checked':''} onchange="_giroToggle(this)" style="width:17px;height:17px;cursor:pointer"></td>
       <td><strong>${label}</strong>${quartiereBadge(c.cantiere_indirizzo||'',c.comune_nome||'')}</td>
       <td>${c.comune_nome||'–'}</td>
       <td>${c.prot_int||'–'}</td>
@@ -5221,6 +5228,66 @@ async function loadCantieri(q=''){
     const handler=e=>{e.stopPropagation();showCantiereDetail(el.dataset.id)}
     if(el.tagName==='TR'){el.ondblclick=handler}else{el.onclick=handler}
   })
+}
+// ── GIRO A TAPPE (selezione cantieri → percorso ottimizzato sul navigatore) ──
+const _giroSel=new Map()
+window._giroToggle=function(chk){
+  const id=chk.dataset.id
+  if(chk.checked)_giroSel.set(id,{lat:chk.dataset.lat!==''?+chk.dataset.lat:null,lng:chk.dataset.lng!==''?+chk.dataset.lng:null,addr:chk.dataset.addr||'',label:chk.dataset.label||''})
+  else _giroSel.delete(id)
+  aggiornaGiroBar()
+}
+function aggiornaGiroBar(){
+  const bar=$('giro-bar');if(!bar)return
+  const n=_giroSel.size
+  bar.style.display=n?'flex':'none'
+  const lbl=$('giro-count')
+  if(lbl)lbl.textContent=n+(n===1?' cantiere selezionato':' cantieri selezionati')+(n>10?' – massimo 10 tappe!':'')
+}
+window._giroClear=function(){_giroSel.clear();document.querySelectorAll('.giro-chk').forEach(c=>c.checked=false);aggiornaGiroBar()}
+function _gHav(a,b){const R=6371,r=Math.PI/180,dLa=(b.lat-a.lat)*r,dLo=(b.lng-a.lng)*r
+  const h=Math.sin(dLa/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLo/2)**2
+  return 2*R*Math.asin(Math.sqrt(h))}
+function _gOrdina(start,stops){
+  // nearest-neighbour dal punto di partenza + miglioramento 2-opt
+  const rest=[...stops],path=[];let cur=start
+  while(rest.length){let bi=0,bd=Infinity
+    rest.forEach((s,i)=>{const d=_gHav(cur,s);if(d<bd){bd=d;bi=i}})
+    cur=rest.splice(bi,1)[0];path.push(cur)}
+  const tot=p=>{let d=_gHav(start,p[0]);for(let i=0;i<p.length-1;i++)d+=_gHav(p[i],p[i+1]);return d}
+  let better=true,guard=0
+  while(better&&guard++<60){better=false
+    for(let i=0;i<path.length-1;i++)for(let j=i+1;j<path.length;j++){
+      const np=path.slice(0,i).concat(path.slice(i,j+1).reverse(),path.slice(j+1))
+      if(tot(np)<tot(path)-0.01){path.length=0;path.push(...np);better=true}
+    }}
+  return path
+}
+window._giroVai=function(){
+  const sel=[..._giroSel.values()]
+  if(!sel.length){toast('Seleziona almeno un cantiere con le caselle 🧭','warn');return}
+  if(sel.length>10){toast('Massimo 10 tappe per il navigatore: deseleziona '+(sel.length-10)+' cantieri','err');return}
+  const conGeo=sel.filter(x=>x.lat!=null&&x.lng!=null)
+  const senzaGeo=sel.filter(x=>x.lat==null||x.lng==null)
+  const go=origin=>{
+    let ord=conGeo
+    if(conGeo.length>1)ord=origin?_gOrdina(origin,conGeo):[conGeo[0],..._gOrdina(conGeo[0],conGeo.slice(1))]
+    const stops=[...ord.map(x=>x.lat+','+x.lng),...senzaGeo.map(x=>encodeURIComponent(x.addr||x.label))]
+    if(!stops.length){toast('Nessun cantiere con posizione utilizzabile','err');return}
+    let url='https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+stops[stops.length-1]
+    const wps=stops.slice(0,-1)
+    if(wps.length)url+='&waypoints='+wps.join('%7C')
+    if(origin)url+='&origin='+origin.lat+','+origin.lng
+    if(senzaGeo.length)toast(senzaGeo.length+' cantiere/i senza coordinate: inserito/i per indirizzo in fondo al giro','warn')
+    window.open(url,'_blank')
+  }
+  if(navigator.geolocation){
+    toast('Rilevo la tua posizione…')
+    navigator.geolocation.getCurrentPosition(
+      p=>go({lat:p.coords.latitude,lng:p.coords.longitude}),
+      _=>{toast('Posizione non disponibile: giro ordinato dalla prima tappa','warn');go(null)},
+      {enableHighAccuracy:true,timeout:8000,maximumAge:60000})
+  }else go(null)
 }
 $('btn-cerca-cant').onclick=()=>loadCantieri()
 $('q-cant').onkeydown=e=>{if(e.key==='Enter')loadCantieri()}
