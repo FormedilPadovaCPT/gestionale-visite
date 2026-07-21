@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Gestionale Visite – Formedil Padova · v2026-07-21b</title>
+<title>Gestionale Visite – Formedil Padova · v2026-07-21c</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -1064,12 +1064,18 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <label style="font-size:13px;color:var(--grey);font-weight:600">👷 Filtra per tecnico:</label>
         <select id="scad-tec-filter" style="padding:6px 10px;border-radius:6px;border:1px solid #ccc;font-size:13px;min-width:220px"><option value="">Tutti i tecnici</option></select>
         <span id="scad-count" style="font-size:12px;color:#888"></span>
+        <div id="scad-extra-filters" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex-basis:100%"></div>
+        <div id="giro-bar-scad" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#fff4ee;border:1px solid var(--orange,#e7500f);border-radius:8px;padding:8px 12px;flex-basis:100%">
+          <span id="giro-count-scad" style="font-size:13px;font-weight:600"></span>
+          <button class="btn-primary btn-sm" onclick="_giroVai()">🧭 Giro a tappe sul navigatore</button>
+          <button class="btn-outline btn-sm" onclick="_giroClear()">Deseleziona tutto</button>
+        </div>
       </div>
       <div class="card" style="border-left:5px solid #f39c12;margin-bottom:14px">
         <h3 style="color:#e7500f">📅 Prossime visite pianificate</h3>
         <p style="font-size:12px;color:#888;margin-bottom:10px">Ultima visita per cantiere con rientro previsto nei prossimi 60 giorni, ordinate per data più vicina.</p>
         <div class="tbl-wrap">
-          <table><thead><tr><th>Verbale</th><th>N° accesso</th><th>Data visita</th><th>Rientro previsto</th><th>Tra giorni</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
+          <table><thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th>Verbale</th><th>N° accesso</th><th>Data visita</th><th>Rientro previsto</th><th>Tra giorni</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
           <tbody id="tbody-scad-prossime"></tbody></table>
         </div>
         <div id="scad-pros-empty" class="hidden" style="text-align:center;color:#aaa;padding:18px;font-size:13px">Nessuna visita pianificata nei prossimi 60 giorni</div>
@@ -1078,7 +1084,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <h3 style="color:#e74c3c">⚠️ Urgenti — rientro scaduto da più di 2 settimane</h3>
         <p style="font-size:12px;color:#888;margin-bottom:10px">Ultima visita per cantiere con IPC diverso da Nessun Rilievo e rientro scaduto. Ordine per IPC (Alto prima) poi per data più vecchia.</p>
         <div class="tbl-wrap">
-          <table><thead><tr><th>Verbale</th><th>N° accesso</th><th>Data visita</th><th>Rientro previsto</th><th>Scaduto da</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
+          <table><thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th>Verbale</th><th>N° accesso</th><th>Data visita</th><th>Rientro previsto</th><th>Scaduto da</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
           <tbody id="tbody-scad-urgenti"></tbody></table>
         </div>
         <div id="scad-urg-empty" class="hidden" style="text-align:center;color:#27ae60;padding:18px;font-size:13px">✅ Nessun rientro urgente scaduto</div>
@@ -4861,7 +4867,7 @@ async function loadScadenze(){
   const ipcOrd={ALTO:0,MEDIO:1,BASSO:2,NR:3,'':3}
 
   const{data:vs}=await sb.from('visite')
-    .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,acc_cant,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_etichetta)')
+    .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,acc_cant,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_civico,cantiere_etichetta,comune_nome,lat,lng,geocode_status)')
     .eq('elimina',0).order('data_visita',{ascending:false})
   const visite=vs||[]
 
@@ -4906,6 +4912,17 @@ async function loadScadenze(){
   prossime.sort((a,b)=>a.diffDays-b.diffDays)
   urgenti.sort((a,b)=>(ipcOrd[a.ipc||'']||3)-(ipcOrd[b.ipc||'']||3)||a.dr-b.dr)
 
+  // zona/comune per filtri e giro a tappe (quartieri per Padova, come in mappa)
+  ;[...prossime,...urgenti].forEach(v=>{
+    const cc=v.cantieri||{}
+    let zk=cc.comune_nome||''
+    if(/^padova$/i.test(zk)){
+      const qq=(typeof quartierePadova==='function')?quartierePadova(cc.cantiere_indirizzo||'',zk):null
+      if(qq&&qq.nome)zk='PADOVA - '+qq.nome
+    }
+    v.zona_key=zk
+  })
+
   const TIPO_LBL={ordinaria:'<span style="font-size:10px;color:#f39c12;background:#fff8ec;border:1px solid #f39c12;padding:1px 5px;border-radius:3px">ordinaria</span>',urgente:'<span style="font-size:10px;color:#e7500f;background:#fff3ee;border:1px solid #e7500f;padding:1px 5px;border-radius:3px">urgente</span>',immediata:'<span style="font-size:10px;color:#e74c3c;background:#fff0f0;border:1px solid #e74c3c;padding:1px 5px;border-radius:3px">immediata</span>'}
 
   function scadRow(v,isUrgente){
@@ -4920,6 +4937,7 @@ async function loadScadenze(){
       ?`<span style="color:#888;font-style:italic">${fmtDate(v.dr.toISOString().slice(0,10))}</span> ${v.tipoCalc?TIPO_LBL[v.tipoCalc]:''} <span style="font-size:10px;color:#aaa" title="Data calcolata secondo procedura Formedil">⚙</span>`
       :fmtDate(v.data_ritorno)
     return`<tr>
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="giro-chk" data-id="${v.cantiere_id}" data-lat="${v.cantieri?.lat??''}" data-lng="${v.cantieri?.lng??''}" data-addr="${esc((((v.cantieri?.cantiere_indirizzo||'')+' '+(v.cantieri?.cantiere_civico||'')).trim())+(v.cantieri?.comune_nome?', '+v.cantieri.comune_nome:''))}" data-label="${esc(cant)}" ${_giroSel.has(v.cantiere_id)?'checked':''} onchange="_giroToggle(this)" style="width:17px;height:17px;cursor:pointer"></td>
       <td>${v.nr_verbale||'–'}</td>
       <td style="text-align:center;font-weight:600">${v.acc_cant||'–'}</td>
       <td>${fmtDate(v.data_visita)}</td>
@@ -4934,6 +4952,7 @@ async function loadScadenze(){
 
   // Salva i dati calcolati e (ri)popola il filtro tecnico, poi delega il rendering
   _scadData={prossime,urgenti,tecMap,scadRow}
+  _scadBuildFilters([...prossime,...urgenti])
   // Popola il menu a tendina con i soli tecnici che hanno scadenze
   const sel=$('scad-tec-filter')
   if(sel){
@@ -4957,12 +4976,57 @@ async function loadScadenze(){
 
 // Dati scadenze calcolati (riutilizzati dal filtro senza rileggere il DB)
 let _scadData=null
+// ── Filtri fini scadenze (comuni/zona, IPC, finestra rientro) ──
+const _scadF={comSel:new Set(),ipc:'',gg:''}
+function _scadPass(v){
+  if(_scadF.comSel.size&&!_scadF.comSel.has(v.zona_key))return false
+  if(_scadF.ipc&&(v.ipc||'NR')!==_scadF.ipc)return false
+  return true
+}
+function _scadBuildFilters(items){
+  const fdiv=$('scad-extra-filters');if(!fdiv)return
+  const pill='padding:5px 10px;border:1px solid var(--border,#ddd);border-radius:20px;font-size:12px;cursor:pointer;background:#fff;width:auto;flex:0 1 auto;min-width:0;max-width:220px'
+  const comuni=[...new Set(items.map(v=>v.zona_key).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'))
+  _scadF.comSel=new Set([..._scadF.comSel].filter(c=>comuni.includes(c)))
+  fdiv.innerHTML=''
+  // multi-selezione comuni + "La mia zona"
+  const cwrap=document.createElement('div');cwrap.style.cssText='position:relative;flex:0 1 auto'
+  const cbtn=document.createElement('button');cbtn.type='button';cbtn.style.cssText=pill+';white-space:nowrap'
+  const cpanel=document.createElement('div');cpanel.id='sc-f-comune-panel';cpanel.style.cssText='position:absolute;top:calc(100% + 4px);left:0;z-index:1200;background:#fff;border:1px solid var(--border,#ddd);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:8px;display:none;max-height:280px;overflow:auto;min-width:230px'
+  const cLbl=()=>{const n=_scadF.comSel.size;cbtn.textContent=n?('📍 '+(n===1?[..._scadF.comSel][0]:n+' comuni')+' ▾'):'📍 Tutti i comuni ▾'}
+  const cRows=()=>{
+    cpanel.innerHTML='<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">'
+      +'<button type="button" data-sc="zona" style="background:#e7500f;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;width:auto">⭐ La mia zona</button>'
+      +'<button type="button" data-sc="none" style="background:#eee;color:#333;border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;width:auto">Azzera</button></div>'
+      +comuni.map(c=>'<label style="display:flex;gap:7px;align-items:center;font-size:12px;padding:3px 2px;cursor:pointer;white-space:nowrap"><input type="checkbox" data-com="'+_cmEsc(c)+'"'+(_scadF.comSel.has(c)?' checked':'')+' style="width:auto"> '+_cmEsc(c)+'</label>').join('')
+    cpanel.querySelectorAll('input[data-com]').forEach(cb=>cb.onchange=()=>{cb.checked?_scadF.comSel.add(cb.dataset.com):_scadF.comSel.delete(cb.dataset.com);cLbl();renderScadenze()})
+    cpanel.querySelector('[data-sc="none"]').onclick=()=>{_scadF.comSel.clear();cRows();cLbl();renderScadenze()}
+    cpanel.querySelector('[data-sc="zona"]').onclick=async()=>{
+      try{
+        const{data:z,error:ez}=await sb.from('tecnici_zone').select('comune_nome').eq('email',((S.user&&S.user.email)||'').toLowerCase())
+        if(ez)throw ez
+        if(!(z||[]).length){toast('Nessuna zona configurata per il tuo account: chiedi alla segreteria','warn');return}
+        const zc=(z||[]).map(r=>r.comune_nome).filter(c=>comuni.includes(c))
+        if(!zc.length)toast('Nessuna scadenza nei comuni della tua zona','warn')
+        _scadF.comSel=new Set(zc);cRows();cLbl();renderScadenze()
+      }catch(e){toast('Errore zona: '+(e.message||e),'err')}
+    }
+  }
+  cbtn.onclick=e=>{e.stopPropagation();cpanel.style.display=cpanel.style.display==='none'?'block':'none'}
+  cpanel.onclick=e=>e.stopPropagation()
+  if(!window.__scComDoc){window.__scComDoc=true;document.addEventListener('click',()=>{const p=$('sc-f-comune-panel');if(p)p.style.display='none'})}
+  cRows();cLbl()
+  cwrap.appendChild(cbtn);cwrap.appendChild(cpanel);fdiv.appendChild(cwrap)
+  const mkSel=(key,html)=>{const el=document.createElement('select');el.style.cssText=pill;el.innerHTML=html;el.value=_scadF[key];el.addEventListener('change',()=>{_scadF[key]=el.value;renderScadenze()});fdiv.appendChild(el)}
+  mkSel('ipc','<option value="">🚦 Tutti gli IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun rilievo</option>')
+  mkSel('gg','<option value="">🗓️ Rientro: tutti</option><option value="7">Entro 7 giorni</option><option value="15">Entro 15 giorni</option><option value="30">Entro 30 giorni</option>')
+}
 function renderScadenze(){
   if(!_scadData)return
   const {prossime,urgenti,scadRow}=_scadData
   const filtroTec=$('scad-tec-filter')?.value||''
-  const fP=filtroTec?prossime.filter(v=>v.tecnico_id===filtroTec):prossime
-  const fU=filtroTec?urgenti.filter(v=>v.tecnico_id===filtroTec):urgenti
+  const fP=prossime.filter(v=>(!filtroTec||v.tecnico_id===filtroTec)&&_scadPass(v)&&(!_scadF.gg||v.diffDays<=+_scadF.gg))
+  const fU=urgenti.filter(v=>(!filtroTec||v.tecnico_id===filtroTec)&&_scadPass(v))
   const tbU=$('tbody-scad-urgenti'),tbP=$('tbody-scad-prossime')
   if(fP.length){tbP.innerHTML=fP.map(v=>scadRow(v,false)).join('');hide('scad-pros-empty')}
   else{tbP.innerHTML='';show('scad-pros-empty')}
@@ -5317,11 +5381,12 @@ window._giroToggle=function(chk){
   aggiornaGiroBar()
 }
 function aggiornaGiroBar(){
-  const bar=$('giro-bar');if(!bar)return
   const n=_giroSel.size
-  bar.style.display=n?'flex':'none'
-  const lbl=$('giro-count')
-  if(lbl)lbl.textContent=n+(n===1?' cantiere selezionato':' cantieri selezionati')+(n>10?' – massimo 10 tappe!':'')
+  const txt=n+(n===1?' cantiere selezionato':' cantieri selezionati')+(n>10?' – massimo 10 tappe!':'')
+  ;[['giro-bar','giro-count'],['giro-bar-scad','giro-count-scad']].forEach(([b,c])=>{
+    const bar=$(b);if(bar)bar.style.display=n?'flex':'none'
+    const lbl=$(c);if(lbl)lbl.textContent=txt
+  })
 }
 window._giroClear=function(){_giroSel.clear();document.querySelectorAll('.giro-chk').forEach(c=>c.checked=false);aggiornaGiroBar()}
 function _gHav(a,b){const R=6371,r=Math.PI/180,dLa=(b.lat-a.lat)*r,dLo=(b.lng-a.lng)*r
