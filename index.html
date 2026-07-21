@@ -4655,7 +4655,7 @@ async function _dashRenderMacro(fE,fT,fTy,fI){
   let _verTot=0;for(let z=1;z<=10;z++){_verTot+=(by[z]||{}).ver||0}
   if($('k-ver'))$('k-ver').textContent=_verTot
   let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">Macroarea</th><th>NC+</th><th>NC−</th><th>OSS</th><th>Verif.</th></tr></thead><tbody>'
-  const _mc=(z,es,val,col)=>val>0?'<td><span class="macro-drill" data-z="'+z+'" data-es="'+es+'" style="cursor:pointer;color:'+col+';font-weight:700;text-decoration:underline dotted" title="Clic per l\'elenco cantieri">'+val+'</span></td>':'<td style="color:#bbb">0</td>';for(let z=1;z<=10;z++){const r=by[z]||{nc_plus:0,nc_minus:0,oss:0,ver:0};h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px">'+_DASH_MACRO[z]+'</td>'+_mc(z,'NC+',r.nc_plus,'#e74c3c')+_mc(z,'NC-',r.nc_minus,'#e67e22')+_mc(z,'OSS',r.oss,'#b9770e')+'<td style="color:#999">'+r.ver+'</td></tr>'}
+  const _mc=(z,es,val,col)=>val>0?'<td><span class="macro-drill" data-z="'+z+'" data-es="'+es+'" style="cursor:pointer;color:'+col+';font-weight:700;text-decoration:underline dotted" title="Clic per l\'elenco cantieri">'+val+'</span></td>':'<td style="color:#bbb">0</td>';for(let z=1;z<=10;z++){const r=by[z]||{nc_plus:0,nc_minus:0,oss:0,ver:0};h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px">'+_DASH_MACRO[z]+'</td>'+_mc(z,'NC+',r.nc_plus,'#E02B20')+_mc(z,'NC-',r.nc_minus,'#ED7D31')+_mc(z,'OSS',r.oss,'#D9A400')+'<td style="color:#999">'+r.ver+'</td></tr>'}
   h+='</tbody></table>';el.innerHTML=h;el.querySelectorAll('.macro-drill').forEach(function(sp){sp.addEventListener('click',function(){_dashMacroDrill(+sp.dataset.z,sp.dataset.es)})})
 }
 
@@ -4999,14 +4999,14 @@ let _listaVerMap=null,_listaVerLoading=false
 function _lcVal(n,col){n=+n||0;return `<span style="color:${n>0?col:'#bbb'};font-weight:700">${n}</span>`}
 function _lcCell(v){
   const ver=_listaVerMap?(_listaVerMap[v.visita_id]||0):null
-  const vhtml=ver===null?`<span class="lc-ver" data-vid="${v.visita_id}" style="color:#bbb;font-weight:700">\u2026</span>`:_lcVal(ver,'#27ae60')
-  return `<td style="white-space:nowrap;font-size:12px" title="NC+ / NC\u2212 / OSS / VER">${_lcVal(v.ipc_nc_plus,'#e74c3c')} / ${_lcVal(v.ipc_nc_minus,'#e67e22')} / ${_lcVal(v.ipc_oss,'#b9770e')} / ${vhtml}</td>`
+  const vhtml=ver===null?`<span class="lc-ver" data-vid="${v.visita_id}" style="color:#bbb;font-weight:700">\u2026</span>`:_lcVal(ver,'#7AA527')
+  return `<td style="white-space:nowrap;font-size:12px" title="NC+ / NC\u2212 / OSS / VER">${_lcVal(v.ipc_nc_plus,'#E02B20')} / ${_lcVal(v.ipc_nc_minus,'#ED7D31')} / ${_lcVal(v.ipc_oss,'#D9A400')} / ${vhtml}</td>`
 }
 function _lcFillVer(){
   if(!_listaVerMap)return
   document.querySelectorAll('#tbody-lista .lc-ver').forEach(e=>{
     const n=_listaVerMap[e.dataset.vid]||0
-    e.textContent=n;e.style.color=n>0?'#27ae60':'#bbb'
+    e.textContent=n;e.style.color=n>0?'#7AA527':'#bbb'
   })
 }
 function _listaLoadVer(){
@@ -8277,14 +8277,38 @@ function oxNice(m){
   return n*p
 }
 function oxWrapTxt(g,t,maxW,maxLines){
-  const words=String(t).split(' '),lines=[]
+  // spezza prima sugli spazi; le parole piu' lunghe dello spazio disponibile
+  // vengono divise carattere per carattere (con trattino) per non uscire dal riquadro
+  const raw=String(t).split(' ')
+  const words=[]
+  raw.forEach(w=>{
+    if(g.measureText(w).width<=maxW){words.push(w);return}
+    let cur=''
+    for(const ch of w){
+      if(g.measureText(cur+ch+'-').width>maxW&&cur){words.push(cur+'-');cur=ch}
+      else cur+=ch
+    }
+    if(cur)words.push(cur)
+  })
+  const lines=[]
   let cur=''
   words.forEach(w=>{
-    const test=cur?cur+' '+w:w
-    if(g.measureText(test).width>maxW&&cur){lines.push(cur);cur=w}else cur=test
+    const brk=cur.endsWith('-')
+    const test=brk?cur+w:(cur?cur+' '+w:w)
+    if(brk||(g.measureText(test).width>maxW&&cur)){
+      if(brk){lines.push(cur);cur=w}else{lines.push(cur);cur=w}
+    }else cur=test
   })
   if(cur)lines.push(cur)
-  return lines.slice(0,maxLines||2)
+  const max=maxLines||2
+  if(lines.length>max){
+    const out=lines.slice(0,max)
+    let last=out[max-1]
+    while(last.length>1&&g.measureText(last+'\u2026').width>maxW)last=last.slice(0,-1)
+    out[max-1]=last+'\u2026'
+    return out
+  }
+  return lines
 }
 // grafico a barre raggruppate (serie multiple, etichette valori, linea opzionale)
 function oxBars(o){
@@ -8336,9 +8360,14 @@ function oxBars(o){
         }
       }
     }
-    g.fillStyle=OXC.gr;g.font=catFont+'px Helvetica,Arial';g.textAlign='center'
+    // corpo adattivo: se lo slot e' stretto rimpicciolisco l'etichetta (min 5px)
+    let cf=catFont
+    g.font=cf+'px Helvetica,Arial'
+    const longest=String(o.cats[i]).split(' ').reduce((a,w)=>g.measureText(w).width>g.measureText(a).width?w:a,'')
+    while(cf>5&&g.measureText(longest).width>slot-4){cf--;g.font=cf+'px Helvetica,Arial'}
+    g.fillStyle=OXC.gr;g.textAlign='center'
     oxWrapTxt(g,o.cats[i],slot-4,catLines).forEach((ln,li)=>{
-      g.fillText(ln,px+i*slot+slot/2,py+ph+catFont+3+li*(catFont+2))
+      g.fillText(ln,px+i*slot+slot/2,py+ph+cf+3+li*(cf+2))
     })
   }
   // linea di tendenza
@@ -8878,14 +8907,17 @@ async function admGeneraReportOsservatorio(){
       ys+=2
       const miniZones=[1,2,3,4,5,6,7,8,10]
       const miniLbls=cats.map(c=>c===0?'nd':d.lbl[c])
-      const mW=61,mH=26
+      const mW=61
+      // altezza adattiva: le 3 righe di grafici + la sezione successiva devono stare in pagina
+      const pitch1=Math.max(20,Math.min(28,(150-ys)/3))
+      const mH=pitch1-2
       miniZones.forEach((z,mi)=>{
         const col=mi%3,row=Math.floor(mi/3)
         const bars=zVis[z],line=bars.map((x,i)=>x?zVer[z][i]/x:null)
         doc.addImage(oxMiniCombo({w:mW,h:mH,title:OS_ZONE_NAMI[z].toUpperCase(),cats:miniLbls,bars:bars,line:line}),
-          'PNG',12+col*63,ys+row*28,mW,mH)
+          'PNG',12+col*63,ys+row*pitch1,mW,mH)
       })
-      ys+=3*28+3
+      ys+=3*pitch1+3
       oxSec(doc,'VISITE PER AREA CANTIERE. PERCENTUALE INADEMPIENZE SU VERIFICHE EFFETTUATE *',ys)
       const zNcp={},zNcm={}
       for(let z=1;z<=10;z++){zNcp[z]=cats.map(()=>0);zNcm[z]=cats.map(()=>0)}
@@ -8913,15 +8945,19 @@ async function admGeneraReportOsservatorio(){
         columnStyles:{0:{halign:'left',cellWidth:34}},
         didParseCell:dd=>{if(dd.section==='body'&&dd.row.index===10){dd.cell.styles.fontStyle='bold';dd.cell.styles.fillColor=OXT.tot}}})
       ys=doc.lastAutoTable.finalY+2
+      // la nota di chiusura sta sotto i grafici: comprimo le righe quanto serve
+      const NOTE_Y=274            // riga della nota: 2 righe di testo sopra la barra a y=282
+      const pitch2=Math.max(12,Math.min(28,(NOTE_Y-6-ys)/3))
+      const mH2=pitch2-2
       miniZones.forEach((z,mi)=>{
         const col=mi%3,row=Math.floor(mi/3)
         const vr=zVer[z]
         const pp=zNcp[z].map((x,i)=>vr[i]?x/vr[i]*100:0)
         const qq=zNcm[z].map((x,i)=>vr[i]?x/vr[i]*100:0)
-        doc.addImage(oxMiniNC({w:mW,h:mH,title:OS_ZONE_NAMI[z].toUpperCase(),cats:miniLbls,ncp:pp,ncm:qq}),
-          'PNG',12+col*63,ys+row*28,mW,mH)
+        doc.addImage(oxMiniNC({w:mW,h:mH2,title:OS_ZONE_NAMI[z].toUpperCase(),cats:miniLbls,ncp:pp,ncm:qq}),
+          'PNG',12+col*63,ys+row*pitch2,mW,mH2)
       })
-      oxNote(doc,Math.min(ys+3*28+4,276))
+      oxNote(doc,Math.max(ys+3*pitch2+4,NOTE_Y-6))
       oxFooter(doc,pg)
 
       // ───── SCHEDA 3 ─────

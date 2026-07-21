@@ -194,9 +194,9 @@ const CEIV_COLOR_MAP={
 const OXC={
   ar:'#e7500f',gr:'#565c66',ve:'#95C22F',
   s1:'#e7500f',s2:'#95C22F',
-  ncp:'#e02b20',ncm:'#FFC000',
+  ncp:'#E02B20',ncm:'#ED7D31',oss:'#FFC000',ver:'#95C22F',
   pie:['#e7500f','#95C22F','#565c66','#f29b6b','#c5dd92','#9aa0a8','#7a3c14','#5d7a1e'],
-  esiti:['#c5dd92','#9aa0a8','#FFC000','#e02b20'],
+  esiti:['#95C22F','#FFC000','#ED7D31','#E02B20'],
   trans:['#95C22F','#eef3e2','#fdeadd','#f08a4b']
 }
 
