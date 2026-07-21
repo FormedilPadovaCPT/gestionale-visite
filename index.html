@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Gestionale Visite – Formedil Padova · v2026-07-21</title>
+<title>Gestionale Visite – Formedil Padova · v2026-07-21b</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -992,6 +992,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <input type="text" id="q-cant" placeholder="Indirizzo, comune, etichetta o codice CNCE…" style="flex:1">
           <button class="btn-primary btn-sm" id="btn-cerca-cant">Cerca</button>
         </div>
+        <div id="cant-list-filters" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px"></div>
+        <div id="cant-list-count" style="font-size:12px;color:#888;margin-bottom:8px"></div>
         <div id="giro-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#fff4ee;border:1px solid var(--orange,#e7500f);border-radius:8px;padding:8px 12px;margin-bottom:10px">
           <span id="giro-count" style="font-size:13px;font-weight:600"></span>
           <button class="btn-primary btn-sm" onclick="_giroVai()">🧭 Giro a tappe sul navigatore</button>
@@ -5162,26 +5164,103 @@ $('btn-pdf').onclick=()=>{
   genPDF(S.savedId)
 }
 
-// ── LISTA CANTIERI ──
+// ── LISTA CANTIERI (con gli stessi filtri della mappa) ──
+let _clRows=null
+const _clState={comSel:new Set(),ope:'',imp:'',sca:'',orig:'',vis:''}
 async function loadCantieri(q=''){
   const qStr=q||vGet('q-cant')?.trim()||''
-  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina,lat,lng,geocode_status').eq('elimina',0).order('updated_at',{ascending:false}).limit(200)
+  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina,lat,lng,geocode_status,cantiere_tip_ope,cantiere_importo,data_ult').eq('elimina',0).order('updated_at',{ascending:false}).limit(2000)
   if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*`)
   const{data,error}=await qb
   if(error){toast('Errore caricamento cantieri: '+error.message,'err');return}
   const rows=data||[]
-  const tbody=$('tbody-cantieri')
-  const empty=$('cantieri-empty')
-  if(!rows.length){tbody.innerHTML='';empty.classList.remove('hidden');return}
+  // zona: per Padova usa il quartiere ricavato dallo stradario (come in mappa)
+  rows.forEach(r=>{
+    let zk=r.comune_nome||''
+    if(/^padova$/i.test(zk)){
+      const qq=(typeof quartierePadova==='function')?quartierePadova(r.cantiere_indirizzo||'',zk):null
+      if(qq&&qq.nome)zk='PADOVA - '+qq.nome
+    }
+    r.zona_key=zk
+  })
+  // conteggio visite (per colonna e filtro con/senza visite)
+  try{
+    const{data:vAll}=await sb.from('visite').select('cantiere_id').eq('elimina',0).limit(10000)
+    const cm={};(vAll||[]).forEach(v=>{if(v.cantiere_id)cm[v.cantiere_id]=(cm[v.cantiere_id]||0)+1})
+    rows.forEach(r=>r.n_visite=cm[r.cantiere_id]||0)
+  }catch(_e){rows.forEach(r=>r.n_visite=0)}
+  _clRows=rows
+  _clBuildFilters(rows)
+  _clRender()
+}
+function _clPass(d){
+  const s=_clState
+  if(s.comSel.size&&!s.comSel.has(d.zona_key||d.comune_nome))return false
+  if(s.ope){if(s.ope==='__nd'){if(d.cantiere_tip_ope!=null)return false}else if(String(d.cantiere_tip_ope)!==s.ope)return false}
+  if(s.imp){if(s.imp==='__nd'){if(d.cantiere_importo!=null)return false}else if(String(d.cantiere_importo)!==s.imp)return false}
+  if(s.sca&&_cmScad(d.data_ult)!==s.sca)return false
+  if(s.orig==='cnce'&&!/^cnce/i.test(d.cantiere_cnce||''))return false
+  if(s.orig==='segn'&&/^cnce/i.test(d.cantiere_cnce||''))return false
+  if(s.vis==='si'&&!(d.n_visite>0))return false
+  if(s.vis==='no'&&d.n_visite>0)return false
+  return true
+}
+function _clBuildFilters(rows){
+  const fdiv=$('cant-list-filters');if(!fdiv)return
+  const pill='padding:5px 10px;border:1px solid var(--border,#ddd);border-radius:20px;font-size:12px;cursor:pointer;background:#fff;width:auto;flex:0 1 auto;min-width:0;max-width:220px'
+  const comuni=[...new Set(rows.map(r=>r.zona_key||r.comune_nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'))
+  const tOpe=[...new Set(rows.map(r=>r.cantiere_tip_ope).filter(v=>v!=null))].sort((a,b)=>a-b)
+  const hasNoOpe=rows.some(r=>r.cantiere_tip_ope==null)
+  const imps=[...new Set(rows.map(r=>r.cantiere_importo).filter(v=>v!=null))].sort((a,b)=>a-b)
+  const hasNoImp=rows.some(r=>r.cantiere_importo==null)
+  _clState.comSel=new Set([..._clState.comSel].filter(c=>comuni.includes(c)))
+  fdiv.innerHTML=''
+  const mkSel=(key,html)=>{const el=document.createElement('select');el.style.cssText=pill;el.innerHTML=html;el.value=_clState[key];el.addEventListener('change',()=>{_clState[key]=el.value;_clRender()});fdiv.appendChild(el)}
+  // multi-selezione comuni con checkbox + "La mia zona" (identico alla mappa)
+  const cwrap=document.createElement('div');cwrap.style.cssText='position:relative;flex:0 1 auto'
+  const cbtn=document.createElement('button');cbtn.type='button';cbtn.style.cssText=pill+';white-space:nowrap'
+  const cpanel=document.createElement('div');cpanel.id='cl-f-comune-panel';cpanel.style.cssText='position:absolute;top:calc(100% + 4px);left:0;z-index:1200;background:#fff;border:1px solid var(--border,#ddd);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:8px;display:none;max-height:280px;overflow:auto;min-width:230px'
+  const cLbl=()=>{const n=_clState.comSel.size;cbtn.textContent=n?('📍 '+(n===1?[..._clState.comSel][0]:n+' comuni')+' ▾'):'📍 Tutti i comuni ▾'}
+  const cRows=()=>{
+    cpanel.innerHTML='<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">'
+      +'<button type="button" data-cl="zona" style="background:#e7500f;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;width:auto">⭐ La mia zona</button>'
+      +'<button type="button" data-cl="none" style="background:#eee;color:#333;border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;width:auto">Azzera</button></div>'
+      +comuni.map(c=>'<label style="display:flex;gap:7px;align-items:center;font-size:12px;padding:3px 2px;cursor:pointer;white-space:nowrap"><input type="checkbox" data-com="'+_cmEsc(c)+'"'+(_clState.comSel.has(c)?' checked':'')+' style="width:auto"> '+_cmEsc(c)+'</label>').join('')
+    cpanel.querySelectorAll('input[data-com]').forEach(cb=>cb.onchange=()=>{cb.checked?_clState.comSel.add(cb.dataset.com):_clState.comSel.delete(cb.dataset.com);cLbl();_clRender()})
+    cpanel.querySelector('[data-cl="none"]').onclick=()=>{_clState.comSel.clear();cRows();cLbl();_clRender()}
+    cpanel.querySelector('[data-cl="zona"]').onclick=async()=>{
+      try{
+        const{data:z,error:ez}=await sb.from('tecnici_zone').select('comune_nome').eq('email',((S.user&&S.user.email)||'').toLowerCase())
+        if(ez)throw ez
+        if(!(z||[]).length){toast('Nessuna zona configurata per il tuo account: chiedi alla segreteria','warn');return}
+        const zc=(z||[]).map(r=>r.comune_nome).filter(c=>comuni.includes(c))
+        if(!zc.length)toast('Nessun cantiere in elenco nei comuni della tua zona','warn')
+        _clState.comSel=new Set(zc);cRows();cLbl();_clRender()
+      }catch(e){toast('Errore zona: '+(e.message||e),'err')}
+    }
+  }
+  cbtn.onclick=e=>{e.stopPropagation();cpanel.style.display=cpanel.style.display==='none'?'block':'none'}
+  cpanel.onclick=e=>e.stopPropagation()
+  if(!window.__clComDoc){window.__clComDoc=true;document.addEventListener('click',()=>{const p=$('cl-f-comune-panel');if(p)p.style.display='none'})}
+  cRows();cLbl()
+  cwrap.appendChild(cbtn);cwrap.appendChild(cpanel);fdiv.appendChild(cwrap)
+  mkSel('ope','<option value="">🏗️ Tutti i tipi opera</option>'+tOpe.map(k=>`<option value="${k}">${_cmEsc(TIP_OPE_LABELS[k]||('Op. '+k))}</option>`).join('')+(hasNoOpe?'<option value="__nd">Non indicato</option>':''))
+  mkSel('imp','<option value="">💶 Tutti gli importi</option>'+imps.map(k=>`<option value="${k}">${_cmEsc(IMP_LBL[k]||('Fascia '+k))}</option>`).join('')+(hasNoImp?'<option value="__nd">Non indicato</option>':''))
+  mkSel('sca','<option value="">🗓️ Tutte le scadenze</option>'+_CM_SCAD.map(x=>`<option value="${x.k}">${x.label}</option>`).join(''))
+  mkSel('orig','<option value="">🏷️ Origine: tutti</option><option value="cnce">Cantieri CNCE/CEIV</option><option value="segn">Non codificati CNCE</option>')
+  mkSel('vis','<option value="">👷 Visite: tutti</option><option value="si">Con visite</option><option value="no">Senza visite</option>')
+}
+function _clRender(){
+  const tbody=$('tbody-cantieri'),empty=$('cantieri-empty')
+  if(!tbody)return
+  const all=(_clRows||[]).filter(_clPass)
+  const info=$('cant-list-count')
+  if(info)info.textContent=all.length?(all.length+' cantieri'+(all.length>300?' — mostrati i primi 300, affina i filtri o la ricerca':'')):''
+  if(!all.length){tbody.innerHTML='';empty.classList.remove('hidden');return}
   empty.classList.add('hidden')
-  // Conta visite per cantiere
-  const ids=rows.map(c=>c.cantiere_id)
-  const{data:vCounts}=await sb.from('visite').select('cantiere_id').in('cantiere_id',ids).eq('elimina',0)
-  const countMap={}
-  ;(vCounts||[]).forEach(v=>{countMap[v.cantiere_id]=(countMap[v.cantiere_id]||0)+1})
-  tbody.innerHTML=rows.map(c=>{
+  tbody.innerHTML=all.slice(0,300).map(c=>{
     const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
-    const nVisite=countMap[c.cantiere_id]||0
+    const nVisite=c.n_visite||0
     return`<tr class="row-detail-hover" data-act="detail-cantiere" data-id="${c.cantiere_id}">
       <td onclick="event.stopPropagation()" ondblclick="event.stopPropagation()"><input type="checkbox" class="giro-chk" data-id="${c.cantiere_id}" data-lat="${c.lat??''}" data-lng="${c.lng??''}" data-addr="${esc(((c.cantiere_indirizzo||'')+' '+(c.cantiere_civico||'')).trim()+(c.comune_nome?', '+c.comune_nome:''))}" data-label="${esc(label)}" ${_giroSel.has(c.cantiere_id)?'checked':''} onchange="_giroToggle(this)" style="width:17px;height:17px;cursor:pointer"></td>
       <td><strong>${label}</strong>${quartiereBadge(c.cantiere_indirizzo||'',c.comune_nome||'')}</td>
