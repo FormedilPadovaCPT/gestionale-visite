@@ -6905,7 +6905,7 @@ async function genPDF(vid, output='save'){
 
     let totalSanzione=0  // accumula sanzioni per OSS/NC+/NC-
 
-    for(const zona of Object.keys(vociByZona).map(Number).sort()){
+    for(const zona of Object.keys(vociByZona).map(Number).sort((a,b)=>a-b)){
       const zonaLbl=(ZONE_LBL[zona]||String(zona)).toUpperCase()
       const prefissi=vociByZona[zona]
 
@@ -8178,7 +8178,7 @@ async function admGeneraReport(){
       const tiImg=rptBar({data:tiKeys.map(k=>tipIntMap[k]),labels:tiKeys.map(k=>TIP_INT_LABELS[k]||`Tipo ${k}`),colors:RPT_PALETTE,title:'Tipologia intervento',w:460,h:180})
       addImg(tiImg,M,y,half-2,48)
     }
-    const duKeys=Object.keys(durataMap).map(Number).sort()
+    const duKeys=Object.keys(durataMap).map(Number).sort((a,b)=>a-b)
     if(duKeys.length){
       const duImg=rptBar({data:duKeys.map(k=>durataMap[k]),labels:duKeys.map(k=>DURATA_LABELS[k]||`Durata ${k}`),colors:RPT_PALETTE,title:'Durata cantiere',w:460,h:180})
       addImg(duImg,M+half+2,y,half-2,48)
