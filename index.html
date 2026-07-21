@@ -9885,7 +9885,7 @@ async function showCantiereDetail(cantId){
     const{data:c,error}=await sb.from('cantieri').select(
       'cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,'+
       'cantiere_cnce,nodo_id,prot_int,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,'+
-      'cantiere_importo,cantiere_durata,data_ult,cantiere_comune_cod,cantiere_chiuso,data_chiusura,chiuso_da,motivo_chiusura,cantiere_descrizione,cantiere_committente_id'
+      'cantiere_importo,cantiere_durata,data_ult,cantiere_comune_cod,cantiere_chiuso,data_chiusura,chiuso_da,motivo_chiusura,cantiere_descrizione,cantiere_committente_id,lat,lng,geocode_status'
     ).eq('cantiere_id',cantId).single()
     if(error||!c){toast('Cantiere non trovato'+(error?' – '+error.message:''),'err');hide('modal-qd');return}
     const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
@@ -9900,6 +9900,17 @@ async function showCantiereDetail(cantId){
       ['Indirizzo',`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()],
       ['Comune',c.comune_nome],['CAP',c.cantiere_cap],['Etichetta',c.cantiere_etichetta],
     ])
+    // ── Naviga fino al cantiere ──
+    {
+      const _prec=c.lat!=null&&c.lng!=null&&c.geocode_status!=='comune'
+      const _addr=`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
+      const _dest=_prec?(c.lat+','+c.lng):encodeURIComponent((_addr?_addr+', ':'')+(c.comune_nome||''))
+      if(_prec||_addr||c.comune_nome){
+        html+='<div style="margin:8px 0 4px"><a href="https://www.google.com/maps/dir/?api=1&destination='+_dest+'&travelmode=driving" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--orange,#e7500f);color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600">🧭 Naviga fino al cantiere</a>'
+        if(!_prec)html+='<div style="font-size:11px;color:#888;margin-top:3px">Destinazione basata sull\'indirizzo (coordinate precise non disponibili)</div>'
+        html+='</div>'
+      }
+    }
     if(c.cantiere_descrizione){html+=qdSec('Descrizione lavori')+'<div style="font-size:13px;line-height:1.5;padding:2px 0;white-space:pre-wrap">'+esc(c.cantiere_descrizione)+'</div>'}
     html+=qdSec('Dati tecnici')
     html+=qdDl([
