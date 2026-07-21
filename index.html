@@ -7738,10 +7738,16 @@ window.sgrCercaDupCnce=sgrCercaDupCnce;window.sgrFondiDupCnce=sgrFondiDupCnce
 
 // ── Canvas helpers ──────────────────────────────────────────────────
 
+// Supersampling dei grafici del report: il canvas viene creato a RPT_SS volte
+// le dimensioni logiche e poi scalato, cosi' testi e linee restano nitidi in stampa
+// (a 4x si ottengono ~400-500 dpi sulle immagini inserite nel PDF).
+const RPT_SS=4
 function _mkCanvas(w,h){
   const c=document.createElement('canvas')
-  c.width=w;c.height=h
+  c.width=Math.round(w*RPT_SS);c.height=Math.round(h*RPT_SS)
   const ctx=c.getContext('2d')
+  ctx.scale(RPT_SS,RPT_SS)
+  ctx.textBaseline='alphabetic'
   ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h)
   return{canvas:c,ctx}
 }
@@ -8037,7 +8043,7 @@ async function admGeneraReport(){
     const M=12,CW=210-M*2,half=CW/2
 
     // helper add image proportional
-    const addImg=(img,x,y,w,h)=>doc.addImage(img,'PNG',x,y,w,h)
+    const addImg=(img,x,y,w,h)=>doc.addImage(img,'PNG',x,y,w,h,undefined,'FAST')
 
     // helper page footer
     const footer=(pg)=>{
@@ -8350,12 +8356,13 @@ function oxCatOf(v,c,ruolo){
 }
 
 // ══════════ GRAFICI CANVAS ══════════
-// Disegno a OXK px per mm (con supersampling 2x): font in px coerenti.
+// Disegno a OXK px per mm (con supersampling OXSS): font in px coerenti.
 const OXK=4
+const OXSS=3   // supersampling grafici Osservatorio (era 2): ~300 dpi in stampa
 function oxCv(w,h){
   const c=document.createElement('canvas')
-  c.width=Math.round(w*OXK*2);c.height=Math.round(h*OXK*2)
-  const g=c.getContext('2d');g.scale(2,2)
+  c.width=Math.round(w*OXK*OXSS);c.height=Math.round(h*OXK*OXSS)
+  const g=c.getContext('2d');g.scale(OXSS,OXSS)
   const W=w*OXK,H=h*OXK
   g.fillStyle='#fff';g.fillRect(0,0,W,H)
   g.strokeStyle='#d4d7db';g.lineWidth=1;g.strokeRect(.5,.5,W-1,H-1)
