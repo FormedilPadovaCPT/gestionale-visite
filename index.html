@@ -41,8 +41,8 @@ label{display:block;font-weight:600;margin-bottom:4px;color:var(--grey);font-siz
 .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .badge-alto{background:#fde8e8;color:var(--danger)}
 .badge-medio{background:#fef3e2;color:var(--warn)}
-.badge-basso{background:#eef7e0;color:#5f8a12}
-.badge-nr{background:#eef0f2;color:#565c66}
+.badge-basso{background:#fff8cc;color:#8a6d00}
+.badge-nr{background:#eef7e0;color:#5f8a12}
 /* esiti checklist: VER verde, OSS giallo (badge dedicati, IPC e esiti non condividono piu' i colori) */
 .badge-ver{background:#eef7e0;color:#5f8a12}
 .badge-oss{background:#fff8cc;color:#8a6d00}
@@ -8068,8 +8068,8 @@ async function admGeneraReport(){
       {v:nTec,l:'Tecnici',c:[149,194,47]},
       {v:nAlto,l:'IPC Alto',c:[224,43,32]},
       {v:nMedio,l:'IPC Medio',c:[237,125,49]},
-      {v:nBasso,l:'IPC Basso',c:[149,194,47]},
-      {v:nNR,l:'Nessun Rilievo',c:[154,160,168]}
+      {v:nBasso,l:'IPC Basso',c:[255,192,0]},
+      {v:nNR,l:'Nessun Rilievo',c:[149,194,47]}
     ]
     const kw=CW/kpis.length
     kpis.forEach((k,i)=>{
@@ -8092,7 +8092,7 @@ async function admGeneraReport(){
     const ipcImg=rptDonut({
       data:[nAlto,nMedio,nBasso,nNR],
       labels:['Alto','Medio','Basso','Nessun Rilievo'],
-      colors:['#E02B20','#ED7D31','#95C22F','#9AA0A8'],
+      colors:['#E02B20','#ED7D31','#FFC000','#95C22F'],
       title:'Distribuzione IPC',w:380,h:240
     })
     addImg(ipcImg,M,y,half-2,60)
