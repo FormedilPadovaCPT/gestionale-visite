@@ -41,8 +41,11 @@ label{display:block;font-weight:600;margin-bottom:4px;color:var(--grey);font-siz
 .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .badge-alto{background:#fde8e8;color:var(--danger)}
 .badge-medio{background:#fef3e2;color:var(--warn)}
-.badge-basso{background:#fff8cc;color:#a07a00}
-.badge-nr{background:#e8f8ee;color:var(--ok)}
+.badge-basso{background:#eef7e0;color:#5f8a12}
+.badge-nr{background:#eef0f2;color:#565c66}
+/* esiti checklist: VER verde, OSS giallo (badge dedicati, IPC e esiti non condividono piu' i colori) */
+.badge-ver{background:#eef7e0;color:#5f8a12}
+.badge-oss{background:#fff8cc;color:#8a6d00}
 .badge-bozza{background:#eef;color:#555}
 .badge-definitivo{background:#e8f8ee;color:var(--ok)}
 .sect-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--grey);background:var(--light);padding:5px 10px;border-radius:var(--radius);margin-bottom:10px;margin-top:4px}
@@ -126,10 +129,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 .check-radios input[type=radio]{display:none}
 .radio-chip{font-size:11px;font-weight:700;padding:3px 6px;border-radius:4px;border:2px solid #ccc;background:#fff;color:#999;cursor:pointer}
 .check-radios input[type=radio]:checked+.radio-chip.na{border-color:#aaa;background:#eee;color:#555}
-.check-radios input[type=radio]:checked+.radio-chip.ver{border-color:var(--ok);background:#e8f8ee;color:var(--ok)}
+.check-radios input[type=radio]:checked+.radio-chip.ver{border-color:#95C22F;background:#eef7e0;color:#5f8a12}
 .check-radios input[type=radio]:checked+.radio-chip.ncm{border-color:var(--warn);background:#fef3e2;color:var(--warn)}
 .check-radios input[type=radio]:checked+.radio-chip.ncp{border-color:var(--danger);background:#fde8e8;color:var(--danger)}
-.check-radios input[type=radio]:checked+.radio-chip.oss{border-color:#8e44ad;background:#f5eef8;color:#8e44ad}
+.check-radios input[type=radio]:checked+.radio-chip.oss{border-color:#D9A400;background:#fff8cc;color:#8a6d00}
 .nota-item{padding:6px 4px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #f0f0f0}
 .nota-item .nota-label{font-size:12px;color:#888;width:180px;flex-shrink:0}
 .nota-item input{max-width:300px}
@@ -463,9 +466,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="stats-grid" id="dash-kpi">
         <div class="stat-card"><div class="num" id="k-sopr" style="color:var(--orange)">–</div><div class="lbl">Sopralluoghi</div></div>
         <div class="stat-card"><div class="num" id="k-ncplus" style="color:var(--danger)">–</div><div class="pct" id="k-ncplus-pct" style="color:var(--danger)"></div><div class="lbl">NC+ totali</div></div>
-        <div class="stat-card"><div class="num" id="k-ncminus" style="color:#e67e22">–</div><div class="lbl">NC- totali</div></div>
-        <div class="stat-card"><div class="num" id="k-oss" style="color:#c8a000">–</div><div class="lbl">Osservazioni</div></div>
-        <div class="stat-card"><div class="num" id="k-ver" style="color:#27ae60">–</div><div class="lbl">Verifiche conformi</div></div>
+        <div class="stat-card"><div class="num" id="k-ncminus" style="color:#ED7D31">–</div><div class="lbl">NC- totali</div></div>
+        <div class="stat-card"><div class="num" id="k-oss" style="color:#D9A400">–</div><div class="lbl">Osservazioni</div></div>
+        <div class="stat-card"><div class="num" id="k-ver" style="color:#7AA527">–</div><div class="lbl">Verifiche conformi</div></div>
         <div class="stat-card"><div class="num" id="k-ipcam" style="color:var(--warn)">–</div><div class="pct" id="k-ipcam-pct" style="color:var(--warn)"></div><div class="lbl">IPC Alto + Medio</div></div>
         <div class="stat-card"><div class="num" id="k-rlst" style="color:#95C22F">–</div><div class="pct" id="k-rlst-pct" style="color:#95C22F"></div><div class="lbl">Affiancamento RLST</div></div>
         <div class="stat-card"><div class="num" id="k-comuni" style="color:var(--grey)">–</div><div class="lbl">Comuni serviti</div></div>
@@ -4356,7 +4359,7 @@ function buildRiepilogo(){
     zoneHtml+=`<div style="margin-bottom:10px"><strong style="font-size:12px;color:var(--grey)">${ZONE_LBL[z]}</strong>
     <div style="margin-top:4px">${ril.map(v=>{
       const vl=S.checklist[v.codice]
-      const cls=vl==='NC+'?'badge-alto':vl==='NC-'?'badge-medio':vl==='OSS'?'badge-basso':'badge-nr'
+      const cls=vl==='NC+'?'badge-alto':vl==='NC-'?'badge-medio':vl==='OSS'?'badge-oss':'badge-ver'
       return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f0f0f0;font-size:12px">
         <span class="badge ${cls}">${vl}</span>${v.descrizione}</div>`
     }).join('')}</div></div>`
@@ -4675,7 +4678,7 @@ function _dashRenderImprese(F){
   const rows=Object.keys(m).map(k=>m[k]).filter(r=>r.vis>=2).sort((a,b)=>b.vis-a.vis).slice(0,20)
   const fmt=d=>d?d.slice(0,10).split('-').reverse().join('/'):'—'
   let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">#</th><th>Impresa</th><th>Visite</th><th>NC+</th><th>NC−</th><th>OSS</th><th>VER</th><th>Tecnico prevalente</th><th>Ultima visita</th></tr></thead><tbody>'
-  rows.forEach((r,i)=>{const tt=Object.keys(r.tec).sort((a,b)=>r.tec[b]-r.tec[a])[0];h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px;color:#bbb">'+(i+1)+'</td><td><b>'+r.nome+'</b></td><td>'+r.vis+'</td><td><b style="color:'+(r.ncp>0?'#e74c3c':'#bbb')+'">'+r.ncp+'</b></td><td>'+r.ncm+'</td><td style="color:#c8a000">'+r.oss+'</td><td style="color:#27ae60">'+(_dashVerReady?r.ver:'...')+'</td><td>'+(tt||'—')+' <span style="color:#aaa">('+(r.tec[tt]||0)+')</span></td><td>'+fmt(r.last)+'</td></tr>'})
+  rows.forEach((r,i)=>{const tt=Object.keys(r.tec).sort((a,b)=>r.tec[b]-r.tec[a])[0];h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px;color:#bbb">'+(i+1)+'</td><td><b>'+r.nome+'</b></td><td>'+r.vis+'</td><td><b style="color:'+(r.ncp>0?'#E02B20':'#bbb')+'">'+r.ncp+'</b></td><td>'+r.ncm+'</td><td style="color:#D9A400">'+r.oss+'</td><td style="color:#7AA527">'+(_dashVerReady?r.ver:'...')+'</td><td>'+(tt||'—')+' <span style="color:#aaa">('+(r.tec[tt]||0)+')</span></td><td>'+fmt(r.last)+'</td></tr>'})
   if(!rows.length)h+='<tr><td colspan="9" style="padding:8px;color:#999">Nessuna impresa con più di una visita nel filtro corrente.</td></tr>'
   h+='</tbody></table>';$('tbl-imprese').innerHTML=h
 }
@@ -4695,7 +4698,7 @@ function _dashRenderComuni(F){
   F.forEach(x=>{if(!x.comune)return;const r=m[x.comune]=m[x.comune]||{vis:0,ncp:0,ncm:0,oss:0,ver:0};r.vis++;r.ncp+=x.ncp;r.ncm+=x.ncm;r.oss+=x.oss;r.ver+=(_dashVerMap[x.vid]||0);tot++})
   const L=Object.keys(m).sort((a,b)=>m[b].vis-m[a].vis).slice(0,20)
   let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">Comune</th><th>Visite</th><th>%</th><th>NC+</th><th>NC−</th><th>OSS</th><th>VER</th></tr></thead><tbody>'
-  L.forEach(c=>{const r=m[c];h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px">'+c+'</td><td>'+r.vis+'</td><td style="color:#888">'+(tot?Math.round(r.vis/tot*1000)/10:0)+'%</td><td><b style="color:'+(r.ncp>0?'#e74c3c':'#bbb')+'">'+r.ncp+'</b></td><td>'+r.ncm+'</td><td style="color:#c8a000">'+r.oss+'</td><td style="color:#27ae60">'+(_dashVerReady?r.ver:'...')+'</td></tr>'})
+  L.forEach(c=>{const r=m[c];h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px">'+c+'</td><td>'+r.vis+'</td><td style="color:#888">'+(tot?Math.round(r.vis/tot*1000)/10:0)+'%</td><td><b style="color:'+(r.ncp>0?'#E02B20':'#bbb')+'">'+r.ncp+'</b></td><td>'+r.ncm+'</td><td style="color:#D9A400">'+r.oss+'</td><td style="color:#7AA527">'+(_dashVerReady?r.ver:'...')+'</td></tr>'})
   if(!L.length)h+='<tr><td colspan="7" style="padding:8px;color:#999">Nessun dato.</td></tr>'
   h+='</tbody></table>';$('tbl-comuni').innerHTML=h
 }
@@ -8063,10 +8066,10 @@ async function admGeneraReport(){
       {v:nV,l:'Visite tot.',c:[231,80,15]},
       {v:nCant,l:'Cantieri',c:[86,92,102]},
       {v:nTec,l:'Tecnici',c:[149,194,47]},
-      {v:nAlto,l:'IPC Alto',c:[192,57,43]},
-      {v:nMedio,l:'IPC Medio',c:[230,126,34]},
-      {v:nBasso,l:'IPC Basso',c:[39,174,96]},
-      {v:nNR,l:'Nessun Rilievo',c:[134,142,150]}
+      {v:nAlto,l:'IPC Alto',c:[224,43,32]},
+      {v:nMedio,l:'IPC Medio',c:[237,125,49]},
+      {v:nBasso,l:'IPC Basso',c:[149,194,47]},
+      {v:nNR,l:'Nessun Rilievo',c:[154,160,168]}
     ]
     const kw=CW/kpis.length
     kpis.forEach((k,i)=>{
@@ -8089,7 +8092,7 @@ async function admGeneraReport(){
     const ipcImg=rptDonut({
       data:[nAlto,nMedio,nBasso,nNR],
       labels:['Alto','Medio','Basso','Nessun Rilievo'],
-      colors:['#c0392b','#e67e22','#27ae60','#95a5a6'],
+      colors:['#E02B20','#ED7D31','#95C22F','#9AA0A8'],
       title:'Distribuzione IPC',w:380,h:240
     })
     addImg(ipcImg,M,y,half-2,60)
@@ -9733,8 +9736,8 @@ async function showVisitaDetail(vid){
     if(imp){ html+=qdSec('Impresa principale')+qdDl([['Ragione sociale',imp.impresa_nome],['P.IVA',imp.piva]]) }
 
     // ── RILIEVI CHECKLIST ──
-    const chkValMap={'VER':'#27ae60','NC-':'#e67e22','NC+':'#c0392b','OSS':'#8e44ad'}
-    const chkBgMap={'VER':'#e8f8ee','NC-':'#fef3e2','NC+':'#fde8e8','OSS':'#f5eef8'}
+    const chkValMap={'VER':'#7AA527','NC-':'#ED7D31','NC+':'#E02B20','OSS':'#D9A400'}
+    const chkBgMap={'VER':'#eef7e0','NC-':'#fef3e2','NC+':'#fde8e8','OSS':'#fff8cc'}
     const rilievi=(chkRows||[]).filter(r=>r.valore&&r.valore!=='NA')
     if(rilievi.length){
       // Mappa codice → voce (usa S.voci già in memoria)
