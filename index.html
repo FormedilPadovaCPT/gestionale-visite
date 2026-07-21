@@ -2369,6 +2369,7 @@ async function initForm(snap=null){
   const nr=await nextVerbale()
   vSet('f-verbale',nr)
   S.fd.nr_verbale=nr
+  bloccaNrVerbale()
 
   vSet('f-data',today())
   vSet('f-da',new Date().toTimeString().slice(0,5))
@@ -3517,6 +3518,14 @@ async function saveVisita(stato){
   if(S.imprese.length===0||!S.imprese[0].impresa_id){toast('Seleziona l\'impresa principale (Tab Imprese)','warn');activateTab(2);return}
   if(!data_v){toast('Inserisci la data della visita','warn');activateTab(0);return}
   if(!tec_id){toast('Seleziona il tecnico (Tab Visita)','warn');activateTab(0);return}
+
+  // numero verbale corretto a mano dalla segreteria: verifica che sia libero
+  const _nrNow=vGet('f-verbale').trim()
+  if(_nrVerbEditVid&&_nrNow!==_nrVerbOrig){
+    if(!_nrNow){toast('Il numero verbale non puo\u2019 essere vuoto','err');activateTab(0);return}
+    const{data:_dup}=await sb.from('visite').select('visita_id').eq('nr_verbale',_nrNow).neq('visita_id',_nrVerbEditVid).limit(1)
+    if(_dup&&_dup.length){toast('Numero verbale gi\u00e0 usato da un\u2019altra visita','err');activateTab(0);return}
+  }
 
   try{
     let vid=S.fd.visita_id||S.savedId||null
@@ -5088,7 +5097,34 @@ async function restoreVisita(id,nr){
 async function modificaVisitaCoord(vid){
   if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
   if(!confirm('Modificare questa visita gia definitiva?\n\nVerra ricaricata nel form di inserimento: dopo le correzioni ricordati di salvarla per aggiornare la visita.'))return
-  riapriBozza(vid)
+  await riapriBozza(vid)
+  sbloccaNrVerbale(vid)
+}
+
+// ── Numero verbale: normalmente assegnato dal sistema e non modificabile.
+// In "Modifica visita" la segreteria/coordinatore puo' correggerlo (es. allineamento
+// alla numerazione cartacea). Al salvataggio si controlla che non sia gia' usato.
+let _nrVerbEditVid=null,_nrVerbOrig=''
+function bloccaNrVerbale(){
+  _nrVerbEditVid=null;_nrVerbOrig=''
+  const i=$('f-verbale');if(!i)return
+  i.readOnly=true;i.style.background='';i.style.borderColor='';i.title=''
+  const h=$('f-verbale-hint');if(h)h.remove()
+}
+function sbloccaNrVerbale(vid){
+  if(!window.__isCoord)return
+  const i=$('f-verbale');if(!i)return
+  _nrVerbEditVid=vid||null;_nrVerbOrig=i.value||''
+  i.readOnly=false
+  i.style.background='#fff8e6';i.style.borderColor='#e7500f'
+  i.title='Numero verbale modificabile (segreteria)'
+  if(!$('f-verbale-hint')){
+    const h=document.createElement('div')
+    h.id='f-verbale-hint'
+    h.style.cssText='font-size:11px;color:#e7500f;margin-top:3px'
+    h.textContent='Modificabile dalla segreteria'
+    i.parentNode.appendChild(h)
+  }
 }
 $('btn-pdf').onclick=()=>{
   if(!S.savedId){toast('Salva prima la visita per generare il PDF','warn');return}
@@ -6287,6 +6323,7 @@ $('btn-cancel-imp').onclick=()=>{pendingSnap=null;hide('imp-preview')}
 // ── RIAPRI BOZZA ──
 async function riapriBozza(vid){
   toast('Caricamento bozza…')
+  bloccaNrVerbale()   // il numero resta bloccato: lo sblocca solo "Modifica" della segreteria
   try{
     let snap=null
     // 1) Prova prima lo snapshot salvato in visite_snapshot
@@ -6639,6 +6676,7 @@ async function genPDF(vid, output='save'){
       {content:tecNome||'–',styles:{fontStyle:'bold'}},
       fmtDate(v.data_visita),
       TIPO_ACC[v.tipo_accesso]||'–',
+      v.acc_cant?String(v.acc_cant):'–',
       cant.cantiere_etichetta||'–',
       v.nr_verbale||'–'
     ]
@@ -6646,17 +6684,17 @@ async function genPDF(vid, output='save'){
     if(tec2Nome||nomStagePDF){
       _tecBody.push([
         tec2Nome?{content:'2° '+tec2Nome,styles:{fontSize:7,textColor:[80,80,80]}}:{content:'',styles:{textColor:[180,180,180]}},
-        '','',
+        '','','',
         nomStagePDF?{content:'Stagista: '+nomStagePDF,styles:{fontSize:7,textColor:[80,80,80]}}:'',
         ''
       ])
     }
     doc.autoTable({startY:y,
-      head:[['TECNICO','DATA','TIPOLOGIA VISITA','ETICHETTA CANTIERE','NR VISITA']],
+      head:[['TECNICO','DATA','TIPOLOGIA VISITA','N° ACCESSO','ETICHETTA CANTIERE','NR VISITA']],
       body:_tecBody,
       styles:{fontSize:8,cellPadding:2},
       headStyles:{fillColor:GREY,textColor:WHITE,fontStyle:'bold',fontSize:7},
-      columnStyles:{0:{cellWidth:42},1:{cellWidth:22},2:{cellWidth:38},4:{cellWidth:18,halign:'center'}},
+      columnStyles:{0:{cellWidth:38},1:{cellWidth:20},2:{cellWidth:34},3:{cellWidth:16,halign:'center'},5:{cellWidth:18,halign:'center'}},
       margin:{left:L,right:L},tableWidth:W,theme:'grid'
     })
     y=doc.lastAutoTable.finalY+3
