@@ -4835,7 +4835,7 @@ async function loadScadenze(){
   const ipcOrd={ALTO:0,MEDIO:1,BASSO:2,NR:3,'':3}
 
   const{data:vs}=await sb.from('visite')
-    .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,acc_cant,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_civico,cantiere_etichetta,comune_nome,lat,lng,geocode_status)')
+    .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,acc_cant,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_civico,cantiere_etichetta,comune_nome,lat,lng,geocode_status,cantiere_chiuso)')
     .eq('elimina',0).order('data_visita',{ascending:false})
   const visite=vs||[]
 
@@ -4855,6 +4855,7 @@ async function loadScadenze(){
   const urgenti=[], prossime=[]
 
   Object.values(ultimePerCantiere).forEach(v=>{
+    if(v.cantieri&&v.cantieri.cantiere_chiuso)return // cantiere chiuso: niente scadenza
     const ipc=v.ipc||'NR'
     // Determina data rientro: prima quella inserita dal tecnico, poi quella calcolata
     let dr, isCalcolata=false, tipoCalc=null
@@ -4914,7 +4915,7 @@ async function loadScadenze(){
       <td style="font-size:12px">${tec}</td>
       <td style="font-size:12px">${cant}</td>
       <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
-      <td><button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Dettaglio">👁</button></td>
+      <td style="white-space:nowrap"><button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Dettaglio">👁</button>${window.__isSegreteria?'<button class="btn-warn btn-sm" data-act="chiudi-cant" style="margin-left:4px" data-id="'+v.cantiere_id+'" data-lbl="'+esc(cant)+'" title="Chiudi cantiere (fine lavori)">🔒</button>':''}</td>
     </tr>`
   }
 
@@ -5138,6 +5139,7 @@ function bindRowActions(){
   document.querySelectorAll('[data-act="snap"]').forEach(b=>b.onclick=e=>{e.stopPropagation();exportSnapFromDB(b.dataset.id)})
   document.querySelectorAll('[data-act="softdel"]').forEach(b=>b.onclick=e=>{e.stopPropagation();softDeleteVisita(b.dataset.id,b.dataset.nr)})
   document.querySelectorAll('[data-act="restore"]').forEach(b=>b.onclick=e=>{e.stopPropagation();restoreVisita(b.dataset.id,b.dataset.nr)})
+  document.querySelectorAll('[data-act="chiudi-cant"]').forEach(b=>b.onclick=e=>{e.stopPropagation();chiudiCantiere(b.dataset.id,b.dataset.lbl)})
   // Dettaglio visita: pulsante 👁 e doppio clic sulla riga
   document.querySelectorAll('[data-act="detail-visita"]').forEach(el=>{
     const handler=e=>{e.stopPropagation();showVisitaDetail(el.dataset.id)}
@@ -10496,6 +10498,7 @@ async function chiudiCantiere(cantId,label){
     toast('Cantiere chiuso \u00b7 '+((data&&data.visite_chiuse)||0)+' visite chiuse','ok')
     hide('modal-qd')
     if(typeof loadCantieri==='function'&&!$('view-cantieri')?.classList.contains('hidden'))loadCantieri()
+    if(typeof loadScadenze==='function'&&!$('view-scadenze')?.classList.contains('hidden'))loadScadenze()
   }catch(e){toast('Errore: '+(e.message||e),'err')}
 }
 async function riapriCantiere(cantId,label){
