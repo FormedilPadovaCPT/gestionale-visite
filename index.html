@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Gestionale Visite – Formedil Padova · v2026-07-21e</title>
+<title>Gestionale Visite – Formedil Padova · v2026-07-21f</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -8020,13 +8020,19 @@ function _splitNome(raw){
   return {nome:parts.slice(0,-1).join(' '),cognome:parts[parts.length-1]}
 }
 async function _inChunks(table,sel,col,ids,extra){
+  // NB: PostgREST restituisce max 1000 righe per richiesta → chunk di id + paginazione .range
   const out=[]
-  for(let i=0;i<ids.length;i+=150){
-    let q=sb.from(table).select(sel).in(col,ids.slice(i,i+150))
-    if(extra)q=extra(q)
-    const{data,error}=await q
-    if(error)throw new Error(table+': '+error.message)
-    out.push(...(data||[]))
+  for(let i=0;i<ids.length;i+=100){
+    let from=0
+    for(;;){
+      let q=sb.from(table).select(sel).in(col,ids.slice(i,i+100)).range(from,from+999)
+      if(extra)q=extra(q)
+      const{data,error}=await q
+      if(error)throw new Error(table+': '+error.message)
+      out.push(...(data||[]))
+      if(!data||data.length<1000)break
+      from+=1000
+    }
   }
   return out
 }
@@ -8039,12 +8045,16 @@ async function admExportOsservatorio(){
   if(rep)rep.innerHTML='Estrazione in corso…'
   try{
     // 1. visite definitive nell'intervallo
-    const{data:vs,error:ev}=await sb.from('visite')
-      .select('visita_id,nr_verbale,cantiere_id,impresa_id,tecnico_id,tecnico2_id,tipo_accesso,data_visita,ora_visita,ora_fine,nr_imp,nr_lavoratori,nr_ind,resp_lav,csp,cse,coord,note_lav,comm_email')
-      .eq('elimina',0).eq('stato','definitivo').gte('data_visita',dal).lte('data_visita',al)
-      .order('data_visita').limit(5000)
-    if(ev)throw new Error(ev.message)
-    const visite=vs||[]
+    const visite=[]
+    for(let vfrom=0;;vfrom+=1000){
+      const{data:vs,error:ev}=await sb.from('visite')
+        .select('visita_id,nr_verbale,cantiere_id,impresa_id,tecnico_id,tecnico2_id,tipo_accesso,data_visita,ora_visita,ora_fine,nr_imp,nr_lavoratori,nr_ind,resp_lav,csp,cse,coord,note_lav,comm_email')
+        .eq('elimina',0).eq('stato','definitivo').gte('data_visita',dal).lte('data_visita',al)
+        .order('data_visita').order('visita_id').range(vfrom,vfrom+999)
+      if(ev)throw new Error(ev.message)
+      visite.push(...(vs||[]))
+      if(!vs||vs.length<1000)break
+    }
     if(!visite.length){if(rep)rep.innerHTML='Nessuna visita definitiva nell\'intervallo.';toast('Nessuna visita nell\'intervallo','warn');return}
     const vids=visite.map(v=>v.visita_id)
     // 2. checklist, ruolo impresa principale
