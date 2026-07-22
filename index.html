@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Gestionale Visite – Formedil Padova · v2026-07-21c</title>
+<title>Gestionale Visite – Formedil Padova · v2026-07-21d</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -1165,6 +1165,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <span style="font-size:13px;color:#fff">Invio automatico attivo</span>
           </label>
           <span id="adm-prom-status" style="font-size:12px;margin-left:10px;color:rgba(255,255,255,.5)">…</span>
+          <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <button class="btn-primary" id="adm-prom-send" onclick="admInviaPromemoriaOra()">📨 Invia ora</button>
+            <span style="font-size:12px;color:rgba(255,255,255,.5)">Invia subito il promemoria a tutti i tecnici con ricontrolli in scadenza, senza aspettare il lunedì (funziona anche con l'invio automatico sospeso).</span>
+          </div>
         </div>
 
         <!-- Target visite mensili -->
@@ -7747,6 +7751,29 @@ async function admTogglePromemoria(cb){
   }catch(e){console.error('admTogglePromemoria:',e);toast('Errore nel salvataggio','err');cb.checked=!val;_admRenderPromStato(!val)}
 }
 
+async function admInviaPromemoriaOra(){
+  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
+  const btn=$('adm-prom-send');if(!btn)return
+  if(!confirm('Inviare ORA il promemoria ricontrolli a tutti i tecnici con cantieri in scadenza?\n\nLe email partono immediatamente.'))return
+  const _txt=btn.textContent;btn.disabled=true;btn.textContent='⏳ Invio in corso…'
+  try{
+    const{data:{session}}=await sb.auth.getSession()
+    const token=session?.access_token
+    if(!token)throw new Error('Sessione non valida: riaccedi')
+    const r=await fetch(`${SB_URL}/functions/v1/promemoria-ricontrolli`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json',apikey:SB_KEY,Authorization:`Bearer ${token}`}
+    })
+    const j=await r.json()
+    if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status))
+    const n=j.inviate||0
+    const falliti=Array.isArray(j.esiti)?j.esiti.filter(e=>!e.ok).length:0
+    if(n===0)toast('Nessun tecnico ha ricontrolli in scadenza: nessuna email inviata','ok')
+    else toast('Promemoria inviato a '+n+' tecnic'+(n===1?'o':'i')+(falliti?' · '+falliti+' non riuscit'+(falliti===1?'o':'i'):''),falliti?'warn':'ok')
+  }catch(e){console.error('admInviaPromemoriaOra:',e);toast('Errore invio: '+(e.message||e),'err')}
+  finally{btn.disabled=false;btn.textContent=_txt}
+}
+window.admInviaPromemoriaOra=admInviaPromemoriaOra;
 window.admTogglePromemoria=admTogglePromemoria;window.admLoadPromemoria=admLoadPromemoria;
 // ── TARGET VISITE MENSILI (Coordinatore) ──
 function _meseRange(anno,mese){ // mese 1-12 → {da,a} inclusivi (YYYY-MM-DD)
