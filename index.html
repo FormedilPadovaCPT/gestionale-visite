@@ -950,6 +950,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <span id="giro-count" style="font-size:13px;font-weight:600"></span>
           <button class="btn-primary btn-sm" onclick="_giroVai()">🧭 Giro a tappe sul navigatore</button>
           <button class="btn-outline btn-sm" onclick="_giroClear()">Deseleziona tutto</button>
+          <button class="btn-warn btn-sm" id="btn-fondi-sel" style="display:none" onclick="fondiSelezionati()">🔗 Unisci selezionati in un unico cantiere</button>
           <span style="font-size:11px;color:#888;flex-basis:100%">Spunta i cantieri da visitare: il giro parte dalla tua posizione e viene ordinato sul percorso più breve (max 10 tappe). La selezione resta anche cambiando ricerca.</span>
         </div>
         <div class="tbl-wrap">
@@ -1027,7 +1028,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <h3 style="color:#e7500f">📅 Prossime visite pianificate</h3>
         <p style="font-size:12px;color:#888;margin-bottom:10px">Ultima visita per cantiere con rientro previsto nei prossimi 60 giorni, ordinate per data più vicina.</p>
         <div class="tbl-wrap">
-          <table><thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th>Verbale</th><th>N° accesso</th><th>Data visita</th><th>Rientro previsto</th><th>Tra giorni</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
+          <table><thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th class="sc-sort" data-k="nr" style="cursor:pointer" title="Ordina per numero verbale">Verbale <span class="sc-si" data-k="nr"></span></th><th>N° accesso</th><th class="sc-sort" data-k="data" style="cursor:pointer" title="Ordina per data visita">Data visita <span class="sc-si" data-k="data"></span></th><th class="sc-sort" data-k="rit" style="cursor:pointer" title="Ordina per data di rientro">Rientro previsto <span class="sc-si" data-k="rit"></span></th><th>Tra giorni</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
           <tbody id="tbody-scad-prossime"></tbody></table>
         </div>
         <div id="scad-pros-empty" class="hidden" style="text-align:center;color:#aaa;padding:18px;font-size:13px">Nessuna visita pianificata nei prossimi 60 giorni</div>
@@ -1036,7 +1037,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <h3 style="color:#e74c3c">⚠️ Urgenti — rientro scaduto da più di 2 settimane</h3>
         <p style="font-size:12px;color:#888;margin-bottom:10px">Ultima visita per cantiere con IPC diverso da Nessun Rilievo e rientro scaduto. Ordine per IPC (Alto prima) poi per data più vecchia.</p>
         <div class="tbl-wrap">
-          <table><thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th>Verbale</th><th>N° accesso</th><th>Data visita</th><th>Rientro previsto</th><th>Scaduto da</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
+          <table><thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th class="sc-sort" data-k="nr" style="cursor:pointer" title="Ordina per numero verbale">Verbale <span class="sc-si" data-k="nr"></span></th><th>N° accesso</th><th class="sc-sort" data-k="data" style="cursor:pointer" title="Ordina per data visita">Data visita <span class="sc-si" data-k="data"></span></th><th class="sc-sort" data-k="rit" style="cursor:pointer" title="Ordina per data di rientro">Rientro previsto <span class="sc-si" data-k="rit"></span></th><th>Scaduto da</th><th>Tecnico</th><th>Cantiere</th><th>IPC</th><th></th></tr></thead>
           <tbody id="tbody-scad-urgenti"></tbody></table>
         </div>
         <div id="scad-urg-empty" class="hidden" style="text-align:center;color:#27ae60;padding:18px;font-size:13px">✅ Nessun rientro urgente scaduto</div>
@@ -3772,6 +3773,12 @@ function applySnap(snap){
     S.fd.visita_id=snap.visita_id
     S.savedId=snap.visita_id
   }
+  // Mantieni SEMPRE la numerazione originale del verbale: niente rinumerazione
+  // automatica in modifica; solo la segreteria può correggerla a mano.
+  if(snap.nr_verbale_origine){
+    vSet('f-verbale',snap.nr_verbale_origine)
+    S.fd.nr_verbale=snap.nr_verbale_origine
+  }
 
   // ── Checklist, lavorazioni, imprese ──────────────────────────────────────
   S.checklist={...(snap.checklist||{})}
@@ -4990,12 +4997,34 @@ function _scadBuildFilters(items){
   mkSel('ipc','<option value="">🚦 Tutti gli IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun rilievo</option>')
   mkSel('gg','<option value="">🗓️ Rientro: tutti</option><option value="7">Entro 7 giorni</option><option value="15">Entro 15 giorni</option><option value="30">Entro 30 giorni</option>')
 }
+let _scadSort={key:'',dir:'asc'}
+function _scadApplySort(arr){
+  if(!_scadSort.key)return arr
+  const d=_scadSort.dir==='asc'?1:-1
+  const nv=s=>{const m=String(s||'').match(/(\d+)\s*$/);return m?parseInt(m[1],10):0}
+  return[...arr].sort((a,b)=>{
+    if(_scadSort.key==='nr')return((nv(a.nr_verbale)-nv(b.nr_verbale))||String(a.nr_verbale||'').localeCompare(String(b.nr_verbale||'')))*d
+    if(_scadSort.key==='data')return String(a.data_visita||'').localeCompare(String(b.data_visita||''))*d
+    return(a.dr-b.dr)*d
+  })
+}
+function _scadSortInd(){
+  document.querySelectorAll('#view-scadenze .sc-si').forEach(s=>s.textContent=s.dataset.k===_scadSort.key?(_scadSort.dir==='asc'?'\u25B2':'\u25BC'):'')
+}
+// clic sulle intestazioni: crescente → decrescente → ordine standard
+document.querySelectorAll('#view-scadenze th.sc-sort').forEach(th=>th.onclick=()=>{
+  const k=th.dataset.k
+  if(_scadSort.key!==k)_scadSort={key:k,dir:'asc'}
+  else if(_scadSort.dir==='asc')_scadSort.dir='desc'
+  else _scadSort={key:'',dir:'asc'}
+  _scadSortInd();renderScadenze()
+})
 function renderScadenze(){
   if(!_scadData)return
   const {prossime,urgenti,scadRow}=_scadData
   const filtroTec=$('scad-tec-filter')?.value||''
-  const fP=prossime.filter(v=>(!filtroTec||v.tecnico_id===filtroTec)&&_scadPass(v)&&(!_scadF.gg||v.diffDays<=+_scadF.gg))
-  const fU=urgenti.filter(v=>(!filtroTec||v.tecnico_id===filtroTec)&&_scadPass(v))
+  const fP=_scadApplySort(prossime.filter(v=>(!filtroTec||v.tecnico_id===filtroTec)&&_scadPass(v)&&(!_scadF.gg||v.diffDays<=+_scadF.gg)))
+  const fU=_scadApplySort(urgenti.filter(v=>(!filtroTec||v.tecnico_id===filtroTec)&&_scadPass(v)))
   const tbU=$('tbody-scad-urgenti'),tbP=$('tbody-scad-prossime')
   if(fP.length){tbP.innerHTML=fP.map(v=>scadRow(v,false)).join('');hide('scad-pros-empty')}
   else{tbP.innerHTML='';show('scad-pros-empty')}
@@ -5357,8 +5386,59 @@ function aggiornaGiroBar(){
     const bar=$(b);if(bar)bar.style.display=n?'flex':'none'
     const lbl=$(c);if(lbl)lbl.textContent=txt
   })
+  const bf=$('btn-fondi-sel');if(bf)bf.style.display=(window.__isSegreteria&&n>=2)?'':'none'
 }
 window._giroClear=function(){_giroSel.clear();document.querySelectorAll('.giro-chk').forEach(c=>c.checked=false);aggiornaGiroBar()}
+// ── FUSIONE CANTIERI SELEZIONATI (solo segreteria) ──
+window.fondiSelezionati=async function(){
+  if(!window.__isSegreteria){toast('Funzione riservata alla segreteria','err');return}
+  const ids=[..._giroSel.keys()]
+  if(ids.length<2){toast('Seleziona almeno 2 cantieri da unire','warn');return}
+  const{data:cs,error}=await sb.from('cantieri').select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,created_at').in('cantiere_id',ids)
+  if(error){toast('Errore: '+error.message,'err');return}
+  const{data:vs}=await sb.from('visite').select('cantiere_id').in('cantiere_id',ids).eq('elimina',0)
+  const nv={};(vs||[]).forEach(v=>nv[v.cantiere_id]=(nv[v.cantiere_id]||0)+1)
+  const rows=(cs||[]).sort((a,b)=>(nv[b.cantiere_id]||0)-(nv[a.cantiere_id]||0)||String(a.created_at||'').localeCompare(String(b.created_at||'')))
+  const ov=document.createElement('div');ov.className='modal-overlay'
+  ov.innerHTML='<div class="card" style="max-width:560px;width:100%;max-height:85vh;overflow:auto">'
+    +'<h3 style="color:#e7500f;margin-bottom:6px">🔗 Unisci '+rows.length+' cantieri</h3>'
+    +'<p style="font-size:12px;color:#888;margin-bottom:10px">Scegli il cantiere da <b>mantenere</b>: visite e segnalazioni degli altri verranno spostate su di esso, i dati mancanti completati dove possibile e i cantieri uniti archiviati. Da usare solo per doppioni dello stesso cantiere reale.</p>'
+    +rows.map((c,i)=>'<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:5px 0;cursor:pointer;border-bottom:1px solid #f0f0f0">'
+      +'<input type="radio" name="fsel-keep" value="'+esc(c.cantiere_id)+'"'+(i===0?' checked':'')+' style="width:auto;margin-top:3px">'
+      +'<span><b>'+esc(c.cantiere_etichetta||((c.cantiere_indirizzo||'')+' '+(c.cantiere_civico||'')).trim()||'(senza indirizzo)')+'</b> · '+esc(c.comune_nome||'–')
+      +'<br><span style="font-size:11px;color:#888">CNCE: '+esc(c.cantiere_cnce||'–')+' · visite: '+(nv[c.cantiere_id]||0)+'</span></span></label>').join('')
+    +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">'
+    +'<button class="btn-outline btn-sm" onclick="this.closest(\'.modal-overlay\').remove()">Annulla</button>'
+    +'<button class="btn-warn btn-sm" id="fsel-go">🔗 Unisci sul selezionato</button></div></div>'
+  document.body.appendChild(ov)
+  ov.querySelector('#fsel-go').onclick=async()=>{
+    const keeper=ov.querySelector('input[name="fsel-keep"]:checked')?.value
+    if(!keeper)return
+    const losers=ids.filter(id=>id!==keeper)
+    if(!confirm('Unire '+losers.length+' cantiere/i su quello selezionato?\nVisite e segnalazioni verranno spostate, gli altri cantieri archiviati.\n\nOperazione non reversibile dalla lista.'))return
+    const go=ov.querySelector('#fsel-go');go.disabled=true;go.textContent='Fusione…'
+    try{
+      const{data:all}=await sb.from('cantieri').select('*').in('cantiere_id',ids)
+      const k=(all||[]).find(c=>c.cantiere_id===keeper)
+      const FIELDS=['cantiere_committente_id','cantiere_importo','cantiere_durata','cantiere_tip_int','cantiere_tip_ope','cantiere_tip_ope_altro','cantiere_cap','cantiere_comune_cod','comune_nome','data_ult','data_inizio_lavori','lat','lng','nodo_id','cantiere_descrizione']
+      const upd={}
+      FIELDS.forEach(f=>{
+        if(k&&(k[f]==null||k[f]==='')){
+          const s2=(all||[]).find(c=>c.cantiere_id!==keeper&&c[f]!=null&&c[f]!=='')
+          if(s2)upd[f]=s2[f]
+        }
+      })
+      if(Object.keys(upd).length){const r0=await sb.from('cantieri').update(upd).eq('cantiere_id',keeper);if(r0.error)throw r0.error}
+      let r=await sb.from('visite').update({cantiere_id:keeper}).in('cantiere_id',losers);if(r.error)throw r.error
+      r=await sb.from('segnalazioni_cantiere').update({cantiere_id:keeper}).in('cantiere_id',losers);if(r.error)throw r.error
+      r=await sb.from('cantieri').update({elimina:1}).in('cantiere_id',losers);if(r.error)throw r.error
+      ov.remove()
+      toast('Fusione completata: '+losers.length+' cantiere/i uniti e archiviati','ok')
+      _giroClear()
+      if(typeof loadCantieri==='function')loadCantieri()
+    }catch(e){console.error('fondiSelezionati:',e);go.disabled=false;go.textContent='🔗 Unisci sul selezionato';toast('Errore fusione: '+(e.message||e),'err')}
+  }
+}
 function _gHav(a,b){const R=6371,r=Math.PI/180,dLa=(b.lat-a.lat)*r,dLo=(b.lng-a.lng)*r
   const h=Math.sin(dLa/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLo/2)**2
   return 2*R*Math.asin(Math.sqrt(h))}
@@ -6514,7 +6594,10 @@ $('btn-load-snap').onclick=async()=>{
         // Nuovo progressivo → scollega dall'identità originale per creare una nuova visita (INSERT)
         S.savedId=null
         S.fd.visita_id=null
-        // Il nuovo nr_verbale è già stato assegnato da initForm → non toccare f-verbale
+        // applySnap ora ripristina il numero originale: qui serve un nuovo progressivo
+        const _nn=await nextVerbale()
+        vSet('f-verbale',_nn)
+        S.fd.nr_verbale=_nn
       }
       hide('imp-preview')
       navTo('form')
