@@ -4020,6 +4020,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 function populateComuniSelect(){
   const sel=$('mc-com'); if(!sel)return
+  sel.innerHTML='<option value="">– Seleziona comune –</option>' // idempotente: evita opzioni duplicate se richiamata due volte
   COMUNI_PD.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o) })
   // CAP e codice ISTAT auto-fill
   sel.onchange=()=>{
@@ -10560,6 +10561,7 @@ async function showCantiereDetail(cantId){
     $('qd-actions').innerHTML=''
     $('qd-actions').appendChild(btnNuova)
     if(window.__isCoord){
+      const _be=document.createElement('button');_be.className='btn-outline btn-sm';_be.style.marginLeft='8px';_be.textContent='✏️ Modifica cantiere';_be.onclick=()=>{hide('modal-qd');admEditCantiere(cantId)};$('qd-actions').appendChild(_be)
       if(c.cantiere_chiuso){
         const _ci=document.createElement('span');_ci.style.cssText='font-size:12px;color:#c0392b;margin-left:8px;align-self:center';_ci.textContent='🔒 Chiuso il '+(c.data_chiusura?new Date(c.data_chiusura).toLocaleDateString('it-IT'):'')+(c.chiuso_da?' · '+c.chiuso_da:'');$('qd-actions').appendChild(_ci)
         const _br=document.createElement('button');_br.className='btn-outline btn-sm';_br.style.marginLeft='8px';_br.textContent='↩️ Riapri';_br.onclick=()=>riapriCantiere(cantId,label);$('qd-actions').appendChild(_br)
