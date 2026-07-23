@@ -955,7 +955,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th>Etichetta / Indirizzo</th><th>Comune</th><th>Prot. Int.</th><th>CNCE</th><th>Visite</th><th></th></tr></thead>
+            <thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th>Etichetta / Indirizzo</th><th>Comune</th><th>Committente</th><th>Prot. Int.</th><th>CNCE</th><th>Visite</th><th></th></tr></thead>
             <tbody id="tbody-cantieri"></tbody>
           </table>
         </div>
@@ -5261,7 +5261,7 @@ function _dedupComuni(list){
 const _clState={comSel:new Set(),ope:'',imp:'',sca:'',orig:'',vis:''}
 async function loadCantieri(q=''){
   const qStr=q||vGet('q-cant')?.trim()||''
-  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina,lat,lng,geocode_status,cantiere_tip_ope,cantiere_importo,data_ult').eq('elimina',0).order('updated_at',{ascending:false}).limit(2000)
+  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina,lat,lng,geocode_status,cantiere_tip_ope,cantiere_importo,data_ult,cantiere_committente_id').eq('elimina',0).order('updated_at',{ascending:false}).limit(2000)
   if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*`)
   const{data,error}=await qb
   if(error){toast('Errore caricamento cantieri: '+error.message,'err');return}
@@ -5281,6 +5281,15 @@ async function loadCantieri(q=''){
     const cm={};(vAll||[]).forEach(v=>{if(v.cantiere_id)cm[v.cantiere_id]=(cm[v.cantiere_id]||0)+1})
     rows.forEach(r=>r.n_visite=cm[r.cantiere_id]||0)
   }catch(_e){rows.forEach(r=>r.n_visite=0)}
+  // nome committente (lookup a blocchi sugli id presenti)
+  try{
+    const _cids=[...new Set(rows.map(r=>r.cantiere_committente_id).filter(Boolean))]
+    if(_cids.length){
+      const _cs=await _inChunks('committenti','committente_id,committente_nome','committente_id',_cids)
+      const _cm={};_cs.forEach(c=>{_cm[c.committente_id]=c.committente_nome})
+      rows.forEach(r=>r.committente_nome=_cm[r.cantiere_committente_id]||null)
+    }
+  }catch(_e){}
   _clRows=rows
   _clBuildFilters(rows)
   _clRender()
@@ -5357,6 +5366,7 @@ function _clRender(){
       <td onclick="event.stopPropagation()" ondblclick="event.stopPropagation()"><input type="checkbox" class="giro-chk" data-id="${c.cantiere_id}" data-lat="${c.lat??''}" data-lng="${c.lng??''}" data-addr="${esc(((c.cantiere_indirizzo||'')+' '+(c.cantiere_civico||'')).trim()+(c.comune_nome?', '+c.comune_nome:''))}" data-label="${esc(label)}" ${_giroSel.has(c.cantiere_id)?'checked':''} onchange="_giroToggle(this)" style="width:17px;height:17px;cursor:pointer"></td>
       <td><strong>${label}</strong>${quartiereBadge(c.cantiere_indirizzo||'',c.comune_nome||'')}</td>
       <td>${c.comune_nome||'–'}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${esc(c.committente_nome||'')}">${c.committente_nome?esc(c.committente_nome):'–'}</td>
       <td>${c.prot_int||'–'}</td>
       <td>${c.cantiere_cnce||'–'}</td>
       <td><span class="badge badge-bozza">${nVisite}</span></td>
