@@ -2751,7 +2751,9 @@ function initCantSearch(){
     await proponiCommittenteCantiere(item.id)
   }
   const fetchCant=async(qa,qc)=>{
-    let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id').eq('elimina',0).not('cantiere_chiuso','is',true).order('comune_nome').order('cantiere_indirizzo').limit(30)
+    let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id,cantiere_chiuso').eq('elimina',0).order('comune_nome').order('cantiere_indirizzo').limit(30)
+    // La segreteria vede anche i cantieri chiusi (contrassegnati in lista); gli altri utenti solo gli attivi
+    if(!window.__isSegreteria)qb=qb.not('cantiere_chiuso','is',true)
     if(qc)qb=qb.ilike('comune_nome',`%${qc}%`)
     if(qa)qb=qb.or(`cantiere_indirizzo.ilike.%${qa}%,cantiere_etichetta.ilike.%${qa}%,cantiere_cnce.ilike.%${qa}%`)
     const{data}=await qb
@@ -2773,8 +2775,10 @@ function initCantSearch(){
       const cnce=c.cantiere_cnce||''
       const _cid=String(c.cantiere_committente_id||'').trim()
       const comm=_cid?(_cmap[_cid]||_cid):''
+      const chiuso=c.cantiere_chiuso===true
+      const chiusoTag=chiuso?` <span style="color:#c0392b;font-weight:800">*</span> <span style="display:inline-block;font-size:9px;font-weight:800;color:#fff;background:#c0392b;padding:1px 5px;border-radius:3px;vertical-align:middle;letter-spacing:.5px">CHIUSO</span>`:''
       const meta=[et?`Etichetta interna: ${esc(et)}`:'',cnce?`CNCE: ${esc(cnce)}`:'',cu?`Cod. univoco: ${esc(cu)}`:''].filter(Boolean).join(' · ')
-      const display=`<div style="font-weight:600;color:#333">${esc(et||ind||'(senza indirizzo)')}</div>`+
+      const display=`<div style="font-weight:600;color:#333">${esc(et||ind||'(senza indirizzo)')}${chiusoTag}</div>`+
         `<div style="font-size:12px;color:#666">${esc(ind||'—')}${loc?' · '+esc(loc):''}</div>`+
         (comm?`<div style="font-size:11px;color:#e7500f">👤 ${esc(comm)}</div>`:'')+
         (meta?`<div style="font-size:11px;color:#999">${meta}</div>`:'')
@@ -2785,7 +2789,7 @@ function initCantSearch(){
     const qa=inA.value.trim(),qc=(inC?inC.value.trim():'')
     if(!force&&qa.length<2&&qc.length<2){lst.classList.add('hidden');return}
     const items=await fetchCant(qa,qc)
-    if(!items.length){lst.innerHTML='<div style="color:#aaa;font-style:italic">Nessun cantiere attivo trovato</div>';lst.classList.remove('hidden');setTimeout(()=>lst.classList.add('hidden'),1800);return}
+    if(!items.length){lst.innerHTML='<div style="color:#aaa;font-style:italic">Nessun cantiere trovato</div>';lst.classList.remove('hidden');setTimeout(()=>lst.classList.add('hidden'),1800);return}
     lst.innerHTML=items.map((it,i)=>`<div data-i="${i}">${it.display}</div>`).join('')
     lst.classList.remove('hidden')
     lst.querySelectorAll('div[data-i]').forEach((d,i)=>{d.onclick=()=>{lst.classList.add('hidden');onSel(items[i])}})
