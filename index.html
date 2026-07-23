@@ -1497,7 +1497,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <div class="sect-title" style="margin-top:10px;font-size:11px;color:var(--grey)">Committente</div>
     <div class="field" style="position:relative">
       <label>Committente <span style="font-weight:400;font-size:11px;color:#aaa">(cerca per nome, CF o P.IVA)</span></label>
-      <input type="text" id="mc-comm-search" placeholder="Cerca committente…" autocomplete="off">
+      <div style="display:flex;gap:6px;align-items:flex-start">
+        <input type="text" id="mc-comm-search" placeholder="Cerca committente…" autocomplete="off" style="flex:1">
+        <button class="btn-outline btn-sm" id="btn-mc-comm-new" type="button" style="white-space:nowrap;margin-top:1px">+ Nuovo</button>
+      </div>
       <input type="hidden" id="mc-comm-id">
       <div id="mc-comm-list" class="ac-list hidden"></div>
       <div id="mc-comm-info" style="font-size:12px;color:#555;margin-top:4px"></div>
@@ -2893,7 +2896,7 @@ async function proponiCommittenteCantiere(cantId){
     }else{
       const isPiva=/^\d{11}$/.test(cid)
       if(confirm(`Il cantiere indica un committente (${isPiva?'P.IVA':'CF'}: ${cid}) non ancora presente in anagrafica.\n\nInserirlo ora?`)){
-        $('btn-new-comm').click()
+        window._commTarget='visita';$('btn-new-comm').click()
         if(isPiva){
           const r=$('mc-sogg-pg');if(r)r.checked=true
           if($('mc-pf-fields'))$('mc-pf-fields').classList.add('hidden')
@@ -2908,7 +2911,20 @@ async function proponiCommittenteCantiere(cantId){
     }
   }catch(e){console.error('proponiCommittenteCantiere:',e)}
 }
+window._commTarget='visita'
+function _apriNuovoComm(target,prefill){
+  window._commTarget=target
+  $('mc-sogg-pf').checked=true;$('mc-tipo-priv').checked=true
+  ;['mc-comm-titolo','mc-comm-nome','mc-comm-cog','mc-comm-cf','mc-comm-email','mc-comm-tel',
+    'mc-comm-rag-soc','mc-comm-piva','mc-comm-cf-pg','mc-comm-email-pg','mc-comm-tel-pg'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  $('mc-pf-fields').classList.remove('hidden')
+  $('mc-pg-fields').classList.add('hidden')
+  if(prefill){const el=$('mc-comm-nome');if(el)el.value=prefill}
+  show('modal-comm')
+}
+$('btn-mc-comm-new')?.addEventListener('click',()=>_apriNuovoComm('cantiere',vGet('mc-comm-search').trim()))
 $('btn-new-comm').onclick=()=>{
+  window._commTarget='visita'
   // reset modal
   $('mc-sogg-pf').checked=true;$('mc-tipo-priv').checked=true
   ;['mc-comm-titolo','mc-comm-nome','mc-comm-cog','mc-comm-cf','mc-comm-email','mc-comm-tel',
@@ -2987,6 +3003,7 @@ $('btn-mc-comm-save').onclick=async()=>{
   }
   const{error}=await sb.from('committenti').insert(comm)
   if(error){toast('Errore: '+error.message,'err');return}
+  if(window._commTarget==='cantiere'){_applyCommACantiere(comm);hide('modal-comm');window._commTarget='visita';toast('Committente "'+nome+'" creato e collegato','ok');return}
   // Popola il form committente inline
   vSet('f-comm-id',comm.committente_id)
   vSet('f-comm-search',nome)
@@ -3404,7 +3421,14 @@ function _useImpresaEsistente(c,idx){
   toast('Impresa esistente selezionata','ok')
 }
 // Usa un committente gia esistente al posto di crearne uno nuovo
+function _applyCommACantiere(c){
+  vSet('mc-comm-id',c.committente_id)
+  vSet('mc-comm-search',c.committente_nome||'')
+  const _mci=$('mc-comm-info')
+  if(_mci)_mci.innerHTML='✓ '+esc(c.committente_nome||'')+' <span style="color:#888;font-family:monospace">'+esc(c.cf_piva||c.piva||c.committente_id)+'</span>'
+}
 function _useCommittenteEsistente(c){
+  if(window._commTarget==='cantiere'){_applyCommACantiere(c);hide('modal-comm');window._commTarget='visita';toast('Committente esistente collegato','ok');return}
   vSet('f-comm-id',c.committente_id)
   vSet('f-comm-search',c.committente_nome||'')
   const isPG=c.tipo_sogg==='PG'||!!c.piva
