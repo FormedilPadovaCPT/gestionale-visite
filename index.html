@@ -10501,6 +10501,7 @@ async function showVisitaDetail(vid){
       sb.from('visite').select(`
         visita_id,nr_verbale,data_visita,ora_visita,ora_fine,ipc,ipc_nc_plus,ipc_nc_minus,ipc_oss,stato,
         tipo_accesso,acc_cant,nr_lavoratori,nr_lavoratori_stranieri,prescrizioni,oss_tec,
+        comm_tipo_sogg,comm_titolo,comm_nome,comm_cog,comm_cf,comm_piva,comm_rag_soc,comm_email,comm_tel,
         tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),
         cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,prot_int),
         imprese(impresa_nome,piva)
@@ -10530,6 +10531,21 @@ async function showVisitaDetail(vid){
       ])
     }
     if(imp){ html+=qdSec('Impresa principale')+qdDl([['Ragione sociale',imp.impresa_nome],['P.IVA',imp.piva]]) }
+
+    // ── COMMITTENTE (dati salvati sulla visita) ──
+    {
+      const isPG=(v.comm_tipo_sogg||'PF')==='PG'
+      const commNome=isPG?(v.comm_rag_soc||''):[v.comm_titolo,v.comm_nome,v.comm_cog].map(x=>(x||'').trim()).filter(Boolean).join(' ')
+      const commId=isPG?(v.comm_piva||v.comm_cf||''):(v.comm_cf||'')
+      if(commNome||commId){
+        html+=qdSec('Committente')
+        html+=qdDl([
+          ['Nominativo',commNome],
+          [isPG?'P.IVA':'Cod. fiscale',commId],
+          ['Email',v.comm_email],['Telefono',v.comm_tel],
+        ])
+      }
+    }
 
     // ── RILIEVI CHECKLIST ──
     const chkValMap={'VER':'#7AA527','NC-':'#ED7D31','NC+':'#E02B20','OSS':'#D9A400'}
