@@ -2991,9 +2991,12 @@ $('btn-mc-comm-save').onclick=async()=>{
     if(tel)vSet('f-comm-tel-pg',tel)
   }else{
     $('comm-radio-pf').checked=true;toggleCommSogg('PF')
-    const parts=nome.split(' ')
-    vSet('f-comm-nome',parts.slice(-2,-1)[0]||'')
-    vSet('f-comm-cog',parts.slice(-1)[0]||'')
+    const _sf=_splitFigura(nome)
+    const _base=_sf.titolo?nome.trim().replace(/^\S+\s+/,''):nome.trim()
+    const _ord=_ordinaNomeCognomeDaCF(_base,cf)||{nome:_sf.nome,cognome:_sf.cognome}
+    if(_sf.titolo)vSet('f-comm-titolo',_sf.titolo)
+    vSet('f-comm-nome',_ord.nome||'')
+    vSet('f-comm-cog',_ord.cognome||'')
     if(cf)vSet('f-comm-cf',cf)
     if(email)vSet('f-comm-email',email)
     if(tel)vSet('f-comm-tel',tel)
@@ -3388,6 +3391,15 @@ function _useCommittenteEsistente(c){
     vSet('f-comm-tel-pg',c.telefono||'')
   }else{
     if(pfRad)pfRad.checked=true;toggleCommSogg('PF')
+    {
+      const _full=String(c.committente_nome||'').trim()
+      const _sf=_splitFigura(_full)
+      const _base=_sf.titolo?_full.replace(/^\S+\s+/,''):_full
+      const _ord=_ordinaNomeCognomeDaCF(_base,c.cf_piva||c.committente_id)||{nome:_sf.nome,cognome:_sf.cognome}
+      if(_sf.titolo)vSet('f-comm-titolo',_sf.titolo)
+      vSet('f-comm-nome',_ord.nome||'')
+      vSet('f-comm-cog',_ord.cognome||'')
+    }
     vSet('f-comm-cf',c.cf_piva||'')
     vSet('f-comm-email',c.email||'')
     vSet('f-comm-tel',c.telefono||'')
@@ -3551,6 +3563,11 @@ async function saveVisita(stato){
       cse:[vGet('f-cse-titolo'),vGet('f-cse-nome'),vGet('f-cse-cog')].filter(Boolean).join(' ')||null,
       cse_email:vGet('f-cse-email')||null,
       cse_tel:vGet('f-cse-tel')||null,
+      // parti separate figure (per ricarica fedele in modifica)
+      ppre_titolo:vGet('f-ppre-titolo')||null,ppre_nome:vGet('f-ppre-nome').trim()||null,ppre_cog:vGet('f-ppre-cog').trim()||null,
+      rl_titolo:vGet('f-rl-titolo')||null,rl_nome:vGet('f-rl-nome').trim()||null,rl_cog:vGet('f-rl-cog').trim()||null,
+      csp_titolo:vGet('f-csp-titolo')||null,csp_nome:vGet('f-csp-nome').trim()||null,csp_cog:vGet('f-csp-cog').trim()||null,
+      cse_titolo:vGet('f-cse-titolo')||null,cse_nome:vGet('f-cse-nome').trim()||null,cse_cog:vGet('f-cse-cog').trim()||null,
       // Tab 1 – committente
       comm_tipo_sogg:document.querySelector('input[name="comm-sogg"]:checked')?.value||'PF',
       comm_tipo:+vGet('f-comm-tipo')||null,
@@ -6644,7 +6661,7 @@ async function riapriBozza(vid){
         data_visita:v.data_visita||null,ora_visita:v.ora_visita||null,ora_fine:v.ora_fine||null,
         tipo_accesso:v.tipo_accesso||null,acc_cant:v.acc_cant||null,
         rlst_sn:v.rlst_sn,stage_vis:v.stage_vis,nom_stage:v.nom_stage||null,
-        nom_ppre:v.nom_ppre||null,qual_ppre:v.qual_ppre||null,tel_ppre:v.tel_ppre||null,
+        ..._figSnap('ppre',v.ppre_titolo,v.ppre_nome,v.ppre_cog,v.nom_ppre),nom_ppre:v.nom_ppre||null,qual_ppre:v.qual_ppre||null,tel_ppre:v.tel_ppre||null,
         tecnico_id:v.tecnico_id||null,
         tecnico_email:v.tecnici?.email||null,
         tec_display:v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():null,
@@ -6656,9 +6673,9 @@ async function riapriBozza(vid){
         comm_cf:v.comm_cf||null,comm_email:v.comm_email||null,comm_tel:v.comm_tel||null,
         comm_rag_soc:v.comm_rag_soc||null,comm_piva:v.comm_piva||null,
         coord:v.coord||false,
-        rl_nome:v.resp_lav||null,rl_email:v.rl_email||null,rl_tel:v.rl_tel||null,
-        csp_nome:v.csp||null,csp_email:v.csp_email||null,csp_tel:v.csp_tel||null,
-        cse_nome:v.cse||null,cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
+        ..._figSnap('rl',v.rl_titolo,v.rl_nome,v.rl_cog,v.resp_lav),rl_email:v.rl_email||null,rl_tel:v.rl_tel||null,
+        ..._figSnap('csp',v.csp_titolo,v.csp_nome,v.csp_cog,v.csp),csp_email:v.csp_email||null,csp_tel:v.csp_tel||null,
+        ..._figSnap('cse',v.cse_titolo,v.cse_nome,v.cse_cog,v.cse),cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
         nr_imp:v.nr_imp||0,nr_ind:v.nr_ind||0,
         nr_lavoratori:v.nr_lavoratori||0,nr_lavoratori_stranieri:v.nr_lavoratori_stranieri||0,
         importo:v.importo||null,costi:v.costi||null,stato_lav:v.stato_lav||null,
@@ -6723,7 +6740,7 @@ async function exportSnapFromDB(vid){
       rlst_sn:v.rlst_sn,
       stage_vis:v.stage_vis,
       nom_stage:v.nom_stage||null,
-      ppre_titolo:null,
+      ..._figSnap('ppre',v.ppre_titolo,v.ppre_nome,v.ppre_cog,v.nom_ppre),
       nom_ppre:v.nom_ppre||null,
       qual_ppre:v.qual_ppre||null,
       tel_ppre:v.tel_ppre||null,
@@ -6747,13 +6764,13 @@ async function exportSnapFromDB(vid){
       comm_rag_soc:v.comm_rag_soc||null,
       comm_piva:v.comm_piva||null,
       coord:v.coord||false,
-      rl_nome:v.resp_lav||null,
+      ..._figSnap('rl',v.rl_titolo,v.rl_nome,v.rl_cog,v.resp_lav),
       rl_email:v.rl_email||null,
       rl_tel:v.rl_tel||null,
-      csp_nome:v.csp||null,
+      ..._figSnap('csp',v.csp_titolo,v.csp_nome,v.csp_cog,v.csp),
       csp_email:v.csp_email||null,
       csp_tel:v.csp_tel||null,
-      cse_nome:v.cse||null,
+      ..._figSnap('cse',v.cse_titolo,v.cse_nome,v.cse_cog,v.cse),
       cse_email:v.cse_email||null,
       cse_tel:v.cse_tel||null,
       nr_imp:v.nr_imp||0,
@@ -8057,6 +8074,45 @@ function _splitNome(raw){
   if(parts.length<2)return null
   return {nome:parts.slice(0,-1).join(' '),cognome:parts[parts.length-1]}
 }
+// ── Figure visita: split "Titolo Nome Cognome" e ordine dedotto dal CF ──
+const _TITOLI_STD=['Sig.','Sig.ra','Dott.','Dott.ssa','Geom.','P.I.','Ing.','Arch.','Avv.','Prof.','Rag.']
+function _splitFigura(raw){
+  let t=String(raw||'').trim()
+  if(!t)return{titolo:null,nome:null,cognome:null}
+  let titolo=null
+  const m=t.match(/^(sig\.ra|sig|dott\.ssa|dott|geom|p\.i|ing|arch|avv|prof|rag)\.?\s+/i)
+  if(m){
+    const k=m[1].toLowerCase().replace(/\./g,'')
+    titolo=_TITOLI_STD.find(x=>x.toLowerCase().replace(/\./g,'')===k)||null
+    t=t.slice(m[0].length).trim()
+  }
+  const parts=t.split(/\s+/).filter(Boolean)
+  if(!parts.length)return{titolo,nome:null,cognome:null}
+  if(parts.length===1)return{titolo,nome:null,cognome:parts[0]}
+  return{titolo,nome:parts.slice(0,-1).join(' '),cognome:parts[parts.length-1]}
+}
+function _figSnap(pfx,tit,nome,cog,legacy){
+  // usa le parti salvate se presenti, altrimenti split best-effort della stringa storica
+  if(nome||cog)return{[pfx+'_titolo']:tit||null,[pfx+'_nome']:nome||null,[pfx+'_cog']:cog||null}
+  const s=_splitFigura(legacy)
+  return{[pfx+'_titolo']:tit||s.titolo,[pfx+'_nome']:s.nome,[pfx+'_cog']:s.cognome}
+}
+function _cfLet(s,voc){return String(s||'').toUpperCase().replace(/[^A-Z]/g,'').split('').filter(c=>'AEIOU'.includes(c)===voc).join('')}
+function _cfTriCog(cog){return(_cfLet(cog,false)+_cfLet(cog,true)+'XXX').slice(0,3)}
+function _cfTriNome(nome){const c=_cfLet(nome,false);return c.length>=4?c[0]+c[2]+c[3]:(c+_cfLet(nome,true)+'XXX').slice(0,3)}
+function _ordinaNomeCognomeDaCF(full,cf){
+  // deduce {nome,cognome} confrontando le triplette del codice fiscale; null se non determinabile
+  const t=String(full||'').trim(),f=String(cf||'').toUpperCase()
+  if(!t||!/^[A-Z]{6}[0-9]/.test(f))return null
+  const parts=t.split(/\s+/).filter(Boolean)
+  if(parts.length<2)return null
+  for(let i=1;i<parts.length;i++){
+    const a=parts.slice(0,i).join(' '),b=parts.slice(i).join(' ')
+    if(_cfTriCog(b)===f.slice(0,3)&&_cfTriNome(a)===f.slice(3,6))return{nome:a,cognome:b}
+    if(_cfTriCog(a)===f.slice(0,3)&&_cfTriNome(b)===f.slice(3,6))return{nome:b,cognome:a}
+  }
+  return null
+}
 async function _inChunks(table,sel,col,ids,extra){
   // NB: PostgREST restituisce max 1000 righe per richiesta → chunk di id + paginazione .range
   const out=[]
@@ -8086,7 +8142,7 @@ async function admExportOsservatorio(){
     const visite=[]
     for(let vfrom=0;;vfrom+=1000){
       const{data:vs,error:ev}=await sb.from('visite')
-        .select('visita_id,nr_verbale,cantiere_id,impresa_id,tecnico_id,tecnico2_id,tipo_accesso,data_visita,ora_visita,ora_fine,nr_imp,nr_lavoratori,nr_ind,resp_lav,csp,cse,coord,note_lav,comm_email')
+        .select('visita_id,nr_verbale,cantiere_id,impresa_id,tecnico_id,tecnico2_id,tipo_accesso,data_visita,ora_visita,ora_fine,nr_imp,nr_lavoratori,nr_ind,resp_lav,csp,cse,coord,note_lav,comm_email,rl_nome,rl_cog,csp_nome,csp_cog,cse_nome,cse_cog')
         .eq('elimina',0).eq('stato','definitivo').gte('data_visita',dal).lte('data_visita',al)
         .order('data_visita').order('visita_id').range(vfrom,vfrom+999)
       if(ev)throw new Error(ev.message)
@@ -8152,9 +8208,9 @@ async function admExportOsservatorio(){
       if(v.nr_lavoratori!=null)xv+=_xel('visitaLavoratoriCantiereNum',v.nr_lavoratori)
       if(v.nr_ind!=null)xv+=_xel('visitaLavoratoriCantiereAutNum',v.nr_ind)
       xv+=_xel('visitaTipo',tipo)
-      const rl=_splitNome(v.resp_lav)
+      const rl=(v.rl_nome&&v.rl_cog)?{nome:v.rl_nome,cognome:v.rl_cog}:_splitNome(v.resp_lav)
       if(rl&&rl.cognome.length>=2&&rl.nome.length>=2)xv+=`<responsabileLavori cognomeResponsabileLavori="${_xesc(rl.cognome.slice(0,128))}" nomeResponsabileLavori="${_xesc(rl.nome.slice(0,128))}" />`
-      const csp=_splitNome(v.csp),cse=_splitNome(v.cse)
+      const csp=(v.csp_nome&&v.csp_cog)?{nome:v.csp_nome,cognome:v.csp_cog}:_splitNome(v.csp),cse=(v.cse_nome&&v.cse_cog)?{nome:v.cse_nome,cognome:v.cse_cog}:_splitNome(v.cse)
       let cAttr=`tipoPresenzaCoordinamento="${v.coord?1:2}"`
       if(csp&&csp.cognome.length>=2&&csp.nome.length>=2)cAttr+=` cognomeCoordinatoreFaseProgettazione="${_xesc(csp.cognome.slice(0,128))}" nomeCoordinatoreFaseProgettazione="${_xesc(csp.nome.slice(0,128))}"`
       if(cse&&cse.cognome.length>=2&&cse.nome.length>=2)cAttr+=` cognomeCoordinatoreFaseEsecuzione="${_xesc(cse.cognome.slice(0,128))}" nomeCoordinatoreFaseEsecuzione="${_xesc(cse.nome.slice(0,128))}"`
@@ -10178,7 +10234,7 @@ async function rebuildSnapFromDB(vid){
     data_visita:v.data_visita||null,ora_visita:v.ora_visita||null,ora_fine:v.ora_fine||null,
     tipo_accesso:v.tipo_accesso||null,acc_cant:v.acc_cant||null,
     rlst_sn:v.rlst_sn,stage_vis:v.stage_vis,nom_stage:v.nom_stage||null,
-    nom_ppre:v.nom_ppre||null,qual_ppre:v.qual_ppre||null,tel_ppre:v.tel_ppre||null,
+    ..._figSnap('ppre',v.ppre_titolo,v.ppre_nome,v.ppre_cog,v.nom_ppre),nom_ppre:v.nom_ppre||null,qual_ppre:v.qual_ppre||null,tel_ppre:v.tel_ppre||null,
     tecnico_id:v.tecnico_id||null,tecnico_email:v.tecnici?.email||null,
     tec_display:v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():null,
     cantiere_id:v.cantiere_id||null,
@@ -10189,9 +10245,9 @@ async function rebuildSnapFromDB(vid){
     comm_cf:v.comm_cf||null,comm_email:v.comm_email||null,comm_tel:v.comm_tel||null,
     comm_rag_soc:v.comm_rag_soc||null,comm_piva:v.comm_piva||null,
     coord:v.coord||false,
-    rl_nome:v.resp_lav||null,rl_email:v.rl_email||null,rl_tel:v.rl_tel||null,
-    csp_nome:v.csp||null,csp_email:v.csp_email||null,csp_tel:v.csp_tel||null,
-    cse_nome:v.cse||null,cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
+    ..._figSnap('rl',v.rl_titolo,v.rl_nome,v.rl_cog,v.resp_lav),rl_email:v.rl_email||null,rl_tel:v.rl_tel||null,
+    ..._figSnap('csp',v.csp_titolo,v.csp_nome,v.csp_cog,v.csp),csp_email:v.csp_email||null,csp_tel:v.csp_tel||null,
+    ..._figSnap('cse',v.cse_titolo,v.cse_nome,v.cse_cog,v.cse),cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
     nr_imp:v.nr_imp||0,nr_ind:v.nr_ind||0,
     nr_lavoratori:v.nr_lavoratori||0,nr_lavoratori_stranieri:v.nr_lavoratori_stranieri||0,
     importo:v.importo||null,costi:v.costi||null,stato_lav:v.stato_lav||null,
@@ -10820,9 +10876,9 @@ async function _loadSnapForVerbale(verbale){
     comm_nome:v.comm_nome||null,comm_cog:v.comm_cog||null,comm_cf:v.comm_cf||null,
     comm_email:v.comm_email||null,comm_tel:v.comm_tel||null,
     comm_rag_soc:v.comm_rag_soc||null,comm_piva:v.comm_piva||null,coord:v.coord||false,
-    rl_nome:v.resp_lav||null,rl_email:v.rl_email||null,rl_tel:v.rl_tel||null,
-    csp_nome:v.csp||null,csp_email:v.csp_email||null,csp_tel:v.csp_tel||null,
-    cse_nome:v.cse||null,cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
+    ..._figSnap('rl',v.rl_titolo,v.rl_nome,v.rl_cog,v.resp_lav),rl_email:v.rl_email||null,rl_tel:v.rl_tel||null,
+    ..._figSnap('csp',v.csp_titolo,v.csp_nome,v.csp_cog,v.csp),csp_email:v.csp_email||null,csp_tel:v.csp_tel||null,
+    ..._figSnap('cse',v.cse_titolo,v.cse_nome,v.cse_cog,v.cse),cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
     nr_imp:v.nr_imp||0,nr_ind:v.nr_ind||0,nr_lavoratori:v.nr_lavoratori||0,nr_lavoratori_stranieri:v.nr_lavoratori_stranieri||0,
     importo:v.importo||null,costi:v.costi||null,stato_lav:v.stato_lav||null,
     imprese:(impRows||[]).map((im,i)=>({
