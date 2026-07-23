@@ -2,21 +2,24 @@
 // Caricato come <script> CLASSICO PRIMA del modulo principale: i const qui sono globali
 // e vengono letti dal modulo. NON aggiungere qui logica/funzioni, solo dati.
 
-const COMUNI_PD=['Abano Terme','Agna','Albignasego','Anguillara Veneta','Arquà Petrarca','Arquà Polesine','Arre','Arzergrande','Bagnoli di Sopra','Baone','Barbona','Battaglia Terme','Boara Pisani','Borgoricco','Bovolenta','Brugine','Cadoneghe','Campodarsego','Campodoro','Camposampiero','Campo San Martino','Candiana','Carceri','Cartura','Casale di Scodosia','Casalserugo','Castelbaldo','Cervarese Santa Croce','Chioggia','Cittadella','Codevigo','Conselve','Correzzola','Curtarolo','Due Carrare','Este','Fontaniva','Galliera Veneta','Galzignano Terme','Gazzo','Granze','Guarda Veneta','Legnaro','Limena','Loreggia','Lozzo Atestino','Masi','Massanzago','Megliadino San Fidenzio','Megliadino San Vitale','Merlara','Mestrino','Monselice','Montagnana','Montegrotto Terme','Motta','Noventa Padovana','Ospedaletto Euganeo','Padova','Pernumia','Piacenza d\'Adige','Piazzola sul Brenta','Piombino Dese','Piove di Sacco','Polverara','Ponso','Pontelongo','Ponte San Nicolò','Pozzonovo','Rovolon','Rubano','Saccolongo','San Giorgio delle Pertiche','San Giorgio in Bosco','San Martino di Lupari','San Pietro in Gu','San Pietro Viminario','Sant\'Angelo di Piove di Sacco','Sant\'Elena','Sant\'Urbano','Saonara','Selvazzano Dentro','Solesino','Stanghella','Teolo','Terrassa Padovana','Tombolo','Torre di Mosto','Trebaseleghe','Tribano','Urbana','Veggiano','Vescovana','Vighizzolo d\'Este','Vigodarzere','Vigonovo','Vigonza','Villa del Conte','Villa Estense','Villafranca Padovana','Villanova di Camposampiero','Vo\'']
+// COMUNI_PD è derivata da ISTAT_PD (definita sotto) — così la tendina è sempre allineata
+// all'elenco ISTAT completo dei comuni attuali della provincia. Qui solo le voci extra:
+// comuni fuori provincia limitrofi + comuni soppressi presenti nei cantieri storici.
+const COMUNI_EXTRA=['Arquà Polesine','Carceri','Chioggia','Guarda Veneta','Megliadino San Fidenzio','Motta','Torre di Mosto','Vighizzolo d\'Este','Vigonovo']
 
 const CAP_PD={
   'Abano Terme':'35031','Agna':'35021','Albignasego':'35020','Anguillara Veneta':'35022',
   'Arquà Petrarca':'35032','Arquà Polesine':'45031','Arre':'35020','Arzergrande':'35020',
   'Bagnoli di Sopra':'35023','Baone':'35030','Barbona':'35040','Battaglia Terme':'35041',
-  'Boara Pisani':'35040','Borgoricco':'35010','Bovolenta':'35024','Brugine':'35020',
+  'Boara Pisani':'35040','Borgo Veneto':'35046','Borgoricco':'35010','Bovolenta':'35024','Brugine':'35020',
   'Cadoneghe':'35010','Campodarsego':'35011','Campodoro':'35010','Camposampiero':'35012',
-  'Campo San Martino':'35010','Candiana':'35020','Carceri':'35040','Cartura':'35025',
+  'Campo San Martino':'35010','Candiana':'35020','Carceri':'35040','Carmignano di Brenta':'35010','Cartura':'35025',
   'Casale di Scodosia':'35040','Casalserugo':'35020','Castelbaldo':'35040',
-  'Cervarese Santa Croce':'35030','Chioggia':'30015','Cittadella':'35013','Codevigo':'35020',
+  'Cervarese Santa Croce':'35030','Chioggia':'30015','Cinto Euganeo':'35030','Cittadella':'35013','Codevigo':'35020',
   'Conselve':'35026','Correzzola':'35020','Curtarolo':'35010','Due Carrare':'35020',
   'Este':'35042','Fontaniva':'35014','Galliera Veneta':'35015','Galzignano Terme':'35030',
-  'Gazzo':'35010','Granze':'35040','Guarda Veneta':'45030','Legnaro':'35020','Limena':'35010',
-  'Loreggia':'35010','Lozzo Atestino':'35034','Masi':'35040','Massanzago':'35010',
+  'Gazzo':'35010','Grantorto':'35010','Granze':'35040','Guarda Veneta':'45030','Legnaro':'35020','Limena':'35010',
+  'Loreggia':'35010','Lozzo Atestino':'35034','Maserà di Padova':'35020','Masi':'35040','Massanzago':'35010',
   'Megliadino San Fidenzio':'35040','Megliadino San Vitale':'35040','Merlara':'35040',
   'Mestrino':'35035','Monselice':'35043','Montagnana':'35044','Montegrotto Terme':'35036',
   'Motta':'35060','Noventa Padovana':'35027','Ospedaletto Euganeo':'35045','Padova':'35100',
@@ -26,9 +29,10 @@ const CAP_PD={
   'Rubano':'35030','Saccolongo':'35030','San Giorgio delle Pertiche':'35010',
   'San Giorgio in Bosco':'35010','San Martino di Lupari':'35018','San Pietro in Gu':'35010',
   'San Pietro Viminario':'35020','Sant\'Angelo di Piove di Sacco':'35020',
+  'Santa Caterina d\'Este':'35040','Santa Giustina in Colle':'35010',
   'Sant\'Elena':'35040','Sant\'Urbano':'35040','Saonara':'35020','Selvazzano Dentro':'35030',
   'Solesino':'35047','Stanghella':'35048','Teolo':'35037','Terrassa Padovana':'35020',
-  'Tombolo':'35019','Torre di Mosto':'30020','Trebaseleghe':'35010','Tribano':'35020',
+  'Tombolo':'35019','Torre di Mosto':'30020','Torreglia':'35038','Trebaseleghe':'35010','Tribano':'35020',
   'Urbana':'35040','Veggiano':'35030','Vescovana':'35040','Vighizzolo d\'Este':'35040',
   'Vigodarzere':'35010','Vigonovo':'35010','Vigonza':'35010','Villa del Conte':'35010',
   'Villa Estense':'35040','Villafranca Padovana':'35010','Villanova di Camposampiero':'35010',
@@ -63,6 +67,8 @@ const ISTAT_PD={
   'Villa Estense':'028102','Villa del Conte':'028101','Villafranca Padovana':'028103','Villanova di Camposampiero':'028104',
   'Vo\'':'028105'
 }
+
+const COMUNI_PD=[...new Set([...Object.keys(ISTAT_PD),...COMUNI_EXTRA])].sort((a,b)=>a.localeCompare(b,'it'))
 
 // --- Batch 2: codelist / etichette / palette ---
 const ZONE_LBL={1:'Impianti di cantiere',2:'Protezione luoghi di lavoro',3:'Apparecchi di sollevamento',4:'Attrezzature, scale, utensili',5:'Macchine di cantiere',6:'Opere provvisionali',7:'DPI',8:'Documentazione',9:'Soggetti',10:'Formazione'}
