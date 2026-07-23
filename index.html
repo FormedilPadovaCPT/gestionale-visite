@@ -1252,10 +1252,17 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               oninput="this.style.color='#fff'">
             <button class="btn-primary btn-sm" onclick="admLoadImprese()">🔍 Cerca</button>
           </div>
+          <div id="imp-merge-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(231,80,15,.12);border:1px solid rgba(231,80,15,.5);border-radius:8px;padding:8px 12px;margin-bottom:10px">
+            <span id="imp-merge-count" style="font-size:13px;font-weight:600"></span>
+            <button class="btn-primary btn-sm" onclick="admFondiImprese()">🔗 Unisci le imprese selezionate</button>
+            <button class="btn-outline btn-sm" onclick="_impSelClear()">Deseleziona</button>
+            <span style="font-size:11px;color:rgba(255,255,255,.5);flex-basis:100%">Spunta due o più imprese che sono la stessa: sceglierai quale tenere come principale; visite, presenze e certificazioni delle altre verranno spostate su di essa e i doppioni archiviati.</span>
+          </div>
           <div class="tbl-wrap" style="background:rgba(255,255,255,.05);border-radius:8px">
             <table id="tbl-adm-imp" style="color:rgba(255,255,255,.85);font-size:12px">
               <thead>
                 <tr style="border-bottom:1px solid rgba(255,255,255,.15)">
+                  <th style="padding:8px 4px;width:26px" title="Seleziona per unione">🔗</th>
                   <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Ragione sociale</th>
                   <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">P.IVA</th>
                   <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Comune</th>
@@ -1265,7 +1272,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
                 </tr>
               </thead>
               <tbody id="tbody-adm-imp">
-                <tr><td colspan="6" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Usa la ricerca per trovare un'impresa</td></tr>
+                <tr><td colspan="7" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Usa la ricerca per trovare un'impresa</td></tr>
               </tbody>
             </table>
           </div>
@@ -9911,17 +9918,22 @@ async function admLoadImprese() {
       return
     }
     if (emptyDiv) emptyDiv.classList.add('hidden')
-    tbody.innerHTML = data.map(imp => `
+    _impRows = data
+    tbody.innerHTML = data.map(imp => {
+      const id = imp.impresa_id||imp.piva||''
+      return `
       <tr style="border-bottom:1px solid rgba(255,255,255,.08);transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">
+        <td style="padding:8px 4px;text-align:center"><input type="checkbox" class="imp-sel-chk" data-id="${esc(id)}" data-nome="${esc(imp.impresa_nome||'')}" ${_impSel.has(id)?'checked':''} onchange="_impSelToggle(this)" style="width:16px;height:16px;cursor:pointer"></td>
         <td style="padding:8px 10px;font-weight:500">${esc(imp.impresa_nome||'')}</td>
         <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:rgba(255,255,255,.6)">${esc(imp.piva||imp.impresa_id||'')}</td>
         <td style="padding:8px 10px;color:rgba(255,255,255,.65)">${esc(imp.comune||'')}</td>
         <td style="padding:8px 10px;color:rgba(255,255,255,.65);font-size:11px">${esc(imp.contratto_ccnl||'')}</td>
         <td style="padding:8px 10px;color:rgba(255,255,255,.65);font-size:11px">${esc(imp.cassa_edile||'')}</td>
         <td style="padding:8px 4px;text-align:right">
-          <button class="btn-primary btn-sm" onclick="admEditImpresa('${esc(imp.impresa_id||imp.piva||'')}')">✏️ Modifica</button>
+          <button class="btn-primary btn-sm" onclick="admEditImpresa('${esc(id)}')">✏️ Modifica</button>
         </td>
-      </tr>`).join('')
+      </tr>`}).join('')
+    _impMergeBar()
   } catch(e) {
     console.error('admLoadImprese:', e)
     tbody.innerHTML = '<tr><td colspan="6" style="padding:16px;text-align:center;color:#ff6b6b">Errore: ' + esc(e.message||'') + '</td></tr>'
@@ -10031,6 +10043,49 @@ $('ei-ccnl')?.addEventListener('change', function(){
   if (wrap) this.value === '13' ? wrap.classList.remove('hidden') : wrap.classList.add('hidden')
 })
 $('adm-imp-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadImprese() })
+
+// ── Selezione multipla per unione imprese duplicate ──
+let _impRows = []
+const _impSel = new Map()  // id -> nome
+function _impMergeBar(){
+  const bar=$('imp-merge-bar'); if(!bar)return
+  const n=_impSel.size
+  bar.style.display=n>=2?'flex':'none'
+  const c=$('imp-merge-count'); if(c)c.textContent=n+' impresa/e selezionate'
+}
+function _impSelToggle(cb){
+  const id=cb.dataset.id
+  if(cb.checked)_impSel.set(id,cb.dataset.nome||id); else _impSel.delete(id)
+  _impMergeBar()
+}
+function _impSelClear(){
+  _impSel.clear()
+  document.querySelectorAll('.imp-sel-chk').forEach(c=>c.checked=false)
+  _impMergeBar()
+}
+async function admFondiImprese(){
+  const ids=[..._impSel.keys()]
+  if(ids.length<2){toast('Seleziona almeno due imprese','warn');return}
+  // Scelta della principale
+  const opts=ids.map((id,i)=>`${i+1}. ${_impSel.get(id)} [${id}]`).join('\n')
+  const raw=prompt('UNIONE IMPRESE\n\nQuale vuoi TENERE come principale?\nDigita il numero:\n\n'+opts,'1')
+  if(raw===null)return
+  const idx=parseInt(raw,10)-1
+  if(isNaN(idx)||idx<0||idx>=ids.length){toast('Scelta non valida','err');return}
+  const masterId=ids[idx]
+  const dupeIds=ids.filter(x=>x!==masterId)
+  if(!confirm('Confermi l\'unione?\n\nPRINCIPALE (tenuta): '+_impSel.get(masterId)+'\n\nUnite e archiviate ('+dupeIds.length+'): \n'+dupeIds.map(x=>'• '+_impSel.get(x)).join('\n')+'\n\nTutte le visite, presenze e certificazioni delle imprese archiviate verranno spostate sulla principale. Operazione non automaticamente reversibile.'))return
+  try{
+    const{data,error}=await sb.rpc('fondi_imprese',{p_master_id:masterId,p_dupe_ids:dupeIds})
+    if(error)throw error
+    toast('Unione completata: '+((data&&data.imprese_archiviate)||dupeIds.length)+' impresa/e archiviata/e','ok')
+    _impSelClear()
+    admLoadImprese()
+  }catch(e){toast('Errore unione: '+(e.message||e),'err')}
+}
+window._impSelToggle=_impSelToggle
+window._impSelClear=_impSelClear
+window.admFondiImprese=admFondiImprese
 window.admLoadImprese = admLoadImprese
 window.admEditImpresa = admEditImpresa
 
