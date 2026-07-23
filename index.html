@@ -1494,6 +1494,14 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     </div>
     <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma" maxlength="50"></div>
     <div class="field"><label>Descrizione cantiere <span style="font-weight:400;font-size:11px;color:#aaa">(cosa si fa nel cantiere)</span></label><textarea id="mc-descr" rows="2" maxlength="500" placeholder="Es. Rifacimento copertura e coibentazione facciata…" style="width:100%;resize:vertical;font-family:inherit;font-size:14px;padding:8px;border:1px solid var(--border);border-radius:6px"></textarea></div>
+    <div class="sect-title" style="margin-top:10px;font-size:11px;color:var(--grey)">Committente</div>
+    <div class="field" style="position:relative">
+      <label>Committente <span style="font-weight:400;font-size:11px;color:#aaa">(cerca per nome, CF o P.IVA)</span></label>
+      <input type="text" id="mc-comm-search" placeholder="Cerca committente…" autocomplete="off">
+      <input type="hidden" id="mc-comm-id">
+      <div id="mc-comm-list" class="ac-list hidden"></div>
+      <div id="mc-comm-info" style="font-size:12px;color:#555;margin-top:4px"></div>
+    </div>
     <div class="sect-title" style="margin-top:10px;font-size:11px;color:var(--grey)">Dati identificativi cantiere</div>
     <div class="row">
       <div class="field"><label>Codice CNCE</label><input type="text" id="mc-cnce" placeholder="Cod. CNCE" maxlength="50"></div>
@@ -3101,6 +3109,24 @@ window.editCommittente=editCommittente
 window.salvaCommittente=salvaCommittente
 
 // ── AUTOCOMPLETE COMMITTENTE ──
+setupAC('mc-comm-search','mc-comm-list', async q=>{
+  let qb=sb.from('committenti').select('committente_id,committente_nome,cf_piva,piva,tipo_sogg').eq('elimina',0).order('committente_nome').limit(20)
+  if(q)qb=qb.or(`committente_nome.ilike.*${q}*,cf_piva.ilike.*${q}*,piva.ilike.*${q}*`)
+  const{data}=await qb
+  return(data||[]).map(c=>({id:c.committente_id,label:c.committente_nome,extra:c}))
+}, it=>{
+  vSet('mc-comm-id',it.id)
+  const co=it.extra||{}
+  const _mci=$('mc-comm-info')
+  if(_mci)_mci.innerHTML='✓ '+esc(co.committente_nome||it.label||'')+' <span style="color:#888;font-family:monospace">'+esc(co.cf_piva||co.piva||it.id)+'</span>'
+})
+// pulsante per scollegare il committente
+;(function(){
+  const inp=$('mc-comm-search')
+  if(inp&&!inp.dataset.clrBound){inp.dataset.clrBound='1'
+    inp.addEventListener('input',()=>{if(!inp.value.trim()){vSet('mc-comm-id','');const _mci=$('mc-comm-info');if(_mci)_mci.textContent=''}})
+  }
+})()
 setupAC('f-comm-search','comm-list', async q=>{
   let qb=sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,email,telefono,piva,tipo_sogg').eq('elimina',0).order('committente_nome').limit(20)
   if(q)qb=qb.or(`committente_nome.ilike.%${q}%,cf_piva.ilike.%${q}%,piva.ilike.%${q}%`)
@@ -3218,6 +3244,7 @@ function resetModalCantiere(){
   const im=$('mc-importo');if(im)im.value=''
   const capEl=$('mc-cap');if(capEl){capEl.readOnly=false;capEl.style.background='#fff'}
   const wrap=$('mc-tip-ope-altro-wrap');if(wrap)wrap.classList.add('hidden')
+  vSet('mc-comm-search','');vSet('mc-comm-id','');const _mci=$('mc-comm-info');if(_mci)_mci.textContent=''
 }
 $('btn-new-cant').onclick=()=>{hideCantCard();resetModalCantiere();show('modal-cant')}
 $('btn-mc-cancel').onclick=()=>{hide('modal-cant');window._editCantId=null;$('modal-cant-title').textContent='Nuovo cantiere'}
@@ -3431,6 +3458,8 @@ $('btn-mc-save').onclick=async()=>{
     cantiere_tip_ope_altro:vGet('mc-tip-ope-altro').trim()||null,
     cantiere_descrizione:vGet('mc-descr').trim()||null,
   }
+  // Committente selezionato (se il campo è vuoto → nessuna modifica del legame esistente lato UI, ma se svuotato esplicitamente vince l'id vuoto)
+  fields.cantiere_committente_id=vGet('mc-comm-id').trim()||null
   // Modalità modifica (da coordinatore)
   if(window._editCantId){
     const{error}=await sb.from('cantieri').update(fields).eq('cantiere_id',window._editCantId)
@@ -10111,6 +10140,21 @@ async function admEditCantiere(cantId) {
   }
   if ($('mc-durata') && c.cantiere_durata) $('mc-durata').value = c.cantiere_durata
   if ($('mc-importo') && c.cantiere_importo) $('mc-importo').value = c.cantiere_importo
+  // Committente collegato
+  const _cid = String(c.cantiere_committente_id || '').trim()
+  vSet('mc-comm-id', _cid)
+  vSet('mc-comm-search', '')
+  const _mci = $('mc-comm-info')
+  if (_mci) _mci.textContent = ''
+  if (_cid) {
+    const { data: co } = await sb.from('committenti').select('committente_nome,tipo_sogg,cf_piva,piva').eq('committente_id', _cid).maybeSingle()
+    if (co) {
+      vSet('mc-comm-search', co.committente_nome || '')
+      if (_mci) _mci.innerHTML = '✓ ' + esc(co.committente_nome || '') + ' <span style="color:#888;font-family:monospace">' + esc(co.cf_piva || co.piva || _cid) + '</span>'
+    } else if (_mci) {
+      _mci.innerHTML = '<span style="color:#c0392b">Codice ' + esc(_cid) + ' non presente in anagrafica</span>'
+    }
+  }
   show('modal-cant')
 }
 $('adm-cant-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadCantieri() })
