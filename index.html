@@ -5359,12 +5359,23 @@ async function loadCantieri(q=''){
       rows.forEach(r=>r.committente_nome=_cm[r.cantiere_committente_id]||null)
     }
   }catch(_e){}
+  // segnalazioni aperte da mobile (pseudo-righe selezionabili nel giro)
+  try{
+    const{data:sg}=await sb.from('segnalazioni_cantiere').select('id,lat,lng,note,tecnico_nome,segnalata_da,created_at').eq('stato','aperta').order('created_at',{ascending:false}).limit(300)
+    ;(sg||[]).forEach(s=>{
+      if(s.lat==null||s.lng==null)return
+      const lbl=(s.note&&s.note.trim())||'Cantiere segnalato'
+      rows.push({_segn:true,seg_id:s.id,cantiere_id:'segn:'+s.id,label:lbl,lat:s.lat,lng:s.lng,
+        seg_tec:s.tecnico_nome||s.segnalata_da||'',seg_data:s.created_at,n_visite:0})
+    })
+  }catch(_e){}
   _clRows=rows
   _clBuildFilters(rows)
   _clRender()
 }
 function _clPass(d){
   const s=_clState
+  if(d._segn)return !(s.comSel.size||s.ope||s.imp||s.sca||s.vis||s.orig==='cnce')
   if(s.comSel.size&&![...s.comSel].some(x=>x.toLowerCase()===String(d.zona_key||d.comune_nome||'').trim().toLowerCase()))return false
   if(s.ope){if(s.ope==='__nd'){if(d.cantiere_tip_ope!=null)return false}else if(String(d.cantiere_tip_ope)!==s.ope)return false}
   if(s.imp){if(s.imp==='__nd'){if(d.cantiere_importo!=null)return false}else if(String(d.cantiere_importo)!==s.imp)return false}
@@ -5429,6 +5440,20 @@ function _clRender(){
   if(!all.length){tbody.innerHTML='';empty.classList.remove('hidden');return}
   empty.classList.add('hidden')
   tbody.innerHTML=all.slice(0,300).map(c=>{
+    if(c._segn){
+      const _dt=c.seg_data?new Date(c.seg_data).toLocaleDateString('it-IT'):''
+      const _nav='https://www.google.com/maps/dir/?api=1&destination='+c.lat+','+c.lng+'&travelmode=driving'
+      return`<tr class="row-detail-hover">
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="giro-chk" data-id="${c.cantiere_id}" data-lat="${c.lat??''}" data-lng="${c.lng??''}" data-addr="${c.lat+','+c.lng}" data-label="${esc(c.label)}" ${_giroSel.has(c.cantiere_id)?'checked':''} onchange="_giroToggle(this)" style="width:17px;height:17px;cursor:pointer"></td>
+      <td><strong style="color:#d5008f">📍 ${esc(c.label)}</strong>${c.seg_tec?`<div style="font-size:11px;color:#888">${esc(c.seg_tec)}${_dt?' · '+_dt:''}</div>`:''}</td>
+      <td>–</td>
+      <td>–</td>
+      <td>–</td>
+      <td><span style="font-size:11px;color:#d5008f;font-weight:600">segnalato</span></td>
+      <td>–</td>
+      <td><div class="tbl-actions"><a href="${_nav}" target="_blank" rel="noopener" class="btn-outline btn-sm" title="Naviga fin qui" style="text-decoration:none">🧭</a></div></td>
+    </tr>`
+    }
     const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
     const nVisite=c.n_visite||0
     return`<tr class="row-detail-hover" data-act="detail-cantiere" data-id="${c.cantiere_id}">
