@@ -1497,7 +1497,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>Durata cantiere</label>
         <select id="mc-durata"><option value="">–</option><option value="1">Fino a 1 mese</option><option value="2">Da 1 a 3 mesi</option><option value="3">Da 3 a 12 mesi</option><option value="4">Da 12 a 24 mesi</option><option value="5">Da 24 a 36 mesi</option><option value="6">Da 36 a 48 mesi</option><option value="7">Oltre 48 mesi</option><option value="8">Non presente</option></select></div>
       <div class="field"><label>Importo lavori (€)</label>
-        <select id="mc-importo"><option value="">–</option><option value="1">fino a 250.000</option><option value="2">da 250.001 a 500.000</option><option value="3">da 500.001 a 1.000.000</option><option value="4">da 1.000.001 a 1.500.000</option><option value="5">da 1.500.001 a 2.500.000</option><option value="6">da 2.500.001 a 3.500.000</option><option value="7">da 3.500.001 a 5.000.000</option><option value="8">da 5.000.001 a 10.000.000</option><option value="11">non disponibile</option></select></div>
+        <select id="mc-importo"><option value="">–</option><option value="1">fino a 250.000</option><option value="2">da 250.001 a 500.000</option><option value="3">da 500.001 a 1.000.000</option><option value="4">da 1.000.001 a 1.500.000</option><option value="5">da 1.500.001 a 2.500.000</option><option value="6">da 2.500.001 a 3.500.000</option><option value="7">da 3.500.001 a 5.000.000</option><option value="8">da 5.000.001 a 10.000.000</option><option value="9">da 10.000.001 a 15.000.000</option><option value="10">oltre 15.000.000</option><option value="11">non disponibile</option></select></div>
     </div>
     <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma" maxlength="50"></div>
     <div class="field"><label>Descrizione cantiere <span style="font-weight:400;font-size:11px;color:#aaa">(cosa si fa nel cantiere)</span></label><textarea id="mc-descr" rows="2" maxlength="500" placeholder="Es. Rifacimento copertura e coibentazione facciata…" style="width:100%;resize:vertical;font-family:inherit;font-size:14px;padding:8px;border:1px solid var(--border);border-radius:6px"></textarea></div>
@@ -6936,7 +6936,7 @@ async function genPDF(vid, output='save'){
     const TIPO_ACC={1:'Su segnalazione',2:'Su richiesta',3:'Per protocolli di intesa',4:'Indicata da RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT'}
     const TIP_INT={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',5:'Altro'}
     const TIP_OPE={1:'Industriale',2:'Civile',3:'Commerciale',5:'Stradale',8:'Scolastica',16:'Altro'}
-    const IMP_LBL={1:'fino a 250.000',2:'da 250.001 a 500.000',3:'da 500.001 a 1.000.000',4:'da 1.000.001 a 1.500.000',5:'da 1.500.001 a 2.500.000',6:'da 2.500.001 a 3.500.000',7:'da 3.500.001 a 5.000.000',8:'da 5.000.001 a 10.000.000',11:'non disponibile'}
+    const IMP_LBL={1:'fino a 250.000',2:'da 250.001 a 500.000',3:'da 500.001 a 1.000.000',4:'da 1.000.001 a 1.500.000',5:'da 1.500.001 a 2.500.000',6:'da 2.500.001 a 3.500.000',7:'da 3.500.001 a 5.000.000',8:'da 5.000.001 a 10.000.000',9:'da 10.000.001 a 15.000.000',10:'oltre 15.000.000',11:'non disponibile'}
     const DUR_LBL={1:'< 30 giorni',2:'da 30 a 90 giorni',3:'da 3 a 6 mesi',4:'da 6 a 12 mesi',5:'> 12 mesi'}
     const PREF_LBL={
       'IMP_LOG':'Logistica','IMP_IGS':'Apprestamenti igienico-sanitari e di sicurezza',
