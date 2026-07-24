@@ -4946,13 +4946,18 @@ async function loadScadenze(){
   Object.values(ultimePerCantiere).forEach(v=>{
     if(v.cantieri&&v.cantieri.cantiere_chiuso)return // cantiere chiuso: niente scadenza
     const ipc=v.ipc||'NR'
-    // Determina data rientro: prima quella inserita dal tecnico, poi quella calcolata
+    // La regola Formedil sull'ULTIMA visita del cantiere decide SE serve un rientro:
+    // se l'esito (n° accesso + IPC) rientra nei casi di archiviazione (es. IPC nessun
+    // rilievo, 2° accesso con IPC basso, ecc.) nessun rientro è dovuto → fuori dallo
+    // scadenziario, anche se in precedenza era stata impostata a mano una data di ritorno
+    // poi superata da un ritorno anticipato del tecnico.
+    const calc=calcRientroFormedil(v.data_visita, v.acc_cant, ipc)
+    if(!calc.date)return // archiviazione: nessun rientro previsto
+    // La data del tecnico (se presente) stabilisce solo QUANDO; altrimenti si usa quella calcolata.
     let dr, isCalcolata=false, tipoCalc=null
     if(v.data_ritorno){
       dr=new Date(v.data_ritorno);dr.setHours(0,0,0,0)
     } else {
-      const calc=calcRientroFormedil(v.data_visita, v.acc_cant, ipc)
-      if(!calc.date)return // archiviazione, nessun rientro
       dr=calc.date;isCalcolata=true;tipoCalc=calc.tipo
     }
 
