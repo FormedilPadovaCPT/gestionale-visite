@@ -5771,9 +5771,14 @@ function _cmRender(fit){
       if(s.lat==null||s.lng==null)return
       const m=L.circleMarker([s.lat,s.lng],{radius:8,color:'#fff',weight:2,fillColor:'#d5008f',fillOpacity:0.95})
       const dt=s.created_at?new Date(s.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'–'
+      const _fid=s.drive_file_id
+      const _img=_fid?('https://drive.google.com/thumbnail?id='+_cmEsc(_fid)+'&sz=w600'):(s.thumb_url||'')
       let ph=''
-      if(s.thumb_url)ph='<a href="'+_cmEsc(s.drive_url||s.thumb_url)+'" target="_blank"><img src="'+_cmEsc(s.thumb_url)+'" referrerpolicy="no-referrer" style="max-width:180px;max-height:120px;border-radius:6px;display:block;margin:4px 0"></a>'
-      else if(s.drive_url)ph='<a href="'+_cmEsc(s.drive_url)+'" target="_blank">📷 Apri foto su Drive</a><br>'
+      if(_img){
+        const _fb=(s.thumb_url&&s.thumb_url!==_img)?_cmEsc(s.thumb_url):''
+        ph='<a href="'+_cmEsc(s.drive_url||_img)+'" target="_blank"><img src="'+_cmEsc(_img)+'" referrerpolicy="no-referrer"'+(_fb?' onerror="this.onerror=null;this.src=\''+_fb+'\'"':'')+' style="max-width:200px;max-height:150px;border-radius:6px;display:block;margin:4px 0"></a>'
+      }else if(s.drive_url)ph='<a href="'+_cmEsc(s.drive_url)+'" target="_blank">📷 Apri foto su Drive</a><br>'
+      const _nav='<a href="https://www.google.com/maps/dir/?api=1&destination='+s.lat+','+s.lng+'&travelmode=driving" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;margin:6px 0 2px;padding:7px 12px;background:var(--orange,#e7500f);color:#fff;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600">🧭 Naviga fin qui</a><br>'
       let btns=''
       if(window.__isCoord){
         btns='<br><button onclick="segnApriAggancio(\''+s.id+'\')" style="background:#d5008f;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">🔗 Aggancia a cantiere</button> '+
@@ -5782,7 +5787,7 @@ function _cmRender(fit){
       m.bindPopup('<b style="color:#d5008f">📍 Cantiere segnalato</b><br>'+
         '<b>Quando:</b> '+dt+'<br>'+
         '<b>Da:</b> '+_cmEsc(s.tecnico_nome||s.segnalata_da||'')+
-        (s.note?'<br><i style="color:#555">'+_cmEsc(s.note)+'</i>':'')+'<br>'+ph+
+        (s.note?'<br><i style="color:#555">'+_cmEsc(s.note)+'</i>':'')+'<br>'+ph+_nav+
         (s.accuracy_m?'<span style="color:#999;font-size:11px">precisione GPS ±'+Math.round(s.accuracy_m)+' m</span>':'')+btns)
       m.addTo(_cmLayer);bounds.push([s.lat,s.lng]);nSeg++
     })
@@ -10747,15 +10752,18 @@ async function showCantiereDetail(cantId){
     }
     // Foto/note da segnalazioni agganciate a questo cantiere
     try{
-      const{data:segs}=await sb.from('segnalazioni_cantiere').select('id,created_at,tecnico_nome,segnalata_da,note,drive_url,thumb_url').eq('cantiere_id',cantId).eq('stato','agganciata').order('created_at',{ascending:false})
+      const{data:segs}=await sb.from('segnalazioni_cantiere').select('id,created_at,tecnico_nome,segnalata_da,note,drive_url,thumb_url,drive_file_id').eq('cantiere_id',cantId).eq('stato','agganciata').order('created_at',{ascending:false})
       if(segs&&segs.length){
         html+=qdSec('Segnalazioni agganciate ('+segs.length+')')
         html+='<div style="display:flex;flex-wrap:wrap;gap:10px">'
         segs.forEach(sg=>{
           const dt=sg.created_at?new Date(sg.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):''
           html+='<div style="width:160px;font-size:11px;color:#666">'
-          if(sg.thumb_url)html+='<a href="'+esc(sg.drive_url||sg.thumb_url)+'" target="_blank"><img src="'+esc(sg.thumb_url)+'" referrerpolicy="no-referrer" style="width:100%;border-radius:8px;display:block;margin-bottom:4px"></a>'
-          else if(sg.drive_url)html+='<a href="'+esc(sg.drive_url)+'" target="_blank">📷 Foto su Drive</a><br>'
+          const _sgImg=sg.drive_file_id?('https://drive.google.com/thumbnail?id='+esc(sg.drive_file_id)+'&sz=w600'):(sg.thumb_url||'')
+          if(_sgImg){
+            const _sgFb=(sg.thumb_url&&sg.thumb_url!==_sgImg)?esc(sg.thumb_url):''
+            html+='<a href="'+esc(sg.drive_url||_sgImg)+'" target="_blank"><img src="'+esc(_sgImg)+'" referrerpolicy="no-referrer"'+(_sgFb?' onerror="this.onerror=null;this.src=\''+_sgFb+'\'"':'')+' style="width:100%;border-radius:8px;display:block;margin-bottom:4px"></a>'
+          }else if(sg.drive_url)html+='<a href="'+esc(sg.drive_url)+'" target="_blank">📷 Foto su Drive</a><br>'
           html+='📍 '+dt+(sg.tecnico_nome?'<br>'+esc(sg.tecnico_nome):'')+(sg.note?'<br><i>'+esc(sg.note)+'</i>':'')
           html+='</div>'
         })
