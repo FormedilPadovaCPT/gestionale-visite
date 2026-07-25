@@ -1055,7 +1055,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="search-bar">
           <input type="text" id="adm-comm-search" placeholder="Nome, CF o P.IVA…" style="flex:1">
           <button class="btn-primary btn-sm" onclick="admLoadCommittenti()">Cerca</button>
-          <button class="btn-outline btn-sm" onclick="var e=$('adm-comm-search');if(e)e.value='';admLoadCommittenti()">Mostra tutti</button>
+          <button class="btn-outline btn-sm" onclick="var e=document.getElementById('adm-comm-search');if(e)e.value='';admLoadCommittenti()">Mostra tutti</button>
         </div>
         <div id="comm-list-count" style="font-size:12px;color:#888;margin-bottom:8px"></div>
         <div id="comm-merge-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#fff4ee;border:1px solid var(--orange,#e7500f);border-radius:8px;padding:8px 12px;margin-bottom:10px">
