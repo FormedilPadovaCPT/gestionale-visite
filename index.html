@@ -650,7 +650,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <div id="cant-quartiere" style="margin-top:4px"></div>
             <div id="cant-info-card" class="hidden" style="margin-top:10px;padding:10px 14px;background:#f8f8f8;border-radius:8px;border-left:3px solid var(--orange);font-size:12px;line-height:1.8;color:#333"></div>
           </div>
-          <button class="btn-outline btn-sm" id="btn-new-cant">+ Nuovo cantiere</button>
+          <button class="btn-outline btn-sm" id="btn-new-cant">+ Nuovo cantiere</button><button class="btn-outline btn-sm" id="btn-edit-cant" type="button" onclick="editCantiereForm()" style="display:none;margin-left:6px" title="Modifica i dati del cantiere selezionato">✏️ Modifica cantiere</button>
           <div class="row" style="margin-top:12px">
             <div class="field"><label>Accesso cantiere n° (dal DB cantiere)</label><input type="text" id="f-acc-cant2" placeholder="Codice accesso interno" readonly style="background:#f8f8f8"></div>
             <div class="field"><label>Protocollo interno</label><input type="text" id="f-prot-int" placeholder="Prot. richiesta"></div>
@@ -2745,6 +2745,7 @@ function computeImpTotals(){
 
 // ── SCHEDA DETTAGLIO CANTIERE ──
 function renderCantCard(c){
+  {const _bec=$('btn-edit-cant');if(_bec)_bec.style.display='inline-flex'}
   const card=$('cant-info-card')
   if(!card)return
   const row=(label,val)=>val?`<div><b style="color:#565c66;min-width:130px;display:inline-block">${label}</b> ${val}</div>`:''
@@ -2812,7 +2813,7 @@ async function _renderCantCardExtra(c){
     if(box)box.innerHTML=html
   }catch(e){console.error('_renderCantCardExtra:',e)}
 }
-function hideCantCard(){const card=$('cant-info-card');if(card){card.innerHTML='';card.classList.add('hidden')}}
+function hideCantCard(){const card=$('cant-info-card');if(card){card.innerHTML='';card.classList.add('hidden')}const _bec=$('btn-edit-cant');if(_bec)_bec.style.display='none'}
 
 // ── AUTOCOMPLETE CANTIERE ──
 // -- RICERCA CANTIERE (comune + indirizzo, esclude terminati) --
@@ -10569,6 +10570,8 @@ async function admEditCantiere(cantId) {
 $('adm-cant-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadCantieri() })
 window.admLoadCantieri = admLoadCantieri
 window.admEditCantiere = admEditCantiere
+function editCantiereForm(){const id=vGet('f-cant-id');if(!id){toast('Seleziona prima un cantiere','warn');return}admEditCantiere(id)}
+window.editCantiereForm=editCantiereForm
 window.admCaricaRiaggancio = admCaricaRiaggancio
 window.admRiaggancia = admRiaggancia
 window._autoDurataCantiere = _autoDurataCantiere
