@@ -396,6 +396,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="scadenze">⏰ Scadenze</button>
     <button id="nav-assev" style="display:none;background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600" onclick="window.open('https://webapp-asseverazione-git-main-asseverazione.vercel.app/dashboard','_blank')">✅ Asseverazione</button>
     <button data-view="admin" id="nav-admin" style="display:none">🔐 Coordinatore</button>
+    <button data-view="committenti" id="nav-committenti" style="display:none">👤 Committenti</button>
     <button data-view="segreteria" id="nav-segreteria" style="display:none">🗂️ Segreteria</button>
   </nav>
   <main>
@@ -1044,6 +1045,44 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       </div>
     </section>
 
+    <section id="view-committenti" class="hidden">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <h3 style="margin:0">&#128100; Gestione committenti</h3>
+          <button class="btn-outline btn-sm" onclick="sgrCercaDupComm()">🧬 Trova possibili duplicati</button>
+        </div>
+        <p style="font-size:12px;color:#888;margin:0 0 10px">Tutti i committenti registrati. Clicca le intestazioni per ordinare, cerca per nome/CF/P.IVA e <b>accorpa</b> quelli che sono lo stesso committente inserito in modi diversi: cantieri e visite vengono spostati sul principale, i doppioni archiviati.</p>
+        <div class="search-bar">
+          <input type="text" id="adm-comm-search" placeholder="Nome, CF o P.IVA…" style="flex:1">
+          <button class="btn-primary btn-sm" onclick="admLoadCommittenti()">Cerca</button>
+          <button class="btn-outline btn-sm" onclick="var e=$('adm-comm-search');if(e)e.value='';admLoadCommittenti()">Mostra tutti</button>
+        </div>
+        <div id="comm-list-count" style="font-size:12px;color:#888;margin-bottom:8px"></div>
+        <div id="comm-merge-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#fff4ee;border:1px solid var(--orange,#e7500f);border-radius:8px;padding:8px 12px;margin-bottom:10px">
+          <span id="comm-merge-count" style="font-size:13px;font-weight:600"></span>
+          <button class="btn-primary btn-sm" onclick="admFondiCommittenti()">🔗 Unisci i selezionati</button>
+          <button class="btn-outline btn-sm" onclick="_commSelClear()">Deseleziona</button>
+          <span style="font-size:11px;color:#888;flex-basis:100%">Spunta due o più committenti che sono lo stesso: sceglierai quale tenere come principale. Attenzione agli omonimi con CF diversi (persone diverse).</span>
+        </div>
+        <div id="sgr-dupcomm-list" style="margin-bottom:12px"></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:30px" title="Seleziona per unione">🔗</th>
+              <th class="cs" data-k="nome" style="cursor:pointer;user-select:none">Committente <span class="cs-i" data-k="nome"></span></th>
+              <th class="cs" data-k="cfp" style="cursor:pointer;user-select:none">CF / P.IVA <span class="cs-i" data-k="cfp"></span></th>
+              <th class="cs" data-k="tipo" style="cursor:pointer;user-select:none">Tipo <span class="cs-i" data-k="tipo"></span></th>
+              <th class="cs" data-k="n_cantieri" style="cursor:pointer;user-select:none;text-align:center">Cantieri <span class="cs-i" data-k="n_cantieri"></span></th>
+              <th class="cs" data-k="n_visite" style="cursor:pointer;user-select:none;text-align:center">Visite <span class="cs-i" data-k="n_visite"></span></th>
+              <th></th>
+            </tr></thead>
+            <tbody id="tbody-adm-comm"></tbody>
+          </table>
+        </div>
+        <div id="comm-empty" class="hidden" style="text-align:center;padding:24px;color:#aaa">Nessun committente trovato</div>
+      </div>
+    </section>
+
     <section id="view-admin" class="hidden">
       <div class="adm-wrap">
         <div class="adm-header">
@@ -1277,44 +1316,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             </table>
           </div>
           <div id="adm-imp-empty" class="hidden" style="text-align:center;padding:16px;color:rgba(255,255,255,.35);font-size:13px">Nessuna impresa trovata</div>
-        </div>
-
-        <!-- ── GESTIONE COMMITTENTI ── -->
-        <div class="adm-section">
-          <div class="adm-section-title">👤 Gestione committenti</div>
-          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:12px">Cerca, correggi e <b>accorpa</b> i committenti registrati: spesso lo stesso committente è stato inserito in modi diversi. L'unione sposta i cantieri collegati sul principale e normalizza il nome sulle visite.</p>
-          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-            <input type="text" id="adm-comm-search" placeholder="Nome, CF o P.IVA…"
-              style="flex:1;min-width:200px;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff"
-              oninput="this.style.color='#fff'">
-            <button class="btn-primary btn-sm" onclick="admLoadCommittenti()">🔍 Cerca</button>
-            <button class="btn-outline btn-sm" onclick="sgrCercaDupComm()">🧬 Trova possibili duplicati</button>
-          </div>
-          <div id="comm-merge-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(231,80,15,.12);border:1px solid rgba(231,80,15,.5);border-radius:8px;padding:8px 12px;margin-bottom:10px">
-            <span id="comm-merge-count" style="font-size:13px;font-weight:600"></span>
-            <button class="btn-primary btn-sm" onclick="admFondiCommittenti()">🔗 Unisci i committenti selezionati</button>
-            <button class="btn-outline btn-sm" onclick="_commSelClear()">Deseleziona</button>
-            <span style="font-size:11px;color:rgba(255,255,255,.5);flex-basis:100%">Spunta due o più committenti che sono lo stesso: sceglierai quale tenere come principale; cantieri e visite delle altre voci verranno spostati su di esso e le voci archiviate.</span>
-          </div>
-          <div id="sgr-dupcomm-list" style="margin-bottom:12px"></div>
-          <div class="tbl-wrap" style="background:rgba(255,255,255,.05);border-radius:8px">
-            <table style="color:rgba(255,255,255,.85);font-size:12px;width:100%;border-collapse:collapse">
-              <thead>
-                <tr style="border-bottom:1px solid rgba(255,255,255,.15)">
-                  <th style="padding:8px 4px;width:26px" title="Seleziona per unione">🔗</th>
-                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Committente</th>
-                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">CF / P.IVA</th>
-                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Tipo</th>
-                  <th style="padding:8px 10px;text-align:center;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Cantieri</th>
-                  <th style="padding:8px 10px;text-align:center;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Visite</th>
-                  <th style="padding:8px 4px"></th>
-                </tr>
-              </thead>
-              <tbody id="tbody-adm-comm">
-                <tr><td colspan="7" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Usa la ricerca oppure "Trova possibili duplicati"</td></tr>
-              </tbody>
-            </table>
-          </div>
         </div>
 
         <!-- Gestione cantieri -->
@@ -2156,6 +2157,7 @@ async function onLogin(user){
   if(navAdm)navAdm.style.display=isCoordPage?'':'none'
   const navSgr=$('nav-segreteria')
   if(navSgr)navSgr.style.display=isSegreteria?'':'none'
+  const navCom=$('nav-committenti');if(navCom)navCom.style.display=isSegreteria?'':'none'
   const navAsv=$('nav-assev')
   if(navAsv)navAsv.style.display=ASSEV_EMAILS.includes(_uem)?'':'none'
   await loadVoci()
@@ -2195,7 +2197,7 @@ function showScr(n){
 }
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','cantieri','rubrica','import','scadenze','admin','segreteria'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','rubrica','import','scadenze','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
@@ -2206,6 +2208,7 @@ function navTo(view){
   if(view==='scadenze')loadScadenze().catch(e=>{console.error('loadScadenze:',e);toast('Errore scadenze: '+e.message,'err')})
   if(view==='admin'){admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
   if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e))}
+  if(view==='committenti')admLoadCommittenti().catch(e=>console.error('committenti:',e))
 }
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
   b.onclick=()=>{if(b.dataset.view==='form')initForm();navTo(b.dataset.view)}
@@ -10166,37 +10169,54 @@ window.admFondiImprese=admFondiImprese
 window.admLoadImprese = admLoadImprese
 window.admEditImpresa = admEditImpresa
 
-// ── GESTIONE COMMITTENTI (segreteria) ──
+// ── GESTIONE COMMITTENTI (pagina dedicata, solo segreteria) ──
 let _commRows=[]
 let _commSel=new Map()
+let _commSort={k:'nome',dir:1}
 function _commMergeBar(){const bar=$('comm-merge-bar');if(!bar)return;const n=_commSel.size;bar.style.display=n>=2?'flex':'none';const c=$('comm-merge-count');if(c)c.textContent=n+' committente/i selezionato/i'}
 function _commSelToggle(cb){const id=cb.dataset.id;if(cb.checked)_commSel.set(id,cb.dataset.nome||id);else _commSel.delete(id);_commMergeBar()}
 function _commSelClear(){_commSel.clear();document.querySelectorAll('.comm-sel-chk').forEach(c=>c.checked=false);_commMergeBar()}
 function _commTipoLbl(k){return (k.tipo_sogg||'')||(k.committente_tipo==1?'Pubblico':(k.committente_tipo==2?'Privato':''))}
-function _commRowHtml(k){
-  const id=k.committente_id
-  const cfp=k.cf_piva||k.piva||''
-  return '<tr style="border-bottom:1px solid rgba(255,255,255,.08)" onmouseover="this.style.background=\'rgba(255,255,255,.06)\'" onmouseout="this.style.background=\'\'">'+
-    '<td style="padding:8px 4px;text-align:center"><input type="checkbox" class="comm-sel-chk" data-id="'+esc(id)+'" data-nome="'+esc(k.committente_nome||'')+'" '+(_commSel.has(id)?'checked':'')+' onchange="_commSelToggle(this)" style="width:16px;height:16px;cursor:pointer"></td>'+
-    '<td style="padding:8px 10px;font-weight:500">'+esc(k.committente_nome||'')+'</td>'+
-    '<td style="padding:8px 10px;font-family:monospace;font-size:11px;color:rgba(255,255,255,.6)">'+esc(cfp)+'</td>'+
-    '<td style="padding:8px 10px;color:rgba(255,255,255,.65);font-size:11px">'+esc(_commTipoLbl(k))+'</td>'+
-    '<td style="padding:8px 10px;text-align:center;color:rgba(255,255,255,.75)">'+(k.n_cantieri||0)+'</td>'+
-    '<td style="padding:8px 10px;text-align:center;color:rgba(255,255,255,.75)">'+(k.n_visite||0)+'</td>'+
-    '<td style="padding:8px 4px;text-align:right;white-space:nowrap"><button class="btn-primary btn-sm" title="Modifica" onclick="admEditCommittente(\''+esc(id)+'\')">✏️</button></td></tr>'
+function _commSortVal(k,key){
+  if(key==='n_cantieri')return k.n_cantieri||0
+  if(key==='n_visite')return k.n_visite||0
+  if(key==='cfp')return (k.cf_piva||k.piva||'').toLowerCase()
+  if(key==='tipo')return _commTipoLbl(k).toLowerCase()
+  return (k.committente_nome||'').toLowerCase()
 }
+function _commRowHtml(k){
+  const id=k.committente_id, cfp=k.cf_piva||k.piva||''
+  return '<tr>'+
+    '<td style="text-align:center"><input type="checkbox" class="comm-sel-chk" data-id="'+esc(id)+'" data-nome="'+esc(k.committente_nome||'')+'" '+(_commSel.has(id)?'checked':'')+' onchange="_commSelToggle(this)" style="width:16px;height:16px;cursor:pointer"></td>'+
+    '<td style="font-weight:500">'+esc(k.committente_nome||'')+'</td>'+
+    '<td style="font-family:monospace;font-size:11px;color:#666">'+esc(cfp)+'</td>'+
+    '<td style="font-size:12px">'+esc(_commTipoLbl(k))+'</td>'+
+    '<td style="text-align:center">'+(k.n_cantieri||0)+'</td>'+
+    '<td style="text-align:center">'+(k.n_visite||0)+'</td>'+
+    '<td style="text-align:right;white-space:nowrap"><button class="btn-outline btn-sm" title="Modifica" onclick="admEditCommittente(\''+esc(id)+'\')">✏️</button> <button class="btn-outline btn-sm" title="Trova simili" onclick="admSimiliCommittente(\''+esc(id)+'\')">🧬</button></td></tr>'
+}
+function _commRender(){
+  const tb=$('tbody-adm-comm');if(!tb)return
+  const k=_commSort.k,dir=_commSort.dir
+  const rows=[..._commRows].sort((a,b)=>{const va=_commSortVal(a,k),vb=_commSortVal(b,k);return (va<vb?-1:va>vb?1:0)*dir})
+  tb.innerHTML=rows.map(_commRowHtml).join('')
+  document.querySelectorAll('#view-committenti .cs-i').forEach(s=>s.textContent=(s.dataset.k===k)?(dir>0?' ▲':' ▼'):'')
+  const cnt=$('comm-list-count');if(cnt)cnt.textContent=_commRows.length+' committenti'
+  _commMergeBar()
+}
+function commSort(k){if(_commSort.k===k)_commSort.dir*=-1;else{_commSort.k=k;_commSort.dir=1}_commRender()}
 async function admLoadCommittenti(){
   const q=($('adm-comm-search')?.value||'').trim()
   const tb=$('tbody-adm-comm');if(!tb)return
-  tb.innerHTML='<tr><td colspan="7" style="padding:16px;text-align:center;color:rgba(255,255,255,.35)">Caricamento…</td></tr>'
+  tb.innerHTML='<tr><td colspan="7" style="padding:16px;text-align:center;color:#aaa">Caricamento…</td></tr>'
+  const emp=$('comm-empty');if(emp)emp.classList.add('hidden')
   try{
     const{data,error}=await sb.rpc('committenti_lista',{p_search:q||null})
     if(error)throw error
-    if(!data||!data.length){tb.innerHTML='<tr><td colspan="7" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Nessun committente trovato</td></tr>';return}
-    _commRows=data
-    tb.innerHTML=data.map(_commRowHtml).join('')
-    _commMergeBar()
-  }catch(e){console.error('admLoadCommittenti',e);tb.innerHTML='<tr><td colspan="7" style="padding:16px;text-align:center;color:#ff6b6b">Errore: '+esc(e.message||'')+'</td></tr>'}
+    _commRows=data||[]
+    if(!_commRows.length){tb.innerHTML='';if(emp)emp.classList.remove('hidden');const cnt=$('comm-list-count');if(cnt)cnt.textContent='0 committenti';return}
+    _commRender()
+  }catch(e){console.error('admLoadCommittenti',e);tb.innerHTML='<tr><td colspan="7" style="padding:16px;text-align:center;color:#c00">Errore: '+esc(e.message||'')+'</td></tr>'}
 }
 async function admEditCommittente(id){
   const k=(_commRows||[]).find(x=>x.committente_id===id)||{}
@@ -10231,25 +10251,39 @@ async function admFondiCommittenti(){
   }catch(e){toast('Errore unione: '+(e.message||e),'err')}
 }
 let _dupCommGroups=[]
+function _dupGroupHtml(g,gi){
+  const badge=g.tipo==='identico'
+    ?'<span style="background:var(--orange,#e7500f);color:#fff;padding:1px 7px;border-radius:10px;font-size:10px">nome identico</span>'
+    :'<span style="background:#565c66;color:#fff;padding:1px 7px;border-radius:10px;font-size:10px">simile'+(g.sim!=null?' '+Math.round(g.sim*100)+'%':'')+'</span>'
+  const rows=(g.membri||[]).map((m,mi)=>'<label style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;cursor:pointer"><input type="radio" name="dc-'+gi+'" value="'+esc(m.id)+'" '+(mi===0?'checked':'')+'> <b>'+esc(m.nome||'')+'</b> <span style="font-family:monospace;color:#888">'+esc(m.cfp||'')+'</span> <span style="color:#aaa">· '+(m.n_cantieri||0)+' cant · '+(m.n_visite||0)+' vis</span></label>').join('')
+  return '<div style="border:1px solid #e2e2e2;border-radius:8px;padding:10px;margin-bottom:8px;background:#fafafa">'+
+    '<div style="margin-bottom:6px">'+badge+' <span style="font-size:11px;color:#888">scegli quale TENERE (principale):</span></div>'+
+    rows+'<button class="btn-primary btn-sm" style="margin-top:6px" onclick="sgrFondiDupComm('+gi+')">🔗 Unisci gruppo</button></div>'
+}
 async function sgrCercaDupComm(){
   const box=$('sgr-dupcomm-list');if(!box)return
-  box.innerHTML='<p style="color:rgba(255,255,255,.4);font-size:12px">Ricerca duplicati in corso…</p>'
+  box.innerHTML='<p style="color:#888;font-size:12px">Ricerca duplicati in corso…</p>'
   try{
     const{data,error}=await sb.rpc('committenti_duplicati')
     if(error)throw error
     const groups=data||[];_dupCommGroups=groups
-    if(!groups.length){box.innerHTML='<p style="color:rgba(255,255,255,.4);font-size:12px">Nessun possibile duplicato trovato 🎉</p>';return}
-    box.innerHTML='<div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:8px">'+groups.length+' gruppi da verificare — <b>identico</b>=nome uguale, <b>simile</b>=grafia diversa. Attenzione agli omonimi con CF diversi (persone diverse):</div>'+groups.map((g,gi)=>{
-      const badge=g.tipo==='identico'
-        ?'<span style="background:#e7500f;color:#fff;padding:1px 7px;border-radius:10px;font-size:10px">nome identico</span>'
-        :'<span style="background:#565c66;color:#fff;padding:1px 7px;border-radius:10px;font-size:10px">simile'+(g.sim!=null?' '+Math.round(g.sim*100)+'%':'')+'</span>'
-      const rows=(g.membri||[]).map((m,mi)=>'<label style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;cursor:pointer"><input type="radio" name="dc-'+gi+'" value="'+esc(m.id)+'" '+(mi===0?'checked':'')+'> <b>'+esc(m.nome||'')+'</b> <span style="font-family:monospace;color:rgba(255,255,255,.5)">'+esc(m.cfp||'')+'</span> <span style="color:rgba(255,255,255,.45)">· '+(m.n_cantieri||0)+' cant · '+(m.n_visite||0)+' vis</span></label>').join('')
-      return '<div style="border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px;margin-bottom:8px">'+
-        '<div style="margin-bottom:6px">'+badge+' <span style="font-size:11px;color:rgba(255,255,255,.45)">scegli quale TENERE (principale):</span></div>'+
-        rows+
-        '<button class="btn-primary btn-sm" style="margin-top:6px" onclick="sgrFondiDupComm('+gi+')">🔗 Unisci gruppo</button></div>'
-    }).join('')
-  }catch(e){box.innerHTML='<p style="color:#ff6b6b;font-size:12px">Errore: '+esc(e.message||'')+'</p>'}
+    if(!groups.length){box.innerHTML='<p style="color:#888;font-size:12px">Nessun duplicato per nome identico 🎉 (usa 🧬 su una riga per cercare nomi simili)</p>';return}
+    box.innerHTML='<div style="font-size:12px;color:#666;margin-bottom:8px"><b>'+groups.length+'</b> gruppi con nome identico — scegli quale tenere. Attenzione agli omonimi persone fisiche con CF diversi (soggetti diversi):</div>'+groups.map((g,gi)=>_dupGroupHtml(g,gi)).join('')
+  }catch(e){box.innerHTML='<p style="color:#c00;font-size:12px">Errore: '+esc(e.message||'')+'</p>'}
+}
+async function admSimiliCommittente(id){
+  const box=$('sgr-dupcomm-list');if(!box)return
+  box.innerHTML='<p style="color:#888;font-size:12px">Ricerca simili…</p>'
+  try{
+    const{data,error}=await sb.rpc('committenti_simili',{p_id:id})
+    if(error)throw error
+    const base=(_commRows||[]).find(x=>x.committente_id===id)||{committente_id:id,committente_nome:'',cf_piva:''}
+    const simili=data||[]
+    if(!simili.length){box.innerHTML='<p style="color:#888;font-size:12px">Nessun nome simile trovato per "'+esc(base.committente_nome||id)+'".</p>';return}
+    const membri=[{id:base.committente_id,nome:base.committente_nome,cfp:base.cf_piva||base.piva||'',n_cantieri:base.n_cantieri,n_visite:base.n_visite}].concat(simili.map(s=>({id:s.id,nome:s.nome,cfp:s.cfp,n_cantieri:s.n_cantieri,n_visite:s.n_visite})))
+    _dupCommGroups=[{tipo:'simile',membri:membri}]
+    box.innerHTML='<div style="font-size:12px;color:#666;margin-bottom:8px">Nomi simili a <b>'+esc(base.committente_nome||'')+'</b> — spunta quale tenere e unisci (verifica che siano davvero lo stesso soggetto):</div>'+_dupGroupHtml(_dupCommGroups[0],0)
+  }catch(e){box.innerHTML='<p style="color:#c00;font-size:12px">Errore: '+esc(e.message||'')+'</p>'}
 }
 async function sgrFondiDupComm(gi){
   const g=_dupCommGroups[gi];if(!g)return
@@ -10259,12 +10293,12 @@ async function sgrFondiDupComm(gi){
   const dupeIds=(g.membri||[]).map(m=>m.id).filter(x=>x!==masterId)
   if(!dupeIds.length){toast('Nessun doppione da unire','warn');return}
   const mnome=((g.membri||[]).find(m=>m.id===masterId)||{}).nome||masterId
-  if(!confirm('Unione gruppo:\n\nPRINCIPALE (tenuto): '+mnome+'\nArchiviati: '+dupeIds.length+'\n\nProcedere?'))return
+  if(!confirm('Unione:\n\nPRINCIPALE (tenuto): '+mnome+'\nArchiviati: '+dupeIds.length+'\n\nProcedere?'))return
   try{
     const{data,error}=await sb.rpc('fondi_committenti',{p_master_id:masterId,p_dupe_ids:dupeIds})
     if(error)throw error
-    toast('Gruppo unito ('+((data&&data.cantieri_spostati)||0)+' cantieri spostati)','ok')
-    sgrCercaDupComm()
+    toast('Unito ('+((data&&data.cantieri_spostati)||0)+' cantieri spostati)','ok')
+    sgrCercaDupComm();admLoadCommittenti()
   }catch(e){toast('Errore unione: '+(e.message||e),'err')}
 }
 window.admLoadCommittenti=admLoadCommittenti
@@ -10274,7 +10308,10 @@ window.admEditCommittente=admEditCommittente
 window.admFondiCommittenti=admFondiCommittenti
 window.sgrCercaDupComm=sgrCercaDupComm
 window.sgrFondiDupComm=sgrFondiDupComm
-$('adm-comm-search')?.addEventListener('keydown',e=>{if(e.key==='Enter')admLoadCommittenti()})
+window.admSimiliCommittente=admSimiliCommittente
+window.commSort=commSort
+document.querySelectorAll('#view-committenti th.cs').forEach(function(th){th.onclick=function(){commSort(th.dataset.k)}})
+$('adm-comm-search')?.addEventListener('keydown',function(e){if(e.key==='Enter')admLoadCommittenti()})
 
 
 // ── GESTIONE CANTIERI (coordinatore) ──

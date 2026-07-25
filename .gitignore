@@ -1,6 +1,6 @@
 
 index_pre_*.html.bak
 app-data_pre_*.js.bak
-_comm_block.*
-_main_check.js
-_main_script_check.js
+_comm_*
+_main*.js
+_chk.js
