@@ -5847,6 +5847,9 @@ function _cmBuildFilters(rows){
   mkSel('cm-f-scad','<option value="">🗓️ Tutte le scadenze</option>'+_CM_SCAD.map(s=>`<option value="${s.k}">${s.label}</option>`).join(''))
   mkSel('cm-f-orig','<option value="">🏷️ Origine: tutti</option><option value="cnce">Cantieri CNCE/CEIV</option><option value="segn">Segnalati da tecnici</option>')
   mkSel('cm-f-visite','<option value="">👷 Visite: tutti</option><option value="si">Con visite</option><option value="no">Senza visite</option>')
+  const _rst=document.createElement('button');_rst.type='button';_rst.textContent='↺ Mostra tutti';_rst.title='Azzera i filtri e mostra tutti i cantieri';_rst.style.cssText=pill+';background:#f2f2f2;font-weight:600;white-space:nowrap';
+  _rst.onclick=()=>{if(window.__cmComSel instanceof Set)window.__cmComSel.clear();['cm-f-opera','cm-f-importo','cm-f-scad','cm-f-orig','cm-f-visite'].forEach(id=>{const e=$(id);if(e)e.value=''});cRows();cLbl();_cmRender(true)};
+  fdiv.appendChild(_rst)
 }
 function _cmEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 
