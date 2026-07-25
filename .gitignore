@@ -4,3 +4,5 @@ app-data_pre_*.js.bak
 _comm_*
 _main*.js
 _chk.js
+_old_edit.*
+_new_edit.*
