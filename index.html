@@ -1256,7 +1256,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <label style="color:rgba(255,255,255,.7);font-size:11px;letter-spacing:.4px;font-weight:600;margin-bottom:6px;display:block">ESPORTA VISITA IN EXCEL</label>
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
               <div style="flex:1;min-width:160px">
-                <input type="text" id="adm-excel-verbale" placeholder="N° verbale (es. CPT/2026/0001)" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff" oninput="this.style.color='#fff'">
+                <input type="text" id="adm-excel-verbale" placeholder="N° verbale (es. CPT/25_26/0001)" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff" oninput="this.style.color='#fff'">
               </div>
               <button class="btn-primary" id="btn-adm-excel-exp" style="background:#27ae60;flex-shrink:0">📊 Esporta Excel</button>
             </div>
@@ -2512,11 +2512,13 @@ async function initForm(snap=null){
 }
 
 async function nextVerbale(){
-  const yr=new Date().getFullYear()
-  const{data}=await sb.from('visite').select('nr_verbale').like('nr_verbale',`CPT/${yr}/%`).order('nr_verbale',{ascending:false}).limit(1)
-  if(!data?.length)return`CPT/${yr}/0001`
+  const n=new Date();const start=(n.getMonth()+1)>=10?n.getFullYear():n.getFullYear()-1
+  const es=String(start%100).padStart(2,'0')+'_'+String((start+1)%100).padStart(2,'0')
+  const pref=`CPT/${es}/`
+  const{data}=await sb.from('visite').select('nr_verbale').like('nr_verbale',pref+'%').order('nr_verbale',{ascending:false}).limit(1)
+  if(!data?.length)return pref+'0001'
   const last=parseInt(data[0].nr_verbale.split('/')[2])||0
-  return`CPT/${yr}/${String(last+1).padStart(4,'0')}`
+  return pref+String(last+1).padStart(4,'0')
 }
 
 function buildLavChecks(){
