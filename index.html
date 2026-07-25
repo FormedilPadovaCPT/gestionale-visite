@@ -943,7 +943,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
         <div class="search-bar">
           <input type="text" id="q-cant" placeholder="Indirizzo, comune, etichetta o codice CNCE…" style="flex:1">
-          <button class="btn-primary btn-sm" id="btn-cerca-cant">Cerca</button>
+          <button class="btn-primary btn-sm" id="btn-cerca-cant">Cerca</button><button class="btn-outline btn-sm" id="btn-tutti-cant">Mostra tutti</button>
         </div>
         <div id="cant-list-filters" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px"></div>
         <div id="cant-list-count" style="font-size:12px;color:#888;margin-bottom:8px"></div>
@@ -5717,6 +5717,7 @@ window._giroVai=function(){
   }else go(null)
 }
 $('btn-cerca-cant').onclick=()=>loadCantieri()
+$('btn-tutti-cant').onclick=()=>{const e=$('q-cant');if(e)e.value='';if(_clState){_clState.comSel.clear();_clState.ope='';_clState.imp='';_clState.sca='';_clState.orig='';_clState.vis=''}loadCantieri('')}
 $('q-cant').onkeydown=e=>{if(e.key==='Enter')loadCantieri()}
 $('btn-nuovo-cant-lista').onclick=()=>{resetModalCantiere();show('modal-cant')}
 
