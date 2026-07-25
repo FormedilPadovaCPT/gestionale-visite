@@ -956,7 +956,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th>Etichetta / Indirizzo</th><th>Comune</th><th>Committente</th><th>Prot. Int.</th><th>CNCE</th><th>Visite</th><th></th></tr></thead>
+            <thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th>Etichetta / Indirizzo</th><th>Comune</th><th>Committente</th><th>Cod. univoco</th><th>CNCE</th><th>Visite</th><th></th></tr></thead>
             <tbody id="tbody-cantieri"></tbody>
           </table>
         </div>
@@ -1805,6 +1805,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     </div>
     <div class="sect-title" style="margin-top:12px">Cantieri collegati <span id="ec-info" style="font-size:11px;color:#888;font-weight:400"></span></div>
     <div id="ec-cantieri-list" style="max-height:200px;overflow:auto;border:1px solid #eee;border-radius:8px;padding:8px;background:#fafafa"></div>
+    <div class="sect-title" style="margin-top:12px">Visite collegate <span id="ec-visite-info" style="font-size:11px;color:#888;font-weight:400"></span></div>
+    <div id="ec-visite-list" style="max-height:200px;overflow:auto;border:1px solid #eee;border-radius:8px;padding:8px;background:#fafafa"></div>
     <div class="modal-actions">
       <button class="btn-outline" id="btn-ec-cancel">Annulla</button>
       <button class="btn-primary" id="btn-ec-save">💾 Salva modifiche</button>
@@ -5419,7 +5421,7 @@ function _dedupComuni(list){
 const _clState={comSel:new Set(),ope:'',imp:'',sca:'',orig:'',vis:''}
 async function loadCantieri(q=''){
   const qStr=q||vGet('q-cant')?.trim()||''
-  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina,lat,lng,geocode_status,cantiere_tip_ope,cantiere_importo,data_ult,cantiere_committente_id').eq('elimina',0).order('updated_at',{ascending:false}).limit(2000)
+  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,elimina,lat,lng,geocode_status,cantiere_tip_ope,cantiere_importo,data_ult,cantiere_committente_id').eq('elimina',0).order('updated_at',{ascending:false}).limit(2000)
   if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*`)
   const{data,error}=await qb
   if(error){toast('Errore caricamento cantieri: '+error.message,'err');return}
@@ -5435,8 +5437,8 @@ async function loadCantieri(q=''){
   })
   // conteggio visite (per colonna e filtro con/senza visite)
   try{
-    const{data:vAll}=await sb.from('visite').select('cantiere_id').eq('elimina',0).limit(10000)
-    const cm={};(vAll||[]).forEach(v=>{if(v.cantiere_id)cm[v.cantiere_id]=(cm[v.cantiere_id]||0)+1})
+    const{data:vm}=await sb.rpc('visite_count_map')
+    const cm=vm||{}
     rows.forEach(r=>r.n_visite=cm[r.cantiere_id]||0)
   }catch(_e){rows.forEach(r=>r.n_visite=0)}
   // nome committente (lookup a blocchi sugli id presenti)
@@ -5550,7 +5552,7 @@ function _clRender(){
       <td><strong>${label}</strong>${quartiereBadge(c.cantiere_indirizzo||'',c.comune_nome||'')}</td>
       <td>${c.comune_nome||'–'}</td>
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${esc(c.committente_nome||'')}">${c.committente_nome?esc(c.committente_nome):'–'}</td>
-      <td>${c.prot_int||'–'}</td>
+      <td>${c.nodo_id||'–'}</td>
       <td>${c.cantiere_cnce||'–'}</td>
       <td><span class="badge badge-bozza">${nVisite}</span></td>
       <td><div class="tbl-actions">
@@ -10282,13 +10284,25 @@ async function admEditCommittente(id){
   const info=$('ec-info');if(info)info.textContent=(k.n_cantieri!=null?('· '+k.n_cantieri+' cantieri · '+(k.n_visite||0)+' visite'):'')
   const box=$('ec-cantieri-list');if(box)box.innerHTML='<div style="color:#aaa;font-size:12px">Caricamento cantieri…</div>'
   show('modal-edit-comm')
+  const vbox=$('ec-visite-list'),vinfo=$('ec-visite-info')
+  if(vbox)vbox.innerHTML='<div style="color:#aaa;font-size:12px">Caricamento visite…</div>'
   try{
-    const{data:cant}=await sb.from('cantieri').select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,comune_nome,cantiere_cnce').eq('cantiere_committente_id',id).order('comune_nome').limit(300)
+    const{data:cant}=await sb.from('cantieri').select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,comune_nome,cantiere_cnce').eq('cantiere_committente_id',id).order('comune_nome').limit(500)
+    const clist=cant||[]
     if(box){
-      if(!cant||!cant.length)box.innerHTML='<div style="color:#aaa;font-size:12px">Nessun cantiere collegato</div>'
-      else box.innerHTML=cant.map(function(c){return '<div style="padding:4px 0;border-bottom:1px solid #eee;font-size:12px"><b>'+esc(c.cantiere_etichetta||c.cantiere_indirizzo||c.cantiere_id)+'</b> <span style="color:#888">'+esc(c.comune_nome||'')+(c.cantiere_cnce?(' · CNCE '+esc(c.cantiere_cnce)):'')+'</span></div>'}).join('')
+      if(!clist.length)box.innerHTML='<div style="color:#aaa;font-size:12px">Nessun cantiere collegato</div>'
+      else box.innerHTML=clist.map(function(c){return '<div style="padding:4px 0;border-bottom:1px solid #eee;font-size:12px"><b>'+esc(c.cantiere_etichetta||c.cantiere_indirizzo||c.cantiere_id)+'</b> <span style="color:#888">'+esc(c.comune_nome||'')+(c.cantiere_cnce?(' · CNCE '+esc(c.cantiere_cnce)):'')+'</span></div>'}).join('')
     }
-  }catch(e){if(box)box.innerHTML='<div style="color:#c00;font-size:12px">Errore cantieri: '+esc(e.message||'')+'</div>'}
+    const cmap={};clist.forEach(function(c){cmap[c.cantiere_id]=c.cantiere_etichetta||c.cantiere_indirizzo||c.cantiere_id})
+    const cids=clist.map(function(c){return c.cantiere_id})
+    let vis=[]
+    if(cids.length){const{data:vv}=await sb.from('visite').select('visita_id,nr_verbale,data_visita,cantiere_id,ipc').in('cantiere_id',cids).eq('elimina',0).order('data_visita',{ascending:false}).limit(500);vis=vv||[]}
+    if(vinfo)vinfo.textContent=vis.length?('· '+vis.length+' visite'):'· nessuna'
+    if(vbox){
+      if(!vis.length)vbox.innerHTML='<div style="color:#aaa;font-size:12px">Nessuna visita collegata</div>'
+      else vbox.innerHTML=vis.map(function(v){var d=v.data_visita?new Date(v.data_visita).toLocaleDateString('it-IT'):'';return '<div style="padding:4px 0;border-bottom:1px solid #eee;font-size:12px"><b>'+esc(v.nr_verbale||v.visita_id)+'</b> <span style="color:#888">'+d+' · '+esc(cmap[v.cantiere_id]||'')+(v.ipc?(' · IPC '+esc(v.ipc)):'')+'</span></div>'}).join('')
+    }
+  }catch(e){if(box)box.innerHTML='<div style="color:#c00;font-size:12px">Errore: '+esc(e.message||'')+'</div>'}
 }
 async function admSaveEditComm(){
   if(!_editCommId)return

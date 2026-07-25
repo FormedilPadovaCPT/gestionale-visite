@@ -6,3 +6,5 @@ _main*.js
 _chk.js
 _old_edit.*
 _new_edit.*
+_cnt_*
+_vis_*
