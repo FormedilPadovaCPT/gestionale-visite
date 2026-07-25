@@ -912,7 +912,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <input type="text" id="q-search" placeholder="Verbale, cantiere, impresa…">
           <select id="q-ipc"><option value="">Tutti IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun Rilievo</option></select>
           <select id="q-stato"><option value="">Tutti stati</option><option value="bozza">Bozza</option><option value="definitivo">Definitivo</option></select>
-          <select id="q-tec"><option value="">Tutti i tecnici</option></select>
+          <select id="q-tec"><option value="">Tutti i tecnici</option></select><select id="q-eserc" title="Esercizio (anno edile ott–set)"></select>
           <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button><label id="q-elim-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer"><input type="checkbox" id="q-elim"> Mostra eliminate</label>
         </div>
         <div class="tbl-wrap">
@@ -5232,10 +5232,19 @@ async function loadLista(){
     }catch(_e){}
     _qt.onchange=loadLista
   }
+  const _qy=$('q-eserc')
+  if(_qy&&!_qy.dataset.init){
+    _qy.dataset.init='1'
+    const _cur=(function(){const n=new Date();return (n.getMonth()+1)>=10?n.getFullYear():n.getFullYear()-1})()
+    let _oh='<option value="">Tutti gli esercizi (max 1000)</option>'
+    for(let y=_cur;y>=2023;y--)_oh+='<option value="'+y+'">'+y+'-'+(y+1)+'</option>'
+    _qy.innerHTML=_oh;_qy.value=String(_cur);_qy.onchange=loadLista
+  }
   let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,elimina,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
   if(!_showElim)qb=qb.eq('elimina',0)
   if(fi)qb=qb.eq('ipc',fi)
   if(fs)qb=qb.eq('stato',fs)
+  const _fy=_qy?_qy.value:'';if(_fy)qb=qb.gte('data_visita',_fy+'-10-01').lte('data_visita',(parseInt(_fy,10)+1)+'-09-30')
   const _ft=_qt?_qt.value:''
   if(_ft)qb=qb.or(`tecnico_id.eq.${_ft},tecnico2_id.eq.${_ft}`)
   const{data}=await qb
