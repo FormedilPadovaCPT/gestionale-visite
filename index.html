@@ -5017,10 +5017,21 @@ async function loadScadenze(){
   const oggi=new Date();oggi.setHours(0,0,0,0)
   const ipcOrd={ALTO:0,MEDIO:1,BASSO:2,NR:3,'':3}
 
-  const{data:vs}=await sb.from('visite')
-    .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,acc_cant,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_civico,cantiere_etichetta,comune_nome,lat,lng,geocode_status,cantiere_chiuso)')
-    .eq('elimina',0).order('data_visita',{ascending:false})
-  const visite=vs||[]
+  // Carica TUTTE le visite paginando (PostgREST limita a 1000 righe per richiesta):
+  // senza questo, lo scadenziario vedeva solo le visite piu' recenti e nascondeva i cantieri vecchi mai richiamati.
+  let visite=[]
+  {
+    const PAGE=1000
+    for(let off=0;;off+=PAGE){
+      const{data:vs,error:ev}=await sb.from('visite')
+        .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,acc_cant,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_civico,cantiere_etichetta,comune_nome,lat,lng,geocode_status,cantiere_chiuso)')
+        .eq('elimina',0).order('data_visita',{ascending:false}).range(off,off+PAGE-1)
+      if(ev){console.error('loadScadenze visite',ev);break}
+      if(!vs||!vs.length)break
+      visite=visite.concat(vs)
+      if(vs.length<PAGE)break
+    }
+  }
 
   const{data:tecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome')
   const tecMap={}
