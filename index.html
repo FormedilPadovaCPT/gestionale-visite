@@ -5444,11 +5444,19 @@ function _dedupComuni(list){
 const _clState={comSel:new Set(),ope:'',imp:'',sca:'',orig:'',vis:''}
 async function loadCantieri(q=''){
   const qStr=q||vGet('q-cant')?.trim()||''
-  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,elimina,lat,lng,geocode_status,cantiere_tip_ope,cantiere_importo,data_ult,cantiere_committente_id').eq('elimina',0).order('updated_at',{ascending:false}).limit(2000)
-  if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*`)
-  const{data,error}=await qb
-  if(error){toast('Errore caricamento cantieri: '+error.message,'err');return}
-  const rows=data||[]
+  const _selC='cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,elimina,lat,lng,geocode_status,cantiere_tip_ope,cantiere_importo,data_ult,cantiere_committente_id'
+  // Carica TUTTI i cantieri non eliminati (paginazione): i filtri lato client (comune, ecc.)
+  // devono vedere l'intero set, non solo le prime N righe per updated_at.
+  let rows=[],_fromC=0
+  for(;;){
+    let qb=sb.from('cantieri').select(_selC).eq('elimina',0).order('updated_at',{ascending:false}).range(_fromC,_fromC+999)
+    if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*`)
+    const{data,error}=await qb
+    if(error){toast('Errore caricamento cantieri: '+error.message,'err');return}
+    rows=rows.concat(data||[])
+    if(!data||data.length<1000)break
+    _fromC+=1000
+  }
   // zona: per Padova usa il quartiere ricavato dallo stradario (come in mappa)
   rows.forEach(r=>{
     let zk=r.comune_nome||''
@@ -7579,7 +7587,7 @@ async function genPDF(vid, output='save'){
     }
 
     // FOTO – griglia 2×2 (~70×70 mm per foto)
-    const FOTO_TIPI=['foto1','foto2','foto3','foto4']
+    const FOTO_TIPI=['foto1','foto2','foto3','foto4','privacy']
     const imgMap={}
 
     // 1. Usa base64 già in memoria (sessione corrente, dopo selezione file)
@@ -7673,10 +7681,11 @@ async function genPDF(vid, output='save'){
       doc.setFillColor(...ORANGE);doc.rect(L,y,W,6,'F')
       setFont('bold',9,WHITE);doc.text('DOCUMENTAZIONE FOTOGRAFICA',L+2,y+4.5)
       ln(10)
-      // Griglia 2×2 – celle 70×70 mm centrate nella pagina
+      // Griglia a 2 colonne, celle 70×70 mm centrate; foto1..foto4 + eventuale foto privacy/firma
       const FW=70,FH=70,FGAP=12
       const fx=L+(W-2*FW-FGAP)/2
-      const fPos=[[fx,y],[fx+FW+FGAP,y],[fx,y+FH+FGAP],[fx+FW+FGAP,y+FH+FGAP]]
+      const _phF=doc.internal.pageSize.getHeight()
+      const FOTO_LBL={privacy:'Informativa privacy / firma'}
       // Legge larghezza e altezza dall'header JPEG (sincrono, nessun Image element)
       const jpegSize=dataUri=>{
         try{
@@ -7696,10 +7705,14 @@ async function genPDF(vid, output='save'){
         }catch(e){}
         return{w:4,h:3}  // fallback proporzione 4:3
       }
-      for(let i=0;i<FOTO_TIPI.length;i++){
-        const uri=imgMap[FOTO_TIPI[i]]
-        if(!uri) continue
-        const[px,py]=fPos[i]
+      // Disegna solo gli slot presenti, in ordine (privacy in coda), a 2 per riga con a-capo pagina
+      const _present=FOTO_TIPI.filter(t=>imgMap[t])
+      let _col=0,_rowTop=y
+      for(let i=0;i<_present.length;i++){
+        if(_col===0 && _rowTop+FH+FGAP>_phF-15){doc.addPage();y=15;_rowTop=y}
+        const _tipo=_present[i]
+        const uri=imgMap[_tipo]
+        const px=fx+_col*(FW+FGAP), py=_rowTop
         try{
           // Comprimi la foto al volo (max 800px) prima di aggiungerla al PDF — evita rallentamenti con foto originali
           const b64orig=uri.includes(',')?uri.split(',')[1]:uri
@@ -7712,9 +7725,12 @@ async function genPDF(vid, output='save'){
           if(ratio>=1){iw=FW;ih=FW/ratio}else{ih=FH;iw=FH*ratio}
           const ox=(FW-iw)/2, oy=(FH-ih)/2
           doc.addImage(pdfUri,'JPEG',px+ox,py+oy,iw,ih,undefined,'FAST')
+          if(FOTO_LBL[_tipo]){setFont('normal',7,GREY);doc.text(FOTO_LBL[_tipo],px+FW/2,py+FH+4,{align:'center'})}
         }catch(e){/* formato non supportato */}
+        _col++
+        if(_col===2){_col=0;_rowTop+=FH+FGAP}
       }
-      ln(2*FH+FGAP+10)
+      y=_rowTop+(_col===1?FH+FGAP:0)+10
     }
 
     // FIRMA – carica immagini firma da Supabase Storage
