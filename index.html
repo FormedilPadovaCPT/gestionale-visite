@@ -5684,12 +5684,15 @@ window.fondiSelezionati=async function(){
     const keeper=ov.querySelector('input[name="fsel-keep"]:checked')?.value
     if(!keeper)return
     const losers=ids.filter(id=>id!==keeper)
-    if(!confirm('Unire '+losers.length+' cantiere/i su quello selezionato?\nVisite e segnalazioni verranno spostate, gli altri cantieri archiviati.\n\nOperazione non reversibile dalla lista.'))return
+    // Se il cantiere mantenuto non ha CNCE ma uno dei doppioni si, il codice viene ereditato: lo dico prima.
+    const _kr=rows.find(c=>c.cantiere_id===keeper)
+    const _cnceEred=(_kr&&!String(_kr.cantiere_cnce||'').trim())?(rows.find(c=>c.cantiere_id!==keeper&&String(c.cantiere_cnce||'').trim())||{}).cantiere_cnce||'':''
+    if(!confirm('Unire '+losers.length+' cantiere/i su quello selezionato?\nVisite e segnalazioni verranno spostate, gli altri cantieri archiviati.'+(_cnceEred?'\n\nIl cantiere mantenuto non ha codice CNCE: eredita il codice '+_cnceEred+' dal doppione.':'')+'\n\nOperazione non reversibile dalla lista.'))return
     const go=ov.querySelector('#fsel-go');go.disabled=true;go.textContent='Fusione…'
     try{
       const{data:all}=await sb.from('cantieri').select('*').in('cantiere_id',ids)
       const k=(all||[]).find(c=>c.cantiere_id===keeper)
-      const FIELDS=['cantiere_committente_id','cantiere_importo','cantiere_durata','cantiere_tip_int','cantiere_tip_ope','cantiere_tip_ope_altro','cantiere_cap','cantiere_comune_cod','comune_nome','data_ult','data_inizio_lavori','lat','lng','nodo_id','cantiere_descrizione']
+      const FIELDS=['cantiere_committente_id','cantiere_importo','cantiere_durata','cantiere_tip_int','cantiere_tip_ope','cantiere_tip_ope_altro','cantiere_cap','cantiere_comune_cod','comune_nome','data_ult','data_inizio_lavori','lat','lng','nodo_id','cantiere_descrizione','cantiere_cnce','cantiere_etichetta']
       const upd={}
       FIELDS.forEach(f=>{
         if(k&&(k[f]==null||k[f]==='')){
@@ -5697,10 +5700,14 @@ window.fondiSelezionati=async function(){
           if(s2)upd[f]=s2[f]
         }
       })
-      if(Object.keys(upd).length){const r0=await sb.from('cantieri').update(upd).eq('cantiere_id',keeper);if(r0.error)throw r0.error}
+      // 1) sposto visite e segnalazioni sul cantiere mantenuto
       let r=await sb.from('visite').update({cantiere_id:keeper}).in('cantiere_id',losers);if(r.error)throw r.error
       r=await sb.from('segnalazioni_cantiere').update({cantiere_id:keeper}).in('cantiere_id',losers);if(r.error)throw r.error
+      // 2) archivio i doppioni PRIMA di completare il keeper: il CNCE ereditato
+      //    violerebbe l'indice unico ux_cantieri_cnce_attivi finche' i doppioni sono attivi
       r=await sb.from('cantieri').update({elimina:1}).in('cantiere_id',losers);if(r.error)throw r.error
+      // 3) completo i campi mancanti del cantiere mantenuto (CNCE ed etichetta compresi)
+      if(Object.keys(upd).length){const r0=await sb.from('cantieri').update(upd).eq('cantiere_id',keeper);if(r0.error)throw r0.error}
       ov.remove()
       toast('Fusione completata: '+losers.length+' cantiere/i uniti e archiviati','ok')
       _giroClear()
@@ -8631,7 +8638,7 @@ async function sgrFondiDupCnce(gi,cnce){
   try{
     const{data:all}=await sb.from('cantieri').select('*').in('cantiere_id',ids)
     const k=(all||[]).find(c=>c.cantiere_id===keeper)
-    const FIELDS=['cantiere_committente_id','cantiere_importo','cantiere_durata','cantiere_tip_int','cantiere_tip_ope','cantiere_tip_ope_altro','cantiere_cap','cantiere_comune_cod','comune_nome','data_ult','data_inizio_lavori','lat','lng','nodo_id','cantiere_descrizione']
+    const FIELDS=['cantiere_committente_id','cantiere_importo','cantiere_durata','cantiere_tip_int','cantiere_tip_ope','cantiere_tip_ope_altro','cantiere_cap','cantiere_comune_cod','comune_nome','data_ult','data_inizio_lavori','lat','lng','nodo_id','cantiere_descrizione','cantiere_cnce','cantiere_etichetta']
     const upd={}
     FIELDS.forEach(f=>{
       if(k&&(k[f]==null||k[f]==='')){
@@ -8639,10 +8646,11 @@ async function sgrFondiDupCnce(gi,cnce){
         if(src)upd[f]=src[f]
       }
     })
-    if(Object.keys(upd).length){const r0=await sb.from('cantieri').update(upd).eq('cantiere_id',keeper);if(r0.error)throw r0.error}
     let r=await sb.from('visite').update({cantiere_id:keeper}).in('cantiere_id',losers);if(r.error)throw r.error
     r=await sb.from('segnalazioni_cantiere').update({cantiere_id:keeper}).in('cantiere_id',losers);if(r.error)throw r.error
+    // archivio i doppioni prima di completare il keeper (indice unico sul CNCE dei cantieri attivi)
     r=await sb.from('cantieri').update({elimina:1}).in('cantiere_id',losers);if(r.error)throw r.error
+    if(Object.keys(upd).length){const r0=await sb.from('cantieri').update(upd).eq('cantiere_id',keeper);if(r0.error)throw r0.error}
     toast('Fusione completata: '+losers.length+' doppione/i archiviati','ok')
     sgrCercaDupCnce()
   }catch(e){console.error('sgrFondiDupCnce:',e);if(st)st.textContent='';toast('Errore fusione: '+(e.message||e),'err')}
