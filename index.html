@@ -6147,7 +6147,8 @@ async function editPersona(id){
   vSet('mp-cf',r.cf||'');vSet('mp-qualifica',r.qualifica||'');vSet('mp-email',r.email||'');vSet('mp-telefono',r.telefono||'')
   vSet('mp-email2',r.email2||'');vSet('mp-email3',r.email3||'');vSet('mp-telefono2',r.telefono2||'')
   _mpNewRuolo=null
-  const t=$('mp-title');if(t)t.textContent='👥 Scheda persona'
+  const t=$('mp-title')
+  if(t)t.textContent=_mpFromRuolo?('👥 Scheda persona — '+(_PERS_RUOLI[_mpFromRuolo]||_mpFromRuolo)):'👥 Scheda persona'
   const qEl=$('mp-qualifica');if(qEl){qEl.readOnly=false;qEl.style.background='';qEl.title=''}
   const coord=!!window.__isCoord
   $('mp-cf').disabled=!coord
@@ -6155,6 +6156,7 @@ async function editPersona(id){
   $('mp-ruoli').textContent='Ruoli visti nelle visite: '+((r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')||'–')
   show('modal-persona')
 }
+{const _mpAnn=document.querySelector('#modal-persona [onclick*="modal-persona"]');if(_mpAnn)_mpAnn.addEventListener('click',()=>{_mpFromRuolo=null;_mpNewRuolo=null})}
 $('mp-salva').onclick=async()=>{
   const cog=vGet('mp-cognome').trim()
   if(!cog){toast('Il cognome è obbligatorio','warn');return}
@@ -6199,8 +6201,10 @@ $('mp-salva').onclick=async()=>{
   }
   const{error}=await sb.from('persone').update(upd).eq('persona_id',_mpId)
   if(error){toast('Errore salvataggio: '+error.message,'err');return}
+  // se la scheda era stata aperta col doppio clic dal form visita, aggiorno il riquadro
+  if(_mpFromRuolo){_applyPersonaAlForm(_mpFromRuolo,upd);_mpFromRuolo=null}
   hide('modal-persona');toast('Persona aggiornata ✓','ok')
-  loadRubrica()
+  if(typeof loadRubrica==='function')loadRubrica()
 }
 
 // ── duplicati (solo coordinatore) ──
@@ -6340,6 +6344,53 @@ function _applyPersonaAlForm(ruolo,r){
   if(cfg.tel)set(cfg.tel,r.telefono||r.telefono2)
   if(cfg.qual&&r.qualifica){const s2=$(cfg.qual);if(s2&&[...s2.options].some(o=>o.value===r.qualifica||o.text===r.qualifica))s2.value=r.qualifica}
 }
+// Doppio clic su un riquadro persona -> apre la scheda anagrafica per aggiornarla.
+let _mpFromRuolo=null
+async function _cercaInAnagrafica(nome,cog){
+  const pul=x=>String(x||'').replace(/[,()*%]/g,' ').trim()
+  const n=pul(nome), c=pul(cog)
+  if(!n&&!c)return []
+  const filtri=[]
+  if(n){filtri.push('nome.ilike.'+n);filtri.push('cognome.ilike.'+n)}
+  if(c){filtri.push('nome.ilike.'+c);filtri.push('cognome.ilike.'+c)}
+  let data=null
+  try{const r=await sb.from('persone').select('*').eq('elimina',0).or(filtri.join(',')).limit(50);data=r.data}catch(_e){return[]}
+  // confronto su nome+cognome normalizzati e ORDINATI: intercetta anche le schede invertite
+  const k=[_normPers(n),_normPers(c)].sort().join('|')
+  return (data||[]).filter(r=>[_normPers(r.nome),_normPers(r.cognome)].sort().join('|')===k)
+}
+window.apriSchedaPersona=async function(ruolo){
+  const cfg=_PERS_CFG[ruolo];if(!cfg)return
+  const nome=(vGet(cfg.nome)||'').trim(), cog=(vGet(cfg.cog)||'').trim()
+  if(!nome&&!cog){toast('Scrivi prima nome e cognome','warn');return}
+  const trovate=await _cercaInAnagrafica(nome,cog)
+  if(!trovate.length){
+    if(confirm('"'+[nome,cog].filter(Boolean).join(' ')+'" non e ancora in anagrafica.\n\nOK = creo adesso la scheda\nAnnulla = la creo io al salvataggio del verbale'))nuovaPersona(ruolo)
+    return
+  }
+  if(trovate.length>1)toast(trovate.length+' schede con questo nominativo: apro la prima. Controlla i duplicati in rubrica','warn')
+  _mpFromRuolo=ruolo
+  await editPersona(trovate[0].persona_id)
+}
+// aggancio: doppio clic sui campi di ciascun riquadro (e sul committente)
+document.addEventListener('DOMContentLoaded',()=>{
+  Object.keys(_PERS_CFG).forEach(ruolo=>{
+    const cfg=_PERS_CFG[ruolo]
+    ;[cfg.nome,cfg.cog,cfg.titolo,cfg.email,cfg.tel].filter(Boolean).forEach(id=>{
+      const el=$(id);if(!el)return
+      el.addEventListener('dblclick',e=>{e.preventDefault();apriSchedaPersona(ruolo)})
+      el.title='Doppio clic: apri la scheda in anagrafica per vedere e aggiornare tutti i dati'
+    })
+  })
+  const cs=$('f-comm-search')
+  if(cs){
+    cs.addEventListener('dblclick',()=>{
+      if(!vGet('f-comm-id')){toast('Seleziona prima un committente','warn');return}
+      if(typeof editCommittente==='function')editCommittente()
+    })
+    cs.title='Doppio clic: sblocca i campi del committente per aggiornarli'
+  }
+})
 window.nuovaPersona=function(ruolo){
   const cfg=_PERS_CFG[ruolo];if(!cfg)return
   _mpId=null;_mpNewRuolo=ruolo
