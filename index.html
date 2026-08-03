@@ -584,6 +584,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             </div>
             <div class="field"><label>Nome</label><input type="text" id="f-ppre-nome" placeholder="Nome"></div>
             <div class="field"><label>Cognome</label><input type="text" id="f-ppre-cog" placeholder="Cognome"></div>
+<div class="field" style="flex:0 0 auto"><label>&nbsp;</label><button type="button" class="btn-outline btn-sm" style="white-space:nowrap" onclick="nuovaPersona('presente')" title="Crea la scheda in anagrafica: potrai ripescarla nei prossimi verbali">+ Nuova</button></div>
           </div>
           <div class="row">
             <div class="field"><label>In qualità di</label>
@@ -743,6 +744,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               </div>
               <div class="field"><label>Nome</label><input type="text" id="f-rl-nome" placeholder="Nome"></div>
               <div class="field"><label>Cognome</label><input type="text" id="f-rl-cog" placeholder="Cognome"></div>
+<div class="field" style="flex:0 0 auto"><label>&nbsp;</label><button type="button" class="btn-outline btn-sm" style="white-space:nowrap" onclick="nuovaPersona('rl')" title="Crea la scheda in anagrafica: potrai ripescarla nei prossimi verbali">+ Nuova</button></div>
             </div>
             <div class="row">
               <div class="field"><label>Email</label><input type="email" id="f-rl-email" placeholder="email@…"></div>
@@ -757,6 +759,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               </div>
               <div class="field"><label>Nome</label><input type="text" id="f-csp-nome" placeholder="Nome"></div>
               <div class="field"><label>Cognome</label><input type="text" id="f-csp-cog" placeholder="Cognome"></div>
+<div class="field" style="flex:0 0 auto"><label>&nbsp;</label><button type="button" class="btn-outline btn-sm" style="white-space:nowrap" onclick="nuovaPersona('csp')" title="Crea la scheda in anagrafica: potrai ripescarla nei prossimi verbali">+ Nuova</button></div>
             </div>
             <div class="row">
               <div class="field"><label>Email</label><input type="email" id="f-csp-email" placeholder="email@…"></div>
@@ -771,6 +774,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               </div>
               <div class="field"><label>Nome</label><input type="text" id="f-cse-nome" placeholder="Nome"></div>
               <div class="field"><label>Cognome</label><input type="text" id="f-cse-cog" placeholder="Cognome"></div>
+<div class="field" style="flex:0 0 auto"><label>&nbsp;</label><button type="button" class="btn-outline btn-sm" style="white-space:nowrap" onclick="nuovaPersona('cse')" title="Crea la scheda in anagrafica: potrai ripescarla nei prossimi verbali">+ Nuova</button></div>
             </div>
             <div class="row">
               <div class="field"><label>Email</label><input type="email" id="f-cse-email" placeholder="email@…"></div>
@@ -1449,7 +1453,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 <!-- ── MODAL MODIFICA PERSONA (rubrica) ── -->
 <div class="modal-overlay hidden" id="modal-persona">
   <div class="modal-box" style="max-width:540px">
-    <h3>👥 Scheda persona</h3>
+    <h3 id="mp-title">👥 Scheda persona</h3>
     <div class="row">
       <div class="field" style="flex:1"><label>Titolo</label><select id="mp-titolo"><option value="">–</option><option>Sig.</option><option>Sig.ra</option><option>Dott.</option><option>Dott.ssa</option><option>Geom.</option><option>P.I.</option><option>Ing.</option><option>Arch.</option><option>Avv.</option><option>Prof.</option><option>Rag.</option></select></div>
       <div class="field" style="flex:2"><label>Nome</label><input type="text" id="mp-nome"></div>
@@ -6142,6 +6146,9 @@ async function editPersona(id){
   vSet('mp-titolo',r.titolo||'');vSet('mp-nome',r.nome||'');vSet('mp-cognome',r.cognome||'')
   vSet('mp-cf',r.cf||'');vSet('mp-qualifica',r.qualifica||'');vSet('mp-email',r.email||'');vSet('mp-telefono',r.telefono||'')
   vSet('mp-email2',r.email2||'');vSet('mp-email3',r.email3||'');vSet('mp-telefono2',r.telefono2||'')
+  _mpNewRuolo=null
+  const t=$('mp-title');if(t)t.textContent='👥 Scheda persona'
+  const qEl=$('mp-qualifica');if(qEl){qEl.readOnly=false;qEl.style.background='';qEl.title=''}
   const coord=!!window.__isCoord
   $('mp-cf').disabled=!coord
   $('mp-cf-note').textContent=coord?'':'(modificabile solo dal coordinatore)'
@@ -6149,14 +6156,47 @@ async function editPersona(id){
   show('modal-persona')
 }
 $('mp-salva').onclick=async()=>{
-  if(!_mpId)return
   const cog=vGet('mp-cognome').trim()
   if(!cog){toast('Il cognome è obbligatorio','warn');return}
-  const upd={titolo:vGet('mp-titolo')||null,nome:vGet('mp-nome').trim()||null,cognome:cog,
+  const nome=vGet('mp-nome').trim()
+  const upd={titolo:vGet('mp-titolo')||null,nome:nome||null,cognome:cog,
     qualifica:vGet('mp-qualifica').trim()||null,email:vGet('mp-email').trim()||null,telefono:vGet('mp-telefono').trim()||null,
     email2:vGet('mp-email2').trim()||null,email3:vGet('mp-email3').trim()||null,telefono2:vGet('mp-telefono2').trim()||null,
     updated_at:new Date().toISOString(),updated_by:S.user?.email||null}
   if(window.__isCoord)upd.cf=vGet('mp-cf').trim().toUpperCase()||null
+  // ── creazione nuova scheda dal form visita ──
+  if(!_mpId){
+    if(!_mpNewRuolo)return
+    const btn=$('mp-salva');btn.disabled=true
+    try{
+      // controllo doppioni su nome+cognome normalizzati e ordinati (prende anche gli invertiti)
+      const _q=cog.replace(/[,()*%]/g,' ').trim()
+      let esistenti=[]
+      try{
+        const{data}=await sb.from('persone').select('*').eq('elimina',0).or('cognome.ilike.'+_q+',nome.ilike.'+_q).limit(50)
+        const k=[_normPers(nome),_normPers(cog)].sort().join('|')
+        esistenti=(data||[]).filter(r=>[_normPers(r.nome),_normPers(r.cognome)].sort().join('|')===k)
+      }catch(_e){}
+      if(esistenti.length){
+        const r=esistenti[0]
+        const et=[r.titolo,r.nome,r.cognome].filter(Boolean).join(' ')
+        const det=[r.qualifica,[r.email,r.telefono].filter(Boolean).join(' · ')].filter(Boolean).join('\n')
+        if(confirm('In anagrafica esiste già questa persona:\n\n'+et+(det?'\n'+det:'')+'\n\nOK = uso la scheda esistente (evita doppioni)\nAnnulla = torno indietro e correggo i dati')){
+          _applyPersonaAlForm(_mpNewRuolo,r)
+          hide('modal-persona');_mpNewRuolo=null
+          toast('Persona esistente collegata','ok')
+        }
+        return
+      }
+      upd.ruoli=[_mpNewRuolo];upd.elimina=0
+      const{data:ins,error}=await sb.from('persone').insert(upd).select().maybeSingle()
+      if(error){toast('Errore salvataggio: '+error.message,'err');return}
+      _applyPersonaAlForm(_mpNewRuolo,ins||upd)
+      hide('modal-persona');_mpNewRuolo=null
+      toast('Persona creata in anagrafica ✓','ok')
+    }finally{btn.disabled=false}
+    return
+  }
   const{error}=await sb.from('persone').update(upd).eq('persona_id',_mpId)
   if(error){toast('Errore salvataggio: '+error.message,'err');return}
   hide('modal-persona');toast('Persona aggiornata ✓','ok')
@@ -6274,6 +6314,60 @@ attachPersonAC({nome:'f-rl-nome',cog:'f-rl-cog',titolo:'f-rl-titolo',email:'f-rl
 attachPersonAC({nome:'f-csp-nome',cog:'f-csp-cog',titolo:'f-csp-titolo',email:'f-csp-email',tel:'f-csp-tel'})
 attachPersonAC({nome:'f-cse-nome',cog:'f-cse-cog',titolo:'f-cse-titolo',email:'f-cse-email',tel:'f-cse-tel'})
 
+// ── NUOVA PERSONA dal form visita (stessa mascherina della scheda rubrica) ────
+// La qualifica di RL/CSP/CSE non si sceglie: il riquadro in cui si inserisce la determina.
+const _PERS_QUAL_AUTO={
+  rl:'Responsabile dei lavori',
+  csp:'Coordinatore per la sicurezza in fase di progettazione',
+  cse:'Coordinatore per la sicurezza in fase di esecuzione'
+}
+const _PERS_CFG={
+  presente:{nome:'f-ppre-nome',cog:'f-ppre-cog',titolo:'f-ppre-titolo',tel:'f-tel-ppre',qual:'f-qual-ppre'},
+  rl:{nome:'f-rl-nome',cog:'f-rl-cog',titolo:'f-rl-titolo',email:'f-rl-email',tel:'f-rl-tel'},
+  csp:{nome:'f-csp-nome',cog:'f-csp-cog',titolo:'f-csp-titolo',email:'f-csp-email',tel:'f-csp-tel'},
+  cse:{nome:'f-cse-nome',cog:'f-cse-cog',titolo:'f-cse-titolo',email:'f-cse-email',tel:'f-cse-tel'}
+}
+let _mpNewRuolo=null
+function _normPers(s){
+  return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim()
+}
+function _applyPersonaAlForm(ruolo,r){
+  const cfg=_PERS_CFG[ruolo];if(!cfg||!r)return
+  const set=(id,v)=>{const el=$(id);if(el&&v)el.value=v}
+  if(cfg.titolo&&r.titolo){const s2=$(cfg.titolo);if(s2&&[...s2.options].some(o=>o.value===r.titolo||o.text===r.titolo))s2.value=r.titolo}
+  set(cfg.nome,r.nome);set(cfg.cog,r.cognome)
+  if(cfg.email)set(cfg.email,r.email||r.email2||r.email3)
+  if(cfg.tel)set(cfg.tel,r.telefono||r.telefono2)
+  if(cfg.qual&&r.qualifica){const s2=$(cfg.qual);if(s2&&[...s2.options].some(o=>o.value===r.qualifica||o.text===r.qualifica))s2.value=r.qualifica}
+}
+window.nuovaPersona=function(ruolo){
+  const cfg=_PERS_CFG[ruolo];if(!cfg)return
+  _mpId=null;_mpNewRuolo=ruolo
+  ;['mp-titolo','mp-nome','mp-cognome','mp-cf','mp-qualifica','mp-email','mp-telefono','mp-email2','mp-email3','mp-telefono2']
+    .forEach(id=>{const el=$(id);if(el)el.value=''})
+  // riprendo quello che il tecnico ha gia' digitato nel riquadro
+  vSet('mp-nome',(vGet(cfg.nome)||'').trim())
+  vSet('mp-cognome',(vGet(cfg.cog)||'').trim())
+  if(cfg.titolo)vSet('mp-titolo',vGet(cfg.titolo)||'')
+  if(cfg.email)vSet('mp-email',(vGet(cfg.email)||'').trim())
+  if(cfg.tel)vSet('mp-telefono',(vGet(cfg.tel)||'').trim())
+  const qEl=$('mp-qualifica')
+  if(qEl){
+    if(_PERS_QUAL_AUTO[ruolo]){
+      qEl.value=_PERS_QUAL_AUTO[ruolo];qEl.readOnly=true;qEl.style.background='#f4f4f4'
+      qEl.title='Automatica: la determina il riquadro in cui stai inserendo la persona'
+    }else{
+      qEl.value=cfg.qual?(vGet(cfg.qual)||''):'';qEl.readOnly=false;qEl.style.background='';qEl.title=''
+    }
+  }
+  const coord=!!window.__isCoord
+  $('mp-cf').disabled=!coord
+  $('mp-cf-note').textContent=coord?'':'(modificabile solo dal coordinatore)'
+  $('mp-ruoli').textContent='Verrà salvata in anagrafica con il ruolo: '+(_PERS_RUOLI[ruolo]||ruolo)
+  const t=$('mp-title');if(t)t.textContent='👥 Nuova persona — '+(_PERS_RUOLI[ruolo]||ruolo)
+  show('modal-persona')
+}
+
 // ── aggiorna l'anagrafica quando si salva una visita ──
 async function upsertPersoneVisita(){
   const specs=[
@@ -6289,7 +6383,8 @@ async function upsertPersoneVisita(){
     const titolo=(vGet(s.t)||'').trim()||null
     const email=s.em?(vGet(s.em)||'').trim()||null:null
     const tel=s.tel?(vGet(s.tel)||'').trim()||null:null
-    const qual=s.q?(vGet(s.q)||'').trim()||null:null
+    // per RL/CSP/CSE la qualifica non si digita: la determina il riquadro di inserimento
+    const qual=s.q?((vGet(s.q)||'').trim()||null):(_PERS_QUAL_AUTO[s.ruolo]||null)
     try{
       let qb=sb.from('persone').select('persona_id,titolo,email,email2,email3,telefono,telefono2,qualifica,ruoli').eq('elimina',0).limit(1)
       qb=nome?qb.ilike('nome',nome):qb.is('nome',null)
