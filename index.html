@@ -4190,7 +4190,8 @@ async function loadComuniIT(){
   return _comuniIT
 }
 // Listener input per comune imprese (tutti i comuni d'Italia)
-document.addEventListener('DOMContentLoaded',()=>{
+// Era dentro un DOMContentLoaded che non scattava mai (await top-level nel modulo): agganciato direttamente.
+{
   const miCom=$('mi-com')
   if(miCom){
     miCom.addEventListener('input',async function(){
@@ -4203,7 +4204,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       matches.forEach(c=>{const o=document.createElement('option');o.value=c;dl.appendChild(o)})
     })
   }
-})
+}
 
 // Normalizza il nome comune per i confronti: minuscole, senza accenti/punteggiatura.
 // Serve perche i cantieri importati hanno il comune in MAIUSCOLO mentre la tendina e in Maiuscolo/minuscolo.
@@ -6372,25 +6373,29 @@ window.apriSchedaPersona=async function(ruolo){
   _mpFromRuolo=ruolo
   await editPersona(trovate[0].persona_id)
 }
-// aggancio: doppio clic sui campi di ciascun riquadro (e sul committente)
-document.addEventListener('DOMContentLoaded',()=>{
-  Object.keys(_PERS_CFG).forEach(ruolo=>{
-    const cfg=_PERS_CFG[ruolo]
-    ;[cfg.nome,cfg.cog,cfg.titolo,cfg.email,cfg.tel].filter(Boolean).forEach(id=>{
-      const el=$(id);if(!el)return
-      el.addEventListener('dblclick',e=>{e.preventDefault();apriSchedaPersona(ruolo)})
-      el.title='Doppio clic: apri la scheda in anagrafica per vedere e aggiornare tutti i dati'
-    })
-  })
-  const cs=$('f-comm-search')
-  if(cs){
-    cs.addEventListener('dblclick',()=>{
-      if(!vGet('f-comm-id')){toast('Seleziona prima un committente','warn');return}
-      if(typeof editCommittente==='function')editCommittente()
-    })
-    cs.title='Doppio clic: sblocca i campi del committente per aggiornarli'
+// Aggancio del doppio clic per DELEGA su document.
+// NB: NON usare DOMContentLoaded in questo modulo: c'e' un await top-level
+// (await __loadSupabase()) che sospende l'esecuzione, e quando riprende l'evento
+// DOMContentLoaded e' gia' passato, quindi quei listener non verrebbero mai registrati.
+const _DBL_CAMPI={}
+Object.keys(_PERS_CFG).forEach(ruolo=>{
+  const cfg=_PERS_CFG[ruolo]
+  ;[cfg.nome,cfg.cog,cfg.titolo,cfg.email,cfg.tel].filter(Boolean).forEach(id=>{_DBL_CAMPI[id]=ruolo})
+})
+document.addEventListener('dblclick',ev=>{
+  const el=ev.target;if(!el||!el.id)return
+  if(_DBL_CAMPI[el.id]){ev.preventDefault();apriSchedaPersona(_DBL_CAMPI[el.id]);return}
+  if(el.id==='f-comm-search'){
+    ev.preventDefault()
+    if(!vGet('f-comm-id')){toast('Seleziona prima un committente','warn');return}
+    if(typeof editCommittente==='function')editCommittente()
   }
 })
+// suggerimento al passaggio del mouse (i campi esistono gia': lo script sta in fondo al body)
+Object.keys(_DBL_CAMPI).forEach(id=>{
+  const el=$(id);if(el)el.title='Doppio clic: apri la scheda in anagrafica per vedere e aggiornare tutti i dati'
+})
+{const _cs=$('f-comm-search');if(_cs)_cs.title='Doppio clic: sblocca i campi del committente per aggiornarli'}
 window.nuovaPersona=function(ruolo){
   const cfg=_PERS_CFG[ruolo];if(!cfg)return
   _mpId=null;_mpNewRuolo=ruolo
