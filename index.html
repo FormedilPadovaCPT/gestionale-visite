@@ -3359,7 +3359,8 @@ $('btn-mi-save').onclick=async()=>{
 // ── MODAL CANTIERE ──
 function resetModalCantiere(){
   ;['mc-ind','mc-civ','mc-etich','mc-cap','mc-cnce','mc-cod-uni','mc-data-inizio','mc-data-ult','mc-comune-cod','mc-tip-ope-altro','mc-descr'].forEach(id=>{const el=$(id);if(el)el.value=''})
-  const com=$('mc-com');if(com)com.value=''
+  const com=$('mc-com');if(com){com.querySelectorAll('option[data-extra="1"]').forEach(o=>o.remove());com.value=''}
+  window._editCantComuneOrig=null
   const ti=$('mc-tip-int');if(ti)ti.value=''
   const to=$('mc-tip-ope');if(to)to.value=''
   const du=$('mc-durata');if(du)du.value=''
@@ -3572,7 +3573,14 @@ $('btn-mc-save').onclick=async()=>{
   const fields={
     cantiere_indirizzo:ind,
     cantiere_civico:civ,
-    comune_nome:vGet('mc-com').trim()||null,
+    comune_nome:(function(){
+      const v=vGet('mc-com').trim()
+      const o=window._editCantComuneOrig
+      // se l'utente non ha cambiato comune, riscrivo la stringa originale del DB
+      // (evita di trasformare PADOVA in Padova solo perche la tendina e in minuscolo)
+      if(o&&v&&_normCom(v)===_normCom(o))return o
+      return v||null
+    })(),
     cantiere_cap:vGet('mc-cap').trim()||null,
     cantiere_tip_int:+vGet('mc-tip-int')||null,
     cantiere_tip_ope:+vGet('mc-tip-ope')||null,
@@ -4193,6 +4201,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 })
 
+// Normalizza il nome comune per i confronti: minuscole, senza accenti/punteggiatura.
+// Serve perche i cantieri importati hanno il comune in MAIUSCOLO mentre la tendina e in Maiuscolo/minuscolo.
+function _normCom(s){
+  return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim()
+}
+window._normCom=_normCom
 function populateComuniSelect(){
   const sel=$('mc-com'); if(!sel)return
   sel.innerHTML='<option value="">– Seleziona comune –</option>' // idempotente: evita opzioni duplicate se richiamata due volte
@@ -10567,10 +10581,23 @@ async function admEditCantiere(cantId) {
   vSet('mc-descr', c.cantiere_descrizione || '')
   vSet('mc-tip-ope-altro', c.cantiere_tip_ope_altro || '')
   const comSel = $('mc-com')
+  window._editCantComuneOrig = c.comune_nome || null
   if (comSel) {
-    // prova a selezionare il comune esistente, altrimenti lascia testo libero
-    const opt = [...comSel.options].find(o => o.value === c.comune_nome || o.textContent === c.comune_nome)
-    if (opt) comSel.value = opt.value
+    const _cn = String(c.comune_nome || '').trim()
+    comSel.querySelectorAll('option[data-extra="1"]').forEach(o => o.remove())
+    if (!_cn) { comSel.value = '' }
+    else {
+      // confronto insensibile a maiuscole/accenti: il DB puo avere PADOVA, la tendina Padova
+      const opt = [...comSel.options].find(o => _normCom(o.value) === _normCom(_cn) || _normCom(o.textContent) === _normCom(_cn))
+      if (opt) comSel.value = opt.value
+      else {
+        // comune non in elenco (fuori provincia o grafia diversa): opzione temporanea
+        // cosi resta visibile e non viene azzerato al salvataggio
+        const o = document.createElement('option')
+        o.value = _cn; o.textContent = _cn + ' (fuori elenco)'; o.dataset.extra = '1'
+        comSel.appendChild(o); comSel.value = _cn
+      }
+    }
   }
   if ($('mc-tip-int') && c.cantiere_tip_int) $('mc-tip-int').value = c.cantiere_tip_int
   if ($('mc-tip-ope') && c.cantiere_tip_ope) {
