@@ -405,6 +405,17 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <section id="view-dashboard">
       <div id="dash-segnala-wrap" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" id="btn-segnala-dash" style="flex:2;min-width:220px;padding:12px;font-size:15px;border-radius:10px">&#128205; Segnala un cantiere attivo</button><button id="btn-servizi-cpt" style="flex:1;min-width:180px;padding:12px;font-size:15px;border-radius:10px;background:#95C22F;border:1px solid #7aa527;color:#fff;font-weight:600;cursor:pointer" onclick="window.open('https://formedilpadovacpt.github.io/servizi/','_blank')">Vai ai servizi CPT ↗</button></div>
       <div id="avvisi-banner"></div>
+      <div class="card" id="inc-card-wrap" style="display:none;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <h3 style="margin:0">&#128203; Incarichi da evadere <span id="inc-badge" style="display:none;background:#e7500f;color:#fff;border-radius:11px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:6px">0</span><span id="inc-badge-eseg" style="display:none;background:#95C22F;color:#fff;border-radius:11px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:5px"></span></h3>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="inc-f-tec" style="display:none;font-size:12px;padding:4px 6px;border:1px solid #ddd;border-radius:6px"></select>
+            <label style="font-size:12px;color:#666;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="inc-f-chiusi" style="accent-color:#e7500f;cursor:pointer">Mostra anche chiusi</label>
+          </div>
+        </div>
+        <div id="inc-list"></div>
+      </div>
+
             <!-- FILTRI DASHBOARD -->
       <div class="card" id="dash-filtri" style="margin-bottom:14px">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
@@ -654,7 +665,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <button class="btn-outline btn-sm" id="btn-new-cant">+ Nuovo cantiere</button><button class="btn-outline btn-sm" id="btn-edit-cant" type="button" onclick="editCantiereForm()" style="display:none;margin-left:6px" title="Modifica i dati del cantiere selezionato">✏️ Modifica cantiere</button>
           <div class="row" style="margin-top:12px">
             <div class="field"><label>Accesso cantiere n° (dal DB cantiere)</label><input type="text" id="f-acc-cant2" placeholder="Codice accesso interno" readonly style="background:#f8f8f8"></div>
-            <div class="field"><label>Protocollo interno</label><input type="text" id="f-prot-int" placeholder="Prot. richiesta"></div>
+            <div class="field"><label>Protocollo interno <span style="font-weight:400;font-size:11px;color:#aaa">(n° richiesta)</span></label><div style="display:flex;gap:6px"><input type="text" id="f-prot-int" placeholder="Prot. richiesta" style="flex:1;min-width:0"><select id="f-prot-inc" title="Scegli fra i tuoi incarichi aperti" style="flex:1.4;min-width:0;display:none"></select></div><div id="f-prot-msg" style="font-size:11px;margin-top:3px"></div></div>
           </div>
           <div class="row">
             <div class="field"><label>Codice CNCE <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="text" id="f-cnce" placeholder="–" readonly style="background:#f8f8f8"></div>
@@ -1413,6 +1424,22 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
 
       </div>
+            <!-- ── INCARICHI AI TECNICI (file di interscambio) ── -->
+        <div class="adm-section">
+          <div class="adm-section-title">&#128203; Incarichi ai tecnici &ndash; import file di interscambio</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:10px">Carica il foglio <strong>INTERSCAMBIO richiesta visite consulenze ai tecnici</strong> generato dal gestionale d&rsquo;ufficio. Le righe vengono abbinate al tecnico incaricato e compaiono nella sua dashboard finch&eacute; la pratica non risulta chiusa. L&rsquo;import aggiorna le righe gi&agrave; presenti (chiave = colonna <em>ID</em>) e non riapre mai un incarico gi&agrave; chiuso.</p>
+          <div class="drop-zone" id="inc-drop" style="background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.5)">
+            <p style="font-size:14px">&#128194; Trascina qui il file .xlsx</p>
+            <p style="font-size:12px;margin-top:4px">oppure <button type="button" class="btn-outline btn-sm" style="border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.75)" onclick="document.getElementById('inc-file').click()">scegli il file</button></p>
+            <input type="file" id="inc-file" accept=".xlsx,.xls" style="display:none">
+          </div>
+          <div id="inc-imp-status" style="font-size:13px;color:rgba(255,255,255,.75);margin-top:10px;line-height:1.7"></div>
+          <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <button class="btn-primary" style="background:#565c66;border-color:#565c66" onclick="incApriGestione()">&#128269; Gestisci incarichi aperti</button>
+            <span style="font-size:12px;color:rgba(255,255,255,.45)">Da qui puoi marcare un incarico come completato: sparisce dalla dashboard del tecnico.</span>
+          </div>
+          <div id="inc-gest-wrap" style="display:none;margin-top:12px;background:rgba(255,255,255,.06);border-radius:8px;padding:12px;max-height:460px;overflow:auto"></div>
+        </div>
     </section>
 
   </main>
@@ -2253,6 +2280,7 @@ function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
   ;['dashboard','form','lista','cantieri','rubrica','import','scadenze','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
+  if(view==='form'&&typeof incCaricaTendina==='function')incCaricaTendina().catch(e=>console.warn('incCaricaTendina:',e))
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
@@ -4647,6 +4675,8 @@ async function loadDash(){
   // card obiettivo mensile (non blocca la dashboard se fallisce)
   loadTargetCard&&loadTargetCard().catch(e=>console.warn('loadTargetCard:',e))
   loadAvvisi&&loadAvvisi().catch(e=>console.warn('loadAvvisi:',e))
+  loadIncarichi&&loadIncarichi().catch(e=>console.warn('loadIncarichi:',e))
+  _incApertiCache=null
   // fetch storico completo (paginato) con cantiere + impresa principale
   const cols=`visita_id,data_visita,ipc,rlst_sn,acc_cant,tecnico_id,tipo_accesso,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantiere_id,impresa_id,cantieri(comune_nome,cantiere_tip_int,cantiere_tip_ope,cantiere_importo),visite_imprese_presenti(is_principale,tipo_imp,impresa_id,imprese(impresa_nome,cassa_edile))`
   let rows=[],from=0
@@ -12096,6 +12126,338 @@ document.getElementById('btn-adm-load-xlsx')?.addEventListener('click',function(
 document.getElementById('btn-adm-cancel-xlsx')?.addEventListener('click',function(){
   const p=document.getElementById('adm-xlsx-preview');if(p)p.style.display='none'
   _xlsxPending=null;if(_fi)_fi.value=''
+})
+
+
+// ══ INCARICHI AI TECNICI ═════════════════════════════════════════════
+const INC_MAP = {
+  'ID':'id','Data richiesta':'data_richiesta','Richiedente':'richiedente','Mezzo':'mezzo',
+  'Emailcomunicazioni':'testo_richiesta','VisiteCassaEdile.TipologiaRichiesta':'tipologia_richiesta',
+  'Tipo di richiesta':'tipo_richiesta','Approvato':'approvato','Tecnico incaricato':'tecnico_nome',
+  'Impresa da visitare':'impresa','Cantiere':'cantiere','Indirizzo Cantiere':'indirizzo',
+  'ComuneCantiere':'comune','Oggetto':'oggetto','Note da inserire nella comunicazione':'note_comunicazione',
+  'Referente sopralluogo':'referente','CellReferente':'cell_referente','Datarisposta':'data_risposta',
+  'Data Verbale':'data_verbale','Corrispettivo':'corrispettivo','Ore':'ore',
+  'Data comunicazione verbale alla Segreteria':'data_com_segreteria','Verbale visita':'verbale_visita',
+  'Audit scheda Cantiere':'audit_scheda','Valutazione cantiere':'valutazione_cantiere',
+  'pratica chiusa':'pratica_chiusa','NoteTecnico':'note_tecnico',
+  '[Dipendenti estesi].E_mail':'tecnico_email'
+}
+function _incHdr(h){
+  h = String(h||'').replace(/\s+/g,' ').trim()
+  if (INC_MAP[h]) return INC_MAP[h]
+  const k = Object.keys(INC_MAP).find(x=>x.toLowerCase().startsWith(h.toLowerCase().slice(0,28)) || h.toLowerCase().startsWith(x.toLowerCase().slice(0,28)))
+  return k ? INC_MAP[k] : null
+}
+function _incDate(v){
+  if(v===null||v===undefined||v==='') return null
+  if(v instanceof Date && !isNaN(v)) return v.toISOString().slice(0,10)
+  if(typeof v==='number'){ const d=XLSX.SSF.parse_date_code(v); if(d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}` ; return null }
+  const s=String(v).trim(); if(!s) return null
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`
+  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/)
+  if(m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`
+  return null
+}
+function _incBool(v){
+  if(typeof v==='boolean') return v
+  const s=String(v==null?'':v).trim().toLowerCase()
+  return s==='true'||s==='vero'||s==='si'||s==='sì'||s==='1'||s==='x'
+}
+function _incNum(v){ if(v===null||v===undefined||v==='') return null; const n=Number(String(v).replace(',','.')); return isNaN(n)?null:n }
+
+async function incImportaFile(file){
+  const box=$('inc-imp-status'); if(!box) return
+  if(!window.__isSegreteria){toast('Funzione riservata alla segreteria','err');return}
+  box.innerHTML='⏳ Lettura del file…'
+  try{
+    const buf=await file.arrayBuffer()
+    const wb=XLSX.read(buf,{type:'array',cellDates:true})
+    const ws=wb.Sheets[wb.SheetNames[0]]
+    const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,blankrows:false})
+    if(!aoa.length) throw new Error('Foglio vuoto')
+    const hdr=aoa[0].map(_incHdr)
+    if(hdr.indexOf('id')<0) throw new Error('Colonna "ID" non trovata: controlla che sia la prima riga del foglio')
+    const rows=[]
+    for(let i=1;i<aoa.length;i++){
+      const r=aoa[i]; if(!r) continue
+      const o={}
+      hdr.forEach((k,j)=>{ if(k) o[k]=r[j] })
+      if(o.id===null||o.id===undefined||String(o.id).trim()==='') continue
+      const id=String(o.id).trim().replace(/\..*$/,'')
+      if(!/^\d+$/.test(id)) continue
+      rows.push({
+        id:id,
+        data_richiesta:_incDate(o.data_richiesta),
+        richiedente:o.richiedente==null?null:String(o.richiedente).trim(),
+        mezzo:o.mezzo==null?null:String(o.mezzo).trim(),
+        testo_richiesta:o.testo_richiesta==null?null:String(o.testo_richiesta).trim(),
+        tipologia_richiesta:o.tipologia_richiesta==null?null:String(o.tipologia_richiesta).trim(),
+        tipo_richiesta:o.tipo_richiesta==null?null:String(o.tipo_richiesta).trim(),
+        approvato:_incBool(o.approvato),
+        tecnico_nome:o.tecnico_nome==null?null:String(o.tecnico_nome).trim(),
+        tecnico_email:o.tecnico_email==null?null:String(o.tecnico_email).trim(),
+        impresa:o.impresa==null?null:String(o.impresa).trim(),
+        cantiere:o.cantiere==null?null:String(o.cantiere).trim(),
+        indirizzo:o.indirizzo==null?null:String(o.indirizzo).trim(),
+        comune:o.comune==null?null:String(o.comune).trim(),
+        oggetto:o.oggetto==null?null:String(o.oggetto).trim(),
+        note_comunicazione:o.note_comunicazione==null?null:String(o.note_comunicazione).trim(),
+        referente:o.referente==null?null:String(o.referente).trim(),
+        cell_referente:o.cell_referente==null?null:String(o.cell_referente).trim(),
+        data_risposta:_incDate(o.data_risposta),
+        data_verbale:o.data_verbale==null?null:String(o.data_verbale).trim(),
+        corrispettivo:_incNum(o.corrispettivo),
+        ore:_incNum(o.ore),
+        data_com_segreteria:_incDate(o.data_com_segreteria),
+        verbale_visita:o.verbale_visita==null?null:String(o.verbale_visita).trim(),
+        audit_scheda:o.audit_scheda==null?null:String(o.audit_scheda).trim(),
+        valutazione_cantiere:o.valutazione_cantiere==null?null:String(o.valutazione_cantiere).trim(),
+        note_tecnico:o.note_tecnico==null?null:String(o.note_tecnico).trim(),
+        pratica_chiusa:_incBool(o.pratica_chiusa)
+      })
+    }
+    if(!rows.length) throw new Error('Nessuna riga valida trovata')
+    box.innerHTML='⏳ Caricamento di '+rows.length+' righe…'
+    let res=null
+    for(let i=0;i<rows.length;i+=300){
+      const{data,error}=await sb.rpc('incarichi_import',{p_rows:rows.slice(i,i+300)})
+      if(error) throw error
+      res=data
+    }
+    box.innerHTML='<span style="color:#95C22F">✓ Import completato.</span><br>'+
+      'Righe lette: <strong>'+rows.length+'</strong> · nuove: <strong>'+(res.nuovi||0)+'</strong> · aggiornate: <strong>'+(res.aggiornati||0)+'</strong> · chiuse dal gestionale: <strong>'+(res.chiusi||0)+'</strong>'+
+      (res.senza_tecnico?'<br><span style="color:#f0ad4e">⚠ '+res.senza_tecnico+' righe senza tecnico riconosciuto (non compariranno a nessuno).</span>':'')+
+      '<br>Incarichi attualmente aperti: <strong>'+(res.aperti_ora||0)+'</strong>'
+    toast('Import incarichi completato','ok')
+    if(typeof loadIncarichi==='function') loadIncarichi().catch(()=>{})
+  }catch(e){
+    box.innerHTML='<span style="color:#e74c3c">✗ Errore: '+esc(e.message||String(e))+'</span>'
+  }
+}
+window.incImportaFile=incImportaFile
+
+// ── card dashboard ──────────────────────────────────────────────
+const INC_COL={'Sopralluogo urgente in Cantiere':'#c0392b','Sopralluogo in Cantiere - Visita singola':'#e7500f',
+  'Serie di visite':'#e7500f','Sopralluogo in Azienda AUDIT ASL/STAGE':'#8e44ad','Conferenza di Cantiere':'#2980b9',
+  'Sopralluogo per Asseverazione - MOG':'#16a085','Informazioni':'#7f8c8d','Consulenza Telefonica':'#7f8c8d',
+  'Consulenza in sede CPT':'#7f8c8d','Informazioni Rapporto di sopralluogo in cantiere':'#7f8c8d'}
+let _incCache=[]
+async function loadIncarichi(){
+  const wrap=$('inc-card-wrap'); if(!wrap||!S.user) return
+  const gest=!!window.__isSegreteria
+  let q=sb.from('incarichi').select('*').order('data_richiesta',{ascending:false}).order('id',{ascending:false}).limit(500)
+  const{data,error}=await q
+  if(error){ wrap.style.display='none'; console.warn('incarichi:',error); return }
+  _incCache=data||[]
+  if(!_incCache.length && !gest){ wrap.style.display='none'; return }
+  // filtro tecnico (solo gestione)
+  const selT=$('inc-f-tec')
+  if(gest&&selT){
+    if(!selT.dataset.done){
+      const nomi=[...new Set(_incCache.map(r=>r.tecnico_nome).filter(Boolean))].sort()
+      selT.innerHTML='<option value="">Tutti i tecnici</option>'+nomi.map(n=>'<option>'+esc(n)+'</option>').join('')
+      selT.dataset.done='1'; selT.style.display=''
+      selT.onchange=renderIncarichi
+    }
+  }
+  const chk=$('inc-f-chiusi'); if(chk&&!chk.dataset.done){chk.dataset.done='1';chk.onchange=renderIncarichi}
+  wrap.style.display=''
+  renderIncarichi()
+}
+window.loadIncarichi=loadIncarichi
+
+function renderIncarichi(){
+  const box=$('inc-list'); if(!box) return
+  const gest=!!window.__isSegreteria
+  const mostraChiusi=$('inc-f-chiusi')&&$('inc-f-chiusi').checked
+  const fTec=($('inc-f-tec')&&$('inc-f-tec').value)||''
+  let rows=_incCache.filter(r=>mostraChiusi||r.stato!=='chiuso')
+  if(fTec) rows=rows.filter(r=>r.tecnico_nome===fTec)
+  const aperti=_incCache.filter(r=>r.stato==='aperto'&&(!fTec||r.tecnico_nome===fTec)).length
+  const eseg=_incCache.filter(r=>r.stato==='eseguito'&&(!fTec||r.tecnico_nome===fTec)).length
+  const bE=$('inc-badge-eseg'); if(bE){bE.textContent=eseg+' eseguiti';bE.style.display=eseg?'':'none'}
+  const b=$('inc-badge'); if(b){b.textContent=aperti;b.style.display=aperti?'':'none';b.style.background=aperti?'#e7500f':'#95C22F'}
+  const t=document.querySelector('#inc-card-wrap h3')
+  if(!rows.length){
+    box.innerHTML='<div style="font-size:13px;color:#888;font-style:italic;padding:6px 0">'+(mostraChiusi?'Nessun incarico.':'Nessun incarico in sospeso. 👍')+'</div>'
+    return
+  }
+  box.innerHTML=rows.map(r=>{
+    const col=INC_COL[r.tipo_richiesta]||'#565c66'
+    const chiuso=r.stato==='chiuso'
+    const eseguito=r.stato==='eseguito'
+    const luogo=[r.cantiere,r.indirizzo,r.comune].filter(Boolean).join(' · ')
+    const dt=r.data_richiesta?r.data_richiesta.split('-').reverse().join('/'):''
+    const vis=r.presa_visione_il
+    let head='<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">'
+      +'<div style="min-width:0;flex:1"><strong style="color:'+col+';font-size:13px">'+esc(r.tipo_richiesta||'Incarico')+'</strong>'
+      +'<span style="font-size:11px;color:#999;margin-left:8px">#'+r.id+(dt?' · '+dt:'')+'</span>'
+      +(gest&&r.tecnico_nome?'<span style="font-size:11px;color:#666;margin-left:8px;background:#f0f0f0;border-radius:9px;padding:1px 8px">'+esc(r.tecnico_nome)+'</span>':'')
+      +(chiuso?'<span style="font-size:11px;color:#27ae60;margin-left:8px">✓ completato</span>':'')
+      +(eseguito?'<span style="font-size:11px;color:#7aa527;margin-left:8px;background:#eef7dd;border-radius:9px;padding:1px 8px">✓ visita registrata'+(r.visita_id?' n° '+esc(r.visita_id):'')+'</span>':'')
+      +'</div><div style="display:flex;gap:6px;align-items:center;white-space:nowrap">'
+    if(!chiuso){
+      if(!eseguito) head += vis
+        ? '<span style="font-size:11px;color:#27ae60">✓ presa visione</span>'
+        : '<button class="btn-outline btn-sm" onclick="incPresaVisione('+r.id+',this)">Presa visione</button>'
+      if(gest) head+='<button class="btn-sm" style="background:#95C22F;border:1px solid #7aa527;color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer" onclick="incChiudi('+r.id+')">'+(eseguito?'Chiudi':'Completato')+'</button>'
+    } else if(gest){
+      head+='<button class="btn-outline btn-sm" onclick="incRiapri('+r.id+')">Riapri</button>'
+    }
+    head+='</div></div>'
+    const body='<div style="font-size:13px;color:#333;margin-top:5px;line-height:1.55">'
+      +(r.impresa?'<div><strong>'+esc(r.impresa)+'</strong></div>':'')
+      +(luogo?'<div style="color:#666">📍 '+esc(luogo)+'</div>':'')
+      +(r.oggetto?'<div style="color:#555;margin-top:3px">'+esc(r.oggetto)+'</div>':'')
+      +(r.referente?'<div style="color:#666;margin-top:3px">👤 '+esc(r.referente)+(r.cell_referente?' · <a href="tel:'+esc(r.cell_referente)+'" style="color:#e7500f;text-decoration:none">'+esc(r.cell_referente)+'</a>':'')+'</div>':'')
+      +(r.note_comunicazione?'<div style="margin-top:5px;background:#fff8f3;border-left:3px solid #e7500f;padding:6px 9px;border-radius:0 5px 5px 0;white-space:pre-wrap;font-size:12px">'+esc(r.note_comunicazione)+'</div>':'')
+      +(r.testo_richiesta?'<details style="margin-top:5px"><summary style="font-size:12px;color:#888;cursor:pointer">Testo della richiesta</summary><div style="white-space:pre-wrap;font-size:12px;color:#555;margin-top:4px">'+esc(r.testo_richiesta)+'</div></details>':'')
+      +'</div>'
+    return '<div style="border:1px solid '+(eseguito?'#cde3a0':'#e6e6e6')+';border-left:4px solid '+(eseguito?'#95C22F':col)+';border-radius:6px;padding:10px 13px;margin-bottom:8px;'+(chiuso?'opacity:.55;':'')+'background:'+(eseguito?'#fbfef5':'#fff')+'">'+head+body+'</div>'
+  }).join('')
+}
+window.renderIncarichi=renderIncarichi
+
+async function incPresaVisione(id,btn){
+  try{
+    const{error}=await sb.from('incarichi').update({presa_visione_il:new Date().toISOString(),presa_visione_da:S.user.email}).eq('id',id)
+    if(error) throw error
+    const r=_incCache.find(x=>x.id===id); if(r){r.presa_visione_il=new Date().toISOString()}
+    if(btn) btn.outerHTML='<span style="font-size:11px;color:#27ae60">✓ presa visione</span>'
+  }catch(e){toast('Errore: '+(e.message||e),'err')}
+}
+window.incPresaVisione=incPresaVisione
+
+async function incChiudi(id){
+  if(!window.__isSegreteria){toast('Riservato alla segreteria','err');return}
+  if(!confirm('Segnare l\'incarico #'+id+' come completato? Sparirà dalla dashboard del tecnico.'))return
+  const{error}=await sb.rpc('incarichi_set_stato',{p_id:id,p_stato:'chiuso'})
+  if(error){toast('Errore: '+error.message,'err');return}
+  toast('Incarico completato','ok'); await loadIncarichi()
+  if($('inc-gest-wrap')&&$('inc-gest-wrap').style.display!=='none') incApriGestione()
+}
+window.incChiudi=incChiudi
+
+async function incRiapri(id){
+  if(!window.__isSegreteria){toast('Riservato alla segreteria','err');return}
+  const{error}=await sb.rpc('incarichi_set_stato',{p_id:id,p_stato:'aperto'})
+  if(error){toast('Errore: '+error.message,'err');return}
+  toast('Incarico riaperto','ok'); await loadIncarichi()
+}
+window.incRiapri=incRiapri
+
+// ── gestione da Zona Segreteria ────────────────────────────────
+async function incApriGestione(){
+  const w=$('inc-gest-wrap'); if(!w) return
+  w.style.display=''
+  w.innerHTML='<div style="color:rgba(255,255,255,.6);font-size:13px">⏳ Caricamento…</div>'
+  const{data,error}=await sb.from('incarichi').select('id,data_richiesta,tecnico_nome,tipo_richiesta,impresa,comune,oggetto,presa_visione_il,stato,visita_id,eseguito_il').in('stato',['aperto','eseguito']).order('stato').order('tecnico_nome').order('data_richiesta',{ascending:false})
+  if(error){w.innerHTML='<span style="color:#e74c3c">Errore: '+esc(error.message)+'</span>';return}
+  if(!data||!data.length){w.innerHTML='<div style="color:rgba(255,255,255,.6);font-size:13px">Nessun incarico aperto.</div>';return}
+  const eseg=data.filter(r=>r.stato==='eseguito')
+  let testa=''
+  if(eseg.length){
+    testa='<div style="background:rgba(149,194,47,.14);border:1px solid rgba(149,194,47,.4);border-radius:8px;padding:10px 12px;margin-bottom:14px">'
+      +'<div style="font-size:13px;font-weight:700;color:#95C22F;margin-bottom:6px">✓ Visita registrata dal tecnico – da chiudere ('+eseg.length+')</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:12px;color:rgba(255,255,255,.85)">'
+      +eseg.map(r=>'<tr style="border-bottom:1px solid rgba(255,255,255,.08)">'
+        +'<td style="padding:5px 6px;white-space:nowrap;color:rgba(255,255,255,.5)">#'+r.id+'</td>'
+        +'<td style="padding:5px 6px">'+esc(r.tecnico_nome||'')+'</td>'
+        +'<td style="padding:5px 6px">'+esc(r.impresa||r.tipo_richiesta||'')+'</td>'
+        +'<td style="padding:5px 6px;color:rgba(255,255,255,.6)">'+esc(r.comune||'')+'</td>'
+        +'<td style="padding:5px 6px;white-space:nowrap">visita <strong>'+esc(r.visita_id||'?')+'</strong></td>'
+        +'<td style="padding:5px 6px;white-space:nowrap"><button class="btn-sm" style="background:#95C22F;border:1px solid #7aa527;color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer" onclick="incChiudi('+r.id+')">Chiudi</button>'
+        +'<button class="btn-sm" style="background:transparent;border:1px solid rgba(255,255,255,.3);color:rgba(255,255,255,.7);border-radius:6px;padding:3px 9px;cursor:pointer;margin-left:5px" onclick="incRiapri('+r.id+')">Riapri</button></td>'
+        +'</tr>').join('')
+      +'</table></div>'
+  }
+  const gruppi={}
+  data.filter(r=>r.stato==='aperto').forEach(r=>{const k=r.tecnico_nome||'(senza tecnico)';(gruppi[k]=gruppi[k]||[]).push(r)})
+  if(!Object.keys(gruppi).length){w.innerHTML=testa+'<div style="color:rgba(255,255,255,.6);font-size:13px">Nessun incarico ancora da evadere.</div>';return}
+  w.innerHTML=testa+Object.keys(gruppi).sort().map(k=>{
+    const rr=gruppi[k]
+    return '<div style="margin-bottom:14px"><div style="font-size:13px;font-weight:700;color:#95C22F;margin-bottom:6px">'+esc(k)+' <span style="color:rgba(255,255,255,.4);font-weight:400">('+rr.length+')</span></div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:12px;color:rgba(255,255,255,.85)">'
+      +rr.map(r=>'<tr style="border-bottom:1px solid rgba(255,255,255,.08)">'
+        +'<td style="padding:5px 6px;white-space:nowrap;color:rgba(255,255,255,.5)">#'+r.id+'</td>'
+        +'<td style="padding:5px 6px;white-space:nowrap;color:rgba(255,255,255,.5)">'+(r.data_richiesta?r.data_richiesta.split('-').reverse().join('/'):'')+'</td>'
+        +'<td style="padding:5px 6px">'+esc(r.tipo_richiesta||'')+'</td>'
+        +'<td style="padding:5px 6px">'+esc(r.impresa||'')+'</td>'
+        +'<td style="padding:5px 6px;color:rgba(255,255,255,.6)">'+esc(r.comune||'')+'</td>'
+        +'<td style="padding:5px 6px;white-space:nowrap">'+(r.presa_visione_il?'<span style="color:#95C22F">👁 vista</span>':'<span style="color:rgba(255,255,255,.35)">non vista</span>')+'</td>'
+        +'<td style="padding:5px 6px;white-space:nowrap"><button class="btn-sm" style="background:#95C22F;border:1px solid #7aa527;color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer" onclick="incChiudi('+r.id+')">Completato</button></td>'
+        +'</tr>').join('')
+      +'</table></div>'
+  }).join('')
+}
+window.incApriGestione=incApriGestione
+
+// ── aggancio input file / drag&drop (delega su document) ────────
+document.addEventListener('change',function(ev){
+  if(ev.target&&ev.target.id==='inc-file'&&ev.target.files&&ev.target.files[0]){
+    incImportaFile(ev.target.files[0]); ev.target.value=''
+  }
+})
+document.addEventListener('dragover',function(ev){
+  const z=ev.target&&ev.target.closest&&ev.target.closest('#inc-drop')
+  if(z){ev.preventDefault();z.style.borderColor='#95C22F'}
+})
+document.addEventListener('dragleave',function(ev){
+  const z=ev.target&&ev.target.closest&&ev.target.closest('#inc-drop')
+  if(z)z.style.borderColor='rgba(255,255,255,.25)'
+})
+document.addEventListener('drop',function(ev){
+  const z=ev.target&&ev.target.closest&&ev.target.closest('#inc-drop')
+  if(!z)return
+  ev.preventDefault(); z.style.borderColor='rgba(255,255,255,.25)'
+  const f=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]
+  if(f) incImportaFile(f)
+})
+
+
+// ══ AGGANCIO VISITA → INCARICO (campo Protocollo interno) ═══════════
+let _incApertiCache=null
+async function incCaricaTendina(){
+  const sel=$('f-prot-inc'); if(!sel||!S.user) return
+  try{
+    const{data,error}=await sb.rpc('incarichi_miei_aperti')
+    if(error) throw error
+    _incApertiCache=data||[]
+    if(!_incApertiCache.length){ sel.style.display='none'; return }
+    sel.innerHTML='<option value="">— scegli dai tuoi incarichi —</option>'+
+      _incApertiCache.map(r=>'<option value="'+r.id+'">'+esc(r.etichetta)+'</option>').join('')
+    sel.style.display=''
+    const cur=vGet('f-prot-int')
+    if(cur&&_incApertiCache.some(r=>String(r.id)===String(cur))) sel.value=String(cur)
+    incVerificaProt()
+  }catch(e){ sel.style.display='none'; console.warn('incarichi tendina:',e) }
+}
+window.incCaricaTendina=incCaricaTendina
+
+function incVerificaProt(){
+  const msg=$('f-prot-msg'); if(!msg) return
+  const v=(vGet('f-prot-int')||'').trim()
+  if(!v){ msg.textContent=''; return }
+  if(!/^\d+$/.test(v)){ msg.innerHTML='<span style="color:#888">Testo libero: nessun incarico verrà agganciato.</span>'; return }
+  const m=(_incApertiCache||[]).find(r=>String(r.id)===v)
+  if(m) msg.innerHTML='<span style="color:#27ae60">✓ Collegato a: '+esc(m.etichetta)+'</span>'
+  else  msg.innerHTML='<span style="color:#D9A400">⚠ Nessun incarico aperto con questo numero (la visita si salva comunque).</span>'
+}
+window.incVerificaProt=incVerificaProt
+
+document.addEventListener('change',function(ev){
+  if(ev.target&&ev.target.id==='f-prot-inc'){
+    if(ev.target.value) vSet('f-prot-int',ev.target.value)
+    incVerificaProt()
+  }
+})
+document.addEventListener('input',function(ev){
+  if(ev.target&&ev.target.id==='f-prot-int'){
+    const s=$('f-prot-inc')
+    if(s) s.value=(_incApertiCache||[]).some(r=>String(r.id)===ev.target.value.trim())?ev.target.value.trim():''
+    incVerificaProt()
+  }
 })
 
 </script>
