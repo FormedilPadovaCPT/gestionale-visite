@@ -405,16 +405,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <section id="view-dashboard">
       <div id="dash-segnala-wrap" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" id="btn-segnala-dash" style="flex:2;min-width:220px;padding:12px;font-size:15px;border-radius:10px">&#128205; Segnala un cantiere attivo</button><button id="btn-servizi-cpt" style="flex:1;min-width:180px;padding:12px;font-size:15px;border-radius:10px;background:#95C22F;border:1px solid #7aa527;color:#fff;font-weight:600;cursor:pointer" onclick="window.open('https://formedilpadovacpt.github.io/servizi/','_blank')">Vai ai servizi CPT ↗</button></div>
       <div id="avvisi-banner"></div>
-      <div class="card" id="inc-card-wrap" style="display:none;margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-          <h3 style="margin:0">&#128203; Incarichi da evadere <span id="inc-badge" style="display:none;background:#e7500f;color:#fff;border-radius:11px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:6px">0</span><span id="inc-badge-eseg" style="display:none;background:#95C22F;color:#fff;border-radius:11px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:5px"></span></h3>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select id="inc-f-tec" style="display:none;font-size:12px;padding:4px 6px;border:1px solid #ddd;border-radius:6px"></select>
-            <label style="font-size:12px;color:#666;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="inc-f-chiusi" style="accent-color:#e7500f;cursor:pointer">Mostra anche chiusi</label>
-          </div>
-        </div>
-        <div id="inc-list"></div>
-      </div>
+      <div id="inc-banner" style="display:none;cursor:pointer;border-radius:8px;padding:12px 16px;margin-bottom:10px;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap" onclick="navTo('scadenze');setTimeout(function(){var e=document.getElementById('inc-scad-card');if(e)e.scrollIntoView({behavior:'smooth',block:'start'})},250)" title="Apri l'elenco completo nella pagina Scadenze"><div style="display:flex;align-items:center;gap:11px;min-width:0"><span id="inc-banner-ico" style="font-size:22px">&#128203;</span><div style="min-width:0"><div id="inc-banner-txt" style="font-weight:700;font-size:14px"></div><div id="inc-banner-sub" style="font-size:12px;opacity:.85;margin-top:2px"></div></div></div><span style="font-size:13px;font-weight:600;white-space:nowrap">Vedi l'elenco &rsaquo;</span></div>
 
             <!-- FILTRI DASHBOARD -->
       <div class="card" id="dash-filtri" style="margin-bottom:14px">
@@ -1029,6 +1020,17 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <!-- ══ ZONA RISERVATA COORDINATORE ══ -->
     <!-- SCADENZE VISITE DI RITORNO -->
     <section id="view-scadenze" class="hidden">
+      <div class="card" id="inc-scad-card" style="display:none;border-left:5px solid #e7500f;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <h3 style="margin:0;color:#e7500f">&#128203; Incarichi assegnati <span id="inc-badge" style="display:none;background:#e7500f;color:#fff;border-radius:11px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:6px">0</span><span id="inc-badge-eseg" style="display:none;background:#95C22F;color:#fff;border-radius:11px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:5px"></span></h3>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="inc-f-tec" style="display:none;font-size:12px;padding:4px 6px;border:1px solid #ccc;border-radius:6px"></select>
+            <label style="font-size:12px;color:#666;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="inc-f-chiusi" style="accent-color:#e7500f;cursor:pointer">Mostra anche chiusi</label>
+          </div>
+        </div>
+        <p style="font-size:12px;color:#888;margin-bottom:10px">Richieste di visita e consulenza assegnate dalla segreteria. Restano qui finch&eacute; non registri la visita indicando il n&deg; richiesta nel campo <em>Protocollo interno</em>, oppure finch&eacute; la segreteria non le chiude.</p>
+        <div id="inc-list"></div>
+      </div>
       <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <label style="font-size:13px;color:var(--grey);font-weight:600">👷 Filtra per tecnico:</label>
         <select id="scad-tec-filter" style="padding:6px 10px;border-radius:6px;border:1px solid #ccc;font-size:13px;min-width:220px"><option value="">Tutti i tecnici</option></select>
@@ -1423,7 +1425,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
         </div>
 
-      </div>
             <!-- ── INCARICHI AI TECNICI (file di interscambio) ── -->
         <div class="adm-section">
           <div class="adm-section-title">&#128203; Incarichi ai tecnici &ndash; import file di interscambio</div>
@@ -1440,6 +1441,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
           <div id="inc-gest-wrap" style="display:none;margin-top:12px;background:rgba(255,255,255,.06);border-radius:8px;padding:12px;max-height:460px;overflow:auto"></div>
         </div>
+
+      </div>
     </section>
 
   </main>
@@ -2287,6 +2290,7 @@ function navTo(view){
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='cantieri'&&typeof loadCantMap==='function')loadCantMap().catch(e=>console.error('loadCantMap:',e))
   if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
+  if(view==='scadenze'&&typeof loadIncarichi==='function')loadIncarichi().catch(e=>console.warn('loadIncarichi:',e))
   if(view==='scadenze')loadScadenze().catch(e=>{console.error('loadScadenze:',e);toast('Errore scadenze: '+e.message,'err')})
   if(view==='admin'){admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
   if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e))}
@@ -12244,13 +12248,13 @@ const INC_COL={'Sopralluogo urgente in Cantiere':'#c0392b','Sopralluogo in Canti
   'Consulenza in sede CPT':'#7f8c8d','Informazioni Rapporto di sopralluogo in cantiere':'#7f8c8d'}
 let _incCache=[]
 async function loadIncarichi(){
-  const wrap=$('inc-card-wrap'); if(!wrap||!S.user) return
+  const wrap=$('inc-scad-card'); if(!wrap||!S.user) return
   const gest=!!window.__isSegreteria
   let q=sb.from('incarichi').select('*').order('data_richiesta',{ascending:false}).order('id',{ascending:false}).limit(500)
   const{data,error}=await q
   if(error){ wrap.style.display='none'; console.warn('incarichi:',error); return }
   _incCache=data||[]
-  if(!_incCache.length && !gest){ wrap.style.display='none'; return }
+  if(!_incCache.length && !gest){ wrap.style.display='none'; incAggiornaBanner(); return }
   // filtro tecnico (solo gestione)
   const selT=$('inc-f-tec')
   if(gest&&selT){
@@ -12277,8 +12281,8 @@ function renderIncarichi(){
   const aperti=_incCache.filter(r=>r.stato==='aperto'&&(!fTec||r.tecnico_nome===fTec)).length
   const eseg=_incCache.filter(r=>r.stato==='eseguito'&&(!fTec||r.tecnico_nome===fTec)).length
   const bE=$('inc-badge-eseg'); if(bE){bE.textContent=eseg+' eseguiti';bE.style.display=eseg?'':'none'}
+  incAggiornaBanner()
   const b=$('inc-badge'); if(b){b.textContent=aperti;b.style.display=aperti?'':'none';b.style.background=aperti?'#e7500f':'#95C22F'}
-  const t=document.querySelector('#inc-card-wrap h3')
   if(!rows.length){
     box.innerHTML='<div style="font-size:13px;color:#888;font-style:italic;padding:6px 0">'+(mostraChiusi?'Nessun incarico.':'Nessun incarico in sospeso. 👍')+'</div>'
     return
@@ -12318,6 +12322,36 @@ function renderIncarichi(){
   }).join('')
 }
 window.renderIncarichi=renderIncarichi
+
+// banner compatto in dashboard: porta alla pagina Scadenze
+function incAggiornaBanner(){
+  const b=$('inc-banner'); if(!b) return
+  const gest=!!window.__isSegreteria
+  const ap=(_incCache||[]).filter(r=>r.stato==='aperto').length
+  const es=(_incCache||[]).filter(r=>r.stato==='eseguito').length
+  const daVedere=gest?(ap+es):ap
+  if(!daVedere){ b.style.display='none'; return }
+  const urg=(_incCache||[]).filter(r=>r.stato==='aperto'&&/urgent/i.test(r.tipo_richiesta||'')).length
+  const nonVisti=(_incCache||[]).filter(r=>r.stato==='aperto'&&!r.presa_visione_il).length
+  let bg='#fff4ee',bd='#e7500f',fg='#c43f0a',ico='📋'
+  if(urg){ bg='#fdecea'; bd='#c0392b'; fg='#c0392b'; ico='🚨' }
+  b.style.display='flex'
+  b.style.background=bg
+  b.style.border='1px solid '+bd
+  b.style.borderLeft='5px solid '+bd
+  b.style.color=fg
+  $('inc-banner-ico').textContent=ico
+  $('inc-banner-txt').textContent = ap
+    ? (gest ? (ap===1?'1 incarico aperto nel team':ap+' incarichi aperti nel team')
+            : (ap===1?'Hai 1 incarico da evadere':'Hai '+ap+' incarichi da evadere'))
+    : (gest?'Nessun incarico aperto':'Nessun incarico in sospeso')
+  const parti=[]
+  if(urg) parti.push(urg===1?'1 urgente':urg+' urgenti')
+  if(nonVisti) parti.push(nonVisti===1?'1 non ancora aperto':nonVisti+' non ancora aperti')
+  if(gest&&es) parti.push(es===1?'1 con visita registrata, da chiudere':es+' con visita registrata, da chiudere')
+  $('inc-banner-sub').textContent = parti.length?parti.join(' · '):'Richieste di visita e consulenza assegnate dalla segreteria'
+}
+window.incAggiornaBanner=incAggiornaBanner
 
 async function incPresaVisione(id,btn){
   try{
