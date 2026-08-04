@@ -394,6 +394,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="rubrica">📒 Rubrica</button>
     <button data-view="import">📥 Importa</button>
     <button data-view="scadenze">⏰ Scadenze</button>
+    <button data-view="incarichi" id="nav-incarichi">📋 Incarichi<span id="nav-inc-badge" style="display:none;background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px">0</span></button>
     <button id="nav-assev" style="display:none;background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600" onclick="window.open('https://webapp-asseverazione.vercel.app/dashboard','_blank')">✅ Asseverazione</button>
     <button data-view="admin" id="nav-admin" style="display:none">🔐 Coordinatore</button>
     <button data-view="committenti" id="nav-committenti" style="display:none">👤 Committenti</button>
@@ -405,7 +406,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <section id="view-dashboard">
       <div id="dash-segnala-wrap" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" id="btn-segnala-dash" style="flex:2;min-width:220px;padding:12px;font-size:15px;border-radius:10px">&#128205; Segnala un cantiere attivo</button><button id="btn-servizi-cpt" style="flex:1;min-width:180px;padding:12px;font-size:15px;border-radius:10px;background:#95C22F;border:1px solid #7aa527;color:#fff;font-weight:600;cursor:pointer" onclick="window.open('https://formedilpadovacpt.github.io/servizi/','_blank')">Vai ai servizi CPT ↗</button></div>
       <div id="avvisi-banner"></div>
-      <div id="inc-banner" style="display:none;cursor:pointer;border-radius:8px;padding:12px 16px;margin-bottom:10px;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap" onclick="navTo('scadenze');setTimeout(function(){var e=document.getElementById('inc-scad-card');if(e)e.scrollIntoView({behavior:'smooth',block:'start'})},250)" title="Apri l'elenco completo nella pagina Scadenze"><div style="display:flex;align-items:center;gap:11px;min-width:0"><span id="inc-banner-ico" style="font-size:22px">&#128203;</span><div style="min-width:0"><div id="inc-banner-txt" style="font-weight:700;font-size:14px"></div><div id="inc-banner-sub" style="font-size:12px;opacity:.85;margin-top:2px"></div></div></div><span style="font-size:13px;font-weight:600;white-space:nowrap">Vedi l'elenco &rsaquo;</span></div>
+      <div id="inc-banner" style="display:none;cursor:pointer;border-radius:8px;padding:12px 16px;margin-bottom:10px;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap" title="Apri l'elenco completo nella pagina Scadenze"><div style="display:flex;align-items:center;gap:11px;min-width:0"><span id="inc-banner-ico" style="font-size:22px">&#128203;</span><div style="min-width:0"><div id="inc-banner-txt" style="font-weight:700;font-size:14px"></div><div id="inc-banner-sub" style="font-size:12px;opacity:.85;margin-top:2px"></div></div></div><span style="font-size:13px;font-weight:600;white-space:nowrap">Vedi l'elenco &rsaquo;</span></div>
 
             <!-- FILTRI DASHBOARD -->
       <div class="card" id="dash-filtri" style="margin-bottom:14px">
@@ -1020,17 +1021,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <!-- ══ ZONA RISERVATA COORDINATORE ══ -->
     <!-- SCADENZE VISITE DI RITORNO -->
     <section id="view-scadenze" class="hidden">
-      <div class="card" id="inc-scad-card" style="display:none;border-left:5px solid #e7500f;margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px">
-          <h3 style="margin:0;color:#e7500f;flex:1 1 auto">&#128203; Incarichi assegnati <span id="inc-badge" style="display:none;background:#e7500f;color:#fff;border-radius:11px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:6px">0</span><span id="inc-badge-eseg" style="display:none;background:#95C22F;color:#fff;border-radius:11px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:5px"></span></h3>
-          <div style="display:flex;gap:12px;align-items:center;flex-wrap:nowrap;flex:0 0 auto">
-            <select id="inc-f-tec" style="display:none;font-size:12px;padding:4px 6px;border:1px solid #ccc;border-radius:6px;max-width:200px;flex:0 1 auto"></select>
-            <label style="font-size:12px;color:#666;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;flex:0 0 auto"><input type="checkbox" id="inc-f-chiusi" style="accent-color:#e7500f;cursor:pointer;margin:0;flex:0 0 auto;width:15px;height:15px">Mostra anche chiusi</label>
-          </div>
-        </div>
-        <p style="font-size:12px;color:#888;margin-bottom:10px">Richieste di visita e consulenza assegnate dalla segreteria. Restano qui finch&eacute; non registri la visita indicando il n&deg; richiesta nel campo <em>Protocollo interno</em>, oppure finch&eacute; la segreteria non le chiude.</p>
-        <div id="inc-list"></div>
-      </div>
       <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <label style="font-size:13px;color:var(--grey);font-weight:600">👷 Filtra per tecnico:</label>
         <select id="scad-tec-filter" style="padding:6px 10px;border-radius:6px;border:1px solid #ccc;font-size:13px;min-width:220px"><option value="">Tutti i tecnici</option></select>
@@ -1042,7 +1032,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <button class="btn-outline btn-sm" onclick="_giroClear()">Deseleziona tutto</button>
         </div>
       </div>
-      <div class="card" style="border-left:5px solid #f39c12;margin-bottom:14px">
+<div class="card" style="border-left:5px solid #f39c12;margin-bottom:14px">
         <h3 style="color:#e7500f">📅 Prossime visite pianificate</h3>
         <p style="font-size:12px;color:#888;margin-bottom:10px">Ultima visita per cantiere con rientro previsto nei prossimi 60 giorni, ordinate per data più vicina.</p>
         <div class="tbl-wrap">
@@ -1060,6 +1050,33 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
         <div id="scad-urg-empty" class="hidden" style="text-align:center;color:#27ae60;padding:18px;font-size:13px">✅ Nessun rientro urgente scaduto</div>
       </div>
+    </section>
+
+    <!-- INCARICHI ASSEGNATI -->
+    <section id="view-incarichi" class="hidden">
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <h3 style="margin:0;color:#e7500f;flex:1 1 auto">&#128203; Incarichi assegnati</h3>
+          <span id="inc-riepilogo" style="font-size:12px;color:#888"></span>
+        </div>
+        <p style="font-size:12px;color:#888;margin:0 0 12px">Richieste di visita e consulenza assegnate dalla segreteria. Restano aperte finch&eacute; non registri la visita indicando il n&deg; richiesta nel campo <em>Protocollo interno</em>; la chiusura definitiva la fa la segreteria.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div class="field" id="inc-fw-tec" style="min-width:190px;display:none;margin:0"><label style="font-size:12px">Tecnico</label><select id="inc-f-tec" style="font-size:13px"></select></div>
+          <div class="field" style="min-width:150px;margin:0"><label style="font-size:12px">Stato</label>
+            <select id="inc-f-stato" style="font-size:13px">
+              <option value="aperti">Da evadere</option>
+              <option value="eseguiti">Con visita registrata</option>
+              <option value="attivi">Da evadere + eseguiti</option>
+              <option value="chiusi">Chiusi</option>
+              <option value="tutti">Tutti</option>
+            </select></div>
+          <div class="field" id="inc-fw-tipo" style="min-width:200px;margin:0"><label style="font-size:12px">Tipo di richiesta</label><select id="inc-f-tipo" style="font-size:13px"><option value="">Tutti i tipi</option></select></div>
+          <div class="field" style="flex:1 1 240px;min-width:200px;margin:0"><label style="font-size:12px">Cerca</label><input type="search" id="inc-f-q" placeholder="Impresa, comune, referente, oggetto, n&deg;&hellip;" style="font-size:13px"></div>
+          <button class="btn-outline btn-sm" id="inc-f-reset" style="margin-bottom:2px">Azzera</button>
+        </div>
+      </div>
+      <div id="inc-list"></div>
+      <div id="inc-vuoto" style="display:none;text-align:center;color:#aaa;padding:26px;font-size:13px" class="card">Nessun incarico con questi filtri.</div>
     </section>
 
     <section id="view-committenti" class="hidden">
@@ -2281,7 +2298,7 @@ function showScr(n){
 }
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','cantieri','rubrica','import','scadenze','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','rubrica','import','scadenze','incarichi','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
   if(view==='form'&&typeof incCaricaTendina==='function')incCaricaTendina().catch(e=>console.warn('incCaricaTendina:',e))
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
@@ -2290,12 +2307,13 @@ function navTo(view){
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='cantieri'&&typeof loadCantMap==='function')loadCantMap().catch(e=>console.error('loadCantMap:',e))
   if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
-  if(view==='scadenze'&&typeof loadIncarichi==='function')loadIncarichi().catch(e=>console.warn('loadIncarichi:',e))
   if(view==='scadenze')loadScadenze().catch(e=>{console.error('loadScadenze:',e);toast('Errore scadenze: '+e.message,'err')})
+  if(view==='incarichi'&&typeof loadIncarichi==='function')loadIncarichi().catch(e=>console.warn('loadIncarichi:',e))
   if(view==='admin'){admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
   if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e))}
   if(view==='committenti')admLoadCommittenti().catch(e=>console.error('committenti:',e))
 }
+window.navTo=navTo
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
   b.onclick=()=>{if(b.dataset.view==='form')initForm();navTo(b.dataset.view)}
 })
@@ -5177,14 +5195,14 @@ async function loadScadenze(){
   // Popola il menu a tendina con i soli tecnici che hanno scadenze
   const sel=$('scad-tec-filter')
   if(sel){
-    const idsConScad=[...new Set([...prossime,...urgenti].map(v=>v.tecnico_id).filter(Boolean))]
+    const ids=[...new Set([...prossime,...urgenti].map(v=>v.tecnico_id).filter(Boolean))]
     const prev=sel.value
-    const opts=idsConScad.map(id=>({id,nome:tecMap[id]||id})).sort((a,b)=>a.nome.localeCompare(b.nome,'it'))
+    const opts=ids.map(id=>({id,nome:tecMap[id]||id})).sort((a,b)=>a.nome.localeCompare(b.nome,'it'))
     sel.innerHTML='<option value="">Tutti i tecnici</option>'+opts.map(o=>`<option value="${o.id}">${o.nome}</option>`).join('')
-    if(prev&&idsConScad.includes(prev))sel.value=prev
+    if(prev&&ids.includes(prev))sel.value=prev
     else if(S.user&&S.user.email!==ADMIN_EMAIL&&S.tecnico){
       // il proprio tecnico è sempre selezionabile, anche se oggi non ha scadenze
-      if(!idsConScad.includes(S.tecnico.tecnico_id)){
+      if(!ids.includes(S.tecnico.tecnico_id)){
         const _nm=((S.tecnico.tecnico_cognome||'')+' '+(S.tecnico.tecnico_nome||'')).trim()||S.tecnico.tecnico_id
         sel.innerHTML+=`<option value="${S.tecnico.tecnico_id}">${_nm}</option>`
       }
@@ -12248,25 +12266,26 @@ const INC_COL={'Sopralluogo urgente in Cantiere':'#c0392b','Sopralluogo in Canti
   'Consulenza in sede CPT':'#7f8c8d','Informazioni Rapporto di sopralluogo in cantiere':'#7f8c8d'}
 let _incCache=[]
 async function loadIncarichi(){
-  const wrap=$('inc-scad-card'); if(!wrap||!S.user) return
+  if(!$('inc-list')||!S.user) return
   const gest=!!window.__isSegreteria
   let q=sb.from('incarichi').select('*').order('data_richiesta',{ascending:false}).order('id',{ascending:false}).limit(500)
   const{data,error}=await q
-  if(error){ wrap.style.display='none'; console.warn('incarichi:',error); return }
+  if(error){ console.warn('incarichi:',error); return }
   _incCache=data||[]
-  if(!_incCache.length && !gest){ wrap.style.display='none'; incAggiornaBanner(); return }
-  // filtro tecnico (solo gestione)
-  const selT=$('inc-f-tec')
-  if(gest&&selT){
-    if(!selT.dataset.done){
-      const nomi=[...new Set(_incCache.map(r=>r.tecnico_nome).filter(Boolean))].sort()
-      selT.innerHTML='<option value="">Tutti i tecnici</option>'+nomi.map(n=>'<option>'+esc(n)+'</option>').join('')
-      selT.dataset.done='1'; selT.style.display=''
-      selT.onchange=renderIncarichi
-    }
-  }
-  const chk=$('inc-f-chiusi'); if(chk&&!chk.dataset.done){chk.dataset.done='1';chk.onchange=renderIncarichi}
-  wrap.style.display=''
+  if(!_incCache.length && !gest){ incAggiornaBanner(); incAggiornaNavBadge(); renderIncarichi(); return }
+  // mappe tecnico_id ↔ email, per condividere il filtro con le scadenze
+  try{
+    const{data:tt}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome,email')
+    const idMail={}, idNomi={}
+    ;(tt||[]).forEach(t=>{
+      if(t.email) idMail[t.tecnico_id]=String(t.email).toLowerCase()
+      idNomi[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()||t.email||t.tecnico_id
+    })
+    window._incIdMail=idMail; window._incTecNomi=idNomi
+    window._incTecIds=[]
+  }catch(e){ console.warn('mappe tecnici incarichi:',e) }
+  incPopolaFiltri()
+  incAggiornaNavBadge()
   renderIncarichi()
 }
 window.loadIncarichi=loadIncarichi
@@ -12274,19 +12293,28 @@ window.loadIncarichi=loadIncarichi
 function renderIncarichi(){
   const box=$('inc-list'); if(!box) return
   const gest=!!window.__isSegreteria
-  const mostraChiusi=$('inc-f-chiusi')&&$('inc-f-chiusi').checked
-  const fTec=($('inc-f-tec')&&$('inc-f-tec').value)||''
-  let rows=_incCache.filter(r=>mostraChiusi||r.stato!=='chiuso')
-  if(fTec) rows=rows.filter(r=>r.tecnico_nome===fTec)
-  const aperti=_incCache.filter(r=>r.stato==='aperto'&&(!fTec||r.tecnico_nome===fTec)).length
-  const eseg=_incCache.filter(r=>r.stato==='eseguito'&&(!fTec||r.tecnico_nome===fTec)).length
-  const bE=$('inc-badge-eseg'); if(bE){bE.textContent=eseg+' eseguiti';bE.style.display=eseg?'':'none'}
-  incAggiornaBanner()
-  const b=$('inc-badge'); if(b){b.textContent=aperti;b.style.display=aperti?'':'none';b.style.background=aperti?'#e7500f':'#95C22F'}
-  if(!rows.length){
-    box.innerHTML='<div style="font-size:13px;color:#888;font-style:italic;padding:6px 0">'+(mostraChiusi?'Nessun incarico.':'Nessun incarico in sospeso. 👍')+'</div>'
-    return
+  const fMail=($('inc-f-tec')&&$('inc-f-tec').value||'').toLowerCase()
+  const fStato=($('inc-f-stato')&&$('inc-f-stato').value)||'aperti'
+  const fTipo=($('inc-f-tipo')&&$('inc-f-tipo').value)||''
+  const q=(($('inc-f-q')&&$('inc-f-q').value)||'').trim().toLowerCase()
+  const STA={aperti:['aperto'],eseguiti:['eseguito'],attivi:['aperto','eseguito'],chiusi:['chiuso'],tutti:['aperto','eseguito','chiuso']}
+  const st=STA[fStato]||STA.aperti
+  const passaTec=r=>!fMail||String(r.tecnico_email||'').toLowerCase()===fMail
+  const passaQ=r=>{
+    if(!q) return true
+    return [r.id,r.impresa,r.cantiere,r.comune,r.indirizzo,r.referente,r.oggetto,r.richiedente,r.tipo_richiesta,r.note_comunicazione]
+      .some(v=>v!=null&&String(v).toLowerCase().includes(q))
   }
+  let rows=_incCache.filter(r=>st.includes(r.stato)&&passaTec(r)&&(!fTipo||r.tipo_richiesta===fTipo)&&passaQ(r))
+  const aperti=_incCache.filter(r=>r.stato==='aperto'&&passaTec(r)).length
+  const eseg=_incCache.filter(r=>r.stato==='eseguito'&&passaTec(r)).length
+  const chiusi=_incCache.filter(r=>r.stato==='chiuso'&&passaTec(r)).length
+  const rp=$('inc-riepilogo')
+  if(rp) rp.textContent=rows.length+' visualizzati · '+aperti+' da evadere · '+eseg+' con visita registrata · '+chiusi+' chiusi'
+  const vuoto=$('inc-vuoto'); if(vuoto) vuoto.style.display=rows.length?'none':''
+  incAggiornaBanner()
+  incAggiornaNavBadge()
+  if(!rows.length){ box.innerHTML=''; return }
   box.innerHTML=rows.map(r=>{
     const col=INC_COL[r.tipo_richiesta]||'#565c66'
     const chiuso=r.stato==='chiuso'
@@ -12323,6 +12351,55 @@ function renderIncarichi(){
 }
 window.renderIncarichi=renderIncarichi
 
+// tendine della pagina Incarichi (ricostruite a ogni caricamento)
+function incPopolaFiltri(){
+  const gest=!!window.__isSegreteria
+  const wt=$('inc-fw-tec'), sel=$('inc-f-tec')
+  if(wt&&sel){
+    if(gest){
+      const m={}
+      ;(_incCache||[]).forEach(r=>{ const e=String(r.tecnico_email||'').toLowerCase(); if(e&&!m[e]) m[e]=r.tecnico_nome||e })
+      const prev=sel.value
+      const opts=Object.keys(m).map(e=>({e,n:m[e]})).sort((a,b)=>a.n.localeCompare(b.n,'it'))
+      sel.innerHTML='<option value="">Tutti i tecnici</option>'+opts.map(o=>'<option value="'+esc(o.e)+'">'+esc(o.n)+'</option>').join('')
+      if(prev&&m[prev]) sel.value=prev
+      wt.style.display=opts.length>1?'':'none'
+    } else { wt.style.display='none'; sel.value='' }
+  }
+  const st=$('inc-f-tipo')
+  if(st){
+    const tipi=[...new Set((_incCache||[]).map(r=>r.tipo_richiesta).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'))
+    const prev=st.value
+    st.innerHTML='<option value="">Tutti i tipi</option>'+tipi.map(t=>'<option>'+esc(t)+'</option>').join('')
+    if(prev&&tipi.includes(prev)) st.value=prev
+    const wrap=$('inc-fw-tipo'); if(wrap) wrap.style.display=tipi.length>1?'':'none'
+  }
+}
+window.incPopolaFiltri=incPopolaFiltri
+
+// contatore sul pulsante del menu
+function incAggiornaNavBadge(){
+  const b=$('nav-inc-badge'); if(!b) return
+  const n=(_incCache||[]).filter(r=>r.stato==='aperto').length
+  b.textContent=n; b.style.display=n?'':'none'
+}
+window.incAggiornaNavBadge=incAggiornaNavBadge
+
+// filtri: un solo listener per delega
+document.addEventListener('input',function(ev){
+  if(ev.target&&ev.target.id==='inc-f-q') renderIncarichi()
+})
+document.addEventListener('change',function(ev){
+  const id=ev.target&&ev.target.id
+  if(id==='inc-f-tec'||id==='inc-f-stato'||id==='inc-f-tipo') renderIncarichi()
+})
+document.addEventListener('click',function(ev){
+  if(!ev.target||ev.target.id!=='inc-f-reset') return
+  ;['inc-f-tec','inc-f-tipo','inc-f-q'].forEach(i=>{const e=$(i); if(e) e.value=''})
+  const s=$('inc-f-stato'); if(s) s.value='aperti'
+  renderIncarichi()
+})
+
 // banner compatto in dashboard: porta alla pagina Scadenze
 function incAggiornaBanner(){
   const b=$('inc-banner'); if(!b) return
@@ -12352,6 +12429,12 @@ function incAggiornaBanner(){
   $('inc-banner-sub').textContent = parti.length?parti.join(' · '):'Richieste di visita e consulenza assegnate dalla segreteria'
 }
 window.incAggiornaBanner=incAggiornaBanner
+
+document.addEventListener('click',function(ev){
+  const b=ev.target&&ev.target.closest&&ev.target.closest('#inc-banner')
+  if(!b) return
+  navTo('incarichi')
+})
 
 async function incPresaVisione(id,btn){
   try{
