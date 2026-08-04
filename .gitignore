@@ -8,3 +8,6 @@ _old_edit.*
 _new_edit.*
 _cnt_*
 _vis_*
+
+desktop.ini
+**/desktop.ini
