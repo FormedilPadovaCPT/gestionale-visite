@@ -1021,11 +1021,11 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <!-- SCADENZE VISITE DI RITORNO -->
     <section id="view-scadenze" class="hidden">
       <div class="card" id="inc-scad-card" style="display:none;border-left:5px solid #e7500f;margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-          <h3 style="margin:0;color:#e7500f">&#128203; Incarichi assegnati <span id="inc-badge" style="display:none;background:#e7500f;color:#fff;border-radius:11px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:6px">0</span><span id="inc-badge-eseg" style="display:none;background:#95C22F;color:#fff;border-radius:11px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:5px"></span></h3>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select id="inc-f-tec" style="display:none;font-size:12px;padding:4px 6px;border:1px solid #ccc;border-radius:6px"></select>
-            <label style="font-size:12px;color:#666;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="inc-f-chiusi" style="accent-color:#e7500f;cursor:pointer">Mostra anche chiusi</label>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+          <h3 style="margin:0;color:#e7500f;flex:1 1 auto">&#128203; Incarichi assegnati <span id="inc-badge" style="display:none;background:#e7500f;color:#fff;border-radius:11px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:6px">0</span><span id="inc-badge-eseg" style="display:none;background:#95C22F;color:#fff;border-radius:11px;padding:1px 9px;font-size:12px;font-weight:700;margin-left:5px"></span></h3>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:nowrap;flex:0 0 auto">
+            <select id="inc-f-tec" style="display:none;font-size:12px;padding:4px 6px;border:1px solid #ccc;border-radius:6px;max-width:200px;flex:0 1 auto"></select>
+            <label style="font-size:12px;color:#666;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;flex:0 0 auto"><input type="checkbox" id="inc-f-chiusi" style="accent-color:#e7500f;cursor:pointer;margin:0;flex:0 0 auto;width:15px;height:15px">Mostra anche chiusi</label>
           </div>
         </div>
         <p style="font-size:12px;color:#888;margin-bottom:10px">Richieste di visita e consulenza assegnate dalla segreteria. Restano qui finch&eacute; non registri la visita indicando il n&deg; richiesta nel campo <em>Protocollo interno</em>, oppure finch&eacute; la segreteria non le chiude.</p>
