@@ -76,9 +76,9 @@ nav button.active{background:rgba(255,255,255,.15)}
 @keyframes incPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(1.12)}}
 .inc-lampeggia{animation:incPulse 1.15s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.inc-lampeggia{animation:none}}
-main{flex:1;padding:14px;max-width:1140px;margin:0 auto;width:100%}
+main{flex:1;padding:14px 22px;max-width:1720px;margin:0 auto;width:100%}
 /* DASHBOARD */
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin-bottom:18px}
 .stat-card{background:#fff;border-radius:var(--radius);padding:14px;text-align:center;box-shadow:var(--shadow)}
 .stat-card .num{font-size:30px;font-weight:800;color:var(--orange)}
 .stat-card .pct{font-size:14px;font-weight:700;margin-top:1px}
@@ -395,7 +395,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="lista">📋 Visite</button>
     <button data-view="cantieri">🏗️ Cantieri</button>
     <button data-view="rubrica">📒 Rubrica</button>
-    <button data-view="import">📥 Importa</button>
     <button data-view="scadenze">⏰ Scadenze</button>
     <button data-view="incarichi" id="nav-incarichi">📋 Incarichi<span id="nav-inc-badge" style="display:none;background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px">0</span></button>
     <button id="nav-assev" style="display:none;background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600" onclick="window.open('https://webapp-asseverazione.vercel.app/dashboard','_blank')">✅ Asseverazione</button>
@@ -2373,6 +2372,17 @@ function buildTabs(){
     b.onclick=()=>{saveTabData();activateTab(n);renderZoneTab(n)}
     bar.appendChild(b)
   })
+  // Voce "Importa" spostata qui dal menu principale: è dal form
+  // che si decide di importare una visita da file
+  const _sepImp=document.createElement('div')
+  _sepImp.style.cssText='border-top:1px solid var(--border);margin:10px 0 4px'
+  bar.appendChild(_sepImp)
+  const _btnImp=document.createElement('button')
+  _btnImp.className='tab-btn'
+  _btnImp.textContent='📥 Importa visita'
+  _btnImp.title='Importa una visita da file (ex pagina Importa)'
+  _btnImp.onclick=()=>navTo('import')
+  bar.appendChild(_btnImp)
   // Build zone tab divs 3–12 if not already present (zone 1–10)
   const ref=$('[data-tab="13"]')
   const tabArea=document.querySelector('#view-form .tab-area')
