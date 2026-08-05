@@ -982,7 +982,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <option value="committente">👤 Committenti</option>
             <option value="persona">👥 Figure di cantiere</option>
             <option value="tecnico">👷 Tecnici</option>
-            <option value="persona">🧑 Persone</option>
           </select>
           <button class="btn-outline btn-sm" id="rub-dedup-btn" style="display:none" onclick="apriDedupPersone()">🧹 Duplicati persone</button>
           <button class="btn-primary btn-sm" id="btn-rub-unisci" style="display:none" onclick="rubUnisciSel()">🔀 Unisci selezionate</button>
@@ -6357,6 +6356,7 @@ function _dedupGroupHtml(kid,rows,rapMap){
       </tbody>
     </table></div>
     <button class="btn-primary btn-sm" style="margin-top:8px" onclick="dedupMerge('${kid}')">Unisci le schede spuntate sulla principale ◉</button>
+    <button class="btn-outline btn-sm" style="margin-top:8px;margin-left:8px;color:#1e8449;border-color:#1e8449" onclick="dedupNonDoppi('${kid}')" title="Conferma che sono persone diverse: il gruppo non verrà più proposto (a meno che non compaiano nuove schede con questo nome)">✓ Non sono duplicati</button>
   </div>`
 }
 window._dedupKeys={}
@@ -6391,7 +6391,13 @@ async function apriDedupPersone(){
     const k=[a,b].sort().join('|')
     ;(groups[k]=groups[k]||[]).push(r)
   })
-  const dupli=Object.entries(groups).filter(([,v])=>v.length>1)
+  let dupli=Object.entries(groups).filter(([,v])=>v.length>1)
+  // Nasconde i gruppi già confermati come "non duplicati" (finché l'insieme di schede non cambia)
+  try{
+    const{data:excl}=await sb.from('dedup_esclusioni').select('persona_ids')
+    const exSets=(excl||[]).map(e=>new Set(e.persona_ids||[]))
+    dupli=dupli.filter(([,rows])=>!exSets.some(s=>rows.every(r=>s.has(r.persona_id))))
+  }catch(_e){}
   _dedupData={};window._dedupKeys={}
   const box=$('dedup-list')
   if(!dupli.length){
@@ -6717,6 +6723,31 @@ async function rubUnisciSel(){
 }
 window.rubSelChange=rubSelChange
 window.rubUnisciSel=rubUnisciSel
+async function eliminaPersona(pid){
+  if(!window.__isCoord){toast('Funzione riservata alla segreteria','err');return}
+  let extra=''
+  try{
+    const{count}=await sb.from('persone_imprese').select('id',{count:'exact',head:true}).eq('persona_id',pid)
+    if(count)extra=`\n\nAttenzione: la scheda ha ${count} rapport${count===1?'o':'i'} di lavoro collegat${count===1?'o':'i'}, che resteranno in archivio.`
+  }catch(_e){}
+  if(!confirm('Eliminare questo contatto dalla rubrica?\n\nLa scheda va nel cestino (elimina=1), non viene cancellata definitivamente.'+extra))return
+  const{error}=await sb.from('persone').update({elimina:1,updated_at:new Date().toISOString(),updated_by:S.user?.email||null}).eq('persona_id',pid)
+  if(error){toast('Errore: '+error.message,'err');return}
+  toast('Contatto eliminato (cestino) ✓','ok')
+  loadRubrica()
+}
+window.eliminaPersona=eliminaPersona
+async function dedupNonDoppi(kid){
+  const rows=(_dedupData&&_dedupData[kid])||[]
+  if(rows.length<2)return
+  if(!confirm(`Confermi che queste ${rows.length} schede sono persone DIVERSE?\n\nIl gruppo non verrà più proposto tra i duplicati (ricomparirà solo se si aggiungeranno nuove schede con questo nome).`))return
+  const{error}=await sb.from('dedup_esclusioni').insert({persona_ids:rows.map(r=>r.persona_id),creato_da:S.user?.email||null})
+  if(error){toast('Errore salvataggio: '+error.message,'err');return}
+  toast('Segnato: non sono duplicati ✓','ok')
+  if(window._dedupFromSel){window._dedupFromSel=false;hide('modal-dedup')}
+  else apriDedupPersone()
+}
+window.dedupNonDoppi=dedupNonDoppi
 window.dedupMerge=dedupMerge
 
 // ══════════════════════════════════════════════════════════════
@@ -11256,7 +11287,8 @@ async function loadRubrica(){
         r.qualifica?esc(r.qualifica):'',
         r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:'',
         r.telefono?`<a href="tel:${esc(r.telefono)}" style="color:var(--orange)">${esc(r.telefono)}</a>`:'',
-        `<a href="javascript:void(0)" onclick="event.stopPropagation();editPersona('${r.persona_id}')" style="color:var(--grey)">✏️ Modifica</a>`
+        `<a href="javascript:void(0)" onclick="event.stopPropagation();editPersona('${r.persona_id}')" style="color:var(--grey)">✏️ Modifica</a>`,
+        window.__isCoord?`<a href="javascript:void(0)" onclick="event.stopPropagation();eliminaPersona('${r.persona_id}')" style="color:#c0392b">\uD83D\uDDD1 Elimina</a>`:''
       ].filter(Boolean)
       cards.push(rubCard('👥','persona',r.persona_id,esc(nomev||'–'),esc(sub),extra))
     })
@@ -11276,21 +11308,6 @@ async function loadRubrica(){
     })
   }
 
-  // ── PERSONE (anagrafica unica: figure di cantiere + lavoratori) ──
-  if(!cat||cat==='persona'){
-    let qb=sb.from('persone').select('persona_id,titolo,nome,cognome,cf,email,telefono,qualifica,comune_nascita').eq('elimina',0).limit(50)
-    if(q)qb=qb.or(`nome.ilike.*${q}*,cognome.ilike.*${q}*,cf.ilike.*${q}*,email.ilike.*${q}*,telefono.ilike.*${q}*`)
-    const{data}=await qb
-    ;(data||[]).forEach(r=>{
-      const nome=[r.cognome,r.nome].filter(Boolean).join(' ')
-      const sub=[r.qualifica,r.cf].filter(Boolean).join(' · ')
-      const extra=[
-        r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:'',
-        r.telefono?`<a href="tel:${esc(r.telefono)}" style="color:var(--orange)">${esc(r.telefono)}</a>`:'',
-      ].filter(Boolean)
-      cards.push(rubCard('🧑','persona',r.persona_id,esc(nome||'–'),sub,extra))
-    })
-  }
 
   if(!cards.length){
     res.innerHTML='<p style="color:#aaa;font-size:13px;grid-column:1/-1">Nessun contatto trovato.</p>'
