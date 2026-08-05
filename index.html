@@ -1083,7 +1083,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
           <h3 style="margin:0">&#128100; Gestione committenti</h3>
-          <button class="btn-outline btn-sm" onclick="sgrCercaDupComm()">🧬 Trova possibili duplicati</button>
+          <div style="display:flex;gap:8px"><button class="btn-primary btn-sm" onclick="admNuovoCommittente()">➕ Nuovo committente</button><button class="btn-outline btn-sm" onclick="sgrCercaDupComm()">🧬 Trova possibili duplicati</button></div>
         </div>
         <p style="font-size:12px;color:#888;margin:0 0 10px">Tutti i committenti registrati. Clicca le intestazioni per ordinare, cerca per nome/CF/P.IVA e <b>accorpa</b> quelli che sono lo stesso committente inserito in modi diversi: cantieri e visite vengono spostati sul principale, i doppioni archiviati.</p>
         <div class="search-bar">
@@ -10938,6 +10938,8 @@ async function admLoadCommittenti(){
 let _editCommId=null
 async function admEditCommittente(id){
   _editCommId=id
+  const _idf=$('ec-id');if(_idf){_idf.readOnly=true;_idf.style.background='#f4f4f4';_idf.style.color='#888';_idf.style.cursor='not-allowed'}
+  const _mh=document.querySelector('#modal-edit-comm h3');if(_mh)_mh.textContent='👤 Scheda committente'
   let k=(_commRows||[]).find(x=>x.committente_id===id)
   if(!k){try{const{data}=await sb.from('committenti').select('*').eq('committente_id',id).single();k=data||{}}catch(_){k={}}}
   vSet('ec-id',k.committente_id||id)
@@ -10971,8 +10973,21 @@ async function admEditCommittente(id){
     }
   }catch(e){if(box)box.innerHTML='<div style="color:#c00;font-size:12px">Errore: '+esc(e.message||'')+'</div>'}
 }
+function admNuovoCommittente(){
+  _editCommId=null
+  ;['ec-id','ec-nome','ec-cfpiva','ec-piva','ec-email','ec-tel'].forEach(function(i){vSet(i,'')})
+  const sog=$('ec-sogg');if(sog)sog.value=''
+  const tp=$('ec-tipo');if(tp)tp.value=''
+  const info=$('ec-info');if(info)info.textContent=''
+  const vinfo=$('ec-visite-info');if(vinfo)vinfo.textContent=''
+  const b1=$('ec-cantieri-list');if(b1)b1.innerHTML='<div style="color:#aaa;font-size:12px">\u2014</div>'
+  const b2=$('ec-visite-list');if(b2)b2.innerHTML='<div style="color:#aaa;font-size:12px">\u2014</div>'
+  const f=$('ec-id');if(f){f.readOnly=false;f.style.background='';f.style.color='';f.style.cursor='';f.placeholder='CF (16) o P.IVA (11)'}
+  const h=document.querySelector('#modal-edit-comm h3');if(h)h.textContent='👤 Nuovo committente'
+  show('modal-edit-comm')
+  if(f)f.focus()
+}
 async function admSaveEditComm(){
-  if(!_editCommId)return
   const nome=vGet('ec-nome').trim()
   if(nome.length<2){toast('Ragione sociale / nome obbligatorio','warn');return}
   const tp=vGet('ec-tipo')
@@ -10985,11 +11000,26 @@ async function admSaveEditComm(){
     email:vGet('ec-email').trim()||null,
     telefono:vGet('ec-tel').trim()||null
   }
-  try{const{error}=await sb.from('committenti').update(upd).eq('committente_id',_editCommId);if(error)throw error
-    hide('modal-edit-comm');toast('Committente aggiornato','ok');admLoadCommittenti();_dupCommRefresh()
+  try{
+    if(_editCommId){
+      const{error}=await sb.from('committenti').update(upd).eq('committente_id',_editCommId);if(error)throw error
+      hide('modal-edit-comm');toast('Committente aggiornato','ok');admLoadCommittenti();_dupCommRefresh()
+    }else{
+      const nid=vGet('ec-id').trim().toUpperCase().replace(/\s+/g,'')
+      if(!nid){toast('Inserisci CF o P.IVA: \u00e8 la chiave del committente','warn');return}
+      if(nid.length!==11&&nid.length!==16&&!confirm('L\'identificativo "'+nid+'" non ha 11 caratteri (P.IVA) n\u00e9 16 (CF).\nSalvare comunque?'))return
+      const{data:ex}=await sb.from('committenti').select('committente_id,committente_nome,elimina').eq('committente_id',nid).maybeSingle()
+      if(ex){toast('Esiste gi\u00e0 un committente con questo identificativo: '+(ex.committente_nome||nid)+(ex.elimina?' (archiviato)':''),'err');return}
+      if(!upd.cf_piva)upd.cf_piva=nid
+      const{error}=await sb.from('committenti').insert(Object.assign({committente_id:nid},upd));if(error)throw error
+      hide('modal-edit-comm');toast('Committente creato','ok')
+      const sf=$('adm-comm-search');if(sf)sf.value=nome
+      admLoadCommittenti()
+    }
   }catch(e){toast('Errore salvataggio: '+(e.message||e),'err')}
 }
 window.admSaveEditComm=admSaveEditComm
+window.admNuovoCommittente=admNuovoCommittente
 ;(function(){var c=$('btn-ec-cancel');if(c)c.onclick=function(){hide('modal-edit-comm')};var s=$('btn-ec-save');if(s)s.onclick=admSaveEditComm})()
 async function admFondiCommittenti(){
   const ids=[..._commSel.keys()]
