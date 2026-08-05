@@ -61,3 +61,66 @@ jobs:
           name: db-backup-${{ env.TS }}
           path: 'backup_*.sql.gz.gpg'
           retention-days: 90
+
+      # Copia del backup (sempre cifrato) nella cartella "Backup_Gestionale"
+      # del Drive di cptpd, via service account con delega. Se il secret
+      # GOOGLE_SERVICE_ACCOUNT_JSON non è configurato, il passo viene saltato.
+      # Rotazione: i backup su Drive più vecchi di 60 giorni vengono cestinati.
+      - name: Carica su Google Drive (Backup_Gestionale)
+        env:
+          GSA_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GSA_JSON:-}" ]; then
+            echo "Secret GOOGLE_SERVICE_ACCOUNT_JSON assente: salto l'upload su Drive."
+            exit 0
+          fi
+          pip -q install google-auth requests
+          python3 - <<'PY'
+          import os, json, glob, datetime, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+
+          info = json.loads(os.environ['GSA_JSON'])
+          creds = service_account.Credentials.from_service_account_info(
+              info, scopes=['https://www.googleapis.com/auth/drive'],
+              subject='cptpd@did.formedilpadova.it')
+          creds.refresh(Request())
+          H = {'Authorization': f'Bearer {creds.token}'}
+
+          # cartella Backup_Gestionale (creata se manca)
+          q = "name = 'Backup_Gestionale' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+          r = requests.get('https://www.googleapis.com/drive/v3/files',
+                           params={'q': q, 'fields': 'files(id)'}, headers=H).json()
+          if r.get('files'):
+              fid = r['files'][0]['id']
+          else:
+              fid = requests.post('https://www.googleapis.com/drive/v3/files',
+                                  headers={**H, 'Content-Type': 'application/json'},
+                                  json={'name': 'Backup_Gestionale',
+                                        'mimeType': 'application/vnd.google-apps.folder'}).json()['id']
+
+          # upload (resumable) del dump cifrato
+          path = glob.glob('backup_*.sql.gz.gpg')[0]
+          init = requests.post(
+              'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+              headers={**H, 'Content-Type': 'application/json'},
+              json={'name': os.path.basename(path), 'parents': [fid]})
+          init.raise_for_status()
+          with open(path, 'rb') as f:
+              data = f.read()
+          up = requests.put(init.headers['Location'], data=data)
+          up.raise_for_status()
+          print('Caricato su Drive:', path, f'({len(data)/1e6:.1f} MB)')
+
+          # rotazione: cestina i backup più vecchi di 60 giorni
+          lim = (datetime.datetime.utcnow() - datetime.timedelta(days=60)).strftime('%Y-%m-%dT%H:%M:%S')
+          q2 = f"'{fid}' in parents and name contains 'backup_' and modifiedTime < '{lim}' and trashed = false"
+          for o in requests.get('https://www.googleapis.com/drive/v3/files',
+                                params={'q': q2, 'fields': 'files(id,name)'},
+                                headers=H).json().get('files', []):
+              requests.patch(f"https://www.googleapis.com/drive/v3/files/{o['id']}",
+                             headers={**H, 'Content-Type': 'application/json'},
+                             json={'trashed': True})
+              print('Cestinato backup vecchio:', o['name'])
+          PY
