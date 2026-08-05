@@ -1083,9 +1083,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
           <h3 style="margin:0">&#128100; Gestione committenti</h3>
-          <div style="display:flex;gap:8px"><button class="btn-primary btn-sm" onclick="admNuovoCommittente()">➕ Nuovo committente</button><button class="btn-outline btn-sm" onclick="sgrCercaDupComm()">🧬 Trova possibili duplicati</button></div>
+          <div style="display:flex;gap:8px"><button class="btn-primary btn-sm" onclick="admNuovoCommittente()">➕ Nuovo committente</button><button class="btn-outline btn-sm" id="btn-comm-dup" onclick="admEvidenziaDup()">🧬 Evidenzia duplicati</button></div>
         </div>
-        <p style="font-size:12px;color:#888;margin:0 0 10px">Tutti i committenti registrati. Clicca le intestazioni per ordinare, cerca per nome/CF/P.IVA e <b>accorpa</b> quelli che sono lo stesso committente inserito in modi diversi: cantieri e visite vengono spostati sul principale, i doppioni archiviati.</p>
+        <p style="font-size:12px;color:#888;margin:0 0 10px">Tutti i committenti registrati. <b>🧬 Evidenzia duplicati</b> colora e porta in cima i gruppi con nome identico (il 🧬 sulla riga cerca i nomi simili); ✏️ apre la scheda per correggere CF e P.IVA. Per <b>accorpare</b> spunta due o più righe e usa "Unisci i selezionati": cantieri e visite passano al principale, i doppioni vengono archiviati.</p>
         <div class="search-bar">
           <input type="text" id="adm-comm-search" placeholder="Nome, CF o P.IVA…" style="flex:1">
           <button class="btn-primary btn-sm" onclick="admLoadCommittenti()">Cerca</button>
@@ -1098,13 +1098,13 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <button class="btn-outline btn-sm" onclick="_commSelClear()">Deseleziona</button>
           <span style="font-size:11px;color:#888;flex-basis:100%">Spunta due o più committenti che sono lo stesso: sceglierai quale tenere come principale. Attenzione agli omonimi con CF diversi (persone diverse).</span>
         </div>
-        <div id="sgr-dupcomm-list" style="margin-bottom:12px"></div>
         <div class="tbl-wrap">
           <table>
             <thead><tr>
               <th style="width:30px" title="Seleziona per unione">🔗</th>
               <th class="cs" data-k="nome" style="cursor:pointer;user-select:none">Committente <span class="cs-i" data-k="nome"></span></th>
-              <th class="cs" data-k="cfp" style="cursor:pointer;user-select:none">CF / P.IVA <span class="cs-i" data-k="cfp"></span></th>
+              <th class="cs" data-k="cf" style="cursor:pointer;user-select:none">CF <span class="cs-i" data-k="cf"></span></th>
+              <th class="cs" data-k="piva" style="cursor:pointer;user-select:none">P.IVA <span class="cs-i" data-k="piva"></span></th>
               <th class="cs" data-k="tipo" style="cursor:pointer;user-select:none">Tipo <span class="cs-i" data-k="tipo"></span></th>
               <th class="cs" data-k="n_cantieri" style="cursor:pointer;user-select:none;text-align:center">Cantieri <span class="cs-i" data-k="n_cantieri"></span></th>
               <th class="cs" data-k="n_visite" style="cursor:pointer;user-select:none;text-align:center">Visite <span class="cs-i" data-k="n_visite"></span></th>
@@ -10890,6 +10890,7 @@ window.admEditImpresa = admEditImpresa
 let _commRows=[]
 let _commSel=new Map()
 let _commSort={k:'nome',dir:1}
+let _commDup=null,_commDupN=0,_commFilterIds=null
 function _commMergeBar(){const bar=$('comm-merge-bar');if(!bar)return;const n=_commSel.size;bar.style.display=n>=2?'flex':'none';const c=$('comm-merge-count');if(c)c.textContent=n+' committente/i selezionato/i'}
 function _commSelToggle(cb){const id=cb.dataset.id;if(cb.checked)_commSel.set(id,cb.dataset.nome||id);else _commSel.delete(id);_commMergeBar()}
 function _commSelClear(){_commSel.clear();document.querySelectorAll('.comm-sel-chk').forEach(c=>c.checked=false);_commMergeBar()}
@@ -10897,35 +10898,51 @@ function _commTipoLbl(k){return (k.tipo_sogg||'')||(k.committente_tipo==1?'Pubbl
 function _commSortVal(k,key){
   if(key==='n_cantieri')return k.n_cantieri||0
   if(key==='n_visite')return k.n_visite||0
-  if(key==='cfp')return (k.cf_piva||k.piva||'').toLowerCase()
+  if(key==='cf')return (k.cf_piva||'').toLowerCase()
+  if(key==='piva')return (k.piva||'').toLowerCase()
   if(key==='tipo')return _commTipoLbl(k).toLowerCase()
   return (k.committente_nome||'').toLowerCase()
 }
 function _commRowHtml(k){
-  const id=k.committente_id, cfp=k.cf_piva||k.piva||''
-  return '<tr>'+
+  const id=k.committente_id
+  const dup=_commDup&&_commDup.has(id)
+  const bg=dup?((_commDup.get(id)%2)?'#ffe3d3':'#fff1e8'):(_commFilterIds?'#fff1e8':'')
+  return '<tr'+(bg?' style="background:'+bg+'"':'')+'>'+
     '<td style="text-align:center"><input type="checkbox" class="comm-sel-chk" data-id="'+esc(id)+'" data-nome="'+esc(k.committente_nome||'')+'" '+(_commSel.has(id)?'checked':'')+' onchange="_commSelToggle(this)" style="width:16px;height:16px;cursor:pointer"></td>'+
-    '<td style="font-weight:500">'+esc(k.committente_nome||'')+'</td>'+
-    '<td style="font-family:monospace;font-size:11px;color:#666">'+esc(cfp)+'</td>'+
+    '<td style="font-weight:500">'+(dup?'<span title="Possibile duplicato" style="color:var(--orange,#e7500f)">●</span> ':'')+esc(k.committente_nome||'')+'</td>'+
+    '<td style="font-family:monospace;font-size:11px;color:#666">'+esc(k.cf_piva||'')+'</td>'+
+    '<td style="font-family:monospace;font-size:11px;color:#666">'+esc(k.piva||'')+'</td>'+
     '<td style="font-size:12px">'+esc(_commTipoLbl(k))+'</td>'+
     '<td style="text-align:center">'+(k.n_cantieri||0)+'</td>'+
     '<td style="text-align:center">'+(k.n_visite||0)+'</td>'+
-    '<td style="text-align:right;white-space:nowrap"><button class="btn-outline btn-sm" title="Modifica" onclick="admEditCommittente(\''+esc(id)+'\')">✏️</button> <button class="btn-outline btn-sm" title="Trova simili" onclick="admSimiliCommittente(\''+esc(id)+'\')">🧬</button></td></tr>'
+    '<td style="text-align:right;white-space:nowrap"><button class="btn-outline btn-sm" title="Modifica" onclick="admEditCommittente(\''+esc(id)+'\')">✏️</button> <button class="btn-outline btn-sm" title="Trova nomi simili" onclick="admSimiliCommittente(\''+esc(id)+'\')">🧬</button></td></tr>'
 }
 function _commRender(){
   const tb=$('tbody-adm-comm');if(!tb)return
   const k=_commSort.k,dir=_commSort.dir
-  const rows=[..._commRows].sort((a,b)=>{const va=_commSortVal(a,k),vb=_commSortVal(b,k);return (va<vb?-1:va>vb?1:0)*dir})
+  let rows=_commFilterIds?_commRows.filter(r=>_commFilterIds.has(r.committente_id)):[..._commRows]
+  if(k==='dup'&&_commDup){
+    rows.sort((a,b)=>{
+      const ga=_commDup.has(a.committente_id)?_commDup.get(a.committente_id):Infinity
+      const gb=_commDup.has(b.committente_id)?_commDup.get(b.committente_id):Infinity
+      if(ga!==gb)return ga<gb?-1:1
+      const va=_commSortVal(a,'nome'),vb=_commSortVal(b,'nome');return va<vb?-1:va>vb?1:0
+    })
+  }else{
+    rows.sort((a,b)=>{const va=_commSortVal(a,k),vb=_commSortVal(b,k);return (va<vb?-1:va>vb?1:0)*dir})
+  }
   tb.innerHTML=rows.map(_commRowHtml).join('')
   document.querySelectorAll('#view-committenti .cs-i').forEach(s=>s.textContent=(s.dataset.k===k)?(dir>0?' ▲':' ▼'):'')
-  const cnt=$('comm-list-count');if(cnt)cnt.textContent=_commRows.length+' committenti'
+  const cnt=$('comm-list-count')
+  if(cnt)cnt.textContent=_commFilterIds?(rows.length+' con nome simile — "Mostra tutti" per tornare alla lista completa'):(rows.length+' committenti'+(_commDup?(' · '+_commDupN+' gruppi di possibili duplicati evidenziati in cima'):''))
   _commMergeBar()
 }
 function commSort(k){if(_commSort.k===k)_commSort.dir*=-1;else{_commSort.k=k;_commSort.dir=1}_commRender()}
 async function admLoadCommittenti(){
+  _commFilterIds=null
   const q=($('adm-comm-search')?.value||'').trim()
   const tb=$('tbody-adm-comm');if(!tb)return
-  tb.innerHTML='<tr><td colspan="7" style="padding:16px;text-align:center;color:#aaa">Caricamento…</td></tr>'
+  tb.innerHTML='<tr><td colspan="8" style="padding:16px;text-align:center;color:#aaa">Caricamento…</td></tr>'
   const emp=$('comm-empty');if(emp)emp.classList.add('hidden')
   try{
     const{data,error}=await sb.rpc('committenti_lista',{p_search:q||null})
@@ -10933,7 +10950,7 @@ async function admLoadCommittenti(){
     _commRows=data||[]
     if(!_commRows.length){tb.innerHTML='';if(emp)emp.classList.remove('hidden');const cnt=$('comm-list-count');if(cnt)cnt.textContent='0 committenti';return}
     _commRender()
-  }catch(e){console.error('admLoadCommittenti',e);tb.innerHTML='<tr><td colspan="7" style="padding:16px;text-align:center;color:#c00">Errore: '+esc(e.message||'')+'</td></tr>'}
+  }catch(e){console.error('admLoadCommittenti',e);tb.innerHTML='<tr><td colspan="8" style="padding:16px;text-align:center;color:#c00">Errore: '+esc(e.message||'')+'</td></tr>'}
 }
 let _editCommId=null
 async function admEditCommittente(id){
@@ -11003,7 +11020,7 @@ async function admSaveEditComm(){
   try{
     if(_editCommId){
       const{error}=await sb.from('committenti').update(upd).eq('committente_id',_editCommId);if(error)throw error
-      hide('modal-edit-comm');toast('Committente aggiornato','ok');admLoadCommittenti();_dupCommRefresh()
+      hide('modal-edit-comm');toast('Committente aggiornato','ok');admLoadCommittenti();_commDupReload()
     }else{
       const nid=vGet('ec-id').trim().toUpperCase().replace(/\s+/g,'')
       if(!nid){toast('Inserisci CF o P.IVA: \u00e8 la chiave del committente','warn');return}
@@ -11035,82 +11052,53 @@ async function admFondiCommittenti(){
     const{data,error}=await sb.rpc('fondi_committenti',{p_master_id:masterId,p_dupe_ids:dupeIds})
     if(error)throw error
     toast('Unione completata: '+((data&&data.committenti_archiviati)||dupeIds.length)+' archiviato/i · '+((data&&data.cantieri_spostati)||0)+' cantieri spostati','ok')
-    _commSelClear();admLoadCommittenti()
-    const dl=$('sgr-dupcomm-list');if(dl&&dl.innerHTML.trim())sgrCercaDupComm()
+    _commSelClear();admLoadCommittenti();_commDupReload()
   }catch(e){toast('Errore unione: '+(e.message||e),'err')}
 }
-let _dupCommGroups=[]
-let _dupCommLast=null
-function _dupCommRefresh(){const dl=$('sgr-dupcomm-list');if(!dl||!dl.innerHTML.trim())return;if(_dupCommLast==='dup')sgrCercaDupComm();else if(_dupCommLast)admSimiliCommittente(_dupCommLast)}
-function _dupGroupHtml(g,gi){
-  const badge=g.tipo==='identico'
-    ?'<span style="background:var(--orange,#e7500f);color:#fff;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:600;letter-spacing:.3px">NOME IDENTICO</span>'
-    :'<span style="background:#565c66;color:#fff;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:600;letter-spacing:.3px">SIMILE'+(g.sim!=null?' '+Math.round(g.sim*100)+'%':'')+'</span>'
-  const rows=(g.membri||[]).map((m,mi)=>
-    '<label style="display:flex;align-items:center;gap:12px;padding:8px 12px;font-size:13px;cursor:pointer;background:#fff'+(mi>0?';border-top:1px solid #f0f0f0':'')+'">'
-    +'<input type="radio" name="dc-'+gi+'" value="'+esc(m.id)+'" '+(mi===0?'checked':'')+' style="flex:0 0 auto;margin:0">'
-    +'<span style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:#333">'+esc(m.nome||'')+'</span>'
-    +'<span style="flex:0 0 auto;font-family:monospace;font-size:12px;color:#565c66;background:#f2f3f5;padding:2px 8px;border-radius:6px">'+esc(m.cfp||'\u2014')+'</span>'
-    +'<span style="flex:0 0 auto;font-size:12px;color:#999;white-space:nowrap">'+(m.n_cantieri||0)+' cant \u00b7 '+(m.n_visite||0)+' vis</span>'
-    +'<button class="btn-outline btn-sm" title="Apri scheda" style="flex:0 0 auto" onclick="event.preventDefault();event.stopPropagation();admEditCommittente(\''+esc(m.id)+'\')">\u270f\ufe0f Scheda</button>'
-    +'</label>').join('')
-  return '<div style="border:1px solid #e3e3e3;border-radius:10px;margin-bottom:10px;background:#fff;overflow:hidden">'
-    +'<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;background:#fafafa;border-bottom:1px solid #eee;flex-wrap:wrap">'
-    +badge+'<span style="font-size:11px;color:#888">spunta quale TENERE come principale</span>'
-    +'<span style="flex:1 1 auto"></span>'
-    +'<button class="btn-primary btn-sm" onclick="sgrFondiDupComm('+gi+')">🔗 Unisci gruppo</button>'
-    +'</div>'+rows+'</div>'
-}
-async function sgrCercaDupComm(){
-  const box=$('sgr-dupcomm-list');if(!box)return
-  _dupCommLast='dup'
-  box.innerHTML='<p style="color:#888;font-size:12px">Ricerca duplicati in corso…</p>'
+async function admEvidenziaDup(){
+  const btn=$('btn-comm-dup')
+  if(_commDup){_commDup=null;_commDupN=0;if(btn)btn.textContent='🧬 Evidenzia duplicati';if(_commSort.k==='dup')_commSort={k:'nome',dir:1};_commRender();return}
+  if(btn)btn.textContent='🧬 Ricerca…'
   try{
     const{data,error}=await sb.rpc('committenti_duplicati')
     if(error)throw error
-    const groups=data||[];_dupCommGroups=groups
-    if(!groups.length){box.innerHTML='<p style="color:#888;font-size:12px">Nessun duplicato per nome identico 🎉 (usa 🧬 su una riga per cercare nomi simili)</p>';return}
-    box.innerHTML='<div style="font-size:12px;color:#666;margin-bottom:8px"><b>'+groups.length+'</b> gruppi con nome identico — scegli quale tenere. Attenzione agli omonimi persone fisiche con CF diversi (soggetti diversi):</div>'+groups.map((g,gi)=>_dupGroupHtml(g,gi)).join('')
-  }catch(e){box.innerHTML='<p style="color:#c00;font-size:12px">Errore: '+esc(e.message||'')+'</p>'}
+    const gs=data||[]
+    if(!gs.length){if(btn)btn.textContent='🧬 Evidenzia duplicati';toast('Nessun duplicato per nome identico 🎉 (usa 🧬 sulla riga per i nomi simili)','ok');return}
+    _commDup=new Map();_commDupN=gs.length
+    gs.forEach((g,gi)=>(g.membri||[]).forEach(m=>_commDup.set(m.id,gi)))
+    _commSort={k:'dup',dir:1}
+    if(btn)btn.textContent='🧬 '+gs.length+' gruppi — togli evidenza'
+    _commRender()
+  }catch(e){if(btn)btn.textContent='🧬 Evidenzia duplicati';toast('Errore: '+(e.message||e),'err')}
+}
+async function _commDupReload(){
+  if(!_commDup)return
+  try{
+    const{data}=await sb.rpc('committenti_duplicati')
+    const gs=data||[]
+    const btn=$('btn-comm-dup')
+    if(!gs.length){_commDup=null;_commDupN=0;if(btn)btn.textContent='🧬 Evidenzia duplicati';if(_commSort.k==='dup')_commSort={k:'nome',dir:1}}
+    else{_commDup=new Map();_commDupN=gs.length;gs.forEach((g,gi)=>(g.membri||[]).forEach(m=>_commDup.set(m.id,gi)));if(btn)btn.textContent='🧬 '+gs.length+' gruppi — togli evidenza'}
+    _commRender()
+  }catch(_){}
 }
 async function admSimiliCommittente(id){
-  const box=$('sgr-dupcomm-list');if(!box)return
-  _dupCommLast=id
-  box.innerHTML='<p style="color:#888;font-size:12px">Ricerca simili…</p>'
   try{
     const{data,error}=await sb.rpc('committenti_simili',{p_id:id})
     if(error)throw error
-    const base=(_commRows||[]).find(x=>x.committente_id===id)||{committente_id:id,committente_nome:'',cf_piva:''}
-    const simili=data||[]
-    if(!simili.length){box.innerHTML='<p style="color:#888;font-size:12px">Nessun nome simile trovato per "'+esc(base.committente_nome||id)+'".</p>';return}
-    const membri=[{id:base.committente_id,nome:base.committente_nome,cfp:base.cf_piva||base.piva||'',n_cantieri:base.n_cantieri,n_visite:base.n_visite}].concat(simili.map(s=>({id:s.id,nome:s.nome,cfp:s.cfp,n_cantieri:s.n_cantieri,n_visite:s.n_visite})))
-    _dupCommGroups=[{tipo:'simile',membri:membri}]
-    box.innerHTML='<div style="font-size:12px;color:#666;margin-bottom:8px">Nomi simili a <b>'+esc(base.committente_nome||'')+'</b> — spunta quale tenere e unisci (verifica che siano davvero lo stesso soggetto):</div>'+_dupGroupHtml(_dupCommGroups[0],0)
-  }catch(e){box.innerHTML='<p style="color:#c00;font-size:12px">Errore: '+esc(e.message||'')+'</p>'}
-}
-async function sgrFondiDupComm(gi){
-  const g=_dupCommGroups[gi];if(!g)return
-  const sel=document.querySelector('input[name="dc-'+gi+'"]:checked')
-  if(!sel){toast('Seleziona il committente da tenere','warn');return}
-  const masterId=sel.value
-  const dupeIds=(g.membri||[]).map(m=>m.id).filter(x=>x!==masterId)
-  if(!dupeIds.length){toast('Nessun doppione da unire','warn');return}
-  const mnome=((g.membri||[]).find(m=>m.id===masterId)||{}).nome||masterId
-  if(!confirm('Unione:\n\nPRINCIPALE (tenuto): '+mnome+'\nArchiviati: '+dupeIds.length+'\n\nProcedere?'))return
-  try{
-    const{data,error}=await sb.rpc('fondi_committenti',{p_master_id:masterId,p_dupe_ids:dupeIds})
-    if(error)throw error
-    toast('Unito ('+((data&&data.cantieri_spostati)||0)+' cantieri spostati)','ok')
-    sgrCercaDupComm();admLoadCommittenti()
-  }catch(e){toast('Errore unione: '+(e.message||e),'err')}
+    const sim=data||[]
+    if(!sim.length){toast('Nessun nome simile trovato','ok');return}
+    sim.forEach(function(x){if(!(_commRows||[]).some(r=>r.committente_id===x.id))_commRows.push({committente_id:x.id,committente_nome:x.nome,cf_piva:x.cfp||null,piva:null,n_cantieri:x.n_cantieri||0,n_visite:x.n_visite||0})})
+    _commFilterIds=new Set([id].concat(sim.map(x=>x.id)))
+    _commRender()
+  }catch(e){toast('Errore: '+(e.message||e),'err')}
 }
 window.admLoadCommittenti=admLoadCommittenti
 window._commSelToggle=_commSelToggle
 window._commSelClear=_commSelClear
 window.admEditCommittente=admEditCommittente
 window.admFondiCommittenti=admFondiCommittenti
-window.sgrCercaDupComm=sgrCercaDupComm
-window.sgrFondiDupComm=sgrFondiDupComm
+window.admEvidenziaDup=admEvidenziaDup
 window.admSimiliCommittente=admSimiliCommittente
 window.commSort=commSort
 document.querySelectorAll('#view-committenti th.cs').forEach(function(th){th.onclick=function(){commSort(th.dataset.k)}})
