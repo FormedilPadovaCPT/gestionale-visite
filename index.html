@@ -990,6 +990,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <option value="persona">🧑 Persone</option>
           </select>
           <button class="btn-outline btn-sm" id="rub-dedup-btn" style="display:none" onclick="apriDedupPersone()">🧹 Duplicati persone</button>
+          <button class="btn-primary btn-sm" id="btn-rub-unisci" style="display:none" onclick="rubUnisciSel()">🔀 Unisci selezionate</button>
         </div>
         <div id="rub-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">
           <p style="color:#aaa;font-size:13px;grid-column:1/-1">Digita nella barra di ricerca per trovare un contatto.</p>
@@ -1533,10 +1534,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 </div>
 <!-- ── MODAL DUPLICATI PERSONE (coordinatore) ── -->
 <div class="modal-overlay hidden" id="modal-dedup">
-  <div class="modal-box" style="max-width:720px">
+  <div class="modal-box" style="max-width:1020px">
     <h3>🧹 Duplicati persone</h3>
-    <p style="font-size:12px;color:#888;margin-bottom:10px">Gruppi con lo stesso nome e cognome (anche invertiti). Scegli la scheda principale e premi Unisci: i contatti mancanti vengono recuperati dalle altre schede, che finiscono nel cestino.</p>
-    <div id="dedup-list" style="max-height:420px;overflow:auto"></div>
+    <p style="font-size:12px;color:#888;margin-bottom:10px">Con la <b>spunta ☑</b> scegli quali schede unire (togli la spunta a quelle che NON c'entrano), col <b>pallino ◉</b> indichi la scheda principale. I rapporti di lavoro e i contatti mancanti passano alla principale; le altre finiscono nel cestino.</p>
+    <div id="dedup-list" style="max-height:62vh;overflow:auto"></div>
     <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn-secondary btn-sm" onclick="hide('modal-dedup')">Chiudi</button></div>
   </div>
 </div>
@@ -6334,9 +6335,39 @@ $('mp-salva').onclick=async()=>{
 
 // ── duplicati (solo coordinatore) ──
 let _dedupData=null
+function _dedupGroupHtml(kid,rows,rapMap){
+  rapMap=rapMap||{}
+  const th=l=>`<th style="padding:6px 8px;text-align:left;color:#888;font-weight:600;font-size:11px;white-space:nowrap;border-bottom:2px solid #eee">${l}</th>`
+  const td=(v,extra)=>`<td style="padding:8px;vertical-align:top;font-size:12px;line-height:1.5;${extra||''}">${v}</td>`
+  return `<div style="border:1px solid #eee;border-radius:8px;padding:12px;margin-bottom:12px">
+    <div style="font-weight:700;margin-bottom:8px;font-size:14px">${esc((rows[0].cognome||'')+' '+(rows[0].nome||''))} <span style="color:#888;font-weight:400">(${rows.length} schede)</span></div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      <thead><tr>${th('☑ Unisci')}${th('◉ Princ.')}${th('Nominativo')}${th('CF · Nascita')}${th('Contatti')}${th('Qualifica · Ruoli')}${th('Rapporti')}</tr></thead>
+      <tbody>
+      ${rows.map(r=>{
+        const nasc=[r.data_nascita?fmtDate(r.data_nascita):null,r.comune_nascita].filter(Boolean).join(' · ')
+        const contatti=[r.email,r.email2,r.email3,r.telefono,r.telefono2].filter(Boolean).map(esc).join('<br>')||'<span style="color:#bbb">–</span>'
+        const ruoli=(r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')
+        const nrap=rapMap[r.persona_id]||0
+        return `<tr style="border-top:1px solid #f0f0f0">
+          ${td(`<input type="checkbox" name="dedc-${kid}" value="${r.persona_id}" checked title="Includi nella fusione" style="width:17px;height:17px;cursor:pointer">`,'text-align:center')}
+          ${td(`<input type="radio" name="ded-${kid}" value="${r.persona_id}" title="Usa come scheda principale" style="width:17px;height:17px;cursor:pointer">`,'text-align:center')}
+          ${td(`<b>${esc([r.titolo,r.nome,r.cognome].filter(Boolean).join(' '))}</b>`)}
+          ${td([r.cf?`<span style="font-family:monospace;font-size:11px">${esc(r.cf)}</span>`:`<span style="color:#bbb">senza CF</span>`,nasc?esc(nasc):null].filter(Boolean).join('<br>'))}
+          ${td(contatti)}
+          ${td([r.qualifica?esc(r.qualifica):null,ruoli?`<span style="color:#888;font-size:11px">${ruoli}</span>`:null].filter(Boolean).join('<br>')||'<span style="color:#bbb">–</span>')}
+          ${td(nrap?`<b style="color:var(--orange)">${nrap}</b>`:'<span style="color:#bbb">0</span>','text-align:center')}
+        </tr>`
+      }).join('')}
+      </tbody>
+    </table></div>
+    <button class="btn-primary btn-sm" style="margin-top:8px" onclick="dedupMerge('${kid}')">Unisci le schede spuntate sulla principale ◉</button>
+  </div>`
+}
 window._dedupKeys={}
 async function apriDedupPersone(){
   if(!window.__isCoord){toast('Funzione riservata al coordinatore','err');return}
+  window._dedupFromSel=false
   // Legge TUTTE le persone attive (paginato: sono oltre 8.000 dopo l'import ufficio)
   let data=[],_pf=0
   for(;;){
@@ -6374,25 +6405,22 @@ async function apriDedupPersone(){
     box.innerHTML=dupli.map(([k,rows],gi)=>{
       const kid='g'+gi
       _dedupData[kid]=rows;window._dedupKeys[kid]=k
-      return `<div style="border:1px solid #eee;border-radius:8px;padding:10px;margin-bottom:10px">
-        <div style="font-weight:700;margin-bottom:6px">${esc((rows[0].cognome||'')+' '+(rows[0].nome||''))} <span style="color:#888;font-weight:400">(${rows.length} schede)</span></div>
-        ${rows.map(r=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:12px;cursor:pointer">
-          <input type="radio" name="ded-${kid}" value="${r.persona_id}" style="margin-top:2px">
-          <span style="flex:1">${esc([r.titolo,r.nome,r.cognome].filter(Boolean).join(' '))} · ${esc(r.qualifica||'–')} · ${esc(r.email||'no email')} · ${esc(r.telefono||'no tel')} · CF: ${esc(r.cf||'–')} · ${(r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')}${_rapMap[r.persona_id]?` · <b>${_rapMap[r.persona_id]} rapport${_rapMap[r.persona_id]===1?'o':'i'} di lavoro</b>`:''}</span>
-        </label>`).join('')}
-        <button class="btn-primary btn-sm" style="margin-top:6px" onclick="dedupMerge('${kid}')">Unisci sul selezionato</button>
-      </div>`
+      return _dedupGroupHtml(kid,rows,_rapMap)
     }).join('')
   }
   show('modal-dedup')
 }
 async function dedupMerge(kid){
-  const rows=(_dedupData&&_dedupData[kid])||[]
+  const all=(_dedupData&&_dedupData[kid])||[]
+  const checked=[...document.querySelectorAll(`input[name="dedc-${kid}"]:checked`)].map(x=>x.value)
+  const rows=all.filter(r=>checked.includes(r.persona_id))
+  if(rows.length<2){toast('Spunta almeno 2 schede da unire','warn');return}
   const sel=document.querySelector(`input[name="ded-${kid}"]:checked`)
-  if(!sel){toast('Seleziona prima la scheda principale del gruppo','warn');return}
+  if(!sel){toast('Scegli col pallino la scheda principale','warn');return}
   const master=rows.find(r=>r.persona_id===sel.value)
+  if(!master){toast('La scheda principale deve essere tra quelle spuntate','warn');return}
   const others=rows.filter(r=>r.persona_id!==sel.value)
-  if(!master||!others.length)return
+  if(!others.length)return
   if(!confirm(`Unire ${others.length} sched${others.length===1?'a':'e'} su "${[master.titolo,master.nome,master.cognome].filter(Boolean).join(' ')}"?`))return
   // 1) sposta i rapporti di lavoro dei doppioni sulla scheda scelta
   //    (così restano validi anche per l'app Asseverazione e le interviste)
@@ -6415,7 +6443,8 @@ async function dedupMerge(kid){
     if(error){toast('Errore aggiornamento: '+error.message,'err');return}
   }
   toast('Schede unite ✓ (rapporti di lavoro spostati)','ok')
-  apriDedupPersone()
+  if(window._dedupFromSel){window._dedupFromSel=false;hide('modal-dedup');loadRubrica()}
+  else apriDedupPersone()
 }
 
 // ── autocomplete persone nel form visita ──
@@ -6669,6 +6698,30 @@ async function _evArricchisciAlt(emails){
 }
 window.editPersona=editPersona
 window.apriDedupPersone=apriDedupPersone
+// ── Fusione da selezione libera: spunta 2+ card persona in Rubrica e unisci ──
+function rubSelChange(){
+  const sel=[...document.querySelectorAll('input.rub-sel:checked')].map(x=>x.dataset.pid)
+  window._rubSel=new Set(sel)
+  const b=$('btn-rub-unisci')
+  if(b){b.style.display=sel.length>=2?'':'none';b.textContent=`\uD83D\uDD00 Unisci selezionate (${sel.length})`}
+}
+async function rubUnisciSel(){
+  const ids=[...(window._rubSel||[])]
+  if(ids.length<2){toast('Spunta almeno 2 schede persona da unire','warn');return}
+  const{data,error}=await sb.from('persone').select('*').in('persona_id',ids)
+  if(error||!(data||[]).length){toast('Errore caricamento schede: '+(error?.message||''),'err');return}
+  const rapMap={}
+  try{
+    const{data:rr}=await sb.from('persone_imprese').select('persona_id').in('persona_id',ids)
+    ;(rr||[]).forEach(r=>{rapMap[r.persona_id]=(rapMap[r.persona_id]||0)+1})
+  }catch(_e){}
+  _dedupData={sel0:data}
+  window._dedupFromSel=true
+  $('dedup-list').innerHTML=_dedupGroupHtml('sel0',data,rapMap)
+  show('modal-dedup')
+}
+window.rubSelChange=rubSelChange
+window.rubUnisciSel=rubUnisciSel
 window.dedupMerge=dedupMerge
 
 // ══════════════════════════════════════════════════════════════
@@ -11249,6 +11302,7 @@ async function loadRubrica(){
     return
   }
   res.innerHTML=cards.join('')
+  if(typeof rubSelChange==='function')rubSelChange()
 }
 
 function rubCard(icon,tipo,id,nome,sub,extraLines){
@@ -11256,6 +11310,7 @@ function rubCard(icon,tipo,id,nome,sub,extraLines){
   const [bg,col]=badge.split(';color:')
   return`<div ondblclick="showRubricaDetail('${tipo}','${id}')" title="Doppio clic per visualizzare tutti i dati" style="background:#fff;border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border-left:3px solid ${col.replace('color:','')};cursor:pointer;transition:box-shadow .15s,transform .1s" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,.13)';this.style.transform='translateY(-1px)'" onmouseleave="this.style.boxShadow='var(--shadow)';this.style.transform=''">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      ${tipo==='persona'&&window.__isCoord?`<input type="checkbox" class="rub-sel" data-pid="${id}" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="rubSelChange()" title="Seleziona per unire" style="width:16px;height:16px;cursor:pointer;flex-shrink:0">`:''}
       <span style="font-size:18px">${icon}</span>
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nome}</div>
