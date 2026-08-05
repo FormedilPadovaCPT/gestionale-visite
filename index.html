@@ -36,7 +36,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 label{display:block;font-weight:600;margin-bottom:4px;color:var(--grey);font-size:12px;text-transform:uppercase;letter-spacing:.4px}
 .field{margin-bottom:13px}
 .field-inline{display:flex;gap:8px;align-items:flex-end}
-.row{display:flex;gap:12px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
 .row>.field{flex:1;min-width:0}
 .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .badge-alto{background:#fde8e8;color:var(--danger)}
@@ -644,11 +644,12 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="tab-content" data-tab="1">
         <div class="card">
           <div class="sect-title">Cantiere *</div>
-          <div class="field">
+          <div class="row">
+          <div class="field" style="flex:0 1 300px">
             <label>Comune</label>
             <input type="text" id="f-cant-comune" placeholder="Es. Padova, Abano Terme…" autocomplete="off">
           </div>
-          <div class="field">
+          <div class="field" style="flex:2 1 380px">
             <label>Indirizzo cantiere (anche parziale)</label>
             <div class="autocomplete-wrap">
               <input type="text" id="f-cant-search" placeholder="Es. via Roma — doppio click = tutti i cantieri attivi" autocomplete="off">
@@ -660,6 +661,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <div id="cant-quartiere" style="margin-top:4px"></div>
             <div id="cant-info-card" class="hidden" style="margin-top:10px;padding:10px 14px;background:#f8f8f8;border-radius:8px;border-left:3px solid var(--orange);font-size:12px;line-height:1.8;color:#333"></div>
           </div>
+          </div>
           <button class="btn-outline btn-sm" id="btn-new-cant">+ Nuovo cantiere</button><button class="btn-outline btn-sm" id="btn-edit-cant" type="button" onclick="editCantiereForm()" style="display:none;margin-left:6px" title="Modifica i dati del cantiere selezionato">✏️ Modifica cantiere</button>
           <div class="row" style="margin-top:12px">
             <div class="field"><label>Accesso cantiere n° (dal DB cantiere)</label><input type="text" id="f-acc-cant2" placeholder="Codice accesso interno" readonly style="background:#f8f8f8"></div>
@@ -668,8 +670,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div class="row">
             <div class="field"><label>Codice CNCE <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="text" id="f-cnce" placeholder="–" readonly style="background:#f8f8f8"></div>
             <div class="field"><label>Codice univoco <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="text" id="f-cod-uni" placeholder="–" readonly style="background:#f8f8f8"></div>
+            <div class="field" style="flex:0 0 230px"><label>Data ultimazione lavori <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="date" id="f-data-ult" readonly style="background:#f8f8f8"></div>
           </div>
-          <div class="field"><label>Data prevista ultimazione lavori <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="date" id="f-data-ult" readonly style="background:#f8f8f8"></div>
           <div class="sect-title">Committente</div>
           <!-- 1. Tipologia (prima scelta) -->
           <div class="field" style="margin-bottom:6px">
@@ -720,8 +722,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               </div>
               <div class="field"><label>Nome *</label><input type="text" id="f-comm-nome" placeholder="Nome"></div>
               <div class="field"><label>Cognome *</label><input type="text" id="f-comm-cog" placeholder="Cognome"></div>
-            </div>
-            <div class="row">
               <div class="field"><label>Codice fiscale</label><input type="text" id="f-comm-cf" placeholder="XXXXXX00X00X000X" maxlength="16" style="text-transform:uppercase"></div>
               <div class="field"><label>Email</label><input type="email" id="f-comm-email" placeholder="email@…"></div>
               <div class="field"><label>Telefono</label><input type="tel" id="f-comm-tel" placeholder="+39…"></div>
@@ -733,8 +733,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <div class="row">
               <div class="field"><label>Partita IVA</label><input type="text" id="f-comm-piva" placeholder="IT + 11 cifre" maxlength="13"></div>
               <div class="field"><label>Codice fiscale</label><input type="text" id="f-comm-cf-pg" placeholder="CF azienda" maxlength="16"></div>
-            </div>
-            <div class="row">
               <div class="field"><label>Email</label><input type="email" id="f-comm-email-pg" placeholder="email@…"></div>
               <div class="field"><label>Telefono</label><input type="tel" id="f-comm-tel-pg" placeholder="+39…"></div>
             </div>
@@ -754,8 +752,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               <div class="field"><label>Nome</label><input type="text" id="f-rl-nome" placeholder="Nome"></div>
               <div class="field"><label>Cognome</label><input type="text" id="f-rl-cog" placeholder="Cognome"></div>
 <div class="field" style="flex:0 0 auto"><label>&nbsp;</label><button type="button" class="btn-outline btn-sm" style="white-space:nowrap" onclick="nuovaPersona('rl')" title="Crea la scheda in anagrafica: potrai ripescarla nei prossimi verbali">+ Nuova</button></div>
-            </div>
-            <div class="row">
               <div class="field"><label>Email</label><input type="email" id="f-rl-email" placeholder="email@…"></div>
               <div class="field"><label>Telefono</label><input type="tel" id="f-rl-tel" placeholder="+39…"></div>
             </div>
@@ -769,8 +765,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               <div class="field"><label>Nome</label><input type="text" id="f-csp-nome" placeholder="Nome"></div>
               <div class="field"><label>Cognome</label><input type="text" id="f-csp-cog" placeholder="Cognome"></div>
 <div class="field" style="flex:0 0 auto"><label>&nbsp;</label><button type="button" class="btn-outline btn-sm" style="white-space:nowrap" onclick="nuovaPersona('csp')" title="Crea la scheda in anagrafica: potrai ripescarla nei prossimi verbali">+ Nuova</button></div>
-            </div>
-            <div class="row">
               <div class="field"><label>Email</label><input type="email" id="f-csp-email" placeholder="email@…"></div>
               <div class="field"><label>Telefono</label><input type="tel" id="f-csp-tel" placeholder="+39…"></div>
             </div>
@@ -784,8 +778,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               <div class="field"><label>Nome</label><input type="text" id="f-cse-nome" placeholder="Nome"></div>
               <div class="field"><label>Cognome</label><input type="text" id="f-cse-cog" placeholder="Cognome"></div>
 <div class="field" style="flex:0 0 auto"><label>&nbsp;</label><button type="button" class="btn-outline btn-sm" style="white-space:nowrap" onclick="nuovaPersona('cse')" title="Crea la scheda in anagrafica: potrai ripescarla nei prossimi verbali">+ Nuova</button></div>
-            </div>
-            <div class="row">
               <div class="field"><label>Email</label><input type="email" id="f-cse-email" placeholder="email@…"></div>
               <div class="field"><label>Telefono</label><input type="tel" id="f-cse-tel" placeholder="+39…"></div>
             </div>
@@ -795,6 +787,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             N° imprese e lavoratori (totali e di cui stranieri) vengono calcolati automaticamente
             dalle imprese inserite nella scheda <strong>Imprese</strong>, indicando i dipendenti in cantiere per ciascuna.
           </p>
+          <div class="row">
           <div class="field"><label>Importo lavori</label>
             <select id="f-importo">
               <option value="">– Seleziona –</option>
@@ -807,11 +800,12 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             </select>
           </div>
           <div class="field"><label>Costi della sicurezza</label><input type="text" id="f-costi" placeholder="es. previsti e/o esposti"></div>
+          </div>
           <div class="field"><label>Stato dei lavori – fasi lavorazioni</label><textarea id="f-stato-lav" rows="2" placeholder="Descrizione stato avanzamento lavori"></textarea></div>
           <div class="field">
             <label>Lavorazioni in corso</label>
             <div style="display:flex;flex-direction:column;gap:8px;margin-top:5px">
-              <div class="row">
+              <div class="row" style="align-items:flex-end">
                 <div class="field" style="margin-bottom:0;flex:1">
                   <label style="font-size:11px">Genere</label>
                   <select id="lav-sel-genere"><option value="">— Seleziona genere —</option></select>
@@ -820,8 +814,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
                   <label style="font-size:11px">Fase</label>
                   <select id="lav-sel-fase" disabled><option value="">— prima seleziona genere —</option></select>
                 </div>
-              </div>
-              <div class="row" style="align-items:flex-end">
                 <div class="field" style="margin-bottom:0;flex:1">
                   <label style="font-size:11px">Lavorazione specifica</label>
                   <select id="lav-sel-lavorazione" disabled><option value="">— prima seleziona fase —</option></select>
@@ -2453,7 +2445,7 @@ function renderZoneTab(ti){
   for(const v of voci){if(!byPref[v.prefisso])byPref[v.prefisso]=[];byPref[v.prefisso].push(v)}
   con.innerHTML=Object.entries(byPref).map(([pref,items])=>`
     <div class="zona-gruppo">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;background:var(--light);border-radius:var(--radius);padding:3px 8px 3px 0">
         <h4 style="margin-bottom:0">${PREF_LBL[pref]||pref.replace(/_/g,' ')}</h4>
         <button type="button" class="btn-ver-gruppo" data-pref="${pref}" onclick="setGruppoVer(this)" style="font-size:11px;padding:3px 9px;background:#e8f8ee;color:var(--ok);border:1.5px solid var(--ok);border-radius:4px;cursor:pointer;font-weight:700;white-space:nowrap">✓ Tutto VER</button>
       </div>
@@ -2801,8 +2793,6 @@ function impreseAccordionHTML(im,idx){
       <div class="row">
         <div class="field"><label>Partita IVA</label><input type="text" id="im-piva-${idx}" value="${im.piva||''}" placeholder="IT…" readonly style="background:#f8f8f8"></div>
         <div class="field"><label>Codice fiscale</label><input type="text" id="im-cf_imp-${idx}" value="${im.cf_imp||''}" placeholder="CF…" readonly style="background:#f8f8f8"></div>
-      </div>
-      <div class="row">
         <div class="field">
           <label>Tipologia</label>
           <select id="im-tipo-${idx}">
@@ -2815,13 +2805,13 @@ function impreseAccordionHTML(im,idx){
       <div class="row">
         <div class="field"><label>Cap./Prep. – Nome</label><input type="text" id="im-capo_nome-${idx}" value="${capNome}" placeholder="Nome"></div>
         <div class="field"><label>Cap./Prep. – Cognome</label><input type="text" id="im-capo_cog-${idx}" value="${capCog}" placeholder="Cognome"></div>
+        <div class="field" style="flex:0 0 170px"><label>N° lavoratori in cantiere</label><input type="number" id="im-nr_lav-${idx}" min="0" value="${im.nr_lav||0}"></div>
+        <div class="field" style="flex:0 0 140px"><label>di cui stranieri</label><input type="number" id="im-nr_lav_str-${idx}" min="0" value="${im.nr_lav_str||0}"></div>
       </div>
       <div class="row">
-        <div class="field"><label>N° lavoratori in cantiere</label><input type="number" id="im-nr_lav-${idx}" min="0" value="${im.nr_lav||0}"></div>
-        <div class="field"><label>di cui stranieri</label><input type="number" id="im-nr_lav_str-${idx}" min="0" value="${im.nr_lav_str||0}"></div>
+        <div class="field"><label>Email invio verbale</label><input type="email" id="im-email_verbale-${idx}" value="${im.email_verbale||''}" placeholder="Lascia vuoto per usare quella in anagrafica…"></div>
+        <div class="field" style="flex:1.4"><label>Note fasi lavorazione (questa impresa)</label><textarea id="im-note_fasilav-${idx}" rows="2">${im.note_fasilav||''}</textarea></div>
       </div>
-      <div class="field"><label>Email invio verbale</label><input type="email" id="im-email_verbale-${idx}" value="${im.email_verbale||''}" placeholder="Lascia vuoto per usare quella in anagrafica…"></div>
-      <div class="field"><label>Note fasi lavorazione (questa impresa)</label><textarea id="im-note_fasilav-${idx}" rows="2">${im.note_fasilav||''}</textarea></div>
     </div>
   </div>`
 }
