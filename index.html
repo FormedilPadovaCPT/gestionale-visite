@@ -938,7 +938,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <h3>Elenco visite</h3>
         <div class="search-bar">
           <input type="text" id="q-search" placeholder="Verbale, cantiere, impresa…">
-          <select id="q-ipc"><option value="">Tutti IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun Rilievo</option></select>
+          <select id="q-eserc" title="Esercizio (1 ott – 30 set)"></select><select id="q-ipc"><option value="">Tutti IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun Rilievo</option></select>
           <select id="q-stato"><option value="">Tutti stati</option><option value="bozza">Bozza</option><option value="definitivo">Definitivo</option></select>
           <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button><label id="q-elim-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer"><input type="checkbox" id="q-elim"> Mostra eliminate</label>
         </div>
@@ -960,6 +960,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="search-bar">
           <input type="text" id="q-cant" placeholder="Indirizzo, comune, etichetta…" style="flex:1">
           <button class="btn-primary btn-sm" id="btn-cerca-cant">Cerca</button>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer;white-space:nowrap"><input type="checkbox" id="chk-cant-chiusi"> Includi chiusi 🔒</label>
+          <span id="cant-count" style="font-size:12px;color:#999;white-space:nowrap"></span>
         </div>
         <div class="tbl-wrap">
           <table>
@@ -3748,7 +3750,7 @@ const datalabelPlugin={id:'datalabel',afterDatasetsDraw(chart){
 // DASHBOARD report-style (visite in cantiere) — fetch unico storico
 // + filtri client-side (esercizio / tecnico / tipo visita / IPC)
 // ══════════════════════════════════════════════════════════════
-let _dashRaw=null, _dashTecMap={}
+let _dashRaw=null, _dashTecMap={}, _dashLite=null, _dashScopeAll=false
 
 function _esercizioDa(d){if(!d)return null;const y=+d.slice(0,4),m=+d.slice(5,7);const s=m>=10?y:y-1;return s+'/'+(s+1)}
 
@@ -3761,11 +3763,15 @@ async function loadDash(){
   // card obiettivo mensile (non blocca la dashboard se fallisce)
   loadTargetCard&&loadTargetCard().catch(e=>console.warn('loadTargetCard:',e))
   loadAvvisi&&loadAvvisi().catch(e=>console.warn('loadAvvisi:',e))
-  // fetch storico completo (paginato) con cantiere + impresa principale
+  // fetch visite con cantiere + impresa principale (paginato).
+  // Default: SOLO esercizio corrente per un avvio veloce; lo storico completo
+  // viene scaricato solo quando l'utente lo richiede dal menu esercizio.
   const cols=`visita_id,data_visita,ipc,rlst_sn,acc_cant,tecnico_id,tipo_accesso,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantiere_id,impresa_id,cantieri(comune_nome,cantiere_tip_int,cantiere_tip_ope,cantiere_importo),visite_imprese_presenti(is_principale,tipo_imp,impresa_id,imprese(impresa_nome,cassa_edile))`
   let rows=[],from=0
   for(;;){
-    const{data,error}=await sb.from('visite').select(cols).eq('elimina',0).order('data_visita',{ascending:true}).range(from,from+999)
+    let _q=sb.from('visite').select(cols).eq('elimina',0).order('data_visita',{ascending:true}).range(from,from+999)
+    if(!_dashScopeAll)_q=_q.gte('data_visita',annoEdile().da)
+    const{data,error}=await _q
     if(error)throw error
     rows=rows.concat(data||[])
     if(!data||data.length<1000)break
@@ -3786,6 +3792,19 @@ async function loadDash(){
       eserc:_esercizioDa(r.data_visita)
     }
   })
+  // Dataset leggero su TUTTO lo storico (4 campi, niente join): alimenta il
+  // grafico "Visite per esercizio (1 ott – 30 set)" e l'elenco esercizi del menu.
+  if(!_dashLite){
+    let lr=[],lf=0
+    for(;;){
+      const{data,error}=await sb.from('visite').select('data_visita,tecnico_id,tipo_accesso,ipc').eq('elimina',0).order('data_visita',{ascending:true}).range(lf,lf+999)
+      if(error)throw error
+      lr=lr.concat(data||[])
+      if(!data||data.length<1000)break
+      lf+=1000
+    }
+    _dashLite=lr.map(r=>({data:r.data_visita,tec:r.tecnico_id,tipo:r.tipo_accesso,ipc:(['ALTO','MEDIO','BASSO'].indexOf(r.ipc)>=0?r.ipc:'NR'),eserc:_esercizioDa(r.data_visita)}))
+  }
   _dashFillSelectors()
   applyDashFilters()
   loadDashMap().catch(e=>console.error('loadDashMap:',e))
@@ -3793,12 +3812,20 @@ async function loadDash(){
 
 function _dashFillSelectors(){
   const cur=annoEdile().label
-  const es=Array.from(new Set(_dashRaw.map(x=>x.eserc).filter(Boolean))).sort()
+  const es=Array.from(new Set((_dashLite||_dashRaw).map(x=>x.eserc).filter(Boolean))).sort()
   const selE=$('fd-eserc')
   if(selE&&!selE.dataset.init){
     selE.innerHTML='<option value="">Tutto lo storico</option>'+es.map(e=>`<option value="${e}">Es. ${e}</option>`).join('')
     selE.value=es.indexOf(cur)>=0?cur:''
-    selE.dataset.init='1';selE.onchange=applyDashFilters
+    selE.dataset.init='1'
+    selE.onchange=async()=>{
+      // Esercizi passati o "Tutto lo storico": servono i dati storici completi
+      if(!_dashScopeAll&&selE.value!==annoEdile().label){
+        _dashScopeAll=true
+        if($('fd-count'))$('fd-count').textContent='Caricamento storico completo…'
+        try{await loadDash()}catch(e){console.error('loadDash storico:',e);toast('Errore caricamento storico: '+e.message,'err')}
+      }else applyDashFilters()
+    }
   }
   const selT=$('fd-tec')
   if(selT&&!selT.dataset.init){
@@ -3827,7 +3854,7 @@ function applyDashFilters(){
   const fTy=$('fd-tipo')?$('fd-tipo').value:''
   const fI=$('fd-ipc')?$('fd-ipc').value:''
   const byTTI=x=>(!fT||String(x.tec)===fT)&&(!fTy||String(x.tipo)===fTy)&&(!fI||x.ipc===fI)
-  const FE=_dashRaw.filter(byTTI)              // per grafico esercizio (no filtro esercizio)
+  const FE=(_dashLite||_dashRaw).filter(byTTI) // per grafico esercizio: sempre tutto lo storico (dataset leggero)
   const F=FE.filter(x=>!fE||x.eserc===fE)      // dataset principale
   _dashVerReady=false
   _dashRenderKpi(F)
@@ -3848,7 +3875,7 @@ function applyDashFilters(){
   _dashRenderCeiv(F)
   _dashRenderMacro(fE,fT,fTy,fI)
   _dashLoadVer(fE,fT,fTy,fI,F)
-  if($('fd-count'))$('fd-count').textContent=F.length+' sopralluoghi mostrati su '+_dashRaw.length
+  if($('fd-count'))$('fd-count').textContent=F.length+' sopralluoghi mostrati su '+((_dashLite&&_dashLite.length)||_dashRaw.length)+' totali'+(_dashScopeAll?'':' · caricato solo l\'esercizio corrente')
 }
 
 function _grp(F,keyfn){const m={};F.forEach(x=>{const k=keyfn(x);if(k==null)return;m[k]=(m[k]||0)+1});return m}
@@ -4256,6 +4283,16 @@ function renderScadenze(){
 // ── LISTA ──
 async function loadLista(){
   const q=vGet('q-search').trim()
+  // Selettore esercizio: default esercizio corrente, "Tutto lo storico" a richiesta
+  const selEs=$('q-eserc')
+  if(selEs&&!selEs.dataset.init){
+    const cur=annoEdile()
+    const anni=[];for(let s=2023;s<=+cur.label.slice(0,4);s++)anni.push(s+'/'+(s+1))
+    selEs.innerHTML='<option value="">Tutto lo storico</option>'+anni.map(e=>`<option value="${e}">Es. ${e}</option>`).join('')
+    selEs.value=cur.label
+    selEs.dataset.init='1';selEs.onchange=loadLista
+  }
+  const fe=selEs?selEs.value:''
   const fi=vGet('q-ipc');const fs=vGet('q-stato')
   const _coord=!!window.__isCoord
   const _ew=$('q-elim-wrap');if(_ew)_ew.style.display=_coord?'inline-flex':'none'
@@ -4263,6 +4300,7 @@ async function loadLista(){
   const _showElim=_coord&&_qe&&_qe.checked
   let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,elimina,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
   if(!_showElim)qb=qb.eq('elimina',0)
+  if(fe){const _s=+fe.slice(0,4);qb=qb.gte('data_visita',_s+'-10-01').lte('data_visita',(_s+1)+'-09-30')}
   if(fi)qb=qb.eq('ipc',fi)
   if(fs)qb=qb.eq('stato',fs)
   const{data}=await qb
@@ -4343,27 +4381,54 @@ $('btn-pdf').onclick=()=>{
 }
 
 // ── LISTA CANTIERI ──
-async function loadCantieri(q=''){
+async function loadCantieri(q='',reuse=false){
   const qStr=q||vGet('q-cant')?.trim()||''
-  let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina').eq('elimina',0).order('updated_at',{ascending:false}).limit(200)
-  if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*`)
-  const{data,error}=await qb
-  if(error){toast('Errore caricamento cantieri: '+error.message,'err');return}
-  const rows=data||[]
+  const _chk=$('chk-cant-chiusi')
+  if(_chk&&!_chk.dataset.b){_chk.dataset.b='1';_chk.onchange=()=>loadCantieri()}
+  const _incChiusi=!!_chk?.checked
+  // Carica TUTTI i cantieri aperti (paginato a blocchi di 1000);
+  // i cantieri chiusi vengono caricati solo spuntando "Includi chiusi"
+  let rows=[],_from=0
+  if(reuse&&window._cantCache){
+    rows=window._cantCache
+  }else for(;;){
+    let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,cantiere_cnce,elimina,cantiere_chiuso').eq('elimina',0).order('updated_at',{ascending:false}).range(_from,_from+999)
+    if(!_incChiusi)qb=qb.or('cantiere_chiuso.is.null,cantiere_chiuso.eq.false')
+    if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*`)
+    const{data,error}=await qb
+    if(error){toast('Errore caricamento cantieri: '+error.message,'err');return}
+    rows=rows.concat(data||[])
+    if(!data||data.length<1000)break
+    _from+=1000
+  }
+  if(!reuse){window._cantCache=rows;window._cantShowAll=false}
   const tbody=$('tbody-cantieri')
   const empty=$('cantieri-empty')
+  const _cc=$('cant-count');if(_cc)_cc.textContent=rows.length+' cantieri'+(_incChiusi?' (inclusi chiusi)':' aperti')
   if(!rows.length){tbody.innerHTML='';empty.classList.remove('hidden');return}
   empty.classList.add('hidden')
-  // Conta visite per cantiere
-  const ids=rows.map(c=>c.cantiere_id)
-  const{data:vCounts}=await sb.from('visite').select('cantiere_id').in('cantiere_id',ids).eq('elimina',0)
-  const countMap={}
-  ;(vCounts||[]).forEach(v=>{countMap[v.cantiere_id]=(countMap[v.cantiere_id]||0)+1})
-  tbody.innerHTML=rows.map(c=>{
+  // Conta visite per cantiere: fetch unico paginato di tutti i cantiere_id
+  // (con migliaia di cantieri il filtro .in() supererebbe i limiti dell'URL)
+  if(!window._cantVisCountMap){
+    const _m={};let _vf=0
+    for(;;){
+      const{data:vc}=await sb.from('visite').select('cantiere_id').eq('elimina',0).range(_vf,_vf+999)
+      ;(vc||[]).forEach(v=>{_m[v.cantiere_id]=(_m[v.cantiere_id]||0)+1})
+      if(!vc||vc.length<1000)break
+      _vf+=1000
+    }
+    window._cantVisCountMap=_m
+  }
+  const countMap=window._cantVisCountMap
+  // Render progressivo: le prime 500 righe subito (le più recenti),
+  // il resto con il pulsante "Mostra tutti". La ricerca è comunque server-side
+  // su tutto l'archivio, quindi non dipende dalle righe visualizzate.
+  const _shown=window._cantShowAll?rows.length:Math.min(500,rows.length)
+  tbody.innerHTML=rows.slice(0,_shown).map(c=>{
     const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
     const nVisite=countMap[c.cantiere_id]||0
     return`<tr class="row-detail-hover" data-act="detail-cantiere" data-id="${c.cantiere_id}">
-      <td><strong>${label}</strong>${quartiereBadge(c.cantiere_indirizzo||'',c.comune_nome||'')}</td>
+      <td><strong>${label}</strong>${c.cantiere_chiuso?' <span title="Cantiere chiuso">\uD83D\uDD12</span>':''}${quartiereBadge(c.cantiere_indirizzo||'',c.comune_nome||'')}</td>
       <td>${c.comune_nome||'–'}</td>
       <td>${c.prot_int||'–'}</td>
       <td>${c.cantiere_cnce||'–'}</td>
@@ -4373,7 +4438,7 @@ async function loadCantieri(q=''){
         <button class="btn-primary btn-sm" data-cant-id="${c.cantiere_id}" data-cant-label="${label}" data-cant-detail="${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}${c.comune_nome?' – '+c.comune_nome:''}">+ Visita</button>
       </div></td>
     </tr>`
-  }).join('')
+  }).join('')+(rows.length>_shown?`<tr><td colspan="6" style="text-align:center;padding:12px"><button class="btn-outline btn-sm" id="btn-cant-more">Mostra tutti i ${rows.length} cantieri (altri ${rows.length-_shown})</button></td></tr>`:'')
   // Click "+ Visita": apre nuova visita precompilando il cantiere
   tbody.querySelectorAll('[data-cant-id]').forEach(btn=>{
     btn.onclick=async e=>{
@@ -4404,6 +4469,8 @@ async function loadCantieri(q=''){
     const handler=e=>{e.stopPropagation();showCantiereDetail(el.dataset.id)}
     if(el.tagName==='TR'){el.ondblclick=handler}else{el.onclick=handler}
   })
+  const _bm=$('btn-cant-more')
+  if(_bm)_bm.onclick=()=>{window._cantShowAll=true;loadCantieri(qStr,true)}
 }
 $('btn-cerca-cant').onclick=()=>loadCantieri()
 $('q-cant').onkeydown=e=>{if(e.key==='Enter')loadCantieri()}
