@@ -4822,7 +4822,7 @@ function applyDashFilters(){
   const fI=$('fd-ipc')?$('fd-ipc').value:''
   const byTTI=x=>(!fT||String(x.tec)===fT)&&(!fTy||String(x.tipo)===fTy)&&(!fI||x.ipc===fI)
   const FE=(_dashLite||_dashRaw).filter(byTTI) // per grafico esercizio: sempre tutto lo storico (dataset leggero)
-  const F=FE.filter(x=>!fE||x.eserc===fE)      // dataset principale
+  const F=_dashRaw.filter(byTTI).filter(x=>!fE||x.eserc===fE) // dataset principale (campi completi)
   _dashVerReady=false
   _dashRenderKpi(F)
   _dashRenderEsercizio(FE,fE)
