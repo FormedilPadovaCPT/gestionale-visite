@@ -6337,8 +6337,27 @@ let _dedupData=null
 window._dedupKeys={}
 async function apriDedupPersone(){
   if(!window.__isCoord){toast('Funzione riservata al coordinatore','err');return}
-  const{data,error}=await sb.from('persone').select('*').eq('elimina',0).limit(5000)
-  if(error){toast('Errore: '+error.message,'err');return}
+  // Legge TUTTE le persone attive (paginato: sono oltre 8.000 dopo l'import ufficio)
+  let data=[],_pf=0
+  for(;;){
+    const{data:pg,error}=await sb.from('persone').select('*').eq('elimina',0).order('persona_id').range(_pf,_pf+999)
+    if(error){toast('Errore: '+error.message,'err');return}
+    data=data.concat(pg||[])
+    if(!pg||pg.length<1000)break
+    _pf+=1000
+  }
+  // Conta i rapporti di lavoro per scheda (aiuta a scegliere la principale)
+  const _rapMap={}
+  try{
+    let _rp=[],_rf=0
+    for(;;){
+      const{data:rr}=await sb.from('persone_imprese').select('persona_id').range(_rf,_rf+999)
+      _rp=_rp.concat(rr||[])
+      if(!rr||rr.length<1000)break
+      _rf+=1000
+    }
+    _rp.forEach(r=>{_rapMap[r.persona_id]=(_rapMap[r.persona_id]||0)+1})
+  }catch(_e){}
   const groups={}
   ;(data||[]).forEach(r=>{
     const a=(r.nome||'').trim().toLowerCase(),b=(r.cognome||'').trim().toLowerCase()
@@ -6359,7 +6378,7 @@ async function apriDedupPersone(){
         <div style="font-weight:700;margin-bottom:6px">${esc((rows[0].cognome||'')+' '+(rows[0].nome||''))} <span style="color:#888;font-weight:400">(${rows.length} schede)</span></div>
         ${rows.map(r=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:12px;cursor:pointer">
           <input type="radio" name="ded-${kid}" value="${r.persona_id}" style="margin-top:2px">
-          <span style="flex:1">${esc([r.titolo,r.nome,r.cognome].filter(Boolean).join(' '))} · ${esc(r.qualifica||'–')} · ${esc(r.email||'no email')} · ${esc(r.telefono||'no tel')} · CF: ${esc(r.cf||'–')} · ${(r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')}</span>
+          <span style="flex:1">${esc([r.titolo,r.nome,r.cognome].filter(Boolean).join(' '))} · ${esc(r.qualifica||'–')} · ${esc(r.email||'no email')} · ${esc(r.telefono||'no tel')} · CF: ${esc(r.cf||'–')} · ${(r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')}${_rapMap[r.persona_id]?` · <b>${_rapMap[r.persona_id]} rapport${_rapMap[r.persona_id]===1?'o':'i'} di lavoro</b>`:''}</span>
         </label>`).join('')}
         <button class="btn-primary btn-sm" style="margin-top:6px" onclick="dedupMerge('${kid}')">Unisci sul selezionato</button>
       </div>`
@@ -6375,8 +6394,17 @@ async function dedupMerge(kid){
   const others=rows.filter(r=>r.persona_id!==sel.value)
   if(!master||!others.length)return
   if(!confirm(`Unire ${others.length} sched${others.length===1?'a':'e'} su "${[master.titolo,master.nome,master.cognome].filter(Boolean).join(' ')}"?`))return
+  // 1) sposta i rapporti di lavoro dei doppioni sulla scheda scelta
+  //    (così restano validi anche per l'app Asseverazione e le interviste)
+  const{error:eR}=await sb.from('persone_imprese').update({persona_id:master.persona_id}).in('persona_id',others.map(o=>o.persona_id))
+  if(eR){toast('Errore spostamento rapporti: '+eR.message,'err');return}
+  // 2) prima i doppioni in elimina=1: l'indice unico sul CF impedirebbe
+  //    di ereditare il CF finché il doppione risulta ancora attivo
+  const{error:e2}=await sb.from('persone').update({elimina:1,updated_at:new Date().toISOString(),updated_by:S.user?.email||null}).in('persona_id',others.map(o=>o.persona_id))
+  if(e2){toast('Errore eliminazione doppioni: '+e2.message,'err');return}
+  // 3) eredita i campi mancanti (compresa l'anagrafica estesa)
   const upd={}
-  ;['titolo','cf','email','email2','email3','telefono','telefono2','qualifica'].forEach(f=>{
+  ;['titolo','cf','email','email2','email3','telefono','telefono2','qualifica','data_nascita','comune_nascita','sesso'].forEach(f=>{
     if(!master[f]){const v=others.map(o=>o[f]).find(Boolean);if(v)upd[f]=v}
   })
   const ruoli=new Set(master.ruoli||[]);others.forEach(o=>(o.ruoli||[]).forEach(x=>ruoli.add(x)))
@@ -6386,9 +6414,7 @@ async function dedupMerge(kid){
     const{error}=await sb.from('persone').update(upd).eq('persona_id',master.persona_id)
     if(error){toast('Errore aggiornamento: '+error.message,'err');return}
   }
-  const{error:e2}=await sb.from('persone').update({elimina:1,updated_at:new Date().toISOString(),updated_by:S.user?.email||null}).in('persona_id',others.map(o=>o.persona_id))
-  if(e2){toast('Errore eliminazione doppioni: '+e2.message,'err');return}
-  toast('Schede unite ✓','ok')
+  toast('Schede unite ✓ (rapporti di lavoro spostati)','ok')
   apriDedupPersone()
 }
 
