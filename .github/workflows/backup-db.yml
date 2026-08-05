@@ -81,7 +81,8 @@ jobs:
           from google.oauth2 import service_account
           from google.auth.transport.requests import Request
 
-          info = json.loads(os.environ['GSA_JSON'])
+          # Il secret può arrivare con BOM/spazi iniziali (copia da Windows): li rimuoviamo
+          info = json.loads(os.environ['GSA_JSON'].lstrip('﻿\r\n\t ').strip())
           creds = service_account.Credentials.from_service_account_info(
               info, scopes=['https://www.googleapis.com/auth/drive'],
               subject='cptpd@did.formedilpadova.it')
