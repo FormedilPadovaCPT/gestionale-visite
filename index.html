@@ -920,7 +920,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <h3>Elenco visite</h3>
         <div class="search-bar">
           <input type="text" id="q-search" placeholder="Verbale, cantiere, impresa…">
-          <select id="q-eserc" title="Esercizio (1 ott – 30 set)"></select><select id="q-ipc"><option value="">Tutti IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun Rilievo</option></select>
+          <select id="q-ipc"><option value="">Tutti IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun Rilievo</option></select>
           <select id="q-stato"><option value="">Tutti stati</option><option value="bozza">Bozza</option><option value="definitivo">Definitivo</option></select>
           <select id="q-tec"><option value="">Tutti i tecnici</option></select><select id="q-eserc" title="Esercizio (anno edile ott–set)"></select>
           <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button><label id="q-elim-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer"><input type="checkbox" id="q-elim"> Mostra eliminate</label>
@@ -5356,16 +5356,6 @@ function renderScadenze(){
 // ── LISTA ──
 async function loadLista(){
   const q=vGet('q-search').trim()
-  // Selettore esercizio: default esercizio corrente, "Tutto lo storico" a richiesta
-  const selEs=$('q-eserc')
-  if(selEs&&!selEs.dataset.init){
-    const cur=annoEdile()
-    const anni=[];for(let s=2023;s<=+cur.label.slice(0,4);s++)anni.push(s+'/'+(s+1))
-    selEs.innerHTML='<option value="">Tutto lo storico</option>'+anni.map(e=>`<option value="${e}">Es. ${e}</option>`).join('')
-    selEs.value=cur.label
-    selEs.dataset.init='1';selEs.onchange=loadLista
-  }
-  const fe=selEs?selEs.value:''
   const fi=vGet('q-ipc');const fs=vGet('q-stato')
   const _coord=!!window.__isCoord
   const _ew=$('q-elim-wrap');if(_ew)_ew.style.display=_coord?'inline-flex':'none'
@@ -5392,7 +5382,6 @@ async function loadLista(){
   }
   let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,elimina,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
   if(!_showElim)qb=qb.eq('elimina',0)
-  if(fe){const _s=+fe.slice(0,4);qb=qb.gte('data_visita',_s+'-10-01').lte('data_visita',(_s+1)+'-09-30')}
   if(fi)qb=qb.eq('ipc',fi)
   if(fs)qb=qb.eq('stato',fs)
   const _fy=_qy?_qy.value:'';if(_fy)qb=qb.gte('data_visita',_fy+'-10-01').lte('data_visita',(parseInt(_fy,10)+1)+'-09-30')
