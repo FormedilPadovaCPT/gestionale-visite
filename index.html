@@ -1499,7 +1499,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 <!-- MODAL CANTIERE -->
 <!-- ── MODAL MODIFICA PERSONA (rubrica) ── -->
 <div class="modal-overlay hidden" id="modal-persona">
-  <div class="modal-box" style="max-width:540px">
+  <div class="modal-box" style="max-width:660px">
     <h3 id="mp-title">👥 Scheda persona</h3>
     <div class="row">
       <div class="field" style="flex:1"><label>Titolo</label><select id="mp-titolo"><option value="">–</option><option>Sig.</option><option>Sig.ra</option><option>Dott.</option><option>Dott.ssa</option><option>Geom.</option><option>P.I.</option><option>Ing.</option><option>Arch.</option><option>Avv.</option><option>Prof.</option><option>Rag.</option></select></div>
@@ -1519,6 +1519,14 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field" style="flex:1"><label>Email 3</label><input type="email" id="mp-email3"></div>
       <div class="field" style="flex:1"><label>Telefono 2</label><input type="text" id="mp-telefono2"></div>
     </div>
+    <div class="row">
+      <div class="field" style="flex:0 0 160px"><label>Data di nascita</label><input type="date" id="mp-nascita"></div>
+      <div class="field" style="flex:1"><label>Comune di nascita</label><input type="text" id="mp-comune-nascita" placeholder="Es. Padova (PD)"></div>
+      <div class="field" style="flex:0 0 90px"><label>Sesso</label><select id="mp-sesso"><option value="">–</option><option value="M">M</option><option value="F">F</option></select></div>
+    </div>
+    <p style="font-size:11px;color:#aaa;margin:-4px 0 10px">Nascita e sesso, se lasciati vuoti, si compilano da soli in presenza di un codice fiscale valido.</p>
+    <div class="field"><label>Note</label><textarea id="mp-note" rows="2" placeholder="Annotazioni sulla persona…"></textarea></div>
+    <div class="field" id="mp-ruoli-edit-wrap" style="display:none"><label>Ruoli <span style="font-weight:400;font-size:11px;color:#aaa">(separati da virgola — solo segreteria)</span></label><input type="text" id="mp-ruoli-edit" placeholder="es. persona_cantiere, lavoratore"></div>
     <div id="mp-ruoli" style="font-size:12px;color:#888;margin:4px 0 10px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button class="btn-secondary btn-sm" onclick="hide('modal-persona')">Annulla</button>
@@ -6266,6 +6274,9 @@ async function editPersona(id){
   vSet('mp-titolo',r.titolo||'');vSet('mp-nome',r.nome||'');vSet('mp-cognome',r.cognome||'')
   vSet('mp-cf',r.cf||'');vSet('mp-qualifica',r.qualifica||'');vSet('mp-email',r.email||'');vSet('mp-telefono',r.telefono||'')
   vSet('mp-email2',r.email2||'');vSet('mp-email3',r.email3||'');vSet('mp-telefono2',r.telefono2||'')
+  vSet('mp-nascita',r.data_nascita||'');vSet('mp-comune-nascita',r.comune_nascita||'')
+  vSet('mp-sesso',r.sesso||'');vSet('mp-note',r.note||'')
+  vSet('mp-ruoli-edit',(r.ruoli||[]).join(', '))
   _mpNewRuolo=null
   const t=$('mp-title')
   if(t)t.textContent=_mpFromRuolo?('👥 Scheda persona — '+(_PERS_RUOLI[_mpFromRuolo]||_mpFromRuolo)):'👥 Scheda persona'
@@ -6273,7 +6284,8 @@ async function editPersona(id){
   const coord=!!window.__isCoord
   $('mp-cf').disabled=!coord
   $('mp-cf-note').textContent=coord?'':'(modificabile solo dal coordinatore)'
-  $('mp-ruoli').textContent='Ruoli visti nelle visite: '+((r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')||'–')
+  const _rw=$('mp-ruoli-edit-wrap');if(_rw)_rw.style.display=coord?'':'none'
+  $('mp-ruoli').textContent=coord?'':'Ruoli visti nelle visite: '+((r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')||'–')
   show('modal-persona')
 }
 {const _mpAnn=document.querySelector('#modal-persona [onclick*="modal-persona"]');if(_mpAnn)_mpAnn.addEventListener('click',()=>{_mpFromRuolo=null;_mpNewRuolo=null})}
@@ -6284,8 +6296,16 @@ $('mp-salva').onclick=async()=>{
   const upd={titolo:vGet('mp-titolo')||null,nome:nome||null,cognome:cog,
     qualifica:vGet('mp-qualifica').trim()||null,email:vGet('mp-email').trim()||null,telefono:vGet('mp-telefono').trim()||null,
     email2:vGet('mp-email2').trim()||null,email3:vGet('mp-email3').trim()||null,telefono2:vGet('mp-telefono2').trim()||null,
+    data_nascita:vGet('mp-nascita')||null,comune_nascita:vGet('mp-comune-nascita').trim()||null,
+    sesso:vGet('mp-sesso')||null,note:vGet('mp-note').trim()||null,
     updated_at:new Date().toISOString(),updated_by:S.user?.email||null}
-  if(window.__isCoord)upd.cf=vGet('mp-cf').trim().toUpperCase()||null
+  if(window.__isCoord){
+    upd.cf=vGet('mp-cf').trim().toUpperCase()||null
+    if($('mp-ruoli-edit-wrap')?.style.display!=='none'){
+      const _rr=vGet('mp-ruoli-edit').trim()
+      upd.ruoli=_rr?_rr.split(',').map(s=>s.trim()).filter(Boolean):[]
+    }
+  }
   // ── creazione nuova scheda dal form visita ──
   if(!_mpId){
     if(!_mpNewRuolo)return
@@ -6579,7 +6599,7 @@ Object.keys(_DBL_CAMPI).forEach(id=>{
 window.nuovaPersona=function(ruolo){
   const cfg=_PERS_CFG[ruolo];if(!cfg)return
   _mpId=null;_mpNewRuolo=ruolo
-  ;['mp-titolo','mp-nome','mp-cognome','mp-cf','mp-qualifica','mp-email','mp-telefono','mp-email2','mp-email3','mp-telefono2']
+  ;['mp-titolo','mp-nome','mp-cognome','mp-cf','mp-qualifica','mp-email','mp-telefono','mp-email2','mp-email3','mp-telefono2','mp-nascita','mp-comune-nascita','mp-sesso','mp-note','mp-ruoli-edit']
     .forEach(id=>{const el=$(id);if(el)el.value=''})
   // riprendo quello che il tecnico ha gia' digitato nel riquadro
   vSet('mp-nome',(vGet(cfg.nome)||'').trim())
