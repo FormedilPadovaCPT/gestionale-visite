@@ -1,8 +1,12 @@
-name: Backup DB (settimanale)
+name: Backup DB (giornaliero)
 
-# Esegue un dump logico del database (schemi public + planning), lo comprime
-# e lo CIFRA con AES256, poi lo carica come artifact scaricabile dai collaboratori
-# del repo. Gratuito. Nessun dato in chiaro viene salvato nel repository.
+# Esegue un dump logico del database (schemi public + planning + cpt_admin +
+# archivio: TUTTI i dati del gestionale, incluse visite_audit e le tabelle
+# archiviate), lo comprime e lo CIFRA con AES256, poi lo carica come artifact
+# scaricabile dai collaboratori del repo (conservato 90 giorni). Gratuito.
+# Nessun dato in chiaro viene salvato nel repository.
+# CONSIGLIO: una volta al mese scaricare manualmente l'ultimo artifact da
+# Actions -> Backup DB e salvarlo su Drive come copia fuori da GitHub.
 #
 # Secret richiesti (Settings -> Secrets and variables -> Actions):
 #   SUPABASE_DB_URL     stringa di connessione Postgres (Supabase -> Project Settings
@@ -16,7 +20,7 @@ name: Backup DB (settimanale)
 
 on:
   schedule:
-    - cron: '0 3 * * 1'   # ogni lunedi' alle 03:00 UTC
+    - cron: '0 2 * * *'   # ogni notte alle 02:00 UTC (04:00 italiane)
   workflow_dispatch:       # avvio manuale dal tab Actions
 
 jobs:
@@ -44,7 +48,7 @@ jobs:
           pg_dump --version
           TS=$(date +%Y%m%d_%H%M%S)
           pg_dump "$DB_URL" --no-owner --no-privileges \
-            --schema=public --schema=planning \
+            --schema=public --schema=planning --schema=cpt_admin --schema=archivio \
             | gzip -9 > "backup_${TS}.sql.gz"
           gpg --batch --yes --symmetric --cipher-algo AES256 \
             --passphrase "$PASS" "backup_${TS}.sql.gz"
