@@ -11044,12 +11044,22 @@ let _dupCommLast=null
 function _dupCommRefresh(){const dl=$('sgr-dupcomm-list');if(!dl||!dl.innerHTML.trim())return;if(_dupCommLast==='dup')sgrCercaDupComm();else if(_dupCommLast)admSimiliCommittente(_dupCommLast)}
 function _dupGroupHtml(g,gi){
   const badge=g.tipo==='identico'
-    ?'<span style="background:var(--orange,#e7500f);color:#fff;padding:1px 7px;border-radius:10px;font-size:10px">nome identico</span>'
-    :'<span style="background:#565c66;color:#fff;padding:1px 7px;border-radius:10px;font-size:10px">simile'+(g.sim!=null?' '+Math.round(g.sim*100)+'%':'')+'</span>'
-  const rows=(g.membri||[]).map((m,mi)=>'<label style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;cursor:pointer"><input type="radio" name="dc-'+gi+'" value="'+esc(m.id)+'" '+(mi===0?'checked':'')+'> <b>'+esc(m.nome||'')+'</b> <span style="font-family:monospace;color:#888">'+esc(m.cfp||'')+'</span> <span style="color:#aaa">· '+(m.n_cantieri||0)+' cant · '+(m.n_visite||0)+' vis</span> <button class="btn-outline btn-sm" title="Apri scheda" style="margin-left:auto" onclick="event.preventDefault();event.stopPropagation();admEditCommittente(\''+esc(m.id)+'\')">✏️</button></label>').join('')
-  return '<div style="border:1px solid #e2e2e2;border-radius:8px;padding:10px;margin-bottom:8px;background:#fafafa">'+
-    '<div style="margin-bottom:6px">'+badge+' <span style="font-size:11px;color:#888">scegli quale TENERE (principale):</span></div>'+
-    rows+'<button class="btn-primary btn-sm" style="margin-top:6px" onclick="sgrFondiDupComm('+gi+')">🔗 Unisci gruppo</button></div>'
+    ?'<span style="background:var(--orange,#e7500f);color:#fff;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:600;letter-spacing:.3px">NOME IDENTICO</span>'
+    :'<span style="background:#565c66;color:#fff;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:600;letter-spacing:.3px">SIMILE'+(g.sim!=null?' '+Math.round(g.sim*100)+'%':'')+'</span>'
+  const rows=(g.membri||[]).map((m,mi)=>
+    '<label style="display:flex;align-items:center;gap:12px;padding:8px 12px;font-size:13px;cursor:pointer;background:#fff'+(mi>0?';border-top:1px solid #f0f0f0':'')+'">'
+    +'<input type="radio" name="dc-'+gi+'" value="'+esc(m.id)+'" '+(mi===0?'checked':'')+' style="flex:0 0 auto;margin:0">'
+    +'<span style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:#333">'+esc(m.nome||'')+'</span>'
+    +'<span style="flex:0 0 auto;font-family:monospace;font-size:12px;color:#565c66;background:#f2f3f5;padding:2px 8px;border-radius:6px">'+esc(m.cfp||'\u2014')+'</span>'
+    +'<span style="flex:0 0 auto;font-size:12px;color:#999;white-space:nowrap">'+(m.n_cantieri||0)+' cant \u00b7 '+(m.n_visite||0)+' vis</span>'
+    +'<button class="btn-outline btn-sm" title="Apri scheda" style="flex:0 0 auto" onclick="event.preventDefault();event.stopPropagation();admEditCommittente(\''+esc(m.id)+'\')">\u270f\ufe0f Scheda</button>'
+    +'</label>').join('')
+  return '<div style="border:1px solid #e3e3e3;border-radius:10px;margin-bottom:10px;background:#fff;overflow:hidden">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;background:#fafafa;border-bottom:1px solid #eee;flex-wrap:wrap">'
+    +badge+'<span style="font-size:11px;color:#888">spunta quale TENERE come principale</span>'
+    +'<span style="flex:1 1 auto"></span>'
+    +'<button class="btn-primary btn-sm" onclick="sgrFondiDupComm('+gi+')">🔗 Unisci gruppo</button>'
+    +'</div>'+rows+'</div>'
 }
 async function sgrCercaDupComm(){
   const box=$('sgr-dupcomm-list');if(!box)return
