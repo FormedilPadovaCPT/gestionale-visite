@@ -2,21 +2,24 @@
 // Caricato come <script> CLASSICO PRIMA del modulo principale: i const qui sono globali
 // e vengono letti dal modulo. NON aggiungere qui logica/funzioni, solo dati.
 
-const COMUNI_PD=['Abano Terme','Agna','Albignasego','Anguillara Veneta','Arquà Petrarca','Arquà Polesine','Arre','Arzergrande','Bagnoli di Sopra','Baone','Barbona','Battaglia Terme','Boara Pisani','Borgoricco','Bovolenta','Brugine','Cadoneghe','Campodarsego','Campodoro','Camposampiero','Campo San Martino','Candiana','Carceri','Cartura','Casale di Scodosia','Casalserugo','Castelbaldo','Cervarese Santa Croce','Chioggia','Cittadella','Codevigo','Conselve','Correzzola','Curtarolo','Due Carrare','Este','Fontaniva','Galliera Veneta','Galzignano Terme','Gazzo','Granze','Guarda Veneta','Legnaro','Limena','Loreggia','Lozzo Atestino','Masi','Massanzago','Megliadino San Fidenzio','Megliadino San Vitale','Merlara','Mestrino','Monselice','Montagnana','Montegrotto Terme','Motta','Noventa Padovana','Ospedaletto Euganeo','Padova','Pernumia','Piacenza d\'Adige','Piazzola sul Brenta','Piombino Dese','Piove di Sacco','Polverara','Ponso','Pontelongo','Ponte San Nicolò','Pozzonovo','Rovolon','Rubano','Saccolongo','San Giorgio delle Pertiche','San Giorgio in Bosco','San Martino di Lupari','San Pietro in Gu','San Pietro Viminario','Sant\'Angelo di Piove di Sacco','Sant\'Elena','Sant\'Urbano','Saonara','Selvazzano Dentro','Solesino','Stanghella','Teolo','Terrassa Padovana','Tombolo','Torre di Mosto','Trebaseleghe','Tribano','Urbana','Veggiano','Vescovana','Vighizzolo d\'Este','Vigodarzere','Vigonovo','Vigonza','Villa del Conte','Villa Estense','Villafranca Padovana','Villanova di Camposampiero','Vo\'']
+// COMUNI_PD è derivata da ISTAT_PD (definita sotto) — così la tendina è sempre allineata
+// all'elenco ISTAT completo dei comuni attuali della provincia. Qui solo le voci extra:
+// comuni fuori provincia limitrofi + comuni soppressi presenti nei cantieri storici.
+const COMUNI_EXTRA=['Arquà Polesine','Carceri','Chioggia','Guarda Veneta','Megliadino San Fidenzio','Motta','Torre di Mosto','Vighizzolo d\'Este','Vigonovo']
 
 const CAP_PD={
   'Abano Terme':'35031','Agna':'35021','Albignasego':'35020','Anguillara Veneta':'35022',
   'Arquà Petrarca':'35032','Arquà Polesine':'45031','Arre':'35020','Arzergrande':'35020',
   'Bagnoli di Sopra':'35023','Baone':'35030','Barbona':'35040','Battaglia Terme':'35041',
-  'Boara Pisani':'35040','Borgoricco':'35010','Bovolenta':'35024','Brugine':'35020',
+  'Boara Pisani':'35040','Borgo Veneto':'35046','Borgoricco':'35010','Bovolenta':'35024','Brugine':'35020',
   'Cadoneghe':'35010','Campodarsego':'35011','Campodoro':'35010','Camposampiero':'35012',
-  'Campo San Martino':'35010','Candiana':'35020','Carceri':'35040','Cartura':'35025',
+  'Campo San Martino':'35010','Candiana':'35020','Carceri':'35040','Carmignano di Brenta':'35010','Cartura':'35025',
   'Casale di Scodosia':'35040','Casalserugo':'35020','Castelbaldo':'35040',
-  'Cervarese Santa Croce':'35030','Chioggia':'30015','Cittadella':'35013','Codevigo':'35020',
+  'Cervarese Santa Croce':'35030','Chioggia':'30015','Cinto Euganeo':'35030','Cittadella':'35013','Codevigo':'35020',
   'Conselve':'35026','Correzzola':'35020','Curtarolo':'35010','Due Carrare':'35020',
   'Este':'35042','Fontaniva':'35014','Galliera Veneta':'35015','Galzignano Terme':'35030',
-  'Gazzo':'35010','Granze':'35040','Guarda Veneta':'45030','Legnaro':'35020','Limena':'35010',
-  'Loreggia':'35010','Lozzo Atestino':'35034','Masi':'35040','Massanzago':'35010',
+  'Gazzo':'35010','Grantorto':'35010','Granze':'35040','Guarda Veneta':'45030','Legnaro':'35020','Limena':'35010',
+  'Loreggia':'35010','Lozzo Atestino':'35034','Maserà di Padova':'35020','Masi':'35040','Massanzago':'35010',
   'Megliadino San Fidenzio':'35040','Megliadino San Vitale':'35040','Merlara':'35040',
   'Mestrino':'35035','Monselice':'35043','Montagnana':'35044','Montegrotto Terme':'35036',
   'Motta':'35060','Noventa Padovana':'35027','Ospedaletto Euganeo':'35045','Padova':'35100',
@@ -26,9 +29,10 @@ const CAP_PD={
   'Rubano':'35030','Saccolongo':'35030','San Giorgio delle Pertiche':'35010',
   'San Giorgio in Bosco':'35010','San Martino di Lupari':'35018','San Pietro in Gu':'35010',
   'San Pietro Viminario':'35020','Sant\'Angelo di Piove di Sacco':'35020',
+  'Santa Caterina d\'Este':'35040','Santa Giustina in Colle':'35010',
   'Sant\'Elena':'35040','Sant\'Urbano':'35040','Saonara':'35020','Selvazzano Dentro':'35030',
   'Solesino':'35047','Stanghella':'35048','Teolo':'35037','Terrassa Padovana':'35020',
-  'Tombolo':'35019','Torre di Mosto':'30020','Trebaseleghe':'35010','Tribano':'35020',
+  'Tombolo':'35019','Torre di Mosto':'30020','Torreglia':'35038','Trebaseleghe':'35010','Tribano':'35020',
   'Urbana':'35040','Veggiano':'35030','Vescovana':'35040','Vighizzolo d\'Este':'35040',
   'Vigodarzere':'35010','Vigonovo':'35010','Vigonza':'35010','Villa del Conte':'35010',
   'Villa Estense':'35040','Villafranca Padovana':'35010','Villanova di Camposampiero':'35010',
@@ -37,34 +41,34 @@ const CAP_PD={
 
 const ISTAT_PD={
   'Abano Terme':'028001','Agna':'028002','Albignasego':'028003','Anguillara Veneta':'028004',
-  'Arquà Petrarca':'028005','Arre':'028007','Arzergrande':'028008','Bagnoli di Sopra':'028009',
-  'Baone':'028010','Barbona':'028011','Battaglia Terme':'028012','Boara Pisani':'028013',
-  'Borgoricco':'028014','Bovolenta':'028015','Brugine':'028016','Cadoneghe':'028017',
-  'Campodarsego':'028018','Campodoro':'028019','Camposampiero':'028020','Campo San Martino':'028021',
-  'Candiana':'028022','Carceri':'028023','Cartura':'028024','Casale di Scodosia':'028025',
-  'Casalserugo':'028026','Castelbaldo':'028027','Cervarese Santa Croce':'028028',
-  'Chioggia':'027004','Cittadella':'028029','Codevigo':'028030','Conselve':'028031',
-  'Correzzola':'028032','Curtarolo':'028033','Due Carrare':'028034','Este':'028037',
+  'Arquà Petrarca':'028005','Arre':'028006','Arzergrande':'028007','Bagnoli di Sopra':'028008',
+  'Baone':'028009','Barbona':'028010','Battaglia Terme':'028011','Boara Pisani':'028012',
+  'Borgo Veneto':'028107','Borgoricco':'028013','Bovolenta':'028014','Brugine':'028015',
+  'Cadoneghe':'028016','Campo San Martino':'028020','Campodarsego':'028017','Campodoro':'028018',
+  'Camposampiero':'028019','Candiana':'028021','Carmignano di Brenta':'028023','Cartura':'028026',
+  'Casale di Scodosia':'028027','Casalserugo':'028028','Castelbaldo':'028029','Cervarese Santa Croce':'028030',
+  'Cinto Euganeo':'028031','Cittadella':'028032','Codevigo':'028033','Conselve':'028034',
+  'Correzzola':'028035','Curtarolo':'028036','Due Carrare':'028106','Este':'028037',
   'Fontaniva':'028038','Galliera Veneta':'028039','Galzignano Terme':'028040','Gazzo':'028041',
-  'Granze':'028042','Legnaro':'028046','Limena':'028047','Loreggia':'028049',
-  'Lozzo Atestino':'028050','Masi':'028053','Massanzago':'028054',
-  'Megliadino San Fidenzio':'028057','Megliadino San Vitale':'028058','Merlara':'028059',
-  'Mestrino':'028060','Monselice':'028061','Montagnana':'028062','Montegrotto Terme':'028063',
-  'Motta':'028065','Noventa Padovana':'028066','Ospedaletto Euganeo':'028067','Padova':'028060',
-  'Pernumia':'028069','Piacenza d\'Adige':'028070','Piazzola sul Brenta':'028071',
-  'Piombino Dese':'028072','Piove di Sacco':'028073','Polverara':'028074','Ponso':'028075',
-  'Pontelongo':'028076','Ponte San Nicolò':'028077','Pozzonovo':'028078','Rovolon':'028080',
-  'Rubano':'028081','Saccolongo':'028082','San Giorgio delle Pertiche':'028083',
-  'San Giorgio in Bosco':'028084','San Martino di Lupari':'028085','San Pietro in Gu':'028086',
-  'San Pietro Viminario':'028087','Sant\'Angelo di Piove di Sacco':'028088',
-  'Sant\'Elena':'028089','Sant\'Urbano':'028090','Saonara':'028091',
-  'Selvazzano Dentro':'028092','Solesino':'028093','Stanghella':'028094','Teolo':'028095',
-  'Terrassa Padovana':'028096','Tombolo':'028097','Trebaseleghe':'028099','Tribano':'028100',
-  'Urbana':'028101','Veggiano':'028102','Vescovana':'028103','Vighizzolo d\'Este':'028104',
-  'Vigodarzere':'028105','Vigonovo':'028106','Vigonza':'028107','Villa del Conte':'028108',
-  'Villa Estense':'028109','Villafranca Padovana':'028110','Villanova di Camposampiero':'028111',
-  'Vo\'':'028112'
+  'Grantorto':'028042','Granze':'028043','Legnaro':'028044','Limena':'028045',
+  'Loreggia':'028046','Lozzo Atestino':'028047','Maserà di Padova':'028048','Masi':'028049',
+  'Massanzago':'028050','Megliadino San Vitale':'028052','Merlara':'028053','Mestrino':'028054',
+  'Monselice':'028055','Montagnana':'028056','Montegrotto Terme':'028057','Noventa Padovana':'028058',
+  'Ospedaletto Euganeo':'028059','Padova':'028060','Pernumia':'028061','Piacenza d\'Adige':'028062',
+  'Piazzola sul Brenta':'028063','Piombino Dese':'028064','Piove di Sacco':'028065','Polverara':'028066',
+  'Ponso':'028067','Ponte San Nicolò':'028069','Pontelongo':'028068','Pozzonovo':'028070',
+  'Rovolon':'028071','Rubano':'028072','Saccolongo':'028073','San Giorgio delle Pertiche':'028075',
+  'San Giorgio in Bosco':'028076','San Martino di Lupari':'028077','San Pietro Viminario':'028079','San Pietro in Gu':'028078',
+  'Sant\'Angelo di Piove di Sacco':'028082','Sant\'Elena':'028083','Sant\'Urbano':'028084','Santa Caterina d\'Este':'028108',
+  'Santa Giustina in Colle':'028080','Saonara':'028085','Selvazzano Dentro':'028086','Solesino':'028087',
+  'Stanghella':'028088','Teolo':'028089','Terrassa Padovana':'028090','Tombolo':'028091',
+  'Torreglia':'028092','Trebaseleghe':'028093','Tribano':'028094','Urbana':'028095',
+  'Veggiano':'028096','Vescovana':'028097','Vigodarzere':'028099','Vigonza':'028100',
+  'Villa Estense':'028102','Villa del Conte':'028101','Villafranca Padovana':'028103','Villanova di Camposampiero':'028104',
+  'Vo\'':'028105'
 }
+
+const COMUNI_PD=[...new Set([...Object.keys(ISTAT_PD),...COMUNI_EXTRA])].sort((a,b)=>a.localeCompare(b,'it'))
 
 // --- Batch 2: codelist / etichette / palette ---
 const ZONE_LBL={1:'Impianti di cantiere',2:'Protezione luoghi di lavoro',3:'Apparecchi di sollevamento',4:'Attrezzature, scale, utensili',5:'Macchine di cantiere',6:'Opere provvisionali',7:'DPI',8:'Documentazione',9:'Soggetti',10:'Formazione'}
@@ -72,13 +76,14 @@ const _QPD_NOMI={1:'Q1 Centro',2:'Q2 Nord',3:'Q3 Est',4:'Q4 Sud-Est',5:'Q5 Sud-O
 const TIPO_IMP_OPT={1:'Affidataria',2:'Affidataria ed esecutrice',3:'Esecutrice'}
 const CERTIF_OPT={1:'Asseverata',2:'Certificata OHSAS 18001',3:'UNI EN ISO 45001',4:'Sistema Qualità UNI EN ISO 9001',5:'Certificazione ambientale ISO 14001'}
 const CEIV_OPT=['C.E.I.V.','EDILCASSA VENETO','CASSA EDILE BELLUNO','CASSA EDILE VENEZIA','CASSA EDILE VICENZA','ALTRO']
-const IMP_LBL={1:'fino a 250.000 €',2:'250.001 – 500.000 €',3:'500.001 – 1.000.000 €',4:'1.000.001 – 1.500.000 €',5:'1.500.001 – 2.500.000 €',6:'2.500.001 – 3.500.000 €',7:'3.500.001 – 5.000.000 €',8:'5.000.001 – 10.000.000 €',11:'non disponibile'}
-const TIP_INT_LABELS={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',6:'Ripristino',7:'Restauro',8:'Manutenzione'}
+const IMP_LBL={1:'fino a 250.000 €',2:'250.001 – 500.000 €',3:'500.001 – 1.000.000 €',4:'1.000.001 – 1.500.000 €',5:'1.500.001 – 2.500.000 €',6:'2.500.001 – 3.500.000 €',7:'3.500.001 – 5.000.000 €',8:'5.000.001 – 10.000.000 €',9:'10.000.001 – 15.000.000 €',10:'oltre 15.000.000 €',11:'non disponibile'}
+const TIP_INT_LABELS={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',5:'Altro',6:'Ripristino',7:'Restauro',8:'Manutenzione'}
 const TIP_OPE_LABELS={1:'Industriale',2:'Civile',3:'Commerciale',4:'Agricola',5:'Stradale',6:'Idraulica',7:'Gallerie',8:'Scolastica',9:'Ospedaliera',10:'Sportiva',11:'Ricettiva',12:'Residenziale',13:'Pubbl. utilità',14:'Bonifiche',15:'Impianti',16:'Altro',17:'Infrastrutture'}
-const DURATA_LABELS={1:'< 30 giorni',2:'30–90 giorni',3:'3–6 mesi',4:'6–12 mesi',5:'> 12 mesi',6:'N/D',7:'Indefinita',8:'Pluriennale'}
-const TIPO_ACC_LABELS={1:'Su segnalazione',2:'Su richiesta',3:'Protocolli di intesa',4:'RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT'}
+const DURATA_LABELS={1:'Fino a 1 mese',2:'Da 1 a 3 mesi',3:'Da 3 a 12 mesi',4:'Da 12 a 24 mesi',5:'Da 24 a 36 mesi',6:'Da 36 a 48 mesi',7:'Oltre 48 mesi',8:'Non presente'}
+const TIPO_ACC_LABELS={1:'Su segnalazione',2:'Su richiesta',3:'Protocolli di intesa',4:'RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT',8:'Adesione servizio visite in serie',9:'Visita STAGE/ASL',10:'Per attività di Asseverazione'}
 const RPT_PALETTE=['#e7500f','#95C22F','#565c66','#3498db','#9b59b6','#e67e22','#1abc9c','#e74c3c','#f39c12','#2980b9']
-const _DASH_C={alto:'#e74c3c',medio:'#f39c12',basso:'#f1c40f',nr:'#95C22F',orange:'#e7500f',grey:'#565c66',green:'#95C22F'}
+// IPC: Alto rosso, Medio arancione, Basso giallo, Nessun Rilievo verde
+const _DASH_C={alto:'#E02B20',medio:'#ED7D31',basso:'#FFC000',nr:'#95C22F',orange:'#e7500f',grey:'#565c66',green:'#95C22F'}
 const _DASH_PIE=['#e7500f','#565c66','#95C22F','#f39c12','#2563eb','#8e44ad','#e74c3c','#1abc9c','#e67e22','#34495e']
 const _DASH_MACRO={1:'01 Impianti di cantiere',2:'02 Protezione luoghi di lavoro',3:'03 Apparecchi di sollevamento',4:'04 Attrezzature, scale, utensili',5:'05 Macchine di cantiere',6:'06 Opere provvisionali',7:'07 DPI',8:'08 Documentazione',9:'09 Soggetti',10:'10 Formazione'}
 const _DASH_IMPORTO={1:'≤ 250.000',2:'250.001–500.000',3:'500.001–1.000.000',4:'1.000.001–1.500.000',5:'1.500.001–2.500.000',6:'2.500.001–3.500.000',7:'3.500.001–5.000.000',8:'5.000.001–10.000.000',9:'10.000.001–15.000.000',10:'oltre 15.000.000',11:'Non disponibile'}
@@ -88,7 +93,7 @@ const OS_MESI=['ott','nov','dic','gen','feb','mar','apr','mag','giu','lug','ago'
 const OS_MESI_FULL=['ottobre','novembre','dicembre','gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre']
 const OXBRAND=[231,80,15]
 const _MESI_IT=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre']
-const _TIP_INT={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',6:'Ripristino',7:'Restauro',8:'Manutenzione'}
+const _TIP_INT={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',5:'Altro',6:'Ripristino',7:'Restauro',8:'Manutenzione'}
 const _TIP_OPE={1:'Industriale',2:'Civile',3:'Commerciale',4:'Agricola',5:'Stradale',8:'Scolastica',16:'Altro'}
 const _DURATA={1:'< 30 gg',2:'30–90 gg',3:'3–6 mesi',4:'6–12 mesi',5:'> 12 mesi'}
 const _IMPORTO={1:'≤ 250k',2:'250k–500k',3:'500k–1M',4:'1–1,5M',5:'1,5–2,5M',6:'2,5–3,5M',7:'3,5–5M',8:'5–10M',11:'N/D'}
@@ -175,10 +180,11 @@ const PREF_LBL={
   'FOR_RIS':'Rischi specifici','FOR_ATM':'Attrezzature e macchine'
 }
 
+// Colorazione ufficiale esiti checklist: VER verde, OSS giallo, NC- arancione, NC+ rosso
 const CHK_COLORS={
-  ncp:'#d50000',  // NC+  rosso vivo
-  ncm:'#e7500f',  // NC-  arancio Formedil
-  oss:'#c8a000',  // OSS  giallo ocra
+  ncp:'#E02B20',  // NC+  rosso
+  ncm:'#ED7D31',  // NC-  arancione
+  oss:'#FFC000',  // OSS  giallo
   ver:'#95C22F',  // VER  verde Formedil
   na :'#565c66'   // NA   grigio Formedil
 }
@@ -196,9 +202,9 @@ const CEIV_COLOR_MAP={
 const OXC={
   ar:'#e7500f',gr:'#565c66',ve:'#95C22F',
   s1:'#e7500f',s2:'#95C22F',
-  ncp:'#e02b20',ncm:'#FFC000',
+  ncp:'#E02B20',ncm:'#ED7D31',oss:'#FFC000',ver:'#95C22F',
   pie:['#e7500f','#95C22F','#565c66','#f29b6b','#c5dd92','#9aa0a8','#7a3c14','#5d7a1e'],
-  esiti:['#c5dd92','#9aa0a8','#FFC000','#e02b20'],
+  esiti:['#95C22F','#FFC000','#ED7D31','#E02B20'],
   trans:['#95C22F','#eef3e2','#fdeadd','#f08a4b']
 }
 
@@ -240,7 +246,7 @@ const TECNICI_LIST=[
   {nome:'Arch. Marco Camuffo',     email:'marco.camuffo@did.formedilpadova.it'},
   {nome:'Arch. Nicola De Marco',   email:'nicola.demarco@did.formedilpadova.it'},
   {nome:'Arch. Tommaso Visentini', email:'tommaso.visentini@did.formedilpadova.it'},
-  {nome:'Geom. Mirco Canova',      email:'mirco.canova@did.formedilpadova.it'},
+  {nome:'Geom. Amedeo Bordina',    email:'amedeo.bordina@did.formedilpadova.it'},
   {nome:'Ing. Paolo Balladore',    email:'paolo.balladore@did.formedilpadova.it'},
   {nome:'P.I. Franco Caon',        email:'franco.caon@did.formedilpadova.it'},
 ]
