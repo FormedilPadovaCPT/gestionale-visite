@@ -11264,7 +11264,7 @@ async function loadRubrica(){
 
   // ── IMPRESE ──
   if(!cat||cat==='impresa'){
-    let qb=sb.from('imprese').select('impresa_id,impresa_nome,piva,impresa_cf,comune,indirizzo,impresa_email_ref,impresa_telefono,contratto_ccnl,tipo_iscrizione_ccia,cassa_edile').eq('elimina',0).limit(50)
+    let qb=sb.from('imprese').select('impresa_id,impresa_nome,piva,impresa_cf,comune,indirizzo,impresa_email_ref,impresa_telefono,contratto_ccnl,tipo_iscrizione_ccia,cassa_edile,cod_ceiv').eq('elimina',0).limit(50)
     if(q)qb=qb.or(`impresa_nome.ilike.*${q}*,piva.ilike.*${q}*,impresa_cf.ilike.*${q}*,impresa_email_ref.ilike.*${q}*,impresa_email2.ilike.*${q}*,impresa_email3.ilike.*${q}*,impresa_telefono.ilike.*${q}*,impresa_telefono2.ilike.*${q}*,comune.ilike.*${q}*`)
     const{data}=await qb
     ;(data||[]).forEach(r=>{
@@ -11276,7 +11276,8 @@ async function loadRubrica(){
         _CCIA_LBL[r.tipo_iscrizione_ccia]?`CCIA: ${_CCIA_LBL[r.tipo_iscrizione_ccia]}`:'',
         r.cassa_edile?`Cassa edile: ${esc(r.cassa_edile)}`:'',
       ].filter(Boolean)
-      cards.push(rubCard('🏢','impresa',r.impresa_id,esc(r.impresa_nome||'–'),sub,extra))
+      const _isCeiv=(r.cassa_edile||'').replace(/\./g,'').toUpperCase()==='CEIV'||!!r.cod_ceiv
+      cards.push(rubCard('🏢','impresa',r.impresa_id,esc(r.impresa_nome||'–'),sub,extra,_isCeiv?'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#e3f1fb;color:#2471a3;white-space:nowrap;margin-right:4px" title="Impresa iscritta C.E.I.V.">C.E.I.V.</span>':''))
     })
   }
 
@@ -11337,7 +11338,7 @@ async function loadRubrica(){
   if(typeof rubSelChange==='function')rubSelChange()
 }
 
-function rubCard(icon,tipo,id,nome,sub,extraLines){
+function rubCard(icon,tipo,id,nome,sub,extraLines,badgeExtra){
   const badge={impresa:'#e7f3e8;color:#27ae60',committente:'#fef3e2;color:#e67e22',tecnico:'#eef4ff;color:#2980b9',persona:'#f3e8fd;color:#8e44ad'}[tipo]||'#eee;color:#555'
   const [bg,col]=badge.split(';color:')
   return`<div ondblclick="showRubricaDetail('${tipo}','${id}')" title="Doppio clic per visualizzare tutti i dati" style="background:#fff;border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border-left:3px solid ${col.replace('color:','')};cursor:pointer;transition:box-shadow .15s,transform .1s" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,.13)';this.style.transform='translateY(-1px)'" onmouseleave="this.style.boxShadow='var(--shadow)';this.style.transform=''">
@@ -11348,7 +11349,7 @@ function rubCard(icon,tipo,id,nome,sub,extraLines){
         <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nome}</div>
         ${sub?`<div style="font-size:11px;color:#888;margin-top:1px">${sub}</div>`:''}
       </div>
-      <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${bg};color:${col.replace('color:','')};white-space:nowrap">${tipo.toUpperCase()}</span>
+      ${badgeExtra||''}<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${bg};color:${col.replace('color:','')};white-space:nowrap">${tipo.toUpperCase()}</span>
     </div>
     ${extraLines.length?`<div style="font-size:12px;line-height:2;border-top:1px solid #f0f0f0;padding-top:6px;margin-top:4px">${extraLines.join('<br>')}</div>`:''}
     <div style="font-size:10px;color:#bbb;margin-top:6px;text-align:right">↕ doppio clic per il dettaglio</div>
@@ -11864,7 +11865,8 @@ async function showRubricaDetail(tipo, id){
       const{data:r,error}=await sb.from('imprese').select('*').eq('impresa_id',id).single()
       if(error||!r){toast('Impresa non trovata','err');hide('modal-rub-detail');return}
       $('rub-detail-title').textContent=`🏢 ${r.impresa_nome||'–'}`
-      $('rub-detail-badge').innerHTML=`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#e8f8ee;color:#27ae60">IMPRESA</span>`
+      const _dCeiv=(r.cassa_edile||'').replace(/\./g,'').toUpperCase()==='CEIV'||!!r.cod_ceiv
+      $('rub-detail-badge').innerHTML=`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#e8f8ee;color:#27ae60">IMPRESA</span>`+(_dCeiv?` <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#e3f1fb;color:#2471a3" title="Impresa iscritta C.E.I.V.">C.E.I.V.</span>`:'')
       let html=qdSec('Anagrafica')
       html+=qdDl([
         ['Ragione sociale',r.impresa_nome],['P.IVA',r.piva],['Cod. Fiscale',r.impresa_cf],
