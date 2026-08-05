@@ -76,7 +76,8 @@ nav button.active{background:rgba(255,255,255,.15)}
 @keyframes incPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(1.12)}}
 .inc-lampeggia{animation:incPulse 1.15s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.inc-lampeggia{animation:none}}
-main{flex:1;padding:14px 22px;max-width:1720px;margin:0 auto;width:100%}
+main{flex:1;padding:14px 22px;margin:0 auto;width:min(1560px,calc(100% - 150px))}
+@media(max-width:900px){main{width:100%}}
 /* DASHBOARD */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin-bottom:18px}
 .stat-card{background:#fff;border-radius:var(--radius);padding:14px;text-align:center;box-shadow:var(--shadow)}
