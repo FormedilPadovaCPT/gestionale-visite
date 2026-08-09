@@ -47,8 +47,13 @@ jobs:
           export PATH="/usr/lib/postgresql/17/bin:$PATH"
           pg_dump --version
           TS=$(date +%Y%m%d_%H%M%S)
+          # Schemi applicativi: struttura + dati.
+          # 'auth' e' incluso per poter ricreare gli utenti in caso di ripristino
+          # (contiene gli hash delle password: il file finale e' sempre cifrato GPG).
+          # Non e' incluso 'storage': i file dei bucket non stanno nel database.
           pg_dump "$DB_URL" --no-owner --no-privileges \
             --schema=public --schema=planning --schema=cpt_admin --schema=archivio \
+            --schema=auth \
             | gzip -9 > "backup_${TS}.sql.gz"
           gpg --batch --yes --symmetric --cipher-algo AES256 \
             --passphrase "$PASS" "backup_${TS}.sql.gz"
