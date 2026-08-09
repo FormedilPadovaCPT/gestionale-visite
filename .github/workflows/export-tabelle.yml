@@ -1,0 +1,223 @@
+name: Export tabelle (settimanale)
+
+# Estrae il contenuto di TUTTE le tabelle del database in file leggibili
+# (un CSV per tabella + un unico Excel con un foglio per tabella) e li copia
+# su Google Drive, nella sottocartella "Tabelle" dentro "Backup_Gestionale".
+#
+# Differenza rispetto a "Backup DB (giornaliero)":
+#   - quello e' un dump SQL cifrato, serve a RIPRISTINARE il database;
+#   - questo produce file APRIBILI, serve a consultare o recuperare dati
+#     senza dover ripristinare nulla.
+#
+# I file NON sono cifrati: contengono nomi, codici fiscali e recapiti, quindi
+# la cartella di destinazione non va condivisa con nessuno.
+#
+# Rotazione: i file piu' vecchi di 180 giorni vengono cestinati.
+
+on:
+  schedule:
+    - cron: '30 3 * * 0'   # ogni domenica alle 03:30 UTC (05:30 italiane)
+  workflow_dispatch:        # avvio manuale dal tab Actions
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Installa client PostgreSQL 17
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Esporta ogni tabella in CSV
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DB_URL:-}" ]; then
+            echo "Secret SUPABASE_DB_URL mancante."; exit 1
+          fi
+          export PATH="/usr/lib/postgresql/17/bin:$PATH"
+          TS=$(date +%Y%m%d)
+          mkdir -p export/csv
+
+          # elenco di tutte le tabelle reali dei quattro schemi applicativi
+          psql "$DB_URL" -At -c "
+            select table_schema || '.' || table_name
+            from information_schema.tables
+            where table_schema in ('public','planning','cpt_admin','archivio')
+              and table_type = 'BASE TABLE'
+            order by 1" > export/tabelle.txt
+
+          N=$(wc -l < export/tabelle.txt)
+          echo "Tabelle da esportare: $N"
+
+          while read -r T; do
+            [ -z "$T" ] && continue
+            S="${T%%.*}"; B="${T#*.}"
+            psql "$DB_URL" -q -c "\copy (select * from \"$S\".\"$B\") to 'export/csv/${T}.csv' with (format csv, header true, delimiter ';')"
+            echo "  ok  $T"
+          done < export/tabelle.txt
+
+          echo "TS=${TS}" >> "$GITHUB_ENV"
+          echo "NTAB=${N}" >> "$GITHUB_ENV"
+
+      - name: Prepara CSV per Excel italiano e costruisci il file unico
+        run: |
+          set -euo pipefail
+          pip -q install openpyxl
+          python3 - <<'PY'
+          import csv, glob, os, re, sys
+          from openpyxl import Workbook
+          from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+
+          TS = os.environ['TS']
+          MAX_RIGHE_FOGLIO = 1_000_000   # limite Excel: 1.048.576
+
+          # 1) BOM davanti a ogni CSV: cosi' Excel italiano li apre con un doppio clic
+          files = sorted(glob.glob('export/csv/*.csv'))
+          for f in files:
+              with open(f, 'rb') as fh:
+                  d = fh.read()
+              if not d.startswith(b'\xef\xbb\xbf'):
+                  with open(f, 'wb') as fh:
+                      fh.write(b'\xef\xbb\xbf' + d)
+
+          # 2) un unico .xlsx con un foglio per tabella + foglio INDICE
+          wb = Workbook(write_only=True)
+          indice = wb.create_sheet('INDICE')
+          indice.append(['Tabella', 'Foglio', 'Righe', 'Colonne', 'Note'])
+          voci, usati = [], set()
+
+          for f in files:
+              nome = os.path.basename(f)[:-4]              # schema.tabella
+              etichetta = nome[7:] if nome.startswith('public.') else nome
+              base = re.sub(r'[\\/*?:\[\]]', '_', etichetta)[:31] or 'foglio'
+              foglio, i = base, 1
+              while foglio.lower() in usati:
+                  suf = '~%d' % i
+                  foglio = base[:31 - len(suf)] + suf
+                  i += 1
+              usati.add(foglio.lower())
+
+              ws = wb.create_sheet(foglio)
+              nr = nc = 0
+              nota = ''
+              with open(f, encoding='utf-8-sig', newline='') as fh:
+                  for k, row in enumerate(csv.reader(fh, delimiter=';')):
+                      if k == 0:
+                          nc = len(row)
+                      else:
+                          nr += 1
+                          if nr > MAX_RIGHE_FOGLIO:
+                              nota = 'TRONCATA nel foglio: righe complete solo nel CSV'
+                              break
+                      ws.append([ILLEGAL_CHARACTERS_RE.sub('', c)[:32000] for c in row])
+              voci.append((nome, foglio, nr, nc, nota))
+              print('  foglio %-33s %7d righe' % (foglio, nr))
+
+          for v in sorted(voci):
+              indice.append(list(v))
+
+          out = 'export/Tabelle_%s.xlsx' % TS
+          wb.save(out)
+          print('Scritto %s (%.1f MB)' % (out, os.path.getsize(out) / 1048576))
+          PY
+
+      - name: Comprimi i CSV
+        run: |
+          set -euo pipefail
+          cd export/csv && zip -q -9 -r "../Tabelle_CSV_${TS}.zip" . && cd -
+          ls -la export/*.xlsx export/*.zip
+
+      - name: Carica i file come artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: export-tabelle-${{ env.TS }}
+          path: |
+            export/Tabelle_*.xlsx
+            export/Tabelle_CSV_*.zip
+          retention-days: 90
+
+      - name: Copia su Google Drive (Backup_Gestionale/Tabelle)
+        env:
+          GSA_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GSA_JSON:-}" ]; then
+            echo "Secret GOOGLE_SERVICE_ACCOUNT_JSON assente: salto l'upload su Drive."
+            exit 0
+          fi
+          pip -q install google-auth requests
+          python3 - <<'PY'
+          import os, json, glob, datetime, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+
+          info = json.loads(os.environ['GSA_JSON'].lstrip('﻿\r\n\t ').strip())
+          creds = service_account.Credentials.from_service_account_info(
+              info, scopes=['https://www.googleapis.com/auth/drive'],
+              subject='cptpd@did.formedilpadova.it')
+          creds.refresh(Request())
+          H = {'Authorization': f'Bearer {creds.token}'}
+          API = 'https://www.googleapis.com/drive/v3/files'
+
+          def cerca_cartella(nome, parent=None):
+              q = ("name = '%s' and mimeType = 'application/vnd.google-apps.folder' "
+                   "and trashed = false" % nome)
+              if parent:
+                  q += " and '%s' in parents" % parent
+              r = requests.get(API, params={'q': q, 'fields': 'files(id)'},
+                               headers=H).json()
+              return r['files'][0]['id'] if r.get('files') else None
+
+          def crea_cartella(nome, parent=None):
+              body = {'name': nome, 'mimeType': 'application/vnd.google-apps.folder'}
+              if parent:
+                  body['parents'] = [parent]
+              return requests.post(API, headers={**H, 'Content-Type': 'application/json'},
+                                   json=body).json()['id']
+
+          # La cartella "Tabelle" vive DENTRO "Backup_Gestionale": cosi' segue
+          # automaticamente la posizione di quest'ultima, ovunque venga spostata.
+          radice = cerca_cartella('Backup_Gestionale')
+          if not radice:
+              radice = crea_cartella('Backup_Gestionale')
+              print('ATTENZIONE: Backup_Gestionale non trovata, ne ho creata una nuova.')
+          fid = cerca_cartella('Tabelle', radice) or crea_cartella('Tabelle', radice)
+
+          for path in sorted(glob.glob('export/Tabelle_*.xlsx') +
+                             glob.glob('export/Tabelle_CSV_*.zip')):
+              init = requests.post(
+                  'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+                  headers={**H, 'Content-Type': 'application/json'},
+                  json={'name': os.path.basename(path), 'parents': [fid]})
+              init.raise_for_status()
+              with open(path, 'rb') as fh:
+                  up = requests.put(init.headers['Location'], headers=H, data=fh)
+              up.raise_for_status()
+              print('caricato %s (%.1f MB)' % (os.path.basename(path),
+                                               os.path.getsize(path) / 1048576))
+
+          # rotazione: cestina gli export piu' vecchi di 180 giorni
+          limite = (datetime.datetime.utcnow() -
+                    datetime.timedelta(days=180)).isoformat('T') + 'Z'
+          vecchi = requests.get(API, params={
+              'q': "'%s' in parents and trashed = false and modifiedTime < '%s'" % (fid, limite),
+              'fields': 'files(id,name)'}, headers=H).json().get('files', [])
+          for f in vecchi:
+              requests.patch(API + '/' + f['id'],
+                             headers={**H, 'Content-Type': 'application/json'},
+                             json={'trashed': True})
+              print('cestinato (oltre 180 gg):', f['name'])
+          PY
+
+      - name: Riepilogo
+        run: |
+          echo "### Export tabelle del $(date +%d/%m/%Y)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Tabelle esportate: **${NTAB}**" >> $GITHUB_STEP_SUMMARY
+          echo "- Destinazione su Drive: **Backup_Gestionale / Tabelle**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          ls -lh export/Tabelle_* | awk '{print "- " $9 " — " $5}' >> $GITHUB_STEP_SUMMARY
