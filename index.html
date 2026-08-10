@@ -11864,6 +11864,47 @@ async function riapriCantiere(cantId,label){
 // ── RUBRICA – DETTAGLIO DOPPIO CLIC
 // ══════════════════════════════════════════════════════════════
 
+// Elenco visite nella scheda impresa: ultime 10 + espansione a tutte
+window._RUBIMP_VIS=[]
+function rubImpVisiteRender(all){
+  const box=$('rub-imp-visite'); if(!box)return
+  const rows=window._RUBIMP_VIS||[]
+  if(!rows.length){
+    box.innerHTML=qdSec('Visite effettuate')+'<div style="color:#aaa;font-size:13px;padding:6px 0">Nessuna visita registrata per questa impresa.</div>'
+    return
+  }
+  const shown=all?rows:rows.slice(0,10)
+  const tit=(rows.length>10&&!all)?('Visite effettuate ('+rows.length+' &ndash; ultime 10)'):('Visite effettuate ('+rows.length+')')
+  let h=qdSec(tit)
+  h+='<div style="'+(all?'max-height:320px;overflow:auto;border:1px solid #f0f0f0;border-radius:6px':'')+'">'
+  h+='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr>'
+  h+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px;background:#fff;position:sticky;top:0">Verbale</th>'
+  h+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px;background:#fff;position:sticky;top:0">Data</th>'
+  h+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px;background:#fff;position:sticky;top:0">Cantiere</th>'
+  h+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px;background:#fff;position:sticky;top:0">Tecnico</th>'
+  h+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px;background:#fff;position:sticky;top:0">IPC</th>'
+  h+='</tr></thead><tbody>'
+  shown.forEach(v=>{
+    const ruolo=v.princ?'':('<span title="'+esc(v.ruolo||'presente in cantiere')+'" style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;background:#f4f4f4;color:#888;margin-left:5px;vertical-align:middle">presente</span>')
+    h+='<tr onclick="hide(\'modal-rub-detail\');showVisitaDetail(\''+v.vid+'\')" title="Apri il verbale" style="border-top:1px solid #f0f0f0;cursor:pointer" onmouseenter="this.style.background=\'#fafafa\'" onmouseleave="this.style.background=\'\'">'
+    h+='<td style="padding:5px 6px;white-space:nowrap">'+esc(v.nr)+ruolo+'</td>'
+    h+='<td style="padding:5px 6px;white-space:nowrap">'+(v.d?fmtDate(v.d):'&ndash;')+'</td>'
+    h+='<td style="padding:5px 6px;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(v.loc+(v.com?' - '+v.com:''))+'">'+esc(v.loc)+'</td>'
+    h+='<td style="padding:5px 6px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(v.tec||'&ndash;')+'</td>'
+    h+='<td style="padding:5px 6px"><span class="badge '+ipcCls(v.ipc)+'" style="font-size:10px">'+ipcLbl(v.ipc)+'</span></td>'
+    h+='</tr>'
+  })
+  h+='</tbody></table></div>'
+  if(rows.length>10){
+    h+='<div style="margin-top:6px">'
+    h+='<button class="btn-outline btn-sm" onclick="rubImpVisiteRender('+(all?'false':'true')+')">'
+    h+=(all?'&#9650; Mostra solo le ultime 10':'&#9660; Mostra tutte le '+rows.length+' visite')
+    h+='</button></div>'
+  }
+  box.innerHTML=h
+}
+window.rubImpVisiteRender=rubImpVisiteRender
+
 async function showRubricaDetail(tipo, id){
   $('rub-detail-title').textContent='⏳ Caricamento…'
   $('rub-detail-badge').innerHTML=''
@@ -11941,7 +11982,29 @@ async function showRubricaDetail(tipo, id){
       } else {
         html+=qdSec('Cantieri')+'<div style="color:#aaa;font-size:13px;padding:6px 0">Nessun cantiere collegato.</div>'
       }
+      // ── Visite effettuate: principale sul verbale + presente in cantiere
+      window._RUBIMP_VIS=[]
+      try{
+        const{data:_vip}=await sb.from('visite_imprese_presenti').select('visita_id,ruolo,is_principale').eq('impresa_id',id)
+        const _ruoloBy={};(_vip||[]).forEach(x=>{_ruoloBy[x.visita_id]=x.ruolo||''})
+        const _vids=[...new Set((_vip||[]).map(x=>x.visita_id))]
+        let _vis=[]
+        if(_vids.length)_vis=await _inChunks('visite','visita_id,nr_verbale,data_visita,ipc,impresa_id,tecnico_id,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome)','visita_id',_vids,q=>q.eq('elimina',0))
+        const{data:_vp}=await sb.from('visite').select('visita_id,nr_verbale,data_visita,ipc,impresa_id,tecnico_id,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome)').eq('impresa_id',id).eq('elimina',0)
+        const _seen=new Set(_vis.map(x=>x.visita_id))
+        ;(_vp||[]).forEach(x=>{if(!_seen.has(x.visita_id)){_seen.add(x.visita_id);_vis.push(x)}})
+        _vis.sort((a,b)=>String(b.data_visita||'').localeCompare(String(a.data_visita||'')))
+        window._RUBIMP_VIS=_vis.map(v=>({
+          vid:v.visita_id,nr:v.nr_verbale||'-',d:v.data_visita,ipc:v.ipc||'NR',
+          princ:v.impresa_id===id,ruolo:_ruoloBy[v.visita_id]||'',
+          tec:v.tecnici?((v.tecnici.tecnico_cognome||'')+' '+(v.tecnici.tecnico_nome||'')).trim():'',
+          loc:v.cantieri?.cantiere_etichetta||((v.cantieri?.cantiere_indirizzo||'')+' '+(v.cantieri?.cantiere_civico||'')).trim()||'-',
+          com:v.cantieri?.comune_nome||''
+        }))
+      }catch(_ev){console.error('rubrica impresa - visite:',_ev)}
+      html+='<div id="rub-imp-visite"></div>'
       $('rub-detail-body').innerHTML=html
+      rubImpVisiteRender(false)
       // Azione: apri scheda modifica impresa
       const btnEdit=document.createElement('button')
       btnEdit.className='btn-outline btn-sm'
