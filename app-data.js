@@ -81,7 +81,7 @@ const TIP_INT_LABELS={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Am
 const TIP_OPE_LABELS={1:'Industriale',2:'Civile',3:'Commerciale',4:'Agricola',5:'Stradale',6:'Idraulica',7:'Gallerie',8:'Scolastica',9:'Ospedaliera',10:'Sportiva',11:'Ricettiva',12:'Residenziale',13:'Pubbl. utilità',14:'Bonifiche',15:'Impianti',16:'Altro',17:'Infrastrutture'}
 const DURATA_LABELS={1:'Fino a 1 mese',2:'Da 1 a 3 mesi',3:'Da 3 a 12 mesi',4:'Da 12 a 24 mesi',5:'Da 24 a 36 mesi',6:'Da 36 a 48 mesi',7:'Oltre 48 mesi',8:'Non presente'}
 const TIPO_ACC_LABELS={1:'Su segnalazione',2:'Su richiesta',3:'Protocolli di intesa',4:'RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT',8:'Adesione servizio visite in serie',9:'Visita STAGE/ASL',10:'Per attività di Asseverazione'}
-const RPT_PALETTE=['#e7500f','#95C22F','#565c66','#3498db','#9b59b6','#e67e22','#1abc9c','#e74c3c','#f39c12','#2980b9']
+const RPT_PALETTE=['#e7500f','#565c66','#95C22F','#f2a276','#8c939d','#c6de8c','#a83a0a','#3d434c','#6f8f1f','#c9ccd1']
 // IPC: Alto rosso, Medio arancione, Basso giallo, Nessun Rilievo verde
 const _DASH_C={alto:'#E02B20',medio:'#ED7D31',basso:'#FFC000',nr:'#95C22F',orange:'#e7500f',grey:'#565c66',green:'#95C22F'}
 const _DASH_PIE=['#e7500f','#565c66','#95C22F','#f39c12','#2563eb','#8e44ad','#e74c3c','#1abc9c','#e67e22','#34495e']
