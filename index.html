@@ -291,6 +291,15 @@ tr.row-detail-hover:hover td{background:#fff3ed}
   /* DASHBOARD: grafici impilati su una colonna */
   #view-dashboard div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
   .dash-row-2,.dash-row-3{grid-template-columns:1fr!important}
+  /* pulsanti Segnala/Servizi compatti su una riga */
+  #dash-segnala-wrap{gap:8px}
+  #dash-segnala-wrap button{min-width:0!important;flex:1 1 0!important;padding:8px 6px!important;font-size:12.5px!important;border-radius:8px!important}
+  /* filtri dashboard compatti: griglia 2x2, testi piccoli */
+  #dash-filtri{padding:10px 10px 6px}
+  #dash-filtri div[style*="grid-template-columns"]{grid-template-columns:1fr 1fr!important;gap:6px 8px!important}
+  #dash-filtri .field label{font-size:9.5px;margin-bottom:1px;letter-spacing:.2px}
+  #dash-filtri select{padding:5px 6px!important;font-size:12px!important}
+  #dash-filtri #fd-count{margin-top:4px;font-size:10px}
   .dash-head .upd{margin-left:0}
   .brand span{display:none}
 }
