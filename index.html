@@ -12421,7 +12421,8 @@ document.getElementById('btn-adm-excel-exp')?.addEventListener('click',admEsport
   }
   const Q_COLW = [16, 12, 20, 5, 26, 16, 5, 5, 6, 28, 14, 5, 14, 14, 14, 5, 22, 14, 5, 22, 14, 5, 22, 14, 5, 22, 28];
   function drawPdf(doc, data, dalFmt, alFmt) {
-    const PW = 210, M = 12, BOT = 282;
+    const PW = 210, M = 12, BOT = 282, W = PW - M * 2;
+    const IPC_COL = { 'Alto': [192, 57, 43], 'Medio': [230, 126, 34], 'Basso': [217, 164, 0], 'Nessun Rilievo': [122, 165, 39] };
     const groups = {};
     data.forEach((r) => { (groups[r.cnce] = groups[r.cnce] || []).push(r); });
     const keys = Object.keys(groups).sort((a, b) => {
@@ -12447,63 +12448,91 @@ document.getElementById('btn-adm-excel-exp')?.addEventListener('click',admEsport
       doc.text(String(page), 204, 293.5);
     };
     header(); footer(); let y = 30;
-    const need = (h) => { if (y + h > BOT) { doc.addPage(); header(); footer(); y = 30; } };
-    const kv = (segs) => {
-      need(5);
-      let x = M;
-      doc.setFontSize(8.3);
-      segs.forEach(([lab, val]) => {
-        doc.setFont('helvetica', 'bold'); doc.setTextColor(86, 92, 102);
-        doc.text(lab + ' ', x, y); x += doc.getTextWidth(lab + ' ');
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30);
-        const vs = String(val ?? '');
-        doc.text(vs, x, y); x += doc.getTextWidth(vs) + 3;
-      });
-      y += 4.6;
+    const newPage = () => { doc.addPage(); header(); footer(); y = 30; };
+    const wrapLines = (txt, size, bold, maxW) => {
+      doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(size);
+      return doc.splitTextToSize(String(txt ?? ''), maxW);
     };
-    const wrap = (lab, val) => {
-      doc.setFontSize(8.3);
-      doc.setFont('helvetica', 'bold'); const labW = doc.getTextWidth(lab + ' ');
-      doc.setFont('helvetica', 'normal');
-      const lines = doc.splitTextToSize(String(val ?? ''), PW - M * 2 - labW);
-      need(4.6 * Math.max(1, lines.length));
-      doc.setFont('helvetica', 'bold'); doc.setTextColor(86, 92, 102);
-      doc.text(lab + ' ', M, y);
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30);
-      lines.forEach((ln, i) => { doc.text(ln, M + (i === 0 ? labW : 0), y); if (i < lines.length - 1) y += 4.6; });
-      y += 4.6;
-    };
+    const XL = M + 27; // colonna dei valori (dopo le etichette)
     keys.forEach((k) => {
-      need(9);
-      doc.setFillColor(245, 238, 232); doc.rect(M, y - 3.4, PW - M * 2, 6.4, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.2); doc.setTextColor(231, 80, 15);
-      doc.text('Codice univoco cantiere ' + k, M + 1.5, y + 1);
-      y += 6.2;
-      groups[k].forEach((r) => {
-        need(30);
-        kv([['Ragione Sociale', r.committente], ['P. IVA', r.commPiva], ['Verbale n°', r.verbale]]);
-        const princ = (r.imprese[0] && r.imprese[0].nome) || '';
-        wrap('Ragione Sociale Impr', princ.toUpperCase());
-        kv([['Data sopralluogo', _fmtDate(r.data)], ['Tecnico', r.tecnico], ['IPC', r.ipc], ['Accesso n°', r.acc]]);
-        wrap('Indirizzo cantiere', (r.indirizzo || '') + '        Comune cantiere ' + (r.comune || ''));
-        kv([['N imprese', r.nrImp], ['N. ditte individuali', r.nrInd], ['Lavoratori tot', r.lavTot], ["N dip. dell'impresa", r.nDipImp]]);
-        const sub = r.imprese.slice(1, 5);
-        if (sub.length) {
-          kv([['P.IVA Impresa1', sub[0] ? (sub[0].piva || '–') : ''], ['N. lav 1', sub[0] ? (sub[0].nlav ?? '') : ''],
-              ['P.IVA Impresa2', sub[1] ? (sub[1].piva || '–') : ''], ['N. lav 2', sub[1] ? (sub[1].nlav ?? '') : '']]);
-          if (sub[2] || sub[3]) {
-            kv([['P.IVA Impresa3', sub[2] ? (sub[2].piva || '–') : ''], ['N. lav 3', sub[2] ? (sub[2].nlav ?? '') : ''],
-                ['P.IVA Impresa4', sub[3] ? (sub[3].piva || '–') : ''], ['N. lav 4', sub[3] ? (sub[3].nlav ?? '') : '']]);
-          }
+      const rows = groups[k];
+      const r0 = rows[0];
+      // ── fascia cantiere ──
+      if (y + 34 > BOT) newPage();
+      doc.setFillColor(86, 92, 102); doc.rect(M, y, W, 8, 'F');
+      doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+      doc.text('Cantiere CNCE  ' + k, M + 2.5, y + 5.4);
+      const nvis = rows.length + (rows.length === 1 ? ' visita' : ' visite');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+      const loc = [(r0.comune || '').toUpperCase(), r0.indirizzo || ''].filter(Boolean).join(' – ');
+      doc.text((loc ? loc + '   ·   ' : '') + nvis, PW - M - 2.5, y + 5.4, { align: 'right', maxWidth: 105 });
+      y += 11;
+      // ── schede visita ──
+      rows.forEach((r, ri) => {
+        const impresa = ((r.imprese[0] && r.imprese[0].nome) || '').toUpperCase();
+        const committente = (r.committente || '–') + (r.commPiva ? '   ·   P.IVA/CF ' + r.commPiva : '');
+        const numeri = 'Imprese ' + r.nrImp + '    ·    Ditte individuali ' + r.nrInd + '    ·    Lavoratori totali ' + r.lavTot + (r.nDipImp === '' ? '' : '    ·    Dipendenti impresa ' + r.nDipImp);
+        const sub = r.imprese.slice(1).filter((x) => x.piva || x.nome);
+        const subTxt = sub.map((x) => (x.piva || x.nome || '–') + (x.nlav === '' ? '' : ' (' + x.nlav + ' lav)')).join('    ·    ');
+        const impL = wrapLines(impresa || '–', 8.6, true, W - (XL - M) - 3);
+        const comL = wrapLines(committente, 8, false, W - (XL - M) - 3);
+        const subL = sub.length ? wrapLines(subTxt, 7.5, false, W - (XL - M) - 3) : [];
+        const cardH = 3.6 + 5.4 + impL.length * 4.2 + comL.length * 4 + 3.8 + (subL.length ? subL.length * 3.6 : 0) + 2;
+        if (y + cardH > BOT) newPage();
+        if (ri % 2 === 0) { doc.setFillColor(250, 246, 242); doc.rect(M, y, W, cardH, 'F'); }
+        let yy = y + 5;
+        // riga 1: data · verbale · tecnico   |   pill IPC + accesso
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(30, 30, 30);
+        let x = M + 2.5;
+        const dtx = _fmtDate(r.data);
+        doc.text(dtx, x, yy); x += doc.getTextWidth(dtx) + 3.5;
+        doc.setTextColor(231, 80, 15);
+        const vtx = 'Verbale ' + (r.verbale || '–');
+        doc.text(vtx, x, yy); x += doc.getTextWidth(vtx) + 3.5;
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(86, 92, 102);
+        doc.text(r.tecnico || '', x, yy);
+        let rx = PW - M - 2.5;
+        doc.setFontSize(7.5); doc.setTextColor(130, 130, 130);
+        const acc = 'Accesso n° ' + (r.acc === '' || r.acc === null || r.acc === undefined ? '–' : r.acc);
+        doc.text(acc, rx, yy, { align: 'right' }); rx -= doc.getTextWidth(acc) + 4;
+        if (r.ipc) {
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
+          const pw2 = doc.getTextWidth(r.ipc) + 5;
+          const col = IPC_COL[r.ipc] || [120, 120, 120];
+          doc.setFillColor(col[0], col[1], col[2]);
+          doc.roundedRect(rx - pw2, yy - 3.3, pw2, 4.6, 1.2, 1.2, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.text(r.ipc, rx - pw2 / 2, yy, { align: 'center' });
         }
-        need(2);
-        doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.2); doc.line(M, y - 1.5, PW - M, y - 1.5);
-        y += 1.5;
+        yy += 5.4;
+        const lab = (t) => { doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8); doc.setTextColor(160, 160, 160); doc.text(t, M + 2.5, yy); };
+        // impresa principale
+        lab('IMPRESA');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8.6); doc.setTextColor(30, 30, 30);
+        impL.forEach((ln, i) => { doc.text(ln, XL, yy); if (i < impL.length - 1) yy += 4.2; });
+        yy += 4.2;
+        // committente
+        lab('COMMITTENTE');
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(60, 60, 60);
+        comL.forEach((ln, i) => { doc.text(ln, XL, yy); if (i < comL.length - 1) yy += 4; });
+        yy += 4;
+        // conteggi
+        doc.setFontSize(7.5); doc.setTextColor(130, 130, 130);
+        doc.text(numeri, XL, yy); yy += 3.8;
+        // altre imprese presenti
+        if (subL.length) {
+          lab('ALTRE IMPRESE');
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(130, 130, 130);
+          subL.forEach((ln, i) => { doc.text(ln, XL, yy); if (i < subL.length - 1) yy += 3.6; });
+          yy += 3.6;
+        }
+        y += cardH;
       });
-      y += 2;
+      y += 6;
     });
     return doc;
   }
+
   const api = { normalizeRows, buildExcelAoa, drawPdf, Q_HEADER, Q_COLW, CEIV_IPC_LBL, _fmtDate };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.CEIVCORE = api;
