@@ -313,6 +313,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 .dash-row-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
 .dash-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
 .dash-row-2>.card,.dash-row-3>.card{margin-bottom:0;min-width:0}
+.chbox{position:relative;width:100%}
 #view-dashboard .card h3{font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:#333;position:relative;padding-bottom:9px;margin-bottom:12px}
 #view-dashboard .card h3::after{content:"";position:absolute;left:0;bottom:0;width:52px;height:3px;background:var(--orange);border-radius:2px}
 #dash-kpi{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
@@ -496,32 +497,32 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
       </div>
       <div class="dash-row-2">
-        <div class="card"><h3>Visite per esercizio (1 ott – 30 set)</h3><canvas id="ch-esercizio" height="150"></canvas></div>
-        <div class="card"><h3>Attività mensile sopralluoghi</h3><canvas id="ch-mesi" height="150"></canvas></div>
+        <div class="card"><h3>Visite per esercizio (1 ott – 30 set)</h3><div class="chbox" style="height:240px"><canvas id="ch-esercizio"></canvas></div></div>
+        <div class="card"><h3>Attività mensile sopralluoghi</h3><div class="chbox" style="height:240px"><canvas id="ch-mesi"></canvas></div></div>
       </div>
       <div class="dash-row-3">
-        <div class="card"><h3>Sopralluoghi per tecnico</h3><canvas id="ch-tecnico" height="200"></canvas></div>
-        <div class="card"><h3>Affiancamento con RLST</h3><canvas id="ch-rlst" height="200"></canvas></div>
-        <div class="card"><h3>IPC — Indice di Pericolosità Cantiere</h3><canvas id="ch-ipc" height="200"></canvas></div>
+        <div class="card"><h3>Sopralluoghi per tecnico</h3><div class="chbox" style="height:260px"><canvas id="ch-tecnico"></canvas></div></div>
+        <div class="card"><h3>Affiancamento con RLST</h3><div class="chbox" style="height:260px"><canvas id="ch-rlst"></canvas></div></div>
+        <div class="card"><h3>IPC — Indice di Pericolosità Cantiere</h3><div class="chbox" style="height:260px"><canvas id="ch-ipc"></canvas></div></div>
       </div>
       <div class="card"><h3>Produttività e qualità per tecnico</h3><div id="tbl-prod" style="overflow-x:auto"></div></div>
       <div class="dash-row-2">
-        <div class="card"><h3>IPC per n° accesso al cantiere</h3><canvas id="ch-accesso" height="200"></canvas></div>
-        <div class="card"><h3>NC+ / NC− / OSS per macroarea (10 aree) <span style="font-weight:400;font-size:11px;color:#999">· clic sui numeri per l'elenco cantieri</span></h3><div id="tbl-macro" style="overflow-x:auto;max-height:340px;overflow-y:auto"></div></div>
+        <div class="card"><h3>IPC per n° accesso al cantiere</h3><div class="chbox" style="height:240px"><canvas id="ch-accesso"></canvas></div></div>
+        <div class="card"><h3>NC+ / NC− / OSS per macroarea (10 aree) <span style="font-weight:400;font-size:11px;color:#999">· clic sui numeri per l'elenco cantieri</span></h3><div id="tbl-macro" style="overflow-x:auto;max-height:265px;overflow-y:auto"></div></div>
       </div>
       <div class="card"><h3>Imprese ricorrenti — cantieri da monitorare</h3><div id="tbl-imprese" style="overflow-x:auto"></div></div>
       <div class="dash-row-2">
-        <div class="card"><h3>Ruolo impresa visitata</h3><canvas id="ch-ruolo" height="200"></canvas></div>
-        <div class="card"><h3>Iscrizione Cassa Edile</h3><canvas id="ch-ceiv" height="200"></canvas></div>
+        <div class="card"><h3>Ruolo impresa visitata</h3><div class="chbox" style="height:260px"><canvas id="ch-ruolo"></canvas></div></div>
+        <div class="card"><h3>Iscrizione Cassa Edile</h3><div class="chbox" style="height:260px"><canvas id="ch-ceiv"></canvas></div></div>
       </div>
       <div class="dash-row-2">
-        <div class="card"><h3>Tipologia di visita</h3><canvas id="ch-tipovis" height="200"></canvas></div>
-        <div class="card"><h3>Top 20 comuni</h3><div id="tbl-comuni" style="overflow-x:auto;max-height:330px;overflow-y:auto"></div></div>
+        <div class="card"><h3>Tipologia di visita</h3><div class="chbox" style="height:260px"><canvas id="ch-tipovis"></canvas></div></div>
+        <div class="card"><h3>Top 20 comuni</h3><div id="tbl-comuni" style="overflow-x:auto;max-height:265px;overflow-y:auto"></div></div>
       </div>
       <div class="dash-row-3">
-        <div class="card"><h3>Tipo di intervento</h3><canvas id="ch-tipint" height="200"></canvas></div>
-        <div class="card"><h3>Tipologia di opera</h3><canvas id="ch-tipope" height="200"></canvas></div>
-        <div class="card"><h3>Importo dei lavori</h3><canvas id="ch-importo" height="200"></canvas></div>
+        <div class="card"><h3>Tipo di intervento</h3><div class="chbox" style="height:220px"><canvas id="ch-tipint"></canvas></div></div>
+        <div class="card"><h3>Tipologia di opera</h3><div class="chbox" style="height:220px"><canvas id="ch-tipope"></canvas></div></div>
+        <div class="card"><h3>Importo dei lavori</h3><div class="chbox" style="height:220px"><canvas id="ch-importo"></canvas></div></div>
       </div>
 <div class="card">
         <h3>Mappa cantieri visitati &mdash; IPC ultima visita</h3>
@@ -4708,6 +4709,7 @@ function _mkChart(id,cfg){
   if(_dashCharts[id]){_dashCharts[id].destroy()}
   const ctx=document.getElementById(id)
   if(!ctx)return
+  cfg.options=Object.assign({maintainAspectRatio:false,responsive:true},cfg.options||{})
   _dashCharts[id]=new Chart(ctx,cfg)
 }
 
