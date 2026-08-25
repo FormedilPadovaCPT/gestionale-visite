@@ -3768,7 +3768,11 @@ $('btn-mc-save').onclick=async()=>{
       :(_gp?(_gp.lat==null?'Cantiere aggiornato \u00b7 posizione rimessa in coda per il ricalcolo':'Cantiere aggiornato \u00b7 posizione corretta')
            :'Cantiere aggiornato'), _gerr?'warn':'ok')
     window._editCantId=null;$('modal-cant-title').textContent='Nuovo cantiere'
-    admLoadCantieri();return
+    const _from=window._mcGeoFrom;window._mcGeoFrom=null
+    if(_from==='dash'){if(typeof loadDashMap==='function')loadDashMap()}
+    else if(_from==='cant'){if(typeof loadCantMap==='function')loadCantMap()}
+    else if(typeof admLoadCantieri==='function')admLoadCantieri()
+    return
   }
   // Avviso se esistono gia cantieri simili (evita inserimenti accidentali doppi)
   const simili=await findSimiliCantieri(ind,fields.comune_nome,fields.cantiere_comune_cod)
@@ -5121,7 +5125,7 @@ let _dashMapRows=null, _dashMapOrder=['NR','BASSO','MEDIO','ALTO'], _dashMapIpcO
 async function loadDashMap(){
   if(typeof L==='undefined'){console.warn('Leaflet non caricato');return}
   const{data,error}=await sb.from('v_mappa_cantieri')
-    .select('lat,lng,ipc,geocode_status,indirizzo,comune_nome,tecnico,data_visita,nr_verbale')
+    .select('cantiere_id,lat,lng,ipc,geocode_status,indirizzo,comune_nome,tecnico,data_visita,nr_verbale')
   if(error){console.error('v_mappa_cantieri:',error);return}
   const rows=(data||[]).filter(r=>r.lat!=null&&r.lng!=null)
   const order=['NR','BASSO','MEDIO','ALTO']
@@ -5195,7 +5199,8 @@ function renderDashMapMarkers(fit=true){
       '<b>N. verbale:</b> '+(d.nr_verbale||'-')+'<br>'+
       '<b>Tecnico:</b> '+(d.tecnico||'-')+'<br>'+
       '<b>Data visita:</b> '+dt+
-      (approx?'<br><i style="color:#999">posizione approssimata (comune)</i>':'')
+      (approx?'<br><i style="color:#999">posizione approssimata (comune)</i>':'')+
+      (d.cantiere_id?'<br>'+_geoFixBtn(d.cantiere_id,'dash'):'')
     )
     m.addTo(_dashMapLayers[k])
     bounds.push([d.lat,d.lng])
@@ -6137,7 +6142,8 @@ function _cmRender(fit){
       '<b>Visite effettuate:</b> '+(d.n_visite||0)+'<br>'+
       '<b>Fine lavori:</b> '+dult+
       (approx?'<br><i style="color:#999">posizione approssimata (comune)</i>':'')+
-      '<br><br><button onclick="showCantiereDetail(\''+_cmEsc(d.cantiere_id)+'\')" style="background:var(--orange,#e7500f);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px">Apri scheda</button>'
+      '<br><br><button onclick="showCantiereDetail(\''+_cmEsc(d.cantiere_id)+'\')" style="background:var(--orange,#e7500f);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px">Apri scheda</button>'+
+      (d.cantiere_id?'<br>'+_geoFixBtn(d.cantiere_id,'cant'):'')
     )
     m.addTo(_cmLayer)
     bounds.push([d.lat,d.lng])
@@ -11584,6 +11590,26 @@ window.mcGeoFill=mcGeoFill;window.mcGeoReset=mcGeoReset;window.mcGeoPatch=mcGeoP
     if(la!=null&&ln!=null)_mcGeoSet(la,ln,false);else _mcGeoStato()
   }})
 }
+
+// Pulsante "Correggi posizione" nei popup delle mappe: porta la segreteria
+// direttamente sul blocco Posizione della scheda cantiere.
+function _geoFixBtn(cantId,from){
+  if(!window.__isSegreteria||!cantId)return ''
+  const id=String(cantId).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')
+  return '<button onclick="geoFixCantiere(\'' + id + '\',\'' + (from||'') + '\')" '
+    + 'style="background:#565c66;color:#fff;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;margin-top:6px">'
+    + '&#128205; Correggi posizione</button>'
+}
+async function geoFixCantiere(cantId,from){
+  if(!window.__isSegreteria){toast('Funzione riservata alla segreteria','err');return}
+  window._mcGeoFrom=from||null
+  try{if(_dashMap&&_dashMap.closePopup)_dashMap.closePopup()}catch(_e){}
+  try{if(_cmMap&&_cmMap.closePopup)_cmMap.closePopup()}catch(_e){}
+  await admEditCantiere(cantId)
+  // porto in vista il blocco Posizione: e in fondo alla modale
+  setTimeout(()=>{const w=$('mc-geo-wrap');if(w&&!w.classList.contains('hidden'))try{w.scrollIntoView({behavior:'smooth',block:'center'})}catch(_e){}},260)
+}
+window._geoFixBtn=_geoFixBtn;window.geoFixCantiere=geoFixCantiere
 
 async function admEditCantiere(cantId) {
   const { data: c, error } = await sb.from('cantieri').select('*').eq('cantiere_id', cantId).single()
