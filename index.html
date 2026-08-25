@@ -1673,12 +1673,13 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="field"><label>Longitudine</label><input type="text" id="mc-lng" placeholder="11.876800" style="font-family:monospace"></div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-gps" title="Prende la posizione dal GPS del dispositivo: usalo mentre sei in cantiere">&#128205; Sono qui (GPS)</button>
         <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-auto" title="Azzera la posizione: il geocodificatore automatico la ricalcola entro pochi minuti">&#128260; Ricalcola in automatico</button>
         <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-open" title="Apri la posizione attuale in Google Maps">&#128506;&#65039; Apri in Google Maps</button>
         <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-undo" title="Torna alla posizione salvata">&#10006; Annulla modifica</button>
       </div>
       <div id="mc-geo-map" style="height:220px;border:1px solid var(--border);border-radius:6px"></div>
-      <div style="font-size:11px;color:#888;margin-top:5px;line-height:1.45">Trascina il pin o clicca sulla mappa per spostarlo. La posizione messa a mano non viene piu sovrascritta dal geocodificatore automatico, finche non cambi indirizzo, civico, comune o CAP.</div>
+      <div style="font-size:11px;color:#888;margin-top:5px;line-height:1.45">Se sei in cantiere usa <b>Sono qui (GPS)</b>: e il modo piu preciso. In alternativa trascina il pin, clicca sulla mappa o incolla un link di Google Maps. La posizione messa a mano non viene piu sovrascritta dal geocodificatore automatico, finche non cambi indirizzo, civico, comune o CAP.</div>
     </div>
     <div class="modal-actions">
       <button class="btn-outline" id="btn-mc-cancel">Annulla</button>
@@ -3771,6 +3772,7 @@ $('btn-mc-save').onclick=async()=>{
     const _from=window._mcGeoFrom;window._mcGeoFrom=null
     if(_from==='dash'){if(typeof loadDashMap==='function')loadDashMap()}
     else if(_from==='cant'){if(typeof loadCantMap==='function')loadCantMap()}
+    else if(_from==='visita'){/* form visita: la lista di segreteria non c'entra */}
     else if(typeof admLoadCantieri==='function')admLoadCantieri()
     return
   }
@@ -11526,7 +11528,8 @@ function _mcGeoMapInit(){
 }
 function mcGeoFill(c){
   const w=$('mc-geo-wrap');if(!w)return
-  if(!window.__isSegreteria){w.classList.add('hidden');return}
+  // Aperto anche ai tecnici: dal form visita hanno gia il pulsante "Modifica cantiere",
+  // e chi e in cantiere e la persona meglio piazzata per mettere il pin nel punto giusto.
   _mcGeo={lat:(c&&c.lat!=null)?+c.lat:null,lng:(c&&c.lng!=null)?+c.lng:null,status:(c&&c.geocode_status)||null,mode:null}
   vSet('mc-lat',_mcGeo.lat!=null?_mcGeo.lat.toFixed(6):'')
   vSet('mc-lng',_mcGeo.lng!=null?_mcGeo.lng.toFixed(6):'')
@@ -11542,7 +11545,6 @@ function mcGeoReset(){
 }
 // Ritorna l'oggetto da scrivere su cantieri, o null se non c'e nulla da cambiare.
 function mcGeoPatch(){
-  if(!window.__isSegreteria)return null
   const w=$('mc-geo-wrap');if(!w||w.classList.contains('hidden'))return null
   if(_mcGeo.mode==='auto')return{lat:null,lng:null,geocode_status:null,geocoded_at:null}
   const la=_mcGeoNum(vGet('mc-lat')),ln=_mcGeoNum(vGet('mc-lng'))
@@ -11569,6 +11571,22 @@ window.mcGeoFill=mcGeoFill;window.mcGeoReset=mcGeoReset;window.mcGeoPatch=mcGeoP
   if(_ba)_ba.onclick=()=>{
     _mcGeo.mode='auto';vSet('mc-lat','');vSet('mc-lng','')
     _mcGeoStato();toast('Al salvataggio la posizione verra ricalcolata in automatico','ok')
+  }
+  const _bg=$('btn-mc-geo-gps')
+  if(_bg)_bg.onclick=()=>{
+    if(!navigator.geolocation){toast('GPS non disponibile su questo dispositivo','warn');return}
+    const el=$('mc-geo-stato');if(el)el.innerHTML='&#8987; Rilevamento posizione GPS\u2026'
+    _bg.disabled=true
+    navigator.geolocation.getCurrentPosition(p=>{
+      _bg.disabled=false
+      _mcGeoSet(p.coords.latitude,p.coords.longitude,false)
+      const e2=$('mc-geo-stato')
+      if(e2)e2.innerHTML+=' <span style="color:#888">GPS \u00b1'+Math.round(p.coords.accuracy||0)+' m</span>'
+      toast('Posizione GPS impostata: ricordati di salvare','ok')
+    },err=>{
+      _bg.disabled=false;_mcGeoStato()
+      toast('Posizione non disponibile: '+err.message+'. Controlla che il GPS sia attivo.','warn')
+    },{enableHighAccuracy:true,timeout:15000,maximumAge:0})
   }
   const _bo=$('btn-mc-geo-open')
   if(_bo)_bo.onclick=()=>{
@@ -11675,7 +11693,7 @@ async function admEditCantiere(cantId) {
 $('adm-cant-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadCantieri() })
 window.admLoadCantieri = admLoadCantieri
 window.admEditCantiere = admEditCantiere
-function editCantiereForm(){const id=vGet('f-cant-id');if(!id){toast('Seleziona prima un cantiere','warn');return}admEditCantiere(id)}
+function editCantiereForm(){const id=vGet('f-cant-id');if(!id){toast('Seleziona prima un cantiere','warn');return}window._mcGeoFrom='visita';admEditCantiere(id)}
 window.editCantiereForm=editCantiereForm
 window.admCaricaRiaggancio = admCaricaRiaggancio
 window.admRiaggancia = admRiaggancia
