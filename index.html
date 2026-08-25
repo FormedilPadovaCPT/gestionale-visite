@@ -1658,6 +1658,28 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     </div>
     <div class="field"><label>Data inizio lavori</label><input type="date" id="mc-data-inizio" onchange="_autoDurataCantiere()"></div>
     <div class="field"><label>Data prevista ultimazione lavori</label><input type="date" id="mc-data-ult" onchange="_autoDurataCantiere()"></div>
+    <div id="mc-geo-wrap" class="hidden">
+      <div class="sect-title" style="margin-top:10px;font-size:11px;color:var(--grey)">Posizione sulla mappa</div>
+      <div id="mc-geo-stato" style="font-size:12px;margin-bottom:8px;min-height:18px"></div>
+      <div class="field">
+        <label>Link Google Maps o coordinate</label>
+        <div style="display:flex;gap:6px;align-items:flex-start">
+          <input type="text" id="mc-geo-paste" placeholder="Incolla il link di Google Maps oppure 45.406400, 11.876800" autocomplete="off" style="flex:1">
+          <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-paste" style="white-space:nowrap;margin-top:1px">Applica</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Latitudine</label><input type="text" id="mc-lat" placeholder="45.406400" style="font-family:monospace"></div>
+        <div class="field"><label>Longitudine</label><input type="text" id="mc-lng" placeholder="11.876800" style="font-family:monospace"></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-auto" title="Azzera la posizione: il geocodificatore automatico la ricalcola entro pochi minuti">&#128260; Ricalcola in automatico</button>
+        <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-open" title="Apri la posizione attuale in Google Maps">&#128506;&#65039; Apri in Google Maps</button>
+        <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-undo" title="Torna alla posizione salvata">&#10006; Annulla modifica</button>
+      </div>
+      <div id="mc-geo-map" style="height:220px;border:1px solid var(--border);border-radius:6px"></div>
+      <div style="font-size:11px;color:#888;margin-top:5px;line-height:1.45">Trascina il pin o clicca sulla mappa per spostarlo. La posizione messa a mano non viene piu sovrascritta dal geocodificatore automatico, finche non cambi indirizzo, civico, comune o CAP.</div>
+    </div>
     <div class="modal-actions">
       <button class="btn-outline" id="btn-mc-cancel">Annulla</button>
       <button class="btn-primary" id="btn-mc-save">Salva</button>
@@ -3502,6 +3524,7 @@ function resetModalCantiere(){
   const capEl=$('mc-cap');if(capEl){capEl.readOnly=false;capEl.style.background='#fff'}
   const wrap=$('mc-tip-ope-altro-wrap');if(wrap)wrap.classList.add('hidden')
   vSet('mc-comm-search','');vSet('mc-comm-id','');const _mci=$('mc-comm-info');if(_mci)_mci.textContent=''
+  if(typeof mcGeoReset==='function')mcGeoReset()
 }
 $('btn-new-cant').onclick=()=>{hideCantCard();resetModalCantiere();show('modal-cant')}
 $('btn-mc-cancel').onclick=()=>{hide('modal-cant');window._editCantId=null;$('modal-cant-title').textContent='Nuovo cantiere'}
@@ -3735,7 +3758,15 @@ $('btn-mc-save').onclick=async()=>{
   if(window._editCantId){
     const{error}=await sb.from('cantieri').update(fields).eq('cantiere_id',window._editCantId)
     if(error){toast('Errore aggiornamento cantiere: '+error.message,'err');return}
-    hide('modal-cant');toast('Cantiere aggiornato','ok')
+    // La posizione si salva con un UPDATE separato: il trigger trg_reset_geocode azzera
+    // lat/lng quando cambia l'indirizzo, quindi scriverla nello stesso update la perderebbe.
+    const _gp=(typeof mcGeoPatch==='function')?mcGeoPatch():null
+    let _gerr=null
+    if(_gp){const _r2=await sb.from('cantieri').update(_gp).eq('cantiere_id',window._editCantId);if(_r2.error)_gerr=_r2.error.message}
+    hide('modal-cant')
+    toast(_gerr?('Cantiere aggiornato, posizione NON salvata: '+_gerr)
+      :(_gp?(_gp.lat==null?'Cantiere aggiornato \u00b7 posizione rimessa in coda per il ricalcolo':'Cantiere aggiornato \u00b7 posizione corretta')
+           :'Cantiere aggiornato'), _gerr?'warn':'ok')
     window._editCantId=null;$('modal-cant-title').textContent='Nuovo cantiere'
     admLoadCantieri();return
   }
@@ -11429,6 +11460,131 @@ async function admRiaggancia(sourceId,targetId,nv){
   else toast('Riaggancio completato','ok')
   admCaricaRiaggancio()
 }
+
+// ===== Posizione cantiere sulla mappa (solo Segreteria) =====
+// Correzione manuale del pin quando il geocodificatore automatico sbaglia comune
+// (es. "SP 90 Montagnana" finito a Montagnana in provincia di Pistoia).
+let _mcGeoMap=null,_mcGeoMk=null,_mcGeo={lat:null,lng:null,status:null,mode:null}
+function _mcGeoNum(v){const n=parseFloat(String(v==null?'':v).replace(',','.'));return Number.isFinite(n)?n:null}
+function _mcGeoParse(txt){
+  const t=String(txt||'').trim();if(!t)return null
+  let m=t.match(/^\s*(-?\d{1,3}[.,]\d+)\s*[,;\s]\s*(-?\d{1,3}[.,]\d+)\s*$/)      // 45.4064, 11.8768
+  if(!m)m=t.match(/[!]3d(-?\d{1,3}\.\d+)[^!]*[!]4d(-?\d{1,3}\.\d+)/)             // .../data=!3d..!4d..
+  if(!m)m=t.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/)                          // .../@45.40,11.87,17z
+  if(!m)m=t.match(/[?&](?:q|ll|sll|daddr|destination|center)=(-?\d{1,3}\.\d+)(?:,|%2C)(-?\d{1,3}\.\d+)/i)
+  if(!m)return null
+  const la=_mcGeoNum(m[1]),ln=_mcGeoNum(m[2])
+  if(la==null||ln==null||la<-90||la>90||ln<-180||ln>180)return null
+  return{lat:la,lng:ln}
+}
+function _mcGeoBadge(st){
+  if(st==='manuale')return '<b style="color:#2e7d32">impostata a mano</b>'
+  if(st==='ok')return '<b style="color:#2e7d32">posizione esatta</b>'
+  if(st==='comune')return '<b style="color:#b26a00">approssimata al centro del comune</b>'
+  if(st==='not_found')return '<b style="color:#c0392b">indirizzo non trovato</b>'
+  if(st==='error')return '<b style="color:#c0392b">errore di geocodifica</b>'
+  return '<b style="color:#888">non ancora geocodificata</b>'
+}
+function _mcGeoStato(){
+  const el=$('mc-geo-stato');if(!el)return
+  if(_mcGeo.mode==='auto'){el.innerHTML='&#128260; Al salvataggio la posizione viene azzerata e ricalcolata dal geocodificatore automatico (di norma entro pochi minuti).';return}
+  const la=_mcGeoNum(vGet('mc-lat')),ln=_mcGeoNum(vGet('mc-lng'))
+  if(la==null||ln==null){el.innerHTML='Nessuna posizione salvata &middot; '+_mcGeoBadge(_mcGeo.status);return}
+  const coord=' <span style="color:#888;font-family:monospace">'+la.toFixed(6)+', '+ln.toFixed(6)+'</span>'
+  const cambiata=(_mcGeo.lat==null||_mcGeo.lng==null||Math.abs(la-_mcGeo.lat)>1e-7||Math.abs(ln-_mcGeo.lng)>1e-7)
+  el.innerHTML=(cambiata?'&#9999;&#65039; <b>Nuova posizione</b>, verra salvata come impostata a mano':'Stato attuale: '+_mcGeoBadge(_mcGeo.status))+coord
+}
+function _mcGeoSet(la,ln,daMappa){
+  vSet('mc-lat',la.toFixed(6));vSet('mc-lng',ln.toFixed(6))
+  _mcGeo.mode=null
+  if(_mcGeoMk)_mcGeoMk.setLatLng([la,ln])
+  if(_mcGeoMap&&!daMappa)_mcGeoMap.setView([la,ln],Math.max(_mcGeoMap.getZoom()||0,16))
+  _mcGeoStato()
+}
+function _mcGeoMapInit(){
+  if(!$('mc-geo-map')||typeof L==='undefined'||!L.map)return
+  const la=_mcGeoNum(vGet('mc-lat')),ln=_mcGeoNum(vGet('mc-lng'))
+  const c=[la==null?45.4064:la,ln==null?11.8768:ln],z=(la==null?11:16)
+  try{
+    if(!_mcGeoMap){
+      _mcGeoMap=L.map('mc-geo-map',{scrollWheelZoom:false}).setView(c,z)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(_mcGeoMap)
+      _mcGeoMk=L.marker(c,{draggable:true}).addTo(_mcGeoMap)
+      _mcGeoMk.on('dragend',()=>{const p=_mcGeoMk.getLatLng();_mcGeoSet(p.lat,p.lng,true)})
+      _mcGeoMap.on('click',e=>{_mcGeoMap.scrollWheelZoom.enable();_mcGeoSet(e.latlng.lat,e.latlng.lng,true)})
+    }else{
+      _mcGeoMap.setView(c,z);if(_mcGeoMk)_mcGeoMk.setLatLng(c)
+    }
+    setTimeout(()=>{try{_mcGeoMap.invalidateSize()}catch(_e){}},200)
+  }catch(e){console.warn('mappa posizione cantiere:',e)}
+}
+function mcGeoFill(c){
+  const w=$('mc-geo-wrap');if(!w)return
+  if(!window.__isSegreteria){w.classList.add('hidden');return}
+  _mcGeo={lat:(c&&c.lat!=null)?+c.lat:null,lng:(c&&c.lng!=null)?+c.lng:null,status:(c&&c.geocode_status)||null,mode:null}
+  vSet('mc-lat',_mcGeo.lat!=null?_mcGeo.lat.toFixed(6):'')
+  vSet('mc-lng',_mcGeo.lng!=null?_mcGeo.lng.toFixed(6):'')
+  vSet('mc-geo-paste','')
+  w.classList.remove('hidden')
+  _mcGeoStato();_mcGeoMapInit()
+}
+function mcGeoReset(){
+  _mcGeo={lat:null,lng:null,status:null,mode:null}
+  vSet('mc-lat','');vSet('mc-lng','');vSet('mc-geo-paste','')
+  const st=$('mc-geo-stato');if(st)st.innerHTML=''
+  const w=$('mc-geo-wrap');if(w)w.classList.add('hidden')
+}
+// Ritorna l'oggetto da scrivere su cantieri, o null se non c'e nulla da cambiare.
+function mcGeoPatch(){
+  if(!window.__isSegreteria)return null
+  const w=$('mc-geo-wrap');if(!w||w.classList.contains('hidden'))return null
+  if(_mcGeo.mode==='auto')return{lat:null,lng:null,geocode_status:null,geocoded_at:null}
+  const la=_mcGeoNum(vGet('mc-lat')),ln=_mcGeoNum(vGet('mc-lng'))
+  if(la==null||ln==null)return null
+  if(la<-90||la>90||ln<-180||ln>180)return null
+  if(_mcGeo.lat!=null&&_mcGeo.lng!=null&&Math.abs(la-_mcGeo.lat)<1e-7&&Math.abs(ln-_mcGeo.lng)<1e-7)return null
+  return{lat:la,lng:ln,geocode_status:'manuale',geocoded_at:new Date().toISOString()}
+}
+window.mcGeoFill=mcGeoFill;window.mcGeoReset=mcGeoReset;window.mcGeoPatch=mcGeoPatch
+{
+  const _bp=$('btn-mc-geo-paste')
+  if(_bp)_bp.onclick=()=>{
+    const t=(vGet('mc-geo-paste')||'').trim()
+    if(!t){toast('Incolla prima un link di Google Maps o due coordinate','warn');return}
+    const p=_mcGeoParse(t)
+    if(!p){
+      if(/goo\.gl|maps\.app/i.test(t))toast('Il link accorciato non contiene le coordinate: aprilo in Google Maps e copia l’indirizzo completo dalla barra del browser','warn')
+      else toast('Non riesco a leggere le coordinate da questo testo','warn')
+      return
+    }
+    _mcGeoSet(p.lat,p.lng,false);vSet('mc-geo-paste','');toast('Posizione impostata: ricordati di salvare','ok')
+  }
+  const _ba=$('btn-mc-geo-auto')
+  if(_ba)_ba.onclick=()=>{
+    _mcGeo.mode='auto';vSet('mc-lat','');vSet('mc-lng','')
+    _mcGeoStato();toast('Al salvataggio la posizione verra ricalcolata in automatico','ok')
+  }
+  const _bo=$('btn-mc-geo-open')
+  if(_bo)_bo.onclick=()=>{
+    const la=_mcGeoNum(vGet('mc-lat')),ln=_mcGeoNum(vGet('mc-lng'))
+    if(la==null||ln==null){toast('Nessuna posizione da aprire','warn');return}
+    window.open('https://www.google.com/maps?q='+la+','+ln,'_blank','noopener')
+  }
+  const _bu=$('btn-mc-geo-undo')
+  if(_bu)_bu.onclick=()=>{
+    _mcGeo.mode=null
+    vSet('mc-lat',_mcGeo.lat!=null?(+_mcGeo.lat).toFixed(6):'')
+    vSet('mc-lng',_mcGeo.lng!=null?(+_mcGeo.lng).toFixed(6):'')
+    vSet('mc-geo-paste','')
+    if(_mcGeo.lat!=null&&_mcGeo.lng!=null&&_mcGeoMk)_mcGeoMk.setLatLng([+_mcGeo.lat,+_mcGeo.lng])
+    _mcGeoStato()
+  }
+  ;['mc-lat','mc-lng'].forEach(id=>{const el=$(id);if(el)el.onchange=()=>{
+    const la=_mcGeoNum(vGet('mc-lat')),ln=_mcGeoNum(vGet('mc-lng'))
+    if(la!=null&&ln!=null)_mcGeoSet(la,ln,false);else _mcGeoStato()
+  }})
+}
+
 async function admEditCantiere(cantId) {
   const { data: c, error } = await sb.from('cantieri').select('*').eq('cantiere_id', cantId).single()
   if (error || !c) { toast('Cantiere non trovato', 'err'); return }
@@ -11487,6 +11643,7 @@ async function admEditCantiere(cantId) {
       _mci.innerHTML = '<span style="color:#c0392b">Codice ' + esc(_cid) + ' non presente in anagrafica</span>'
     }
   }
+  mcGeoFill(c)
   show('modal-cant')
 }
 $('adm-cant-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadCantieri() })
