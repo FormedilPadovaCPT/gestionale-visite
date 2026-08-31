@@ -2423,14 +2423,23 @@ async function loadAutorizzazioni(){
   if(!box)return
   let righe=[]
   try{
-    const{data,error}=await sb.from('s_segnalazioni')
-      .select('id,progressivo,notificante,comune_cantiere,ind_cantiere,aut_stato,autorizzata_da,data_autorizzazione,stato')
-      .not('stato','in','(chiusa,scartata)').order('id',{ascending:false}).limit(30)
-    if(error||!data||!data.length){box.style.display='none';return}
-    righe=data
+    const[segn,cons]=await Promise.all([
+      sb.from('s_segnalazioni')
+        .select('id,progressivo,notificante,comune_cantiere,ind_cantiere,aut_stato,autorizzata_da,data_autorizzazione,stato')
+        .not('stato','in','(chiusa,scartata)').order('id',{ascending:false}).limit(30),
+      sb.from('s_consulenze')
+        .select('id,progressivo,ragione_sociale,aut_stato,autorizzata_da,data_autorizzazione,stato,corsia')
+        .eq('corsia','uscita').not('stato','in','(chiusa,scartata)').order('id',{ascending:false}).limit(30),
+    ])
+    if((segn.error||!segn.data||!segn.data.length)&&(cons.error||!cons.data||!cons.data.length)){box.style.display='none';return}
+    righe=[
+      ...(segn.data||[]).map(r=>({...r,tipo:'segnalazione'})),
+      ...(cons.data||[]).map(r=>({...r,tipo:'consulenza'})),
+    ]
   }catch(_e){box.style.display='none';return}
   const attesa=righe.filter(r=>['da_richiedere','richiesta'].includes(r.aut_stato))
-  const processate=righe.filter(r=>['approvata','respinta'].includes(r.aut_stato)).slice(0,3)
+  const processate=righe.filter(r=>['approvata','respinta'].includes(r.aut_stato))
+    .sort((a,b)=>String(b.data_autorizzazione||'').localeCompare(String(a.data_autorizzazione||''))).slice(0,3)
   if(!attesa.length&&!processate.length){box.style.display='none';return}
   const dIt=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):''
   const badge=st=>st==='approvata'?'<span style="background:#e8f5e0;color:#2d7a06;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">APPROVATA</span>'
@@ -2440,16 +2449,18 @@ async function loadAutorizzazioni(){
   const esc_=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
   const riga=r=>{
     const n=r.progressivo!=null?r.progressivo:('m'+r.id)
-    const luogo=[r.ind_cantiere,r.comune_cantiere].filter(Boolean).join(' — ')
+    const cosa=r.tipo==='consulenza'
+      ?('&#128172; consulenza &middot; '+esc_(r.ragione_sociale||'impresa da individuare'))
+      :('&#128680; segnalazione &middot; '+esc_([r.ind_cantiere,r.comune_cantiere].filter(Boolean).join(' — ')||'cantiere da individuare'))
     const daFare=['da_richiedere','richiesta'].includes(r.aut_stato)
     return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid #f0e6dd">
       <strong style="font-size:12px">n&deg; ${n}</strong>${badge(r.aut_stato)}
-      <span style="font-size:12px;color:#444;flex:1;min-width:200px">${esc_(luogo||'cantiere da individuare')}${r.data_autorizzazione?` <span style="color:#888">&middot; ${esc_(r.autorizzata_da||'')} il ${dIt(r.data_autorizzazione)}</span>`:''}</span>
-      <a href="https://formedilpadovacpt.github.io/segreteria/#segnalazione-${r.id}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:var(--orange,#e7500f);text-decoration:none">${daFare?'Autorizza nell\'app segreteria &#8599;':'apri la pratica &#8599;'}</a>
+      <span style="font-size:12px;color:#444;flex:1;min-width:200px">${cosa}${r.data_autorizzazione?` <span style="color:#888">&middot; ${esc_(r.autorizzata_da||'')} il ${dIt(r.data_autorizzazione)}</span>`:''}</span>
+      <a href="https://formedilpadovacpt.github.io/segreteria/#${r.tipo==='consulenza'?'consulenza':'segnalazione'}-${r.id}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:var(--orange,#e7500f);text-decoration:none">${daFare?'Autorizza nell\'app segreteria &#8599;':'apri la pratica &#8599;'}</a>
     </div>`
   }
   box.innerHTML=`<div class="card" style="border-left:4px solid var(--orange,#e7500f)">
-    <h3>&#128680; Autorizzazioni visite su segnalazione ${attesa.length?`<span style="color:#b35c00">&mdash; ${attesa.length} in attesa</span>`:'&mdash; tutte processate'}</h3>
+    <h3>&#9997;&#65039; Autorizzazioni servizi CPT (segnalazioni e consulenze) ${attesa.length?`<span style="color:#b35c00">&mdash; ${attesa.length} in attesa</span>`:'&mdash; tutte processate'}</h3>
     ${attesa.map(riga).join('')}
     ${processate.length?`<div style="font-size:11px;color:#999;margin-top:8px">Ultime processate:</div>${processate.map(riga).join('')}`:''}
   </div>`
