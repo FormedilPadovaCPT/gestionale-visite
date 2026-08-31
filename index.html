@@ -2423,7 +2423,7 @@ async function loadAutorizzazioni(){
   if(!box)return
   let righe=[]
   try{
-    const[segn,cons,vis,confz]=await Promise.all([
+    const[segn,cons,vis,confz,attz]=await Promise.all([
       sb.from('s_segnalazioni')
         .select('id,progressivo,notificante,comune_cantiere,ind_cantiere,aut_stato,autorizzata_da,data_autorizzazione,stato')
         .not('stato','in','(chiusa,scartata)').order('id',{ascending:false}).limit(30),
@@ -2436,12 +2436,16 @@ async function loadAutorizzazioni(){
       sb.from('s_conferenze_cantiere')
         .select('id,progressivo,ragione_sociale,aut_stato,autorizzata_da,data_autorizzazione,stato')
         .not('stato','in','(chiusa,scartata)').order('id',{ascending:false}).limit(30),
+      sb.from('s_attestazioni_dm132')
+        .select('id,progressivo,ragione_sociale,aut_stato,autorizzata_da,data_autorizzazione,stato')
+        .not('stato','in','(chiusa,scartata)').order('id',{ascending:false}).limit(30),
     ])
     righe=[
       ...(segn.data||[]).map(r=>({...r,tipo:'segnalazione'})),
       ...(cons.data||[]).map(r=>({...r,tipo:'consulenza'})),
       ...(vis.data||[]).map(r=>({...r,tipo:'visita'})),
       ...(confz.data||[]).map(r=>({...r,tipo:'conferenza'})),
+      ...(attz.data||[]).map(r=>({...r,tipo:'attestazione'})),
     ]
     if(!righe.length){box.style.display='none';return}
   }catch(_e){box.style.display='none';return}
@@ -2463,6 +2467,8 @@ async function loadAutorizzazioni(){
       ?('&#127959;&#65039; '+(r.tipo_richiesta==='serie'?'serie di visite':'visita richiesta')+' &middot; '+esc_(r.ragione_sociale||'impresa da individuare'))
       :r.tipo==='conferenza'
       ?('&#127891; conferenza di cantiere &middot; '+esc_(r.ragione_sociale||'impresa da individuare'))
+      :r.tipo==='attestazione'
+      ?('&#129715; attestazione DM 132 &middot; '+esc_(r.ragione_sociale||'impresa da individuare'))
       :('&#128680; segnalazione &middot; '+esc_([r.ind_cantiere,r.comune_cantiere].filter(Boolean).join(' — ')||'cantiere da individuare'))
     const daFare=['da_richiedere','richiesta'].includes(r.aut_stato)
     return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid #f0e6dd">
