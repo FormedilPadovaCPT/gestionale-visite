@@ -453,6 +453,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <section id="view-dashboard">
       <div id="dash-segnala-wrap" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" id="btn-segnala-dash" style="flex:2;min-width:220px;padding:12px;font-size:15px;border-radius:10px">&#128205; Segnala un cantiere attivo</button><button id="btn-servizi-cpt" style="flex:1;min-width:180px;padding:12px;font-size:15px;border-radius:10px;background:#95C22F;border:1px solid #7aa527;color:#fff;font-weight:600;cursor:pointer" onclick="window.open('https://formedilpadovacpt.github.io/servizi/','_blank')">Vai ai servizi CPT ↗</button></div>
       <div id="avvisi-banner"></div>
+      <div id="dash-autorizzazioni" style="display:none;margin-bottom:14px"></div>
       
 
             <!-- FILTRI DASHBOARD -->
@@ -2395,6 +2396,7 @@ function navTo(view){
   if(view==='form'&&typeof incCaricaTendina==='function')incCaricaTendina().catch(e=>console.warn('incCaricaTendina:',e))
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
+  if(view==='dashboard')loadAutorizzazioni().catch(e=>console.warn('autorizzazioni:',e))
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='cantieri'&&typeof loadCantMap==='function')loadCantMap().catch(e=>console.error('loadCantMap:',e))
@@ -2409,6 +2411,50 @@ window.navTo=navTo
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
   b.onclick=()=>{if(b.dataset.view==='form')initForm();navTo(b.dataset.view)}
 })
+
+// ── AUTORIZZAZIONI VISITE SU SEGNALAZIONE (dall'app segreteria) ──
+// Il quadro compare solo a chi puo' leggerle: le policy del database
+// aprono s_segnalazioni alla segreteria e al Direttore — per tecnici e
+// altri viewer la query torna vuota e il riquadro resta nascosto.
+// Il visto si firma in un posto solo (l'app segreteria): da qui si
+// vede lo stato a colpo d'occhio e si salta alla pratica col link.
+async function loadAutorizzazioni(){
+  const box=$('dash-autorizzazioni')
+  if(!box)return
+  let righe=[]
+  try{
+    const{data,error}=await sb.from('s_segnalazioni')
+      .select('id,progressivo,notificante,comune_cantiere,ind_cantiere,aut_stato,autorizzata_da,data_autorizzazione,stato')
+      .not('stato','in','(chiusa,scartata)').order('id',{ascending:false}).limit(30)
+    if(error||!data||!data.length){box.style.display='none';return}
+    righe=data
+  }catch(_e){box.style.display='none';return}
+  const attesa=righe.filter(r=>['da_richiedere','richiesta'].includes(r.aut_stato))
+  const processate=righe.filter(r=>['approvata','respinta'].includes(r.aut_stato)).slice(0,3)
+  if(!attesa.length&&!processate.length){box.style.display='none';return}
+  const dIt=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):''
+  const badge=st=>st==='approvata'?'<span style="background:#e8f5e0;color:#2d7a06;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">APPROVATA</span>'
+    :st==='respinta'?'<span style="background:#fdeaea;color:#c0392b;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">RESPINTA</span>'
+    :st==='richiesta'?'<span style="background:#fff3e0;color:#b35c00;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">&#9203; sul tavolo del Direttore</span>'
+    :'<span style="background:#f0f0f3;color:#666;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">da richiedere</span>'
+  const esc_=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  const riga=r=>{
+    const n=r.progressivo!=null?r.progressivo:('m'+r.id)
+    const luogo=[r.ind_cantiere,r.comune_cantiere].filter(Boolean).join(' — ')
+    const daFare=['da_richiedere','richiesta'].includes(r.aut_stato)
+    return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid #f0e6dd">
+      <strong style="font-size:12px">n&deg; ${n}</strong>${badge(r.aut_stato)}
+      <span style="font-size:12px;color:#444;flex:1;min-width:200px">${esc_(luogo||'cantiere da individuare')}${r.data_autorizzazione?` <span style="color:#888">&middot; ${esc_(r.autorizzata_da||'')} il ${dIt(r.data_autorizzazione)}</span>`:''}</span>
+      <a href="https://formedilpadovacpt.github.io/segreteria/#segnalazione-${r.id}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:var(--orange,#e7500f);text-decoration:none">${daFare?'Autorizza nell\'app segreteria &#8599;':'apri la pratica &#8599;'}</a>
+    </div>`
+  }
+  box.innerHTML=`<div class="card" style="border-left:4px solid var(--orange,#e7500f)">
+    <h3>&#128680; Autorizzazioni visite su segnalazione ${attesa.length?`<span style="color:#b35c00">&mdash; ${attesa.length} in attesa</span>`:'&mdash; tutte processate'}</h3>
+    ${attesa.map(riga).join('')}
+    ${processate.length?`<div style="font-size:11px;color:#999;margin-top:8px">Ultime processate:</div>${processate.map(riga).join('')}`:''}
+  </div>`
+  box.style.display=''
+}
 
 // ── VOCI CHECKLIST ──
 async function loadVoci(){
