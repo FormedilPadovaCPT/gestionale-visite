@@ -13417,9 +13417,16 @@ function renderIncarichi(){
       +(serie?'<span style="font-size:11px;margin-left:8px;background:'+(fatte>=prev?'#eef7dd':'#f2f2f2')+';color:'+(fatte>=prev?'#5f8c1a':'#666')+';border-radius:9px;padding:1px 9px;font-weight:600">'+fatte+' di '+prev+' visite</span>':'')
       +'</div><div style="display:flex;gap:6px;align-items:center;white-space:nowrap">'
     if(!chiuso){
-      if(!eseguito) head += vis
-        ? '<span style="font-size:11px;color:#27ae60">✓ presa visione</span>'
-        : '<button class="btn-outline btn-sm" onclick="incPresaVisione('+r.id+',this)">Presa visione</button>'
+      /* «Presa visione» e' un gesto del TECNICO: la segreteria vede solo
+         lo stato, con «annulla» per rimediare a un clic sbagliato
+         (successo il 01/09/2026) */
+      if(!eseguito) head += gest
+        ? (vis
+          ? '<span style="font-size:11px;color:#27ae60">✓ presa visione</span> <a href="#" style="font-size:11px;color:#999" onclick="incAnnullaVisione('+r.id+');return false">annulla</a>'
+          : '<span style="font-size:11px;color:#bbb">non ancora vista dal tecnico</span>')
+        : (vis
+          ? '<span style="font-size:11px;color:#27ae60">✓ presa visione</span>'
+          : '<button class="btn-outline btn-sm" onclick="incPresaVisione('+r.id+',this)">Presa visione</button>')
       if(gest) head+='<button class="btn-sm" style="background:#95C22F;border:1px solid #7aa527;color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer" onclick="incChiudi('+r.id+')">'+(eseguito?'Chiudi':'Completato')+'</button>'
     } else if(gest){
       head+='<button class="btn-outline btn-sm" onclick="incRiapri('+r.id+')">Riapri</button>'
@@ -13557,6 +13564,17 @@ async function incPresaVisione(id,btn){
   }catch(e){toast('Errore: '+(e.message||e),'err')}
 }
 window.incPresaVisione=incPresaVisione
+
+async function incAnnullaVisione(id){
+  if(!window.__isSegreteria){toast('Riservato alla segreteria','err');return}
+  if(!confirm('Annullo la presa visione dell\'incarico #'+id+'? Tornerà «da vedere» per il tecnico.'))return
+  const{error}=await sb.from('incarichi').update({presa_visione_il:null,presa_visione_da:null}).eq('id',id)
+  if(error){toast('Errore: '+error.message,'err');return}
+  const r=_incCache.find(x=>x.id===id); if(r){r.presa_visione_il=null;r.presa_visione_da=null}
+  toast('Presa visione annullata','ok')
+  renderIncarichi()
+}
+window.incAnnullaVisione=incAnnullaVisione
 
 async function incChiudi(id){
   if(!window.__isSegreteria){toast('Riservato alla segreteria','err');return}
