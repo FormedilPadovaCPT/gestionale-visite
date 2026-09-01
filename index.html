@@ -2412,15 +2412,18 @@ document.querySelectorAll('nav button[data-view]').forEach(b=>{
   b.onclick=()=>{if(b.dataset.view==='form')initForm();navTo(b.dataset.view)}
 })
 
-// ── AUTORIZZAZIONI VISITE SU SEGNALAZIONE (dall'app segreteria) ──
-// Il quadro compare solo a chi puo' leggerle: le policy del database
-// aprono s_segnalazioni alla segreteria e al Direttore — per tecnici e
-// altri viewer la query torna vuota e il riquadro resta nascosto.
-// Il visto si firma in un posto solo (l'app segreteria): da qui si
-// vede lo stato a colpo d'occhio e si salta alla pratica col link.
+// ── AUTORIZZAZIONI SERVIZI CPT (dall'app segreteria) ──
+// SOLO PER IL DIRETTORE, e solo quando c'e' qualcosa in attesa del
+// suo visto (deciso dall'utente 01/09/2026): per la segreteria le
+// pratiche vivono nell'app segreteria, per i tecnici l'autorizzata
+// arriva come INCARICO nella scheda Incarichi — qui niente riquadro.
 async function loadAutorizzazioni(){
   const box=$('dash-autorizzazioni')
   if(!box)return
+  try{
+    const{data:dir}=await sb.rpc('is_direttore')
+    if(!dir){box.style.display='none';return}
+  }catch(_e){box.style.display='none';return}
   let righe=[]
   try{
     const[segn,cons,vis,confz,attz]=await Promise.all([
@@ -2452,7 +2455,8 @@ async function loadAutorizzazioni(){
   const attesa=righe.filter(r=>['da_richiedere','richiesta'].includes(r.aut_stato))
   const processate=righe.filter(r=>['approvata','respinta'].includes(r.aut_stato))
     .sort((a,b)=>String(b.data_autorizzazione||'').localeCompare(String(a.data_autorizzazione||''))).slice(0,3)
-  if(!attesa.length&&!processate.length){box.style.display='none';return}
+  /* senza nulla in attesa il riquadro sparisce anche al Direttore */
+  if(!attesa.length){box.style.display='none';return}
   const dIt=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):''
   const badge=st=>st==='approvata'?'<span style="background:#e8f5e0;color:#2d7a06;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">APPROVATA</span>'
     :st==='respinta'?'<span style="background:#fdeaea;color:#c0392b;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">RESPINTA</span>'
