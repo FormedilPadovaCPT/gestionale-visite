@@ -13560,6 +13560,8 @@ function renderIncarichi(){
     const luogo=[r.cantiere,r.indirizzo,r.comune].filter(Boolean).join(' · ')
     const dt=r.data_richiesta?r.data_richiesta.split('-').reverse().join('/'):''
     const vis=r.presa_visione_il
+    const acc=r.accettato_il
+    const rif=r.rifiutato_il
     const prev=r.visite_previste||1, fatte=r.visite_fatte||0
     const serie=prev>1
     let head='<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">'
@@ -13570,19 +13572,32 @@ function renderIncarichi(){
       +(gest&&r.tecnico_nome?'<span style="font-size:11px;color:#666;margin-left:8px;background:#f0f0f0;border-radius:9px;padding:1px 8px">'+esc(r.tecnico_nome)+'</span>':'')
       +(chiuso?'<span style="font-size:11px;color:#27ae60;margin-left:8px">✓ completato</span>':'')
       +(eseguito&&!serie?'<span style="font-size:11px;color:#7aa527;margin-left:8px;background:#eef7dd;border-radius:9px;padding:1px 8px">✓ visita registrata'+(r.visita_id?' n° '+esc(r.visita_id):'')+'</span>':'')
+      +(rif&&!chiuso?'<span style="font-size:11px;color:#c0392b;margin-left:8px;background:#fdeaea;border-radius:9px;padding:1px 8px;font-weight:600">✋ rifiutato</span>':'')
+      +(acc&&!rif&&!eseguito&&!chiuso?'<span style="font-size:11px;color:#2d7a06;margin-left:8px;background:#eef7dd;border-radius:9px;padding:1px 8px">✓ accettato</span>':'')
       +(serie?'<span style="font-size:11px;margin-left:8px;background:'+(fatte>=prev?'#eef7dd':'#f2f2f2')+';color:'+(fatte>=prev?'#5f8c1a':'#666')+';border-radius:9px;padding:1px 9px;font-weight:600">'+fatte+' di '+prev+' visite</span>':'')
       +'</div><div style="display:flex;gap:6px;align-items:center;white-space:nowrap">'
     if(!chiuso){
-      /* «Presa visione» e' un gesto del TECNICO: la segreteria vede solo
-         lo stato, con «annulla» per rimediare a un clic sbagliato
-         (successo il 01/09/2026) */
+      /* Tre gesti distinti, e sono tutti del TECNICO (04/09/2026):
+         «presa visione» dice che l'ha letto, «accetto» che la fa,
+         «non posso» che va riassegnata — con il motivo, altrimenti la
+         segreteria non sa che cosa fare. La segreteria vede lo stato e
+         puo' solo annullare una presa visione messa per sbaglio
+         (01/09/2026) o riassegnare un incarico rifiutato. */
       if(!eseguito) head += gest
-        ? (vis
+        ? (rif
+          ? '<span style="font-size:11px;color:#c0392b">rifiutato dal tecnico</span> <button class="btn-outline btn-sm" onclick="incRiassegna('+r.id+')">Riassegna</button>'
+          : acc
+          ? '<span style="font-size:11px;color:#2d7a06">✓ accettato dal tecnico</span>'
+          : vis
           ? '<span style="font-size:11px;color:#27ae60">✓ presa visione</span> <a href="#" style="font-size:11px;color:#999" onclick="incAnnullaVisione('+r.id+');return false">annulla</a>'
           : '<span style="font-size:11px;color:#bbb">non ancora vista dal tecnico</span>')
-        : (vis
-          ? '<span style="font-size:11px;color:#27ae60">✓ presa visione</span>'
-          : '<button class="btn-outline btn-sm" onclick="incPresaVisione('+r.id+',this)">Presa visione</button>')
+        : (rif
+          ? '<span style="font-size:11px;color:#c0392b">hai dichiarato di non essere disponibile</span> <a href="#" style="font-size:11px;color:#999" onclick="incAnnullaRifiuto('+r.id+');return false">annulla</a>'
+          : acc
+          ? '<span style="font-size:11px;color:#2d7a06">✓ accettato</span> <button class="btn-primary btn-sm" onclick="incNuovaVisita('+r.id+')">➕ Nuova visita</button>'
+          : (vis?'':'<button class="btn-outline btn-sm" onclick="incPresaVisione('+r.id+',this)">Presa visione</button> ')
+            +'<button class="btn-sm" style="background:#95C22F;border:1px solid #7aa527;color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer" onclick="incAccetta('+r.id+')">✅ Accetto</button> '
+            +'<button class="btn-outline btn-sm" onclick="incRifiuta('+r.id+')">✋ Non posso</button>')
       /* Visite allo stagista: non c'e' il rapporto di cantiere, c'e' la
          relazione — e da qui si compila, senza scrivere una mail a mano.
          Chiude l'incarico da sola (04/09/2026). */
@@ -13602,6 +13617,7 @@ function renderIncarichi(){
       +(r.oggetto?'<div style="color:#555;margin-top:3px">'+esc(r.oggetto)+'</div>':'')
       +(r.referente?'<div style="color:#666;margin-top:3px">👤 '+esc(r.referente)+(r.cell_referente?' · <a href="tel:'+esc(r.cell_referente)+'" style="color:#e7500f;text-decoration:none">'+esc(r.cell_referente)+'</a>':'')+'</div>':'')
       +(r.note_comunicazione?'<div style="margin-top:5px;background:#fff8f3;border-left:3px solid #e7500f;padding:6px 9px;border-radius:0 5px 5px 0;white-space:pre-wrap;font-size:12px">'+esc(r.note_comunicazione)+'</div>':'')
+      +(rif&&!chiuso?'<div style="margin-top:5px;background:#fdeaea;border-left:3px solid #c0392b;padding:6px 9px;border-radius:0 5px 5px 0;font-size:12px;color:#8e2b20"><strong>Non disponibile</strong>'+(r.rifiuto_motivo?': '+esc(r.rifiuto_motivo):'')+(r.rifiutato_il?' <span style="color:#b07a72">('+new Date(r.rifiutato_il).toLocaleDateString('it-IT')+')</span>':'')+'</div>':'')
       +(r.testo_richiesta?'<details style="margin-top:5px"><summary style="font-size:12px;color:#888;cursor:pointer">Testo della richiesta</summary><div style="white-space:pre-wrap;font-size:12px;color:#555;margin-top:4px">'+esc(r.testo_richiesta)+'</div></details>':'')
       +barra+fine
       +'</div>'
@@ -13725,6 +13741,94 @@ async function incPresaVisione(id,btn){
   }catch(e){toast('Errore: '+(e.message||e),'err')}
 }
 window.incPresaVisione=incPresaVisione
+
+/* ── ACCETTAZIONE E RIFIUTO DELL'INCARICO (04/09/2026) ──
+   Chiesto dall'utente: la presa visione non basta, perche' non dice se
+   il tecnico la visita puo' farla. Accettando, l'incarico e' suo e il
+   cantiere gia' individuato dalla segreteria lo segue nella nuova
+   visita; rifiutando deve motivare, e la segreteria riassegna. */
+async function incAccetta(id){
+  const ora=new Date().toISOString()
+  const patch={accettato_il:ora,accettato_da:S.user.email,rifiutato_il:null,rifiutato_da:null,rifiuto_motivo:null}
+  const r=_incCache.find(x=>x.id===id)
+  /* accettare vuol dire averlo letto: se la spunta manca, si mette qui */
+  if(r&&!r.presa_visione_il){patch.presa_visione_il=ora;patch.presa_visione_da=S.user.email}
+  const{error}=await sb.from('incarichi').update(patch).eq('id',id)
+  if(error){toast('Errore: '+(error.message||error),'err');return}
+  if(r)Object.assign(r,patch)
+  toast('Incarico accettato','ok')
+  renderIncarichi()
+}
+window.incAccetta=incAccetta
+
+async function incRifiuta(id){
+  const motivo=prompt('Perche\' non puoi prendere questo incarico?\n(es. «in ferie dal 10 al 20», «cantiere fuori zona», «gia\' pieno quel giorno»)\nIl motivo arriva alla segreteria, che assegnera\' l\'incarico a un altro tecnico.')
+  if(motivo===null)return
+  if(!motivo.trim()){toast('Serve il motivo: senza, la segreteria non sa come rimediare','warn');return}
+  const ora=new Date().toISOString()
+  const patch={rifiutato_il:ora,rifiutato_da:S.user.email,rifiuto_motivo:motivo.trim(),accettato_il:null,accettato_da:null}
+  const r=_incCache.find(x=>x.id===id)
+  if(r&&!r.presa_visione_il){patch.presa_visione_il=ora;patch.presa_visione_da=S.user.email}
+  const{error}=await sb.from('incarichi').update(patch).eq('id',id)
+  if(error){toast('Errore: '+(error.message||error),'err');return}
+  if(r)Object.assign(r,patch)
+  toast('Segnalato alla segreteria: incarico da riassegnare','ok')
+  renderIncarichi()
+}
+window.incRifiuta=incRifiuta
+
+async function incAnnullaRifiuto(id){
+  if(!confirm('Ritiri la dichiarazione di non disponibilita\'? L\'incarico torna fra quelli da evadere.'))return
+  const patch={rifiutato_il:null,rifiutato_da:null,rifiuto_motivo:null}
+  const{error}=await sb.from('incarichi').update(patch).eq('id',id)
+  if(error){toast('Errore: '+(error.message||error),'err');return}
+  const r=_incCache.find(x=>x.id===id); if(r)Object.assign(r,patch)
+  renderIncarichi()
+}
+window.incAnnullaRifiuto=incAnnullaRifiuto
+
+/* La segreteria riassegna: cambia il tecnico e azzera quel che il
+   precedente aveva dichiarato, altrimenti il nuovo eredita il rifiuto. */
+async function incRiassegna(id){
+  if(!window.__isSegreteria){toast('Riservato alla segreteria','err');return}
+  const{data:tec}=await sb.from('tecnici').select('tecnico_nome,tecnico_cognome,email').eq('attivo',true).not('email','is',null).order('tecnico_cognome')
+  const lista=(tec||[]).filter(t=>t.email)
+  if(!lista.length){toast('Nessun tecnico attivo con email','warn');return}
+  const scelta=prompt('A chi riassegno l\'incarico #'+id+'?\n\n'+lista.map((t,i)=>(i+1)+') '+[t.tecnico_nome,t.tecnico_cognome].filter(Boolean).join(' ')).join('\n')+'\n\nScrivi il numero:')
+  if(scelta===null)return
+  const t=lista[parseInt(scelta,10)-1]
+  if(!t){toast('Numero non valido','warn');return}
+  const{error}=await sb.from('incarichi').update({
+    tecnico_email:t.email,tecnico_nome:[t.tecnico_nome,t.tecnico_cognome].filter(Boolean).join(' '),
+    rifiutato_il:null,rifiutato_da:null,rifiuto_motivo:null,
+    accettato_il:null,accettato_da:null,presa_visione_il:null,presa_visione_da:null
+  }).eq('id',id)
+  if(error){toast('Errore: '+error.message,'err');return}
+  toast('Incarico riassegnato a '+[t.tecnico_nome,t.tecnico_cognome].filter(Boolean).join(' '),'ok')
+  await loadIncarichi()
+}
+window.incRiassegna=incRiassegna
+
+/* Apre la Nuova visita gia' agganciata all'incarico: numero della
+   richiesta nel Protocollo interno e, se il cantiere e' noto, cantiere
+   selezionato. E' il senso dell'accettazione: non ricercare a mano
+   quello che la segreteria ha gia' scritto. */
+async function incNuovaVisita(id){
+  const r=_incCache.find(x=>x.id===id)
+  if(!r)return
+  initForm();navTo('form')
+  setTimeout(async()=>{
+    vSet('f-prot-int',String(id))
+    const _sel=$('f-prot-inc'); if(_sel) _sel.value=String(id)
+    if(typeof incVerificaProt==='function') incVerificaProt()
+    if(!r.cantiere_id)return
+    const{data:c}=await sb.from('cantieri').select('*').eq('cantiere_id',r.cantiere_id).maybeSingle()
+    if(!c){toast('Il cantiere indicato dalla segreteria non e\' piu\' in archivio: cercalo a mano','warn');return}
+    if(typeof _useCantiereEsistente==='function') await _useCantiereEsistente(c)
+    else{vSet('f-cant-id',c.cantiere_id);S.fd.cantiere_id=c.cantiere_id}
+  },120)
+}
+window.incNuovaVisita=incNuovaVisita
 
 async function incAnnullaVisione(id){
   if(!window.__isSegreteria){toast('Riservato alla segreteria','err');return}
