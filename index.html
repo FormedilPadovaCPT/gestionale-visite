@@ -1448,6 +1448,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div class="adm-date-row" style="align-items:flex-end">
             <div class="field" style="min-width:140px"><label>Dal</label><input type="date" id="oss-dal"></div>
             <div class="field" style="min-width:140px"><label>Al</label><input type="date" id="oss-al"></div>
+            <button class="btn-outline" id="oss-tutto" onclick="admOssTuttoArchivio()" title="Riempie le date con la prima e l'ultima visita definitiva presenti in archivio">🗄 Tutto l'archivio</button>
             <button class="btn-primary" id="oss-genera" onclick="admExportOsservatorio()">📤 Genera file XML</button>
           </div>
           <div id="oss-report" style="font-size:12px;color:rgba(255,255,255,.7);margin-top:10px;line-height:1.5"></div>
@@ -9310,23 +9311,57 @@ function _ordinaNomeCognomeDaCF(full,cf){
   }
   return null
 }
-async function _inChunks(table,sel,col,ids,extra){
-  // NB: PostgREST restituisce max 1000 righe per richiesta → chunk di id + paginazione .range
+// Chiave primaria di ogni tabella letta a blocchi: serve per ORDINARE.
+// Senza ORDER BY, LIMIT/OFFSET su PostgreSQL non garantisce lo stesso
+// ordine fra una pagina e l'altra — e allora una riga puo' uscire due
+// volte o non uscire affatto. Con la check-list (100 visite ≈ 5.200
+// righe, cioe' 6 pagine) succede a ogni estrazione.
+const _PK_CHUNK={visite:'visita_id',visite_checklist:'id',visite_imprese_presenti:'id',
+  cantieri:'cantiere_id',imprese:'impresa_id',committenti:'committente_id',tecnici:'tecnico_id'}
+async function _inChunks(table,sel,col,ids,extra,avanza){
+  // PostgREST restituisce max 1000 righe per richiesta: si spezzano gli id
+  // in blocchi da 100 e si pagina finche' la pagina non e' incompleta.
+  // Nessun tetto: si legge tutto quello che c'e'.
+  const ord=_PK_CHUNK[table]||col
   const out=[]
   for(let i=0;i<ids.length;i+=100){
     let from=0
     for(;;){
-      let q=sb.from(table).select(sel).in(col,ids.slice(i,i+100)).range(from,from+999)
+      let q=sb.from(table).select(sel).in(col,ids.slice(i,i+100)).order(ord).range(from,from+999)
       if(extra)q=extra(q)
       const{data,error}=await q
       if(error)throw new Error(table+': '+error.message)
       out.push(...(data||[]))
+      if(avanza)avanza(out.length)
       if(!data||data.length<1000)break
       from+=1000
     }
   }
   return out
 }
+/* Primo invio: l'intervallo copre tutto quello che c'e' in archivio.
+   Le date si chiedono al database (prima e ultima visita definitiva),
+   non si scrivono a mano: e' il modo di non lasciare fuori un pezzo. */
+async function admOssTuttoArchivio(){
+  const btn=$('oss-tutto');const _t=btn?btn.textContent:''
+  if(btn){btn.disabled=true;btn.textContent='⏳'}
+  try{
+    const[{data:pri},{data:ult}]=await Promise.all([
+      sb.from('visite').select('data_visita').eq('elimina',0).eq('stato','definitivo')
+        .not('data_visita','is',null).order('data_visita',{ascending:true}).limit(1),
+      sb.from('visite').select('data_visita').eq('elimina',0).eq('stato','definitivo')
+        .not('data_visita','is',null).order('data_visita',{ascending:false}).limit(1)
+    ])
+    if(!pri||!pri.length){toast('Nessuna visita definitiva in archivio','warn');return}
+    vSet('oss-dal',String(pri[0].data_visita).slice(0,10))
+    vSet('oss-al',String(ult[0].data_visita).slice(0,10))
+    const rep=$('oss-report')
+    if(rep)rep.innerHTML='Intervallo impostato su tutto l\'archivio: <b>'+vGet('oss-dal')+'</b> → <b>'+vGet('oss-al')+'</b>. Premi «Genera file XML».'
+  }catch(e){toast('Errore: '+(e.message||e),'err')}
+  finally{if(btn){btn.disabled=false;btn.textContent=_t}}
+}
+window.admOssTuttoArchivio=admOssTuttoArchivio
+
 async function admExportOsservatorio(){
   if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
   const dal=vGet('oss-dal'),al=vGet('oss-al')
@@ -9335,7 +9370,8 @@ async function admExportOsservatorio(){
   const btn=$('oss-genera');const _t=btn.textContent;btn.disabled=true;btn.textContent='⏳ Estrazione…'
   if(rep)rep.innerHTML='Estrazione in corso…'
   try{
-    // 1. visite definitive nell'intervallo
+    // 1. visite definitive nell'intervallo (nessun tetto: si pagina finche' finiscono)
+    const _passo=(t)=>{if(rep)rep.innerHTML='⏳ '+t}
     const visite=[]
     for(let vfrom=0;;vfrom+=1000){
       const{data:vs,error:ev}=await sb.from('visite')
@@ -9344,12 +9380,24 @@ async function admExportOsservatorio(){
         .order('data_visita').order('visita_id').range(vfrom,vfrom+999)
       if(ev)throw new Error(ev.message)
       visite.push(...(vs||[]))
+      _passo('Lettura visite: '+visite.length+'…')
       if(!vs||vs.length<1000)break
     }
+    /* Le NON definitive restano fuori per regola dell'Osservatorio, ma
+       nell'invio massiccio bisogna saperlo: si contano e si dichiarano. */
+    let nonDef=0
+    try{
+      const{count}=await sb.from('visite').select('visita_id',{count:'exact',head:true})
+        .eq('elimina',0).neq('stato','definitivo').gte('data_visita',dal).lte('data_visita',al)
+      nonDef=count||0
+    }catch(_e){}
     if(!visite.length){if(rep)rep.innerHTML='Nessuna visita definitiva nell\'intervallo.';toast('Nessuna visita nell\'intervallo','warn');return}
     const vids=visite.map(v=>v.visita_id)
     // 2. checklist, ruolo impresa principale
-    const chk=await _inChunks('visite_checklist','visita_id,codice,valore,nota','visita_id',vids)
+    _passo(visite.length+' visite lette. Lettura check-list…')
+    const chk=await _inChunks('visite_checklist','visita_id,codice,valore,nota','visita_id',vids,
+      null,(n)=>_passo('Lettura check-list: '+n.toLocaleString('it-IT')+' righe…'))
+    _passo(chk.length.toLocaleString('it-IT')+' righe di check-list. Lettura anagrafiche…')
     const vip=await _inChunks('visite_imprese_presenti','visita_id,ruolo,is_principale','visita_id',vids,q=>q.eq('is_principale',true))
     const ruoloMap={};vip.forEach(r=>{if(!ruoloMap[r.visita_id])ruoloMap[r.visita_id]=r.ruolo})
     // 3. anagrafiche collegate
@@ -9385,7 +9433,7 @@ async function admExportOsservatorio(){
     const TIPO_MAP={1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:5,9:5,10:7}
     const RUOLO_MAP={'affidataria':1,'affidataria ed esecutrice':2,'esecutrice':3,'subappaltatrice':3,'lavoratore autonomo':3}
     let xv='<?xml version="1.0" encoding="utf-8"?>\n<visite>\n'
-    let nVis=0
+    let nVis=0,nVal=0
     visite.forEach(v=>{
       const vals=valPerVisita[v.visita_id]
       if(!vals||!Object.keys(vals).length){W.senzaChk.push(v.nr_verbale||v.visita_id);return}
@@ -9420,6 +9468,7 @@ async function admExportOsservatorio(){
         if(x.nota)a+=` visitaZonaNote="${_xesc(x.nota.slice(0,1000))}"`
         xv+=`<visitaValutazione ${a} />`
       })
+      nVal+=Object.keys(vals).length
       xv+='</visitaValutazioni>'
       xv+=_xel('visitaData',v.data_visita)
       const oi=String(v.ora_visita||'').match(/^(\d{1,2}):(\d{2})/)
@@ -9497,9 +9546,13 @@ async function admExportOsservatorio(){
     const tag=dal.replace(/-/g,'')+'_'+al.replace(/-/g,'')
     const files=[['Visite_'+tag+'.xml',xv],['Cantieri_'+tag+'.xml',xc],['Imprese_'+tag+'.xml',xi],['Committenti_'+tag+'.xml',xm],['Tecnici_'+tag+'.xml',xt]]
     files.forEach((f,i)=>setTimeout(()=>_xdl(f[0],f[1]),i*600))
+    const _peso=files.reduce((t,f)=>t+f[1].length,0)
     // ── riepilogo ──
-    let h=`<b style="color:#95C22F">✔ Estrazione completata (${dal} → ${al})</b><br>`
+    let h=`<b style="color:#95C22F">✔ Estrazione completata (${dal} → ${al})</b> <span style="color:rgba(255,255,255,.45)">— 5 file, ${(_peso/1048576).toFixed(1)} MB</span><br>`
+    h+=`<span style="color:rgba(255,255,255,.55)">Il browser scarica cinque file di seguito: se chiede il permesso per i «download multipli», autorizzalo, altrimenti ne salva solo il primo.</span><br>`
     h+=`Visite esportate: <b>${nVis}</b> su ${visite.length} definitive · Cantieri: <b>${cants.length}</b> · Imprese: <b>${imps.length}</b> · Committenti: <b>${comms.length}</b> · Tecnici: <b>${tecs.length}</b><br>`
+    h+=`<span style="color:rgba(255,255,255,.55)">Righe lette: check-list <b>${chk.length.toLocaleString('it-IT')}</b> · valutazioni scritte <b>${nVal.toLocaleString('it-IT')}</b>. Nessun limite di righe: le letture sono paginate e ordinate sulla chiave primaria.</span><br>`
+    if(nonDef)h+=`<span style="color:#f39c12">⚠ ${nonDef} visite del periodo NON sono definitive e restano fuori dall'invio: chiudile prima di trasmettere.</span><br>`
     if(W.senzaChk.length)h+=`<span style="color:#f39c12">⚠ ${W.senzaChk.length} visite ESCLUSE perché senza checklist compilata (obbligatoria per l'Osservatorio): ${W.senzaChk.slice(0,30).join(', ')}${W.senzaChk.length>30?'…':''}</span><br>`
     if(W.senzaImpresa.length)h+=`<span style="color:#f39c12">⚠ ${W.senzaImpresa.length} visite escluse senza impresa principale: ${W.senzaImpresa.slice(0,20).join(', ')}</span><br>`
     if(W.cantIncompleti.length)h+=`<span style="color:#f39c12">⚠ ${W.cantIncompleti.length} cantieri con dati obbligatori mancanti (esportati con valore di ripiego): ${W.cantIncompleti.slice(0,15).join('; ')}${W.cantIncompleti.length>15?'…':''}</span><br>`
