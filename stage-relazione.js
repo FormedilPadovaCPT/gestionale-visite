@@ -13,16 +13,19 @@
    - salva in s_visite_stage, cosi' la visita entra da sola nel
      riepilogo del mese da fatturare (tipo visita_stage);
    - CHIUDE l'incarico;
-   - produce il PDF e una bozza di mail per chi ha chiesto la
+   - archivia il PDF nel vault e lo manda a chi ha chiesto la
      visita (i referenti della didattica, da s_config).
 
-   ⚠️ Il parere sul TUTOR non esce nel PDF che va alla didattica:
-   e' un giudizio su una persona che lavora nell'impresa, e
-   l'impresa quel documento potrebbe leggerlo. Resta nel database
-   per l'ufficio (stessa cautela della sigla VAL del vault).
+   I tre pareri entrano tutti nel documento, tutor compreso
+   (deciso dall'utente il 04/09/2026): la relazione va alla
+   didattica, che dello stage risponde, e il giudizio sul tutor
+   e' parte di quel che serve a decidere se rimandarci un ragazzo.
 
-   L'invio della mail resta a una persona, come ovunque qui: si
-   scarica un .eml con l'allegato e si preme Invia da Outlook.
+   L'INVIO LO ATTIVA IL TECNICO, come per il verbale di cantiere:
+   la funzione send-relazione-stage archivia il PDF nel vault e
+   manda la mail con Gmail. Destinatari: il referente della
+   didattica (Barbara a Padova, Alessia a Stanghella), con
+   l'ufficio e il tecnico stesso in copia.
    ============================================================ */
 
 (function () {
@@ -90,7 +93,8 @@
     const rr = await caricaReferenti();
     $('srel-dest').innerHTML = '<option value="">— scegli chi ha chiesto la visita —</option>'
       + rr.map((r) => '<option value="' + esc_(r.email) + '" data-nome="' + esc_(r.nome) + '"'
-        + (v?.richiedente_email === r.email ? ' selected' : '') + '>' + esc_(r.nome) + ' — ' + esc_(r.email) + '</option>').join('');
+        + (v?.richiedente_email === r.email ? ' selected' : '') + '>'
+        + esc_(r.sede || '') + (r.sede ? ' — ' : '') + esc_(r.nome) + ' (' + esc_(r.email) + ')</option>').join('');
 
     $('srel-salva').dataset.vid = v?.id || '';
     $('modal-stage-rel').classList.remove('hidden');
@@ -114,7 +118,7 @@
 
   /* ── il PDF ──
      Stessa carta dei rapporti del gestionale: banda arancio, logo,
-     dati in riquadro, poi i testi. Il parere sul tutor NON entra. */
+     dati in riquadro, poi i testi e i tre pareri. */
   function pdfRelazione(d, inc) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -128,18 +132,28 @@
     /* il logo si precarica all'avvio (vedi in fondo): se non e' ancora
        pronto o non c'e', la carta regge lo stesso e resta la sola
        intestazione a testo */
+    /* il logo e' largo cinque volte quanto e' alto: il testo deve
+       cominciare DOPO la sua larghezza reale, altrimenti ci finisce
+       sopra (succedeva con un margine fisso) */
+    let xTesto = L;
     try {
       if (logoImg && logoImg.complete && logoImg.naturalWidth) {
-        const h = 13, w = h * logoImg.naturalWidth / logoImg.naturalHeight;
-        doc.addImage(logoImg, 'PNG', L, y - 5, w, h);
+        const h = 11, w = h * logoImg.naturalWidth / logoImg.naturalHeight;
+        /* 'FAST' come negli altri PDF dell'app: senza compressione il
+           logo RGBA gonfia il foglio da 12 KB a 200, e quel peso finisce
+           in allegato a ogni relazione */
+        doc.addImage(logoImg, 'PNG', L, y - 4, w, h, undefined, 'FAST');
+        xTesto = L + w + 6;
       }
     } catch (_e) { /* la carta regge anche senza logo */ }
 
-    font('bold', 13, ORANGE);
-    doc.text('FORMEDIL PADOVA', L + 40, y + 2);
-    font('normal', 8.5, GREY);
-    doc.text('Area Sicurezza e Salute — Scuola Costruzioni Giuseppe Jappelli', L + 40, y + 7);
-    doc.text('Via Basilicata 10 — 35127 Padova (PD) — tel. 049 761168', L + 40, y + 11);
+    /* il nome dell'ente sta gia' nel logo: accanto vanno solo i
+       riferimenti, altrimenti si legge due volte */
+    font('bold', 9, ORANGE);
+    doc.text('Area Sicurezza e Salute', xTesto, y);
+    font('normal', 7.5, GREY);
+    doc.text('Scuola Costruzioni Giuseppe Jappelli', xTesto, y + 4);
+    doc.text('Via Basilicata 10 — 35127 Padova (PD) — tel. 049 761168', xTesto, y + 7.6);
     y += 20;
     doc.setDrawColor(...ORANGE); doc.setLineWidth(0.6); doc.line(L, y, PW - L, y);
     y += 9;
@@ -186,6 +200,7 @@
 
     blocco('Relazione della visita', d.relazione);
     blocco('Parere sull\'azienda', d.parere_azienda);
+    blocco('Parere sul tutor aziendale', d.parere_tutor);
     blocco('Parere sullo stagista', d.parere_stagista);
     /* il parere sul tutor resta fuori: vedi la nota in testa al file */
 
@@ -206,52 +221,29 @@
       + '_visita-stage-' + (pulito(d.azienda) || 'azienda') + '.pdf';
   }
 
-  /* ── la bozza di mail, con il PDF allegato ──
-     X-Unsent: 1 fa aprire il file nella finestra di composizione di
-     Outlook invece che come messaggio ricevuto: si rilegge e si
-     preme Invia a mano. Stesso confine dell'app segreteria. */
-  function scaricaEml(d, byteB64, nome) {
-    const conf = 'FORMEDIL PADOVA - Area Sicurezza e Salute';
-    const oggetto = conf + ' - Relazione visita allo stagista '
-      + (d.stagista || '') + ' presso ' + (d.azienda || '')
-      + (d.richiedente ? ' - alla c.a. ' + d.richiedente : '');
-    const tec = (window.S?.tecnico ? ((S.tecnico.tecnico_cognome || '') + ' ' + (S.tecnico.tecnico_nome || '')).trim() : '') || '';
-    const corpo = 'Gent.ma ' + (d.richiedente || '') + ',\r\n\r\n'
-      + 'in allegato la relazione della visita effettuata il ' + dIt(d.data)
-      + ' allo stagista ' + (d.stagista || '') + ' presso ' + (d.azienda || '')
-      + (d.comune ? ' di ' + d.comune : '') + '.\r\n\r\n'
-      + (d.periodo_stage ? 'Periodo di stage: ' + d.periodo_stage + '.\r\n\r\n' : '')
-      + 'Cordiali saluti,\r\n' + (tec || 'Area Sicurezza e Salute') + '\r\n'
-      + 'CPT — Area Sicurezza e Salute, Formedil Padova\r\n';
-
-    const b = '----=_Parte_' + Date.now();
-    const eml = [
-      'X-Unsent: 1',
-      'To: ' + (d.richiedente_email || ''),
-      'Subject: ' + oggetto,
-      'MIME-Version: 1.0',
-      'Content-Type: multipart/mixed; boundary="' + b + '"',
-      '',
-      '--' + b,
-      'Content-Type: text/plain; charset=UTF-8',
-      'Content-Transfer-Encoding: 8bit',
-      '',
-      corpo,
-      '--' + b,
-      'Content-Type: application/pdf; name="' + nome + '"',
-      'Content-Transfer-Encoding: base64',
-      'Content-Disposition: attachment; filename="' + nome + '"',
-      '',
-      byteB64.replace(/(.{76})/g, '$1\r\n'),
-      '--' + b + '--',
-      '',
-    ].join('\r\n');
-
-    const url = URL.createObjectURL(new Blob([eml], { type: 'message/rfc822' }));
-    const a = document.createElement('a');
-    a.href = url; a.download = nome.replace(/\.pdf$/, '') + '.eml';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  /* ── invio ──
+     Lo attiva il tecnico, come per il verbale di cantiere: la funzione
+     send-relazione-stage archivia il PDF nel vault e manda la mail dalla
+     casella dell'ufficio. Il .eml non serve piu': qui si spedisce davvero. */
+  async function inviaRelazione(d, byteB64, nome, visitaId) {
+    const { data: { session } } = await sb.auth.getSession();
+    const tec = (window.S?.tecnico
+      ? ((S.tecnico.tecnico_cognome || '') + ' ' + (S.tecnico.tecnico_nome || '')).trim() : '') || '';
+    const r = await fetch(`${SB_URL}/functions/v1/send-relazione-stage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token || SB_KEY}`,
+        apikey: SB_KEY,
+      },
+      body: JSON.stringify({
+        pdf_base64: byteB64, nome_file: nome, visita_stage_id: visitaId,
+        dati: { ...d, tecnico: tec, tecnico_email: S.user?.email || null },
+      }),
+    });
+    const esito = await r.json();
+    if (!r.ok || esito?.ok === false) throw new Error(esito?.error || `HTTP ${r.status}`);
+    return esito;
   }
 
   function scaricaPdf(doc, nome) { doc.save(nome); }
@@ -295,10 +287,16 @@
 
       const doc = pdfRelazione(d, corrente);
       const nome = nomeFile(d);
-      scaricaPdf(doc, nome);
-      scaricaEml(d, doc.output('datauristring').split(',')[1], nome);
+      const b64 = doc.output('datauristring').split(',')[1];
 
-      toast('Relazione salvata' + (eInc ? ' (incarico da chiudere a mano)' : ', incarico chiuso') + ': PDF e bozza mail scaricati', 'ok');
+      if (btn) btn.textContent = 'Archivio e invio…';
+      const esito = await inviaRelazione(d, b64, nome, salvata?.id);
+
+      toast('Relazione inviata a ' + (d.richiedente || d.richiedente_email)
+        + (esito.archiviata ? ' e archiviata in ' + esito.cartella : ' — ⚠️ archivio su Drive non riuscito, il PDF è stato scaricato')
+        + (eInc ? ' (incarico da chiudere a mano)' : ', incarico chiuso'), 'ok');
+      /* se l'archivio non è riuscito il PDF non deve andare perso */
+      if (!esito.archiviata) scaricaPdf(doc, nome);
       chiudi();
       if (typeof loadIncarichi === 'function') loadIncarichi().catch(() => {});
       if (typeof loadStageSr === 'function') loadStageSr().catch(() => {});

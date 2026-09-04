@@ -1632,11 +1632,11 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <div class="field"><label>Parere sullo stagista</label><textarea id="srel-p-st" rows="2" style="width:100%"></textarea></div>
     <div class="field"><label>La relazione va a <span style="font-weight:400;font-size:11px;color:#aaa">(chi ha chiesto la visita)</span></label>
       <select id="srel-dest"></select></div>
-    <div style="font-size:11px;color:#888;margin-top:2px">Il PDF si scarica insieme a una bozza di mail gi&#224; pronta: l'invio resta a te, da Outlook.</div>
+    <div style="font-size:11px;color:#888;margin-top:2px">Il report parte al referente scelto, con l'ufficio e te in copia, e il PDF viene archiviato nel vault.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
       <button class="btn-secondary btn-sm" id="srel-annulla">Annulla</button>
-      <button class="btn-outline btn-sm" id="srel-solopdf">Solo il PDF</button>
-      <button class="btn-primary btn-sm" id="srel-salva">Salva, chiudi l'incarico e prepara la mail</button>
+      <button class="btn-outline btn-sm" id="srel-solopdf">Anteprima PDF</button>
+      <button class="btn-primary btn-sm" id="srel-salva">Salva, chiudi l'incarico e invia</button>
     </div>
   </div>
 </div>
@@ -13853,6 +13853,14 @@ function incVerificaProt(){
   else  msg.innerHTML='<span style="color:#D9A400">⚠ Nessun incarico aperto con questo numero (la visita si salva comunque).</span>'
 }
 window.incVerificaProt=incVerificaProt
+
+/* Il client, lo stato e il toast vivono nello scope di QUESTO modulo:
+   stage-relazione.js e' uno script a parte e senza queste righe non li
+   vedrebbe (l'app espone gia' su window decine di funzioni, stessa via).
+   S e' un oggetto che si muta e non si riassegna mai: passarlo per
+   riferimento e' sicuro. */
+window.sb=sb; window.S=S; window.toast=toast
+window.SB_URL=SB_URL; window.SB_KEY=SB_KEY
 
 document.addEventListener('change',function(ev){
   if(ev.target&&ev.target.id==='f-prot-inc'){
