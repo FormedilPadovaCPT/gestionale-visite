@@ -454,6 +454,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div id="dash-segnala-wrap" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" id="btn-segnala-dash" style="flex:2;min-width:220px;padding:12px;font-size:15px;border-radius:10px">&#128205; Segnala un cantiere attivo</button><button id="btn-servizi-cpt" style="flex:1;min-width:180px;padding:12px;font-size:15px;border-radius:10px;background:#95C22F;border:1px solid #7aa527;color:#fff;font-weight:600;cursor:pointer" onclick="window.open('https://formedilpadovacpt.github.io/servizi/','_blank')">Vai ai servizi CPT ↗</button></div>
       <div id="avvisi-banner"></div>
       <div id="dash-autorizzazioni" style="display:none;margin-bottom:14px"></div>
+      <div id="dash-fatture" style="display:none;margin-bottom:14px"></div>
+      <div id="dash-stage-sr" style="display:none;margin-bottom:14px"></div>
       
 
             <!-- FILTRI DASHBOARD -->
@@ -2397,6 +2399,7 @@ function navTo(view){
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
   if(view==='dashboard')loadAutorizzazioni().catch(e=>console.warn('autorizzazioni:',e))
+  if(view==='dashboard'){loadFattureCoord().catch(e=>console.warn('fatture:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))}
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='cantieri'&&typeof loadCantMap==='function')loadCantMap().catch(e=>console.error('loadCantMap:',e))
@@ -2488,6 +2491,122 @@ async function loadAutorizzazioni(){
   </div>`
   box.style.display=''
 }
+
+// ── FATTURE DEI TECNICI DA APPROVARE (coordinatore) ──
+// La segreteria registra la fattura nell'app segreteria (modulo
+// «Incarichi e fatture tecnici», 04/09/2026); il coordinatore la
+// approva qui SOLO se tutte le attivita' del mese sono a posto, oppure
+// la mette in stand-by con un motivo: il mandato non parte finche' non
+// si risolve (regola del controllo verbali, 07/08/2026). Visibile a
+// Nicola e alla segreteria; la decisione passa dalla RPC
+// s_fattura_decisione, che scrive chi e quando.
+async function loadFattureCoord(){
+  const box=$('dash-fatture')
+  if(!box)return
+  if(typeof isCoordPageUser!=='function'||!isCoordPageUser()){box.style.display='none';return}
+  let righe=[]
+  try{
+    const{data,error}=await sb.from('s_fatture_tecnici')
+      .select('id,tecnico_nome,numero,data_fattura,data_ricevimento,importo,stato,standby_motivo,incarico_mensile_id,note')
+      .in('stato',['ricevuta','verificata','standby']).order('id',{ascending:false}).limit(40)
+    if(error)throw error
+    righe=data||[]
+  }catch(_e){box.style.display='none';return}
+  if(!righe.length){box.style.display='none';return}
+  const nPrest={}
+  try{
+    const{data:pp}=await sb.from('s_prestazioni').select('fattura_id,importo').in('fattura_id',righe.map(r=>r.id))
+    ;(pp||[]).forEach(p=>{const k=nPrest[p.fattura_id]||(nPrest[p.fattura_id]={n:0,netto:0});k.n++;k.netto+=Number(p.importo||0)})
+  }catch(_e){}
+  const dIt=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):''
+  const eur=n=>Number(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})
+  const esc_=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  const badge=st=>st==='standby'?'<span style="background:#fdeaea;color:#c0392b;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">STAND-BY</span>'
+    :st==='verificata'?'<span style="background:#e8f5e0;color:#2d7a06;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">verificata dalla segreteria</span>'
+    :'<span style="background:#fff3e0;color:#b35c00;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">ricevuta</span>'
+  const riga=r=>{
+    const k=nPrest[r.id]||{n:0,netto:0}
+    return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid #f0e6dd">
+      <strong style="font-size:12px">${esc_(r.tecnico_nome)}</strong>${badge(r.stato)}
+      <span style="font-size:12px;color:#444;flex:1;min-width:220px">fattura n&deg; <strong>${esc_(r.numero||'?')}</strong>${r.data_fattura?' del '+dIt(r.data_fattura):''} &middot; ricevuta ${dIt(r.data_ricevimento)} &middot; <strong>${eur(r.importo)} &euro;</strong> &middot; ${k.n} prestazioni (netto ${eur(k.netto)})${r.stato==='standby'&&r.standby_motivo?`<br><span style="color:#c0392b">Stand-by: ${esc_(r.standby_motivo)}</span>`:''}${r.note?`<br><span style="color:#888">${esc_(r.note)}</span>`:''}</span>
+      <button class="btn-primary btn-sm" onclick="fattDecidi(${r.id},'approvata')">&#9989; Approva</button>
+      ${r.stato!=='standby'?`<button class="btn-outline btn-sm" onclick="fattDecidi(${r.id},'standby')">&#9208; Stand-by</button>`:''}
+      <a href="https://formedilpadovacpt.github.io/segreteria/#fattura-${r.id}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:var(--orange,#e7500f);text-decoration:none">dettaglio &#8599;</a>
+    </div>`
+  }
+  box.innerHTML=`<div class="card" style="border-left:4px solid var(--orange,#e7500f)">
+    <h3>&#128182; Fatture dei tecnici da approvare <span style="color:#b35c00">&mdash; ${righe.length}</span></h3>
+    <p style="font-size:12px;color:#666;margin:4px 0 6px">Si approva solo se tutte le attivita' del mese sono a posto; altrimenti stand-by con il motivo, e il mandato non parte finche' non si risolve col tecnico.</p>
+    ${righe.map(riga).join('')}
+  </div>`
+  box.style.display=''
+}
+async function fattDecidi(id,esito){
+  let motivo=null
+  if(esito==='standby'){motivo=prompt('Motivo dello stand-by (anomalia da risolvere col tecnico):');if(motivo===null)return}
+  if(esito==='approvata'&&!confirm('Approvi la fattura per il pagamento? Vuol dire che tutte le attivita\' del mese sono a posto.'))return
+  const{error}=await sb.rpc('s_fattura_decisione',{p_id:id,p_esito:esito,p_motivo:motivo||null})
+  if(error){toast('Non riuscito: '+error.message,'err');return}
+  toast(esito==='approvata'?'Fattura approvata: la segreteria la mette in mandato':'Fattura in stand-by: il mandato non parte','ok')
+  loadFattureCoord().catch(()=>{})
+}
+window.loadFattureCoord=loadFattureCoord
+window.fattDecidi=fattDecidi
+
+// ── VISITA STAGE FUORI PROVINCIA, SENZA VERBALE (tecnico) ──
+// Deciso dall'utente il 04/09/2026: la visita allo stagista fuori
+// provincia non ha il rapporto (non e' una visita ordinaria) ma una
+// relazione via mail, e va pagata come le altre. Qui il tecnico la
+// registra nella tabella s_visite_stage cosi' resta tracciata e finisce
+// da sola nel riepilogo del mese dell'app segreteria (tipo visita_stage).
+async function loadStageSr(){
+  const box=$('dash-stage-sr')
+  if(!box)return
+  if(!S.tecnico?.tecnico_id||window.__isCoord){box.style.display='none';return}
+  let righe=[]
+  try{
+    const{data}=await sb.from('s_visite_stage').select('*').eq('tecnico_id',S.tecnico.tecnico_id).order('data',{ascending:false}).limit(8)
+    righe=data||[]
+  }catch(_e){}
+  const dIt=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):''
+  const esc_=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  const oggi=new Date().toISOString().slice(0,10)
+  box.innerHTML=`<div class="card">
+    <h3>&#127891; Visite stage fuori provincia (senza verbale)</h3>
+    <p style="font-size:12px;color:#666;margin:4px 0 8px">Per lo stagista seguito fuori provincia non si compila il rapporto di visita: si registra qui la visita con due righe di relazione. Vale come visita stage nel riepilogo del mese da fatturare.</p>
+    <button class="btn-outline btn-sm" onclick="stageSrToggle()">+ Registra una visita stage senza verbale</button>
+    <div id="stage-sr-form" style="display:none;margin-top:10px">
+      <div class="row">
+        <div class="field" style="flex:0 0 150px"><label>Data</label><input type="date" id="ssr-data" value="${oggi}"></div>
+        <div class="field"><label>Azienda / impresa</label><input type="text" id="ssr-azienda" placeholder="ragione sociale"></div>
+        <div class="field"><label>Comune</label><input type="text" id="ssr-comune"></div>
+        <div class="field" style="flex:0 0 80px"><label>Prov.</label><input type="text" id="ssr-prov" maxlength="2" placeholder="VI"></div>
+        <div class="field"><label>Stagista</label><input type="text" id="ssr-stagista" placeholder="Nome Cognome"></div>
+      </div>
+      <div class="field"><label>Relazione (cosa e' stato visto, esito)</label><textarea id="ssr-rel" rows="3" style="width:100%"></textarea></div>
+      <button class="btn-primary btn-sm" style="margin-top:6px" onclick="stageSrSalva()">Salva la visita</button>
+    </div>
+    ${righe.length?`<table style="width:100%;font-size:12px;margin-top:10px;border-collapse:collapse">
+      <thead><tr style="text-align:left;color:#888"><th style="padding:4px 6px">Data</th><th style="padding:4px 6px">Azienda</th><th style="padding:4px 6px">Comune</th><th style="padding:4px 6px">Stagista</th><th style="padding:4px 6px">Relazione</th></tr></thead>
+      <tbody>${righe.map(r=>`<tr style="border-top:1px solid #f0e6dd${r.stato==='annullata'?';opacity:.5;text-decoration:line-through':''}"><td style="padding:4px 6px;white-space:nowrap">${dIt(r.data)}</td><td style="padding:4px 6px">${esc_(r.azienda)}</td><td style="padding:4px 6px">${esc_([r.comune,r.provincia].filter(Boolean).join(' '))}</td><td style="padding:4px 6px">${esc_(r.stagista)}</td><td style="padding:4px 6px;color:#666">${esc_((r.relazione||'').slice(0,120))}</td></tr>`).join('')}</tbody></table>`:''}
+  </div>`
+  box.style.display=''
+}
+function stageSrToggle(){const f=$('stage-sr-form');if(f)f.style.display=f.style.display==='none'?'':'none'}
+async function stageSrSalva(){
+  const v=id=>($(id)?.value||'').trim()
+  if(!v('ssr-data')||!v('ssr-azienda')){toast('Servono la data e l\'azienda','warn');return}
+  const{error}=await sb.from('s_visite_stage').insert({
+    tecnico_id:S.tecnico.tecnico_id,data:v('ssr-data'),azienda:v('ssr-azienda'),comune:v('ssr-comune')||null,
+    provincia:(v('ssr-prov')||'').toUpperCase()||null,stagista:v('ssr-stagista')||null,relazione:v('ssr-rel')||null,
+    creato_da:S.user?.email||null})
+  if(error){toast('Salvataggio non riuscito: '+error.message,'err');return}
+  toast('Visita stage registrata: entra nel riepilogo del mese','ok')
+  loadStageSr().catch(()=>{})
+}
+window.loadStageSr=loadStageSr
+window.stageSrToggle=stageSrToggle
+window.stageSrSalva=stageSrSalva
 
 // ── VOCI CHECKLIST ──
 async function loadVoci(){
