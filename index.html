@@ -1603,6 +1603,43 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     </div>
   </div>
 </div>
+<!-- ── MODAL RELAZIONE VISITA STAGE (dalla pagina Incarichi) ──
+     Per lo stagista seguito fuori provincia non si compila il rapporto di
+     cantiere: al suo posto questa relazione, che chiude l'incarico e va a
+     chi ha chiesto la visita (didattica). I dati dello stagista e
+     dell'azienda arrivano dall'incarico, non si riscrivono. -->
+<div class="modal-overlay hidden" id="modal-stage-rel">
+  <div class="modal-box" style="max-width:640px">
+    <h3>&#127891; Relazione di visita allo stagista</h3>
+    <div id="srel-info" style="font-size:12px;color:#666;background:#f7f7f7;border-radius:6px;padding:8px 10px;margin-bottom:10px"></div>
+    <div class="row">
+      <div class="field" style="flex:0 0 150px"><label>Data della visita</label><input type="date" id="srel-data"></div>
+      <div class="field"><label>Azienda ospitante</label><input type="text" id="srel-azienda"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Comune</label><input type="text" id="srel-comune"></div>
+      <div class="field" style="flex:0 0 80px"><label>Prov.</label><input type="text" id="srel-prov" maxlength="2"></div>
+      <div class="field"><label>Stagista</label><input type="text" id="srel-stagista"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Tutor aziendale</label><input type="text" id="srel-tutor" placeholder="Nome Cognome"></div>
+      <div class="field"><label>Periodo di stage</label><input type="text" id="srel-periodo" placeholder="dal … al …"></div>
+    </div>
+    <div class="field"><label>Relazione della visita <span style="font-weight:400;font-size:11px;color:#aaa">(cosa hai trovato, lavorazioni, DPI, sicurezza)</span></label>
+      <textarea id="srel-rel" rows="5" style="width:100%"></textarea></div>
+    <div class="field"><label>Parere sull'azienda</label><textarea id="srel-p-az" rows="2" style="width:100%"></textarea></div>
+    <div class="field"><label>Parere sul tutor aziendale</label><textarea id="srel-p-tu" rows="2" style="width:100%"></textarea></div>
+    <div class="field"><label>Parere sullo stagista</label><textarea id="srel-p-st" rows="2" style="width:100%"></textarea></div>
+    <div class="field"><label>La relazione va a <span style="font-weight:400;font-size:11px;color:#aaa">(chi ha chiesto la visita)</span></label>
+      <select id="srel-dest"></select></div>
+    <div style="font-size:11px;color:#888;margin-top:2px">Il PDF si scarica insieme a una bozza di mail gi&#224; pronta: l'invio resta a te, da Outlook.</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
+      <button class="btn-secondary btn-sm" id="srel-annulla">Annulla</button>
+      <button class="btn-outline btn-sm" id="srel-solopdf">Solo il PDF</button>
+      <button class="btn-primary btn-sm" id="srel-salva">Salva, chiudi l'incarico e prepara la mail</button>
+    </div>
+  </div>
+</div>
 <!-- ── MODAL AGGANCIO SEGNALAZIONE → CANTIERE CNCE ── -->
 <div class="modal-overlay hidden" id="modal-segn-agg">
   <div class="modal-box" style="max-width:560px">
@@ -13546,6 +13583,11 @@ function renderIncarichi(){
         : (vis
           ? '<span style="font-size:11px;color:#27ae60">✓ presa visione</span>'
           : '<button class="btn-outline btn-sm" onclick="incPresaVisione('+r.id+',this)">Presa visione</button>')
+      /* Visite allo stagista: non c'e' il rapporto di cantiere, c'e' la
+         relazione — e da qui si compila, senza scrivere una mail a mano.
+         Chiude l'incarico da sola (04/09/2026). */
+      if(!gest && typeof window.stageRelPertinente==='function' && window.stageRelPertinente(r))
+        head+='<button class="btn-sm" style="background:#8e44ad;border:1px solid #7d3c98;color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer" title="Compila la relazione della visita: chiude l\'incarico e prepara il PDF per la didattica" onclick="stageRelApri('+r.id+')">&#127891; Relazione</button>'
       if(gest) head+='<button class="btn-sm" style="background:#95C22F;border:1px solid #7aa527;color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer" onclick="incChiudi('+r.id+')">'+(eseguito?'Chiudi':'Completato')+'</button>'
     } else if(gest){
       head+='<button class="btn-outline btn-sm" onclick="incRiapri('+r.id+')">Riapri</button>'
@@ -13827,5 +13869,7 @@ document.addEventListener('input',function(ev){
 })
 
 </script>
+<!-- relazione di visita allo stagista: apre dalla pagina Incarichi -->
+<script src="stage-relazione.js"></script>
 </body>
 </html>
