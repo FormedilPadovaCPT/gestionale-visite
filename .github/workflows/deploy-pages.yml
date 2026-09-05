@@ -13,6 +13,8 @@ on:
     paths:
       - 'index.html'
       - 'app-data.js'
+      - 'stage-relazione.js'
+      - '*.png'
       - '.github/workflows/deploy-pages.yml'
       - 'tools/valida_index.py'
   workflow_dispatch:
@@ -45,10 +47,22 @@ jobs:
           set -e
           mkdir -p _site
           cp index.html _site/
-          # File opzionali inclusi solo se presenti
-          [ -f app-data.js ] && cp app-data.js _site/ || true
+          # Tutto ciò che index.html carica va pubblicato: il 05/09/2026
+          # stage-relazione.js era in repo ma 404 su Pages (la relazione stage
+          # non esisteva in produzione e il typeof lo nascondeva).
+          for f in app-data.js stage-relazione.js *.png; do
+            [ -f "$f" ] && cp "$f" _site/ || true
+          done
           # .nojekyll evita l'elaborazione Jekyll (serve i file così come sono)
           touch _site/.nojekyll
+
+      - name: Ogni script locale referenziato da index.html deve stare in _site
+        run: |
+          set -e
+          for f in $(grep -oE '<script[^>]+src="[^"]+"' index.html | sed -E 's/.*src="([^"]+)".*//' | grep -vE '^https?://'); do
+            test -f "_site/$f" || { echo "::error::$f è referenziato da index.html ma non viene pubblicato"; exit 1; }
+          done
+          echo "Script locali pubblicati: ok"
 
       - name: Carica artifact Pages
         uses: actions/upload-pages-artifact@v3

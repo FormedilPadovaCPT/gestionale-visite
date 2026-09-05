@@ -2161,7 +2161,7 @@ window.onunhandledrejection = function(e) {
 
 <script src="app-data.js"></script>
 <script type="module">
-console.log("%c Gestionale v2025-05-21 caricato correttamente ✓", "color:green;font-weight:bold;font-size:14px")
+console.log("%c Gestionale v2026-07-21f caricato correttamente ✓", "color:green;font-weight:bold;font-size:14px")
 
 // ── Caricamento robusto di Supabase con fallback su più CDN ───────────────────
 // Risolve i blocchi di avvio causati da CDN irraggiungibili (firewall, proxy,
@@ -2373,12 +2373,16 @@ async function onLogin(user){
   }
   document.querySelector('nav')?.classList.remove('hidden')
   document.body.classList.remove('viewer-mode')
-  let{data:tec}=await sb.from('tecnici').select('*').eq('email',user.email).single()
+  let{data:tec}=await sb.from('tecnici').select('*').eq('email',user.email).maybeSingle()
   if(!tec){
-    const p=user.email.split('@')[0].split('.')
-    const nome=p[0]||'';const cog=p[1]||''
-    const{data:nt}=await sb.from('tecnici').insert({tecnico_id:uuid(),tecnico_cognome:cog||user.email,tecnico_nome:nome,email:user.email}).select().single()
-    tec=nt
+    /* Audit 05/09/2026: un account senza scheda tecnico e senza ruolo NON diventa
+       piu' un tecnico da solo (prima si auto-inseriva in `tecnici`, e con la
+       registrazione aperta chiunque poteva farlo). La scheda la crea la segreteria. */
+    await sb.auth.signOut()
+    showScr('login')
+    const el=document.getElementById('login-err')
+    if(el){el.textContent=`L'account ${user.email} non e' abilitato al gestionale: chiedi alla segreteria di creare la scheda tecnico.`;el.style.display='block'}
+    return
   }
   S.tecnico=tec
   $('lbl-user').textContent=tec?`${tec.tecnico_nome} ${tec.tecnico_cognome}`:user.email
