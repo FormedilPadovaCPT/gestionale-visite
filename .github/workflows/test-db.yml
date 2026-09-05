@@ -1,0 +1,44 @@
+name: Test database
+
+# Esegue sul database VERO, dentro transazioni che vengono annullate, i test SQL
+# tenuti nel repo segreteria (tests-db/*.sql): registro di protocollo con il
+# passaggio alla serie unica del 01/10/2026, tariffe e regime fiscale, rete di
+# sicurezza RLS (un autenticato senza ruolo non vede nulla, anon a zero).
+#
+# Vive qui e non nel repo segreteria perche' qui c'e' gia' il secret
+# SUPABASE_DB_URL usato dal backup notturno. Ogni test finisce con ROLLBACK:
+# non lascia righe.
+#
+# Se un test fallisce il job diventa rosso e GitHub manda l'email.
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'      # ogni lunedi' alle 05:00 UTC
+  workflow_dispatch:
+
+jobs:
+  test-db:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prendi i test dal repo segreteria
+        uses: actions/checkout@v4
+        with:
+          repository: FormedilPadovaCPT/segreteria
+          path: segreteria
+
+      - name: Esegui i test SQL (ogni file: begin ... rollback)
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -e
+          if [ -z "${DB_URL:-}" ]; then echo "::error::Secret SUPABASE_DB_URL mancante"; exit 1; fi
+          esito=0
+          for f in segreteria/tests-db/*.sql; do
+            echo "=== $f"
+            if psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$f"; then
+              echo "OK  $f"
+            else
+              echo "::error::Test fallito: $f"; esito=1
+            fi
+          done
+          exit $esito

@@ -13,54 +13,8 @@ const CORS = {
 }
 
 // ── JWT per Service Account Google ──────────────────────────────────────────
-async function getAccessToken(sa: Record<string, string>): Promise<string> {
-  const now = Math.floor(Date.now() / 1000)
-  const header = { alg: 'RS256', typ: 'JWT' }
-  const payload = {
-    iss: sa.client_email,
-    sub: 'cptpd@did.formedilpadova.it',   // impersona l'account cptpd (domain-wide delegation)
-    scope: 'https://www.googleapis.com/auth/drive',
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-  }
-
-  const b64 = (obj: unknown) =>
-    btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-
-  const signingInput = `${b64(header)}.${b64(payload)}`
-
-  // Importa la chiave privata RSA
-  const pemBody = sa.private_key
-    .replace('-----BEGIN PRIVATE KEY-----', '')
-    .replace('-----END PRIVATE KEY-----', '')
-    .replace(/\s/g, '')
-  const binaryKey = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0))
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8', binaryKey.buffer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false, ['sign']
-  )
-
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5', cryptoKey,
-    new TextEncoder().encode(signingInput)
-  )
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-
-  const jwt = `${signingInput}.${sigB64}`
-
-  // Scambia JWT per access token
-  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
-  })
-  const tokenData = await tokenRes.json()
-  if (!tokenData.access_token) throw new Error('Token Google non ottenuto: ' + JSON.stringify(tokenData))
-  return tokenData.access_token
-}
+import { getAccessToken } from '../_shared/google.ts'
+// (audit 05/09/2026: il token Google viene dal modulo condiviso, non piu' copiato qui)
 
 // ── Handler principale ───────────────────────────────────────────────────────
 serve(async (req) => {
