@@ -59,7 +59,7 @@ jobs:
       - name: Ogni script locale referenziato da index.html deve stare in _site
         run: |
           set -e
-          for f in $(grep -oE '<script[^>]+src="[^"]+"' index.html | sed -E 's/.*src="([^"]+)".*//' | grep -vE '^https?://'); do
+          for f in $(grep -oE '<script[^>]+src="[^"]+"' index.html | sed -E 's/.*src="([^"]+)".*/\1/' | grep -vE '^https?://'); do
             test -f "_site/$f" || { echo "::error::$f è referenziato da index.html ma non viene pubblicato"; exit 1; }
           done
           echo "Script locali pubblicati: ok"
