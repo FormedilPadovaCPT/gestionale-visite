@@ -14,6 +14,7 @@ on:
       - 'index.html'
       - 'app-data.js'
       - 'stage-relazione.js'
+      - 'osservatorio.js'
       - '*.png'
       - '.github/workflows/deploy-pages.yml'
       - 'tools/valida_index.py'
@@ -50,11 +51,30 @@ jobs:
           # Tutto ciò che index.html carica va pubblicato: il 05/09/2026
           # stage-relazione.js era in repo ma 404 su Pages (la relazione stage
           # non esisteva in produzione e il typeof lo nascondeva).
-          for f in app-data.js stage-relazione.js *.png; do
+          for f in app-data.js stage-relazione.js osservatorio.js *.png; do
             [ -f "$f" ] && cp "$f" _site/ || true
           done
           # .nojekyll evita l'elaborazione Jekyll (serve i file così come sono)
           touch _site/.nojekyll
+
+      - name: Sintassi JavaScript (node --check sul modulo inline e su ogni script locale)
+        run: |
+          set -e
+          mkdir -p _chk
+          # il modulo inline di index.html va estratto per essere controllato
+          python3 - <<'PY'
+          import re
+          s = open('index.html', encoding='utf-8').read()
+          m = re.search(r'<script type="module">\n(.*?)\n</script>', s, re.S)
+          assert m, 'modulo inline non trovato'
+          open('_chk/inline.mjs', 'w', encoding='utf-8').write(m.group(1))
+          PY
+          node --check _chk/inline.mjs
+          for f in _site/*.js; do
+            cp "$f" "_chk/$(basename "$f" .js).mjs"
+            node --check "_chk/$(basename "$f" .js).mjs" || node --check "$f"
+          done
+          echo "Sintassi ok"
 
       - name: Ogni script locale referenziato da index.html deve stare in _site
         run: |
