@@ -26,7 +26,7 @@ jobs:
           repository: FormedilPadovaCPT/segreteria
           path: segreteria
 
-      - name: Esegui i test SQL (ogni file: begin ... rollback)
+      - name: "Esegui i test SQL (ogni file comincia con begin e finisce con rollback)"
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
