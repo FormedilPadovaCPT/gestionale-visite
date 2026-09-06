@@ -292,8 +292,11 @@ tr.row-detail-hover:hover td{background:#fff3ed}
   #view-dashboard div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
   .dash-row-2,.dash-row-3{grid-template-columns:1fr!important}
   /* pulsanti Segnala/Servizi compatti su una riga */
-  #dash-segnala-wrap{gap:8px}
-  #dash-segnala-wrap button{min-width:0!important;flex:1 1 0!important;padding:8px 6px!important;font-size:12.5px!important;border-radius:8px!important}
+  /* Telefono (06/09/2026): tre pulsanti su una riga sola si tagliavano. Griglia a due
+     colonne: «Segnala un cantiere attivo» a tutta larghezza, sotto QR e «Vai ai servizi». */
+  #dash-segnala-wrap{gap:8px;display:grid!important;grid-template-columns:1fr 1fr}
+  #dash-segnala-wrap button{min-width:0!important;flex:none!important;width:100%;padding:11px 8px!important;font-size:14px!important;border-radius:8px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #dash-segnala-wrap #btn-segnala-dash{grid-column:1/-1}
   /* filtri dashboard compatti: griglia 2x2, testi piccoli */
   #dash-filtri{padding:10px 10px 6px}
   #dash-filtri div[style*="grid-template-columns"]{grid-template-columns:1fr 1fr!important;gap:6px 8px!important}
