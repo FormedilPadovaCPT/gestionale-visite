@@ -451,7 +451,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 
     <!-- DASHBOARD -->
     <section id="view-dashboard">
-      <div id="dash-segnala-wrap" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" id="btn-segnala-dash" style="flex:2;min-width:220px;padding:12px;font-size:15px;border-radius:10px">&#128205; Segnala un cantiere attivo</button><button id="btn-servizi-cpt" style="flex:1;min-width:180px;padding:12px;font-size:15px;border-radius:10px;background:#95C22F;border:1px solid #7aa527;color:#fff;font-weight:600;cursor:pointer" onclick="window.open('https://formedilpadovacpt.github.io/servizi/','_blank')">Vai ai servizi CPT ↗</button></div>
+      <div id="dash-segnala-wrap" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" id="btn-segnala-dash" style="flex:2;min-width:220px;padding:12px;font-size:15px;border-radius:10px">&#128205; Segnala un cantiere attivo</button><button id="btn-qr-servizi" title="Mostra il QR del portale servizi a chi è in cantiere" style="flex:1;min-width:160px;padding:12px;font-size:15px;border-radius:10px;background:#fff;border:2px solid #e7500f;color:#e7500f;font-weight:600;cursor:pointer">&#128241; QR servizi CPT</button><button id="btn-servizi-cpt" style="flex:1;min-width:180px;padding:12px;font-size:15px;border-radius:10px;background:#95C22F;border:1px solid #7aa527;color:#fff;font-weight:600;cursor:pointer" onclick="window.open('https://formedilpadovacpt.github.io/servizi/','_blank')">Vai ai servizi CPT ↗</button></div>
       <div id="avvisi-banner"></div>
       <div id="dash-autorizzazioni" style="display:none;margin-bottom:14px"></div>
       <div id="dash-fatture" style="display:none;margin-bottom:14px"></div>
@@ -1642,6 +1642,19 @@ tr.row-detail-hover:hover td{background:#fff3ed}
   </div>
 </div>
 <!-- ── MODAL AGGANCIO SEGNALAZIONE → CANTIERE CNCE ── -->
+<!-- QR del portale servizi, da mostrare in cantiere (06/09/2026). Il QR e' un SVG
+     inline generato una volta per sempre dall'URL del portale: niente rete, niente
+     libreria, si vede anche senza campo. Se l'URL del portale cambia, va rigenerato. -->
+<div class="modal-overlay hidden" id="modal-qr-servizi">
+  <div class="modal-box" style="max-width:420px;text-align:center">
+    <h3>&#128241; Servizi CPT sul telefono</h3>
+    <p style="font-size:13px;color:#666;margin:0 0 10px">Fai inquadrare il codice con la fotocamera: si apre il portale dei servizi, da cui impresa, lavoratori e committente possono chiedere visite, consulenze, RLST, conferenze e segnalare un cantiere.</p>
+    <div style="width:min(78vw,300px);margin:0 auto;border:1px solid #e8e6e0;border-radius:10px;padding:8px;background:#fff"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 37 37" shape-rendering="crispEdges" role="img" aria-label="QR del portale servizi"><rect x="-2" y="-2" width="37" height="37" fill="#fff"/><path d="M0 0h7v1h-7zM8 0h2v1h-2zM12 0h1v1h-1zM14 0h5v1h-5zM21 0h1v1h-1zM23 0h1v1h-1zM26 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM9 1h1v1h-1zM17 1h1v1h-1zM19 1h4v1h-4zM26 1h1v1h-1zM32 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM13 2h1v1h-1zM15 2h1v1h-1zM19 2h2v1h-2zM22 2h3v1h-3zM26 2h1v1h-1zM28 2h3v1h-3zM32 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM8 3h5v1h-5zM14 3h2v1h-2zM17 3h2v1h-2zM20 3h2v1h-2zM23 3h1v1h-1zM26 3h1v1h-1zM28 3h3v1h-3zM32 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM8 4h3v1h-3zM14 4h1v1h-1zM18 4h3v1h-3zM24 4h1v1h-1zM26 4h1v1h-1zM28 4h3v1h-3zM32 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM10 5h1v1h-1zM13 5h2v1h-2zM16 5h1v1h-1zM18 5h2v1h-2zM22 5h1v1h-1zM26 5h1v1h-1zM32 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM26 6h7v1h-7zM8 7h2v1h-2zM11 7h2v1h-2zM15 7h4v1h-4zM21 7h2v1h-2zM24 7h1v1h-1zM0 8h1v1h-1zM4 8h1v1h-1zM6 8h4v1h-4zM12 8h1v1h-1zM16 8h2v1h-2zM19 8h1v1h-1zM21 8h9v1h-9zM32 8h1v1h-1zM1 9h1v1h-1zM3 9h1v1h-1zM5 9h1v1h-1zM9 9h1v1h-1zM11 9h1v1h-1zM13 9h1v1h-1zM15 9h2v1h-2zM18 9h1v1h-1zM23 9h1v1h-1zM25 9h1v1h-1zM29 9h3v1h-3zM0 10h1v1h-1zM2 10h2v1h-2zM6 10h3v1h-3zM11 10h2v1h-2zM15 10h1v1h-1zM17 10h1v1h-1zM20 10h5v1h-5zM29 10h1v1h-1zM31 10h1v1h-1zM1 11h1v1h-1zM3 11h1v1h-1zM7 11h1v1h-1zM9 11h4v1h-4zM14 11h8v1h-8zM23 11h2v1h-2zM26 11h1v1h-1zM32 11h1v1h-1zM0 12h2v1h-2zM4 12h3v1h-3zM9 12h1v1h-1zM13 12h3v1h-3zM18 12h1v1h-1zM20 12h1v1h-1zM23 12h2v1h-2zM26 12h4v1h-4zM0 13h1v1h-1zM2 13h2v1h-2zM5 13h1v1h-1zM7 13h1v1h-1zM9 13h3v1h-3zM13 13h1v1h-1zM16 13h1v1h-1zM19 13h1v1h-1zM21 13h4v1h-4zM27 13h1v1h-1zM0 14h3v1h-3zM4 14h1v1h-1zM6 14h2v1h-2zM10 14h1v1h-1zM16 14h1v1h-1zM19 14h1v1h-1zM21 14h6v1h-6zM28 14h1v1h-1zM31 14h1v1h-1zM0 15h2v1h-2zM3 15h1v1h-1zM8 15h2v1h-2zM11 15h1v1h-1zM14 15h1v1h-1zM17 15h5v1h-5zM23 15h1v1h-1zM25 15h2v1h-2zM28 15h1v1h-1zM2 16h1v1h-1zM4 16h1v1h-1zM6 16h2v1h-2zM10 16h3v1h-3zM14 16h2v1h-2zM17 16h1v1h-1zM20 16h5v1h-5zM26 16h1v1h-1zM28 16h1v1h-1zM31 16h1v1h-1zM2 17h4v1h-4zM7 17h1v1h-1zM9 17h2v1h-2zM12 17h1v1h-1zM14 17h4v1h-4zM21 17h1v1h-1zM23 17h1v1h-1zM25 17h1v1h-1zM29 17h3v1h-3zM0 18h3v1h-3zM6 18h1v1h-1zM9 18h1v1h-1zM11 18h2v1h-2zM15 18h1v1h-1zM18 18h1v1h-1zM23 18h1v1h-1zM25 18h1v1h-1zM27 18h1v1h-1zM29 18h1v1h-1zM0 19h1v1h-1zM4 19h1v1h-1zM8 19h2v1h-2zM11 19h1v1h-1zM13 19h1v1h-1zM20 19h1v1h-1zM22 19h1v1h-1zM26 19h2v1h-2zM32 19h1v1h-1zM1 20h2v1h-2zM4 20h7v1h-7zM13 20h1v1h-1zM16 20h1v1h-1zM19 20h1v1h-1zM22 20h1v1h-1zM24 20h1v1h-1zM26 20h1v1h-1zM28 20h2v1h-2zM31 20h2v1h-2zM0 21h1v1h-1zM2 21h4v1h-4zM7 21h1v1h-1zM9 21h3v1h-3zM13 21h2v1h-2zM18 21h4v1h-4zM23 21h1v1h-1zM25 21h1v1h-1zM27 21h1v1h-1zM29 21h1v1h-1zM31 21h1v1h-1zM2 22h2v1h-2zM5 22h4v1h-4zM11 22h2v1h-2zM15 22h1v1h-1zM17 22h1v1h-1zM20 22h2v1h-2zM23 22h1v1h-1zM25 22h1v1h-1zM30 22h2v1h-2zM2 23h1v1h-1zM5 23h1v1h-1zM8 23h1v1h-1zM13 23h5v1h-5zM21 23h2v1h-2zM26 23h4v1h-4zM0 24h2v1h-2zM4 24h6v1h-6zM11 24h2v1h-2zM14 24h1v1h-1zM17 24h1v1h-1zM19 24h10v1h-10zM8 25h1v1h-1zM11 25h3v1h-3zM15 25h2v1h-2zM22 25h3v1h-3zM28 25h1v1h-1zM30 25h2v1h-2zM0 26h7v1h-7zM8 26h1v1h-1zM14 26h4v1h-4zM20 26h3v1h-3zM24 26h1v1h-1zM26 26h1v1h-1zM28 26h2v1h-2zM31 26h1v1h-1zM0 27h1v1h-1zM6 27h1v1h-1zM9 27h4v1h-4zM17 27h2v1h-2zM21 27h1v1h-1zM24 27h1v1h-1zM28 27h1v1h-1zM31 27h1v1h-1zM0 28h1v1h-1zM2 28h3v1h-3zM6 28h1v1h-1zM8 28h1v1h-1zM10 28h1v1h-1zM13 28h1v1h-1zM15 28h1v1h-1zM18 28h3v1h-3zM24 28h6v1h-6zM32 28h1v1h-1zM0 29h1v1h-1zM2 29h3v1h-3zM6 29h1v1h-1zM10 29h1v1h-1zM12 29h1v1h-1zM14 29h1v1h-1zM16 29h1v1h-1zM19 29h1v1h-1zM22 29h2v1h-2zM26 29h4v1h-4zM31 29h1v1h-1zM0 30h1v1h-1zM2 30h3v1h-3zM6 30h1v1h-1zM9 30h4v1h-4zM14 30h1v1h-1zM16 30h4v1h-4zM21 30h2v1h-2zM24 30h1v1h-1zM26 30h3v1h-3zM30 30h1v1h-1zM0 31h1v1h-1zM6 31h1v1h-1zM9 31h2v1h-2zM12 31h3v1h-3zM17 31h1v1h-1zM19 31h4v1h-4zM24 31h1v1h-1zM26 31h1v1h-1zM0 32h7v1h-7zM8 32h1v1h-1zM11 32h2v1h-2zM15 32h1v1h-1zM17 32h2v1h-2zM20 32h5v1h-5zM26 32h1v1h-1zM29 32h1v1h-1zM32 32h1v1h-1z" fill="#2c2c2a"/></svg></div>
+    <div style="font-family:monospace;font-size:13px;color:#2c2c2a;margin:10px 0 2px;word-break:break-all">formedilpadovacpt.github.io/servizi/</div>
+    <div style="font-size:11px;color:#999;margin-bottom:12px">Formedil Padova &middot; Area Sicurezza e Salute</div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn-primary btn-sm" id="qr-servizi-invia">&#128228; Invia il link</button><button class="btn-secondary btn-sm" id="qr-servizi-chiudi">Chiudi</button></div>
+  </div>
+</div>
 <div class="modal-overlay hidden" id="modal-segn-agg">
   <div class="modal-box" style="max-width:560px">
     <h3>&#128279; Aggancia segnalazione a cantiere</h3>
@@ -6445,6 +6458,20 @@ function apriSegnalaCantiere(){
 }
 $('btn-segnala-cant').onclick=apriSegnalaCantiere
 if($('btn-segnala-dash'))$('btn-segnala-dash').onclick=apriSegnalaCantiere
+/* QR del portale servizi in dashboard (06/09/2026): da mostrare a chi e' in cantiere.
+   «Invia il link» usa la condivisione di sistema del telefono (WhatsApp, SMS, mail);
+   dove non c'e', copia l'indirizzo negli appunti. */
+if($('btn-qr-servizi'))$('btn-qr-servizi').onclick=()=>show('modal-qr-servizi')
+if($('qr-servizi-chiudi'))$('qr-servizi-chiudi').onclick=()=>hide('modal-qr-servizi')
+if($('qr-servizi-invia'))$('qr-servizi-invia').onclick=async()=>{
+  const url='https://formedilpadovacpt.github.io/servizi/'
+  const dati={title:'Servizi CPT - Formedil Padova',text:'Portale dei servizi dell\'Area Sicurezza e Salute di Formedil Padova: visite, consulenze, RLST, conferenze di cantiere, segnalazioni.',url}
+  try{
+    if(navigator.share){await navigator.share(dati);return}
+    await navigator.clipboard.writeText(url)
+    const b=$('qr-servizi-invia');const t=b.textContent;b.textContent='Link copiato';setTimeout(()=>b.textContent=t,1800)
+  }catch(e){if(e&&e.name!=='AbortError')console.warn('condivisione non riuscita',e)}
+}
 $('segn-annulla').onclick=()=>hide('modal-segn')
 $('segn-foto').addEventListener('change',e=>{
   const f=e.target.files&&e.target.files[0]
