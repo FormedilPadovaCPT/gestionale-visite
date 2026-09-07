@@ -181,9 +181,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 .tgt-bar-mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:#565c66;opacity:.55}
 .tgt-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:8px}
 @media(max-width:720px){.tgt-grid{grid-template-columns:1fr}}
-.tgt-target-table{width:100%;border-collapse:collapse;font-size:13px}
-.tgt-target-table th,.tgt-target-table td{padding:7px 9px;text-align:left;border-bottom:1px solid rgba(255,255,255,.12)}
-.tgt-target-table input{width:90px;padding:5px 7px;border-radius:6px;border:1px solid #ccc;font-size:13px}
 .save-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:2px solid var(--border)}
 /* IMPORT */
 .drop-zone{border:3px dashed var(--border);border-radius:var(--radius);padding:36px;text-align:center;color:#aaa;cursor:pointer;transition:all .2s}
@@ -1241,28 +1238,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <button class="btn-primary" id="adm-prom-send" onclick="admInviaPromemoriaOra()">📨 Invia ora</button>
             <span style="font-size:12px;color:rgba(255,255,255,.5)">Invia subito il promemoria a tutti i tecnici con ricontrolli in scadenza, senza aspettare il lunedì (funziona anche con l'invio automatico sospeso).</span>
-          </div>
-        </div>
-
-        <!-- Target visite mensili -->
-        <div class="adm-section">
-          <div class="adm-section-title">🎯 Target visite mensili per tecnico</div>
-          <p style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:10px">Imposta il numero massimo di visite che ciascun tecnico può effettuare nel mese selezionato. Il tecnico vedrà l'avanzamento nella sua dashboard, insieme alla quota minima del 20% di visite in affiancamento RLST.</p>
-          <div class="adm-date-row">
-            <div class="field" style="min-width:160px">
-              <label>Mese</label>
-              <input type="month" id="adm-target-mese">
-            </div>
-            <button class="btn-primary" onclick="admLoadTarget()">📥 Carica</button>
-            <button class="btn-primary" style="background:#565c66;border-color:#565c66" onclick="admCopyLastMonth()">📋 Copia mese scorso</button>
-          </div>
-          <div id="adm-target-wrap" style="display:none;margin-top:12px">
-            <table class="tgt-target-table">
-              <thead><tr><th>Tecnico</th><th>Max visite</th><th>Effettuate nel mese</th></tr></thead>
-              <tbody id="adm-target-tbody"></tbody>
-            </table>
-            <button class="btn-primary" style="margin-top:12px;background:#95C22F;border-color:#7aa527" onclick="admSaveTarget()">💾 Salva target</button>
-            <span id="adm-target-status" style="font-size:12px;color:rgba(255,255,255,.6);margin-left:10px"></span>
           </div>
         </div>
 
@@ -9018,8 +8993,6 @@ function sgrInit(){
   const dal=$('sgr-dal'),al=$('sgr-al')
   if(dal&&!dal.value)dal.value=`${y}-01-01`
   if(al&&!al.value)al.value=today.toISOString().split('T')[0]
-  const tm=$('adm-target-mese')
-  if(tm&&!tm.value)tm.value=`${y}-${String(today.getMonth()+1).padStart(2,'0')}`
   admLoadPromemoria()
 }
 window.sgrInit=sgrInit
@@ -9072,53 +9045,13 @@ async function admInviaPromemoriaOra(){
 }
 window.admInviaPromemoriaOra=admInviaPromemoriaOra;
 window.admTogglePromemoria=admTogglePromemoria;window.admLoadPromemoria=admLoadPromemoria;
-// ── TARGET VISITE MENSILI (Coordinatore) ──
+// ── OBIETTIVO MENSILE ── (i target li scrive l'app segreteria dagli incarichi del mese)
 function _meseRange(anno,mese){ // mese 1-12 → {da,a} inclusivi (YYYY-MM-DD)
   const da=`${anno}-${String(mese).padStart(2,'0')}-01`
   const ultimo=new Date(anno,mese,0).getDate()
   const a=`${anno}-${String(mese).padStart(2,'0')}-${String(ultimo).padStart(2,'0')}`
   return{da,a}
 }
-async function admLoadTarget(){
-  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
-  const mv=$('adm-target-mese')?.value
-  if(!mv){toast('Seleziona un mese','warn');return}
-  const[anno,mese]=mv.split('-').map(Number)
-  const{data:tecsAll}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome,email').eq('attivo',true).order('tecnico_cognome')
-  // solo i tecnici ufficiali Formedil Padova (stessa lista del form visita)
-  const _tgtEmails=new Set(TECNICI_LIST.map(t=>t.email.toLowerCase()))
-  const tecs=(tecsAll||[]).filter(t=>_tgtEmails.has((t.email||'').toLowerCase()))
-  const{data:tgts}=await sb.from('target_visite_mensili').select('tecnico_id,max_visite').eq('anno',anno).eq('mese',mese)
-  const tgtMap={};(tgts||[]).forEach(t=>tgtMap[t.tecnico_id]=t.max_visite)
-  // Visite effettuate nel mese per tecnico
-  const{da,a}=_meseRange(anno,mese)
-  const{data:vs}=await sb.from('visite').select('tecnico_id').eq('elimina',0).gte('data_visita',da).lte('data_visita',a)
-  const visCount={};(vs||[]).forEach(v=>{visCount[v.tecnico_id]=(visCount[v.tecnico_id]||0)+1})
-  const tbody=$('adm-target-tbody')
-  tbody.innerHTML=(tecs||[]).map(t=>{
-    const nome=`${t.tecnico_cognome||''} ${t.tecnico_nome||''}`.trim()||t.tecnico_id
-    const val=tgtMap[t.tecnico_id]??''
-    return`<tr><td>${nome}</td><td><input type="number" min="0" step="1" data-tec="${t.tecnico_id}" value="${val}" placeholder="–"></td><td style="color:rgba(255,255,255,.7)">${visCount[t.tecnico_id]||0}</td></tr>`
-  }).join('')
-  $('adm-target-wrap').style.display='block'
-  $('adm-target-status').textContent=''
-}
-window.admLoadTarget=admLoadTarget
-async function admSaveTarget(){
-  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
-  const mv=$('adm-target-mese')?.value
-  if(!mv)return
-  const[anno,mese]=mv.split('-').map(Number)
-  const rows=[...document.querySelectorAll('#adm-target-tbody input[data-tec]')]
-    .filter(i=>i.value!=='')
-    .map(i=>({tecnico_id:i.dataset.tec,anno,mese,max_visite:Math.max(0,parseInt(i.value,10)||0),updated_at:new Date().toISOString()}))
-  if(!rows.length){toast('Nessun valore da salvare','warn');return}
-  const{error}=await sb.from('target_visite_mensili').upsert(rows,{onConflict:'tecnico_id,anno,mese'})
-  if(error){toast('Errore salvataggio: '+error.message,'err');return}
-  $('adm-target-status').textContent=`✓ Salvati ${rows.length} target`
-  toast('Target salvati','ok')
-}
-window.admSaveTarget=admSaveTarget
 
 // ── CARD OBIETTIVO MENSILE (dashboard del tecnico) ──
 async function loadTargetCard(){
@@ -9230,19 +9163,6 @@ async function admArchiveAvviso(id){ await sb.from('avvisi').update({archiviato:
 window.admArchiveAvviso=admArchiveAvviso
 async function admRestoreAvviso(id){ await sb.from('avvisi').update({archiviato:false}).eq('id',id); admLoadAvvisi() }
 window.admRestoreAvviso=admRestoreAvviso
-async function admCopyLastMonth(){
-  if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
-  const mv=$('adm-target-mese')?.value
-  if(!mv){toast('Seleziona il mese e clicca Carica','warn');return}
-  if(($('adm-target-wrap').style.display||'none')==='none'){toast('Prima clicca 📥 Carica','warn');return}
-  let[anno,mese]=mv.split('-').map(Number); let pm=mese-1,pa=anno; if(pm<1){pm=12;pa=anno-1}
-  const{data:tgts}=await sb.from('target_visite_mensili').select('tecnico_id,max_visite').eq('anno',pa).eq('mese',pm)
-  if(!tgts||!tgts.length){toast('Nessun target nel mese precedente','warn');return}
-  const map={};tgts.forEach(t=>map[t.tecnico_id]=t.max_visite); let n=0
-  document.querySelectorAll('#adm-target-tbody input[data-tec]').forEach(i=>{if(map[i.dataset.tec]!=null){i.value=map[i.dataset.tec];n++}})
-  toast('Copiati '+n+' target dal mese precedente — ricordati di salvare','ok')
-}
-window.admCopyLastMonth=admCopyLastMonth
 
 async function admLoadStats(){
   if(!isCoordPageUser()){toast('Accesso negato','err');return}
