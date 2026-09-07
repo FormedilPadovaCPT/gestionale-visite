@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Prendi i test dal repo segreteria
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: FormedilPadovaCPT/segreteria
           path: segreteria
