@@ -115,18 +115,35 @@ serve(async (req)=>{
     const all = await rpc.json()
     if(!Array.isArray(all)) throw new Error('RPC ricontrolli_pendenti: '+JSON.stringify(all))
 
+    // 08/09/2026: la mail va solo ai tecnici IN SERVIZIO. Il 07/09 il promemoria era partito anche
+    // verso mirco.canova@…, account cancellato (attivo=false, elimina=1): è tornato indietro con
+    // «indirizzo inesistente», e i suoi 42 cantieri con rientro scaduto non li ha visti nessuno.
+    // I cantieri dei tecnici non più in servizio finiscono in una mail a parte al coordinatore:
+    // vanno riassegnati, non dimenticati.
+    const tr = await fetch(`${SB_URL}/rest/v1/tecnici?select=email,attivo,elimina`, { headers:{ apikey:SRK, Authorization:`Bearer ${SRK}` } })
+    const tecniciTutti = await tr.json().catch(()=>[])
+    const inServizio = new Set((Array.isArray(tecniciTutti)?tecniciTutti:[]).filter((t:any)=>t.email && t.attivo!==false && !(Number(t.elimina)>0)).map((t:any)=>String(t.email).toLowerCase()))
+
     const byTec: Record<string, {email:string, nome:string, urgenti:any[], prossime:any[]}> = {}
+    const orfani: Record<string, {nome:string, rows:any[]}> = {}
     for(const r of all){
       if(r.categoria!=='urgente' && r.categoria!=='imminente') continue
-      if(!r.tecnico_email) continue
-      const k = r.tecnico_email.toLowerCase()
+      const k = String(r.tecnico_email||'').toLowerCase()
+      if(!k || !inServizio.has(k)){
+        const kk = k || (r.tecnico_nome||'senza tecnico')
+        if(!orfani[kk]) orfani[kk] = { nome:r.tecnico_nome||kk, rows:[] }
+        orfani[kk].rows.push(r)
+        continue
+      }
       if(!byTec[k]) byTec[k] = { email:r.tecnico_email, nome:r.tecnico_nome||'', urgenti:[], prossime:[] }
       ;(r.categoria==='urgente' ? byTec[k].urgenti : byTec[k].prossime).push(r)
     }
     for(const k in byTec){ byTec[k].urgenti.sort(ordinaUrgenti); byTec[k].prossime.sort(ordinaProssime) }
+    for(const k in orfani){ orfani[k].rows.sort((a,b)=> (a.categoria===b.categoria ? 0 : (a.categoria==='urgente'?-1:1)) || ordinaUrgenti(a,b)) }
 
     const riepilogo = Object.values(byTec).map(t=>({ tecnico:t.nome, email:t.email, urgenti:t.urgenti.length, imminenti:t.prossime.length, verbali_urgenti:t.urgenti.map(r=>r.nr_verbale), verbali_prossime:t.prossime.map(r=>r.nr_verbale) }))
-    if(dryRun) return new Response(JSON.stringify({ ok:true, dryRun:true, attivo, manuale, giorni, bcc:COORD, tecnici:riepilogo }, null, 2),{headers:{'Content-Type':'application/json',...CORS}})
+    const riepilogoOrfani = Object.values(orfani).map(o=>({ tecnico:o.nome, cantieri:o.rows.length }))
+    if(dryRun) return new Response(JSON.stringify({ ok:true, dryRun:true, attivo, manuale, giorni, bcc:COORD, tecnici:riepilogo, da_riassegnare:riepilogoOrfani }, null, 2),{headers:{'Content-Type':'application/json',...CORS}})
 
     const sa = JSON.parse(Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON')!)
     const token = await getToken(sa,'https://www.googleapis.com/auth/gmail.send')
@@ -148,7 +165,20 @@ serve(async (req)=>{
       try{ const id = await sendMail(token, t.email, `Scadenze visite di ritorno – ${nU} scaduti, ${nI} nei prossimi ${giorni} giorni`, html, COORD); esiti.push({email:t.email, ok:true, id, bcc:COORD}) }
       catch(e){ esiti.push({email:t.email, ok:false, err:String(e.message||e)}) }
     }
-    return new Response(JSON.stringify({ ok:true, manuale, giorni, bcc:COORD, inviate:esiti.filter(e=>e.ok).length, esiti }, null, 2),{headers:{'Content-Type':'application/json',...CORS}})
+    // i cantieri dei tecnici non più in servizio: una mail sola al coordinatore, da riassegnare
+    const listaOrfani = Object.values(orfani)
+    if(listaOrfani.length){
+      const tot = listaOrfani.reduce((s,o)=>s+o.rows.length,0)
+      const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#333;max-width:760px">`
+        + `<div style="background:#565c66;color:#fff;padding:12px 16px;border-radius:6px 6px 0 0"><strong>FORMEDIL PADOVA · Rientri di tecnici non più in servizio</strong></div>`
+        + `<div style="border:1px solid #eee;border-top:none;padding:16px;border-radius:0 0 6px 6px">`
+        + `<p>Questi <strong>${tot}</strong> cantieri hanno l'ultima visita di un tecnico che non è più in servizio (o senza indirizzo), quindi il promemoria non li manda a nessuno: vanno <strong>riassegnati</strong> dal gestionale, oppure chiusi se conclusi.</p>`
+        + listaOrfani.map(o=>`<h3 style="font-size:13px;color:#565c66;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 4px">${o.nome} · ${o.rows.length} cantieri</h3>`+tabella(o.rows.slice(0,80), true)+(o.rows.length>80?`<p style="font-size:12px;color:#888">…e altri ${o.rows.length-80}.</p>`:'')).join('')
+        + `</div></div>`
+      try{ const id = await sendMail(token, COORD, `Rientri scaduti di tecnici non più in servizio – ${tot} cantieri da riassegnare`, html); esiti.push({email:COORD, ok:true, id, orfani:tot}) }
+      catch(e){ esiti.push({email:COORD, ok:false, err:String(e.message||e), orfani:tot}) }
+    }
+    return new Response(JSON.stringify({ ok:true, manuale, giorni, bcc:COORD, inviate:esiti.filter(e=>e.ok).length, da_riassegnare:riepilogoOrfani, esiti }, null, 2),{headers:{'Content-Type':'application/json',...CORS}})
   }catch(e){
     console.error('promemoria-ricontrolli:', e)
     return new Response(JSON.stringify({error:String(e.message||e)}),{status:400,headers:{'Content-Type':'application/json',...CORS}})
