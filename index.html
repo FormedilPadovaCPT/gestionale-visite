@@ -5478,7 +5478,7 @@ async function loadScadenze(){
     for(let off=0;;off+=PAGE){
       const{data:vs,error:ev}=await sb.from('visite')
         .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,acc_cant,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_civico,cantiere_etichetta,comune_nome,lat,lng,geocode_status,cantiere_chiuso)')
-        .eq('elimina',0).order('data_visita',{ascending:false}).range(off,off+PAGE-1)
+        .eq('elimina',0).order('data_visita',{ascending:false}).order('nr_verbale',{ascending:false}).range(off,off+PAGE-1)
       if(ev){console.error('loadScadenze visite',ev);break}
       if(!vs||!vs.length)break
       visite=visite.concat(vs)
