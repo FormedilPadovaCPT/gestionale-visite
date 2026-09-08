@@ -1686,6 +1686,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <div class="sect-title" style="margin-top:10px;font-size:11px;color:var(--grey)">Dati identificativi cantiere</div>
     <div class="row">
       <div class="field"><label>Codice CNCE</label><input type="text" id="mc-cnce" placeholder="Cod. CNCE" maxlength="50"></div>
+      <div class="field"><label>Lotto <span style="font-weight:400;font-size:11px;color:#aaa">(se il complesso ha più lotti con lo stesso CNCE)</span></label><input type="text" id="mc-lotto" placeholder="es. 1, 2, A…" maxlength="30"></div>
       <div class="field"><label>Codice univoco cantiere</label><input type="text" id="mc-cod-uni" placeholder="Codice univoco" maxlength="50"></div>
     </div>
     <div class="field"><label>Data inizio lavori</label><input type="date" id="mc-data-inizio" onchange="_autoDurataCantiere()"></div>
@@ -3747,7 +3748,7 @@ $('btn-mi-save').onclick=async()=>{
 
 // ── MODAL CANTIERE ──
 function resetModalCantiere(){
-  ;['mc-ind','mc-civ','mc-etich','mc-cap','mc-cnce','mc-cod-uni','mc-data-inizio','mc-data-ult','mc-comune-cod','mc-tip-ope-altro','mc-descr'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  ;['mc-ind','mc-civ','mc-etich','mc-cap','mc-cnce','mc-lotto','mc-cod-uni','mc-data-inizio','mc-data-ult','mc-comune-cod','mc-tip-ope-altro','mc-descr'].forEach(id=>{const el=$(id);if(el)el.value=''})
   const com=$('mc-com');if(com){com.querySelectorAll('option[data-extra="1"]').forEach(o=>o.remove());com.value=''}
   window._editCantComuneOrig=null
   const ti=$('mc-tip-int');if(ti)ti.value=''
@@ -3978,6 +3979,7 @@ $('btn-mc-save').onclick=async()=>{
     cantiere_importo:+vGet('mc-importo')||null,
     cantiere_etichetta:vGet('mc-etich').trim()||null,
     cantiere_cnce:vGet('mc-cnce').trim()||null,
+    lotto:vGet('mc-lotto').trim()||null,
     nodo_id:vGet('mc-cod-uni').trim()||null,
     data_ult:vGet('mc-data-ult')||null,
     data_inizio_lavori:vGet('mc-data-inizio')||null,
@@ -9224,10 +9226,10 @@ async function sgrCercaDupCnce(){
   if(!window.__isSegreteria){toast('Funzione riservata alla segreteria','err');return}
   const box=$('sgr-dupcnce-list');if(!box)return
   box.innerHTML='<div style="color:rgba(255,255,255,.5);font-size:12px">Ricerca in corso…</div>'
-  const{data,error}=await sb.from('cantieri').select('cantiere_id,cantiere_cnce,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,created_at').eq('elimina',0).ilike('cantiere_cnce','CNCE%').limit(10000)
+  const{data,error}=await sb.from('cantieri').select('cantiere_id,cantiere_cnce,lotto,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,created_at').eq('elimina',0).ilike('cantiere_cnce','CNCE%').limit(10000)
   if(error){box.innerHTML='';toast('Errore: '+error.message,'err');return}
   const grp={}
-  ;(data||[]).forEach(c=>{const k=(c.cantiere_cnce||'').replace(/\s+/g,'').toUpperCase();if(!k)return;(grp[k]=grp[k]||[]).push(c)})
+  ;(data||[]).forEach(c=>{let k=(c.cantiere_cnce||'').replace(/\s+/g,'').toUpperCase();if(!k)return;if(c.lotto)k+=' · lotto '+String(c.lotto).trim();(grp[k]=grp[k]||[]).push(c)}) // stesso CNCE con lotti diversi = lotti di un complesso, non doppioni (08/09/2026)
   const dupli=Object.entries(grp).filter(([,v])=>v.length>1)
   if(!dupli.length){box.innerHTML='<div style="color:#95C22F;font-size:13px">✔ Nessun duplicato CNCE tra i cantieri attivi.</div>';return}
   const ids=dupli.flatMap(([,v])=>v.map(c=>c.cantiere_id))
@@ -11575,6 +11577,7 @@ async function admEditCantiere(cantId) {
   vSet('mc-etich', c.cantiere_etichetta || '')
   vSet('mc-cap', c.cantiere_cap || '')
   vSet('mc-cnce', c.cantiere_cnce || '')
+  vSet('mc-lotto', c.lotto || '')
   vSet('mc-cod-uni', c.nodo_id || '')
   vSet('mc-data-ult', c.data_ult || '')
   vSet('mc-data-inizio', c.data_inizio_lavori || '')
