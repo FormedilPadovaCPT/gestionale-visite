@@ -619,18 +619,13 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               </div>
               <input type="hidden" id="f-rlst">
             </div>
-            <div class="field" style="flex:0 0 auto">
-              <label style="white-space:nowrap;font-size:12px">Visita stage?</label>
-              <div class="tipo-chips" style="margin-top:5px">
-                <label class="tipo-chip"><input type="radio" name="stage-vis" id="f-stage-vis-si" value="si"><span>Sì</span></label>
-                <label class="tipo-chip"><input type="radio" name="stage-vis" id="f-stage-vis-no" value="no" checked><span>No</span></label>
-              </div>
-              <input type="hidden" id="f-stage-vis">
-            </div>
           </div>
-          <div id="field-nom-stage" style="display:none;margin-top:4px">
-            <div class="field" style="max-width:280px;margin-bottom:6px"><label>Nominativo stagista</label><input type="text" id="f-nom-stage" placeholder="Nome Cognome"></div>
-          </div>
+          <!-- Stage (10/09/2026): niente piu' Si/No a mano. Le visite stage partono
+               solo da un incarico della segreteria: agganciando l'incarico nel
+               Protocollo interno, lo stagista si prende da li'. -->
+          <input type="hidden" id="f-stage-vis">
+          <input type="hidden" id="f-nom-stage">
+          <div id="field-nom-stage" style="display:none;margin:4px 0 6px;font-size:12px;color:#8e44ad;background:#f5eefa;border:1px solid #e2d3ee;border-radius:6px;padding:6px 10px">&#127891; Visita stage — stagista: <strong id="f-nom-stage-lbl"></strong> <span id="f-nom-stage-orig" style="color:#888"></span></div>
           <div class="sect-title" style="margin-top:10px">Persona presente alla visita</div>
           <div class="row">
             <div class="field" style="flex:0 0 110px"><label>Titolo</label>
@@ -829,7 +824,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
           <div class="sect-title">Dati cantiere al momento della visita</div>
           <p style="font-size:12px;color:#888;margin:-4px 0 12px">
-            N° imprese e lavoratori (totali e di cui stranieri) vengono calcolati automaticamente
+            N° imprese e lavoratori vengono calcolati automaticamente
             dalle imprese inserite nella scheda <strong>Imprese</strong>, indicando i dipendenti in cantiere per ciascuna.
           </p>
           <div class="row">
@@ -2844,10 +2839,8 @@ async function initForm(snap=null){
   ;['f-tec2-display','f-tec2-id','f-tec2-email'].forEach(id=>vSet(id,''))
   // Pre-seleziona il tecnico loggato come Tecnico responsabile (dopo il reset dei select)
   if(S.tecnico&&S.tecnico.email){ setTecnicoFromEmail(S.tecnico.email); vSet('f-tec-id',S.tecnico.tecnico_id||'') }
-  // reset stage toggle a No
-  const stageVisNo=$('f-stage-vis-no'); if(stageVisNo)stageVisNo.checked=true
-  const stageVisH=$('f-stage-vis'); if(stageVisH)stageVisH.value=''
-  $('field-nom-stage').style.display='none'
+  // stage: si azzera, lo rimette l'aggancio a un incarico stage
+  _stageDaInc=null; stageMostra('', false)
   const rlstNo=$('f-rlst-no'); if(rlstNo)rlstNo.checked=true
   const rlstH=$('f-rlst'); if(rlstH)rlstH.value=''
   ;['f-privacy','f-note-for-sn','f-segnalazione'].forEach(id=>cSet(id,false))
@@ -2951,15 +2944,7 @@ function removeLav(i){
   renderLavTags()
 }
 
-// Toggle: si tratta di visita stage? → apre il campo nome
-document.querySelectorAll('input[name="stage-vis"]').forEach(r=>{
-  r.onchange=()=>{
-    const isSi=r.value==='si'
-    $('field-nom-stage').style.display=isSi?'block':'none'
-    const h=$('f-stage-vis'); if(h)h.value=isSi?'1':''
-    if(!isSi)vSet('f-nom-stage','')
-  }
-})
+// Stage: il Si/No a mano e' stato tolto il 10/09/2026, vedi stageDaIncarico()
 
 // Toggle: affiancamento RLST Sì/No → aggiorna hidden field
 document.querySelectorAll('input[name="rlst-aff"]').forEach(r=>{
@@ -3075,7 +3060,6 @@ function impreseAccordionHTML(im,idx){
         <div class="field"><label>Cap./Prep. – Nome</label><input type="text" id="im-capo_nome-${idx}" value="${capNome}" placeholder="Nome"></div>
         <div class="field"><label>Cap./Prep. – Cognome</label><input type="text" id="im-capo_cog-${idx}" value="${capCog}" placeholder="Cognome"></div>
         <div class="field" style="flex:0 0 170px"><label>N° lavoratori in cantiere</label><input type="number" id="im-nr_lav-${idx}" min="0" value="${im.nr_lav||0}"></div>
-        <div class="field" style="flex:0 0 140px"><label>di cui stranieri</label><input type="number" id="im-nr_lav_str-${idx}" min="0" value="${im.nr_lav_str||0}"></div>
       </div>
       <div class="row">
         <div class="field"><label>Email invio verbale</label><input type="email" id="im-email_verbale-${idx}" value="${im.email_verbale||''}" placeholder="Lascia vuoto per usare quella in anagrafica…"></div>
@@ -4358,13 +4342,11 @@ function applySnap(snap){
     const rSi=$('f-rlst-si'),rNo=$('f-rlst-no')
     if(rSi)rSi.checked=v; if(rNo)rNo.checked=!v
   }
-  // Stage
+  // Stage: si ricarica com'era salvato; se la visita e' agganciata a un
+  // incarico stage, l'aggancio lo riallinea al nominativo dell'incarico
   if(snap.stage_vis!=null){
     const v=snap.stage_vis==='1'||snap.stage_vis===true||snap.stage_vis==='si'
-    vSet('f-stage-vis',v?'1':'0')
-    const rSi=$('f-stage-vis-si'),rNo=$('f-stage-vis-no')
-    if(rSi)rSi.checked=v; if(rNo)rNo.checked=!v
-    if(v&&snap.nom_stage){vSet('f-nom-stage',snap.nom_stage);const el=$('field-nom-stage');if(el)el.style.display=''}
+    _stageDaInc=null; stageMostra(v?(snap.nom_stage||''):'', v)
   }
   // Persona presente
   if(snap.ppre_titolo)vSet('f-ppre-titolo',snap.ppre_titolo)
@@ -4904,7 +4886,7 @@ function buildRiepilogo(){
     ['Impresa principale',S.imprese[0]?.impresa_nome||'-'],
     ['Tecnico',vGet('f-tec-display')],
     ['N° imprese',String(computeImpTotals().nr_imp)],
-    ['N° lavoratori',`${computeImpTotals().nr_lavoratori} (di cui stranieri: ${computeImpTotals().nr_lavoratori_stranieri})`],
+    ['N° lavoratori',String(computeImpTotals().nr_lavoratori)],
     ['Visita di ritorno',ritornoTxt],
   ].map(([k,v])=>`<div class="rp-item"><div class="rp-k">${k}</div><div class="rp-v">${v||'-'}</div></div>`).join('')
 
@@ -5037,7 +5019,7 @@ async function loadDash(){
       rlst:!!r.rlst_sn, acc:+r.acc_cant||0, tec:r.tecnico_id, tipo:r.tipo_accesso, cid:r.cantiere_id||null,
       ncp:+r.ipc_nc_plus||0, ncm:+r.ipc_nc_minus||0, oss:+r.ipc_oss||0,
       comune:c.comune_nome||null, tipint:c.cantiere_tip_int||null, tipope:c.cantiere_tip_ope||null, importo:c.cantiere_importo||null,
-      ruolo:(p&&p.tipo_imp)||null, ceiv:((p&&p.imprese&&p.imprese.cassa_edile)||'').trim()||'Altro',
+      ruolo:(p&&p.tipo_imp)||null, ceiv:_ceivDash(p&&p.imprese&&p.imprese.cassa_edile),
       impnome:(p&&p.imprese&&p.imprese.impresa_nome)||null, impid:(p&&p.impresa_id)||null,
       eserc:_esercizioDa(r.data_visita)
     }
@@ -5311,6 +5293,15 @@ function _dashRenderCeiv(F){
   _mkChart('ch-ceiv',{type:'doughnut',data:{labels:L,datasets:[{data:L.map(l=>m[l]),backgroundColor:L.map((lb,i)=>_ceivCol(lb,i)),borderWidth:2}]},options:{plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:14,generateLabels(ch){return ch.data.labels.map((lb,i)=>({text:lb+' – '+ch.data.datasets[0].data[i]+' ('+Math.round(ch.data.datasets[0].data[i]/tot*100)+'%)',fillStyle:_ceivCol(lb,i),strokeStyle:'#fff',lineWidth:1,index:i}))}}}}}})
 }
 
+
+/* Cassa edile nella dashboard (10/09/2026): «ALTRO» della tendina, la
+   vecchia «Iscritta altra Cassa» e l'impresa senza cassa indicata sono la
+   stessa voce, «Altro». Prima comparivano «Altro» e «ALTRO» distinti. */
+function _ceivDash(v){
+  const s=String(v||'').trim()
+  if(!s||/^altr[oa]$/i.test(s)||/altra\s+cassa/i.test(s)) return 'Altro'
+  return s
+}
 
 // ── MAPPA CANTIERI (dashboard) ──
 let _dashMap=null, _dashMapLayers=null
@@ -8005,20 +7996,19 @@ async function genPDF(vid, output='save'){
       const piva=im.imprese?.piva||(im.impresa_id&&!/^\d{1,6}$/.test(im.impresa_id)?im.impresa_id:'')||''
       const email=im.imprese?.impresa_email_ref||'–'
       const nomeCell=`${i+1}. ${nome}`
-      const nrLav=+im.nr_lav||0, nrLavStr=+im.nr_lav_str||0
+      const nrLav=+im.nr_lav||0
       impsRows.push([
         {content:nomeCell,styles:{fontStyle:'bold'}},
         {content:ruolo,styles:{halign:'center'}},
         {content:piva||'–'},
         {content:cf},
         {content:String(nrLav),styles:{halign:'center'}},
-        {content:String(nrLavStr),styles:{halign:'center'}},
         {content:email,styles:{fontSize:6.5}}
       ])
       const _noteImp=(im.note_fasilav||'').trim()
-      if(_noteImp)impsRows.push([{content:'Note fasi/lavorazione (questa impresa): '+_noteImp,colSpan:7,styles:{fontSize:7,fontStyle:'italic',textColor:[90,90,90],fillColor:[248,248,248]}}])
+      if(_noteImp)impsRows.push([{content:'Note fasi/lavorazione (questa impresa): '+_noteImp,colSpan:6,styles:{fontSize:7,fontStyle:'italic',textColor:[90,90,90],fillColor:[248,248,248]}}])
     })
-    if(!impsRows.length) impsRows.push([{content:'Nessuna impresa registrata',colSpan:7,styles:{halign:'center',textColor:[180,180,180]}}])
+    if(!impsRows.length) impsRows.push([{content:'Nessuna impresa registrata',colSpan:6,styles:{halign:'center',textColor:[180,180,180]}}])
 
     doc.autoTable({startY:y,
       head:[[
@@ -8027,7 +8017,6 @@ async function genPDF(vid, output='save'){
         {content:'P.IVA',styles:{fontStyle:'bold',cellWidth:26}},
         {content:'Cod. fiscale',styles:{fontStyle:'bold',cellWidth:28}},
         {content:'N° lav.',styles:{fontStyle:'bold',cellWidth:14,halign:'center'}},
-        {content:'di cui stran.',styles:{fontStyle:'bold',cellWidth:16,halign:'center'}},
         {content:'Email verbale',styles:{fontStyle:'bold',cellWidth:40}}
       ]],
       body:impsRows,
@@ -8084,7 +8073,6 @@ async function genPDF(vid, output='save'){
         [{content:'Importo lavori (€)',styles:{fontStyle:'bold',fillColor:LBL}},{content:impLbl},{content:'Durata cantiere',styles:{fontStyle:'bold',fillColor:LBL}},{content:durLbl}],
         [{content:'Codice CNCE',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.cantiere_cnce||'–'},{content:'Codice univoco',styles:{fontStyle:'bold',fillColor:LBL}},{content:cant.nodo_id||'–'}],
         [{content:'N° imprese in cantiere',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).filter(im=>im.impresa_id).length||v.nr_imp||1)},{content:'Totale lavoratori',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).reduce((s,im)=>s+(+im.nr_lav||0),0)||v.nr_lavoratori||0)}],
-        [{content:'di cui stranieri',styles:{fontStyle:'bold',fillColor:LBL}},{content:String((imps||[]).reduce((s,im)=>s+(+im.nr_lav_str||0),0)||v.nr_lavoratori_stranieri||0)},{content:'',colSpan:2}],
         [{content:'Lavorazioni in corso',styles:{fontStyle:'bold',fillColor:LBL}},{content:_lavTextC,colSpan:3}],
         [{content:'Note lavorazioni',styles:{fontStyle:'bold',fillColor:LBL}},{content:_noteLavC,colSpan:3}]
       ],
@@ -11704,7 +11692,7 @@ async function showVisitaDetail(vid){
     html+=qdDl([
       ['Data',fmtDate(v.data_visita)],['Ora',ora],['Tecnico',tec],
       ['Tipo accesso',_TIPO_ACC[v.tipo_accesso]||''],['N° accesso',v.acc_cant||''],
-      ['Lavoratori',v.nr_lavoratori!=null?`${v.nr_lavoratori} (stranieri: ${v.nr_lavoratori_stranieri||0})`:''],
+      ['Lavoratori',v.nr_lavoratori!=null?String(v.nr_lavoratori):''],
       ['NC+ / NC- / OSS',[v.ipc_nc_plus,v.ipc_nc_minus,v.ipc_oss].map(x=>x||0).join(' / ')],
     ])
     if(cant){
@@ -12988,7 +12976,9 @@ window.incImportaFile=incImportaFile
 const INC_COL={'Sopralluogo urgente in Cantiere':'#c0392b','Sopralluogo in Cantiere - Visita singola':'#e7500f',
   'Serie di visite':'#e7500f','Sopralluogo in Azienda AUDIT ASL/STAGE':'#8e44ad','Conferenza di Cantiere':'#2980b9',
   'Sopralluogo per Asseverazione - MOG':'#16a085','Informazioni':'#7f8c8d','Consulenza Telefonica':'#7f8c8d',
-  'Consulenza in sede CPT':'#7f8c8d','Informazioni Rapporto di sopralluogo in cantiere':'#7f8c8d'}
+  'Consulenza in sede CPT':'#7f8c8d','Informazioni Rapporto di sopralluogo in cantiere':'#7f8c8d',
+  /* le consulenze con uscita create dall'app segreteria (10/09/2026) */
+  'Consulenza in sede Impresa':'#2c7a7b','Consulenza in Cantiere':'#2c7a7b'}
 let _incCache=[]
 async function loadIncarichi(){
   if(!$('inc-list')||!S.user) return
@@ -13082,7 +13072,13 @@ function renderIncarichi(){
           ? '<span style="font-size:11px;color:#c0392b">hai dichiarato di non essere disponibile</span> <a href="#" style="font-size:11px;color:#999" onclick="incAnnullaRifiuto('+r.id+');return false">annulla</a>'
           : acc
           ? '<span style="font-size:11px;color:#2d7a06">✓ accettato</span> <button class="btn-primary btn-sm" onclick="incNuovaVisita('+r.id+')">➕ Nuova visita</button>'
-          : (vis?'':'<button class="btn-outline btn-sm" onclick="incPresaVisione('+r.id+',this)">Presa visione</button> ')
+          /* Visita allo stagista (10/09/2026): un tasto solo. Accetta
+             l'incarico e apre la visita con allievo, ditta e cantiere gia'
+             compilati dall'elenco della Scuola, tutto modificabile. */
+          : ((typeof window.stageRelPertinente==='function'&&window.stageRelPertinente(r))
+              ?'<button class="btn-primary btn-sm" title="Accetta l\'incarico e apre la visita con allievo, ditta e cantiere gia\' compilati (tutto modificabile)" onclick="incNuovaVisita('+r.id+',true)">➕ Fai la visita</button> '
+              :'')
+            +(vis?'':'<button class="btn-outline btn-sm" onclick="incPresaVisione('+r.id+',this)">Presa visione</button> ')
             +'<button class="btn-sm" style="background:#95C22F;border:1px solid #7aa527;color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer" onclick="incAccetta('+r.id+')">✅ Accetto</button> '
             +'<button class="btn-outline btn-sm" onclick="incRifiuta('+r.id+')">✋ Non posso</button>')
       /* Visite allo stagista: non c'e' il rapporto di cantiere, c'e' la
@@ -13300,20 +13296,79 @@ window.incRiassegna=incRiassegna
    richiesta nel Protocollo interno e, se il cantiere e' noto, cantiere
    selezionato. E' il senso dell'accettazione: non ricercare a mano
    quello che la segreteria ha gia' scritto. */
-async function incNuovaVisita(id){
+async function incNuovaVisita(id,accetta){
   const r=_incCache.find(x=>x.id===id)
   if(!r)return
+  /* «Fai la visita» sugli stage accetta da se', come «Accetto» mette da se'
+     la presa visione: il gesto dice gia' che la visita la fa lui. */
+  if(accetta&&!r.accettato_il){
+    const ora=new Date().toISOString()
+    const patch={accettato_il:ora,accettato_da:S.user.email,rifiutato_il:null,rifiutato_da:null,rifiuto_motivo:null}
+    if(!r.presa_visione_il){patch.presa_visione_il=ora;patch.presa_visione_da=S.user.email}
+    const{error}=await sb.from('incarichi').update(patch).eq('id',id)
+    if(error){toast('Accettazione non riuscita: '+error.message,'err');return}
+    Object.assign(r,patch)
+    if(typeof incAggiornaNavBadge==='function') incAggiornaNavBadge()
+  }
   initForm();navTo('form')
   setTimeout(async()=>{
     vSet('f-prot-int',String(id))
     const _sel=$('f-prot-inc'); if(_sel) _sel.value=String(id)
     if(typeof incVerificaProt==='function') incVerificaProt()
-    if(!r.cantiere_id)return
+    /* l'impresa principale dall'incarico (anche per le visite non stage):
+       la segreteria l'ha gia' agganciata all'anagrafica */
+    await incPrecompilaImpresa(r)
+    if(!r.cantiere_id){ incPrecompilaCantiere(r); return }
     const{data:c}=await sb.from('cantieri').select('*').eq('cantiere_id',r.cantiere_id).maybeSingle()
     if(!c){toast('Il cantiere indicato dalla segreteria non e\' piu\' in archivio: cercalo a mano','warn');return}
     if(typeof _useCantiereEsistente==='function') await _useCantiereEsistente(c)
     else{vSet('f-cant-id',c.cantiere_id);S.fd.cantiere_id=c.cantiere_id}
   },120)
+}
+
+/* L'impresa dell'incarico diventa l'impresa principale della visita, se il
+   tecnico non ne ha gia' scelta una. In anagrafica → selezionata come
+   esistente; solo col nome → il nome resta scritto e il tecnico completa. */
+async function incPrecompilaImpresa(r){
+  for(let k=0;k<20&&!(S.imprese&&S.imprese.length);k++) await new Promise(res=>setTimeout(res,100))
+  if(!S.imprese||!S.imprese.length) return
+  const pi=S.imprese.findIndex(x=>x.is_principale); const idx=pi>=0?pi:0
+  if(S.imprese[idx].impresa_id||S.imprese[idx].impresa_nome) return
+  if(r.impresa_id&&typeof _useImpresaEsistente==='function'){
+    const{data:c}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,tipo_iscrizione_ccia,contratto_ccnl').eq('impresa_id',r.impresa_id).maybeSingle()
+    if(c){ _useImpresaEsistente(c,idx); return }
+  }
+  if(r.impresa){
+    S.imprese[idx].impresa_nome=r.impresa
+    if(typeof renderImpreseAccordion==='function') renderImpreseAccordion()
+    toast('Impresa presa dall\'incarico ma non in anagrafica: completa i dati','warn')
+  }
+}
+
+/* Nessun cantiere agganciato (le visite stage): si apre la scheda «Nuovo
+   cantiere» gia' compilata con via, civico e comune dell'incarico. Il tecnico
+   controlla e salva; se esiste gia' un cantiere simile, il salvataggio lo
+   propone da se' (findSimiliCantieri) invece di creare un doppione. */
+function incPrecompilaCantiere(r){
+  const testo=String(r.indirizzo||'').trim()
+  const cn=String(r.comune||'').trim()
+  if(!testo&&!cn) return
+  let via=testo, civ=''
+  const m=testo.match(/^(.*?)[\s,]+(\d+[a-zA-Z]?(?:\s*[\/-]\s*\d+[a-zA-Z]?)*)\s*$/)
+  if(m&&m[1].trim()){ via=m[1].trim().replace(/[\s,]+$/,''); civ=m[2].replace(/\s+/g,'') }
+  if(typeof hideCantCard==='function') hideCantCard()
+  if(typeof resetModalCantiere==='function') resetModalCantiere()
+  vSet('mc-ind',via); vSet('mc-civ',civ)
+  const comSel=$('mc-com')
+  if(comSel&&cn){
+    const nc=(s)=>typeof _normCom==='function'?_normCom(s):String(s||'').toLowerCase().trim()
+    const opt=[...comSel.options].find(o=>nc(o.value)===nc(cn)||nc(o.textContent)===nc(cn))
+    if(opt) comSel.value=opt.value
+    else{ const o=document.createElement('option'); o.value=cn; o.textContent=cn+' (fuori elenco)'; o.dataset.extra='1'; comSel.appendChild(o); comSel.value=cn }
+    comSel.dispatchEvent(new Event('change',{bubbles:true}))
+  }
+  show('modal-cant')
+  toast('Cantiere proposto dall\'incarico: controlla via, civico e comune e salva','ok')
 }
 window.incNuovaVisita=incNuovaVisita
 
@@ -13434,9 +13489,44 @@ async function incCaricaTendina(){
 }
 window.incCaricaTendina=incCaricaTendina
 
+/* ── STAGISTA DALL'INCARICO ───────────────────────────────────────────
+   Chiesto dall'utente il 10/09/2026: le visite stage partono SOLO da un
+   incarico della segreteria, quindi il Si/No e il nominativo scritto a
+   mano sono stati tolti. Agganciando l'incarico (Protocollo interno) se
+   ne guarda il tipo: se e' uno stage la visita e' stage, e lo stagista e'
+   il nominativo scritto nell'incarico (testo_richiesta, come arriva da
+   Access — stessa lettura di stage-relazione.js). Se l'aggancio cambia,
+   il dato messo dall'incarico si toglie; quello salvato su una visita
+   vecchia senza incarico resta com'era. */
+var _stageDaInc=null, _stageReq=0
+function stageMostra(nome, on, origine){
+  vSet('f-stage-vis', on?'1':'')
+  vSet('f-nom-stage', on?(nome||''):'')
+  const box=$('field-nom-stage'); if(!box) return
+  box.style.display=on?'':'none'
+  const lbl=$('f-nom-stage-lbl'); if(lbl) lbl.textContent=nome||'nominativo non indicato nell\'incarico'
+  const o=$('f-nom-stage-orig'); if(o) o.textContent=origine||''
+}
+async function stageDaIncarico(v){
+  const req=++_stageReq
+  const togli=()=>{ if(_stageDaInc!=null){ _stageDaInc=null; stageMostra('', false) } }
+  if(!/^\d+$/.test(v||'')){ togli(); return }
+  try{
+    const{data:inc}=await sb.from('incarichi').select('id,tipo_richiesta,testo_richiesta').eq('id',+v).maybeSingle()
+    if(req!==_stageReq) return
+    if(!inc||!/stage/i.test(String(inc.tipo_richiesta||''))){ togli(); return }
+    const t=String(inc.testo_richiesta||'').trim()
+    const nome=(t&&t.length<=60&&!/\n/.test(t))?t:''
+    _stageDaInc=v
+    stageMostra(nome, true, '(dall\'incarico n. '+inc.id+')')
+  }catch(e){ console.warn('stage da incarico:', e) }
+}
+window.stageDaIncarico=stageDaIncarico
+
 function incVerificaProt(){
   const msg=$('f-prot-msg'); if(!msg) return
   const v=(vGet('f-prot-int')||'').trim()
+  stageDaIncarico(v)
   if(!v){ msg.textContent=''; return }
   if(!/^\d+$/.test(v)){ msg.innerHTML='<span style="color:#888">Testo libero: nessun incarico verrà agganciato.</span>'; return }
   const m=(_incApertiCache||[]).find(r=>String(r.id)===v)
