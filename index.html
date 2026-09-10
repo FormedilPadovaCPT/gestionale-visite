@@ -943,7 +943,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div class="save-actions">
             <button class="btn-secondary" id="btn-bozza">💾 Salva bozza</button>
             <button class="btn-primary" id="btn-final">✅ Definitivo</button>
-            <button class="btn-outline" id="btn-snap-exp">📤 Snapshot</button>
             <button class="btn-success hidden" id="btn-pdf">🖨 PDF</button>
             <button class="btn-outline hidden" id="btn-email-verbale" style="border-color:var(--grey);color:var(--grey)">📧 Invia verbale</button>
           </div>
@@ -1033,32 +1032,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
         <div id="rub-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">
           <p style="color:#aaa;font-size:13px;grid-column:1/-1">Digita nella barra di ricerca per trovare un contatto.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- IMPORTA -->
-    <section id="view-import" class="hidden">
-      <div class="card">
-        <h3>Importa snapshot visita</h3>
-        <p style="font-size:13px;color:#888;margin-bottom:14px">
-          Carica un file .json esportato in precedenza. Potrai modificare tutti i dati
-          (inclusa l'impresa principale) prima di salvare come nuova visita.
-        </p>
-        <div class="drop-zone" id="drop-zone">
-          <p style="font-size:15px">📂 Trascina qui il file .json</p>
-          <small>oppure clicca per selezionare</small>
-          <input type="file" id="file-imp" accept=".json" style="display:none">
-        </div>
-        <div id="imp-preview" class="hidden" style="margin-top:14px">
-          <div class="card" style="box-shadow:none;border:1px solid var(--border)">
-            <h4 style="margin-bottom:8px;color:var(--grey)">Snapshot rilevato</h4>
-            <div id="imp-info" style="font-size:13px;line-height:1.8"></div>
-            <div style="margin-top:12px;display:flex;gap:8px">
-              <button class="btn-primary" id="btn-load-snap">Apri nel form</button>
-              <button class="btn-outline" id="btn-cancel-imp">Annulla</button>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -2074,19 +2047,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
   </div>
 </div>
 
-<!-- CONFIRM VERBALE (per snapshot) -->
-<div class="modal-overlay hidden" id="modal-verbale">
-  <div class="confirm-box">
-    <h3>Numero verbale</h3>
-    <p id="conf-verb-txt"></p>
-    <div class="confirm-actions">
-      <button class="btn-outline" id="btn-verb-mantieni">Mantieni originale</button>
-      <button class="btn-primary" id="btn-verb-nuovo">Assegna nuovo progressivo</button>
-    </div>
-  </div>
-</div>
-
-
 <!-- MODAL FIRME TECNICI -->
 <div class="modal-overlay hidden" id="modal-firme">
   <div class="modal-box" style="max-width:560px;max-height:85vh;overflow-y:auto">
@@ -2262,9 +2222,7 @@ let S={
   imprese:[],   // [{impresa_id,impresa_nome,att,nom_prec,...,tip_imp,certif:[]}]
   lavorazioni:[],
   tab:0,
-  savedId:null,
-  // callback per dialog verbale
-  _verbCb:null
+  savedId:null
 }
 const TOTAL_TABS=15 // 0..14
 
@@ -2429,7 +2387,7 @@ function showScr(n){
 }
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','cantieri','rubrica','import','scadenze','incarichi','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
   if(view==='form'&&typeof incCaricaTendina==='function')incCaricaTendina().catch(e=>console.warn('incCaricaTendina:',e))
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
@@ -2674,17 +2632,6 @@ function buildTabs(){
     b.onclick=()=>{saveTabData();activateTab(n);renderZoneTab(n)}
     bar.appendChild(b)
   })
-  // Voce "Importa" spostata qui dal menu principale: è dal form
-  // che si decide di importare una visita da file
-  const _sepImp=document.createElement('div')
-  _sepImp.style.cssText='border-top:1px solid var(--border);margin:10px 0 4px'
-  bar.appendChild(_sepImp)
-  const _btnImp=document.createElement('button')
-  _btnImp.className='tab-btn'
-  _btnImp.textContent='📥 Importa visita'
-  _btnImp.title='Importa una visita da file (ex pagina Importa)'
-  _btnImp.onclick=()=>navTo('import')
-  bar.appendChild(_btnImp)
   // Build zone tab divs 3–12 if not already present (zone 1–10)
   const ref=$('[data-tab="13"]')
   const tabArea=document.querySelector('#view-form .tab-area')
@@ -2908,7 +2855,7 @@ async function initForm(snap=null){
   ;['f-nr-lav','f-nr-lav-str','f-nr-imp','f-nr-ind'].forEach(id=>vSet(id,'0'))
 
   buildLavChecks()
-  $('form-title').textContent=snap?'Nuova visita da snapshot':'Nuova Visita'
+  $('form-title').textContent=snap?.visita_id?'Modifica visita':'Nuova Visita'
 
   if(snap){
     applySnap(snap)
@@ -4522,14 +4469,6 @@ function applySnap(snap){
 
 $('btn-bozza').onclick=()=>saveVisita('bozza')
 $('btn-final').onclick=()=>saveVisita('definitivo')
-$('btn-snap-exp').onclick=()=>{
-  saveTabData()
-  const snap=buildSnap()
-  const blob=new Blob([JSON.stringify(snap,null,2)],{type:'application/json'})
-  const url=URL.createObjectURL(blob)
-  const a=document.createElement('a');a.href=url;a.download=`snap_${snap.nr_verbale_origine||'visita'}.json`;a.click();URL.revokeObjectURL(url)
-  toast('Snapshot esportato','ok')
-}
 
 // ── TECNICI ───────────────────────────────────────────────────────────────────
 // Recupera o crea il record tecnico nel DB per una voce di TECNICI_LIST
@@ -5822,7 +5761,6 @@ function vtRow(v){
       +(isBozza?`<button class="btn-warn btn-sm" data-act="riapri" data-id="${v.visita_id}" title="Riapri bozza">✏️ Riapri</button>`:(coord?`<button class="btn-warn btn-sm" data-act="modvis" data-id="${v.visita_id}" title="Modifica visita (coordinatore)">✏️ Modifica</button>`:''))
       +`<button class="btn-primary btn-sm" data-act="pdf" data-id="${v.visita_id}">PDF</button>`
       +`<button class="btn-outline btn-sm" data-act="email" data-id="${v.visita_id}" title="Invia verbale via email">📧</button>`
-      +`<button class="btn-outline btn-sm" data-act="snap" data-id="${v.visita_id}">📤</button>`
       +(coord?`<button class="btn-outline btn-sm" data-act="softdel" data-id="${v.visita_id}" data-nr="${nr}" title="Metti in eliminata" style="color:#c0392b">🗑</button>`:'')
   }
   return`<tr class="row-detail-hover" data-act="detail-visita" data-id="${v.visita_id}"${isElim?' style="opacity:.55"':''}>
@@ -5839,7 +5777,6 @@ function bindRowActions(){
   document.querySelectorAll('[data-act="modvis"]').forEach(b=>b.onclick=e=>{e.stopPropagation();modificaVisitaCoord(b.dataset.id)})
   document.querySelectorAll('[data-act="pdf"]').forEach(b=>b.onclick=e=>{e.stopPropagation();genPDF(b.dataset.id)})
   document.querySelectorAll('[data-act="email"]').forEach(b=>b.onclick=e=>{e.stopPropagation();inviEmailVerbaleFromList(b.dataset.id)})
-  document.querySelectorAll('[data-act="snap"]').forEach(b=>b.onclick=e=>{e.stopPropagation();exportSnapFromDB(b.dataset.id)})
   document.querySelectorAll('[data-act="softdel"]').forEach(b=>b.onclick=e=>{e.stopPropagation();softDeleteVisita(b.dataset.id,b.dataset.nr)})
   document.querySelectorAll('[data-act="restore"]').forEach(b=>b.onclick=e=>{e.stopPropagation();restoreVisita(b.dataset.id,b.dataset.nr)})
   document.querySelectorAll('[data-act="chiudi-cant"]').forEach(b=>b.onclick=e=>{e.stopPropagation();chiudiCantiere(b.dataset.id,b.dataset.lbl)})
@@ -7758,69 +7695,6 @@ $('btn-ev-invia').onclick=async()=>{
   }
 }
 
-// ── IMPORT SNAPSHOT ──
-let pendingSnap=null
-const dz=$('drop-zone')
-dz.onclick=()=>$('file-imp').click()
-dz.ondragover=e=>{e.preventDefault();dz.classList.add('drag-over')}
-dz.ondragleave=()=>dz.classList.remove('drag-over')
-dz.ondrop=e=>{e.preventDefault();dz.classList.remove('drag-over');if(e.dataTransfer.files[0])readSnapFile(e.dataTransfer.files[0])}
-$('file-imp').onchange=e=>{if(e.target.files[0])readSnapFile(e.target.files[0])}
-
-function readSnapFile(f){
-  const r=new FileReader()
-  r.onerror=()=>toast('Errore lettura file','err')
-  r.onload=e=>{
-    try{
-      pendingSnap=JSON.parse(e.target.result)
-      if(!pendingSnap||typeof pendingSnap!=='object'){throw new Error('Formato JSON non riconosciuto')}
-      $('imp-info').innerHTML=`
-        <p><b>Verbale origine:</b> ${pendingSnap.nr_verbale_origine||'N/D'}</p>
-        <p><b>Cantiere:</b> ${pendingSnap.cantiere_label||'N/D'}</p>
-        <p><b>Impresa principale:</b> ${pendingSnap.imprese?.[0]?.impresa_nome||'N/D'}</p>
-        <p><b>Voci compilate:</b> ${Object.keys(pendingSnap.checklist||{}).length}</p>
-        <p><b>Esportato:</b> ${pendingSnap.exported_at?new Date(pendingSnap.exported_at).toLocaleString('it-IT'):'N/D'}</p>`
-      show('imp-preview')
-    }catch(err){toast('File JSON non valido: '+err.message,'err');console.error(err)}
-  }
-  r.readAsText(f)
-}
-
-$('btn-load-snap').onclick=async()=>{
-  if(!pendingSnap)return
-  // Dialog: mantenere o assegnare nuovo verbale?
-  const origNr=pendingSnap.nr_verbale_origine
-  $('conf-verb-txt').innerHTML=`Verbale originale: <strong>${origNr||'N/D'}</strong><br><br>Vuoi mantenere il numero originale o assegnarne uno nuovo?`
-  show('modal-verbale')
-  S._verbCb=async(mantieni)=>{
-    try{
-      hide('modal-verbale')
-      const snapToLoad=pendingSnap
-      pendingSnap=null
-      await initForm(snapToLoad)
-      if(mantieni&&origNr){
-        // Mantieni numero originale → aggiorna la visita esistente (UPDATE)
-        vSet('f-verbale',origNr)
-        S.fd.nr_verbale=origNr
-      } else {
-        // Nuovo progressivo → scollega dall'identità originale per creare una nuova visita (INSERT)
-        S.savedId=null
-        S.fd.visita_id=null
-        // applySnap ora ripristina il numero originale: qui serve un nuovo progressivo
-        const _nn=await nextVerbale()
-        vSet('f-verbale',_nn)
-        S.fd.nr_verbale=_nn
-      }
-      hide('imp-preview')
-      navTo('form')
-      toast(mantieni?`Verbale ${origNr} mantenuto`:'Nuovo progressivo assegnato — visita originale conservata','ok')
-    }catch(e){toast('Errore importazione: '+e.message,'err');console.error('Import error:',e)}
-  }
-}
-$('btn-verb-mantieni').onclick=()=>S._verbCb?.(true)
-$('btn-verb-nuovo').onclick=()=>S._verbCb?.(false)
-$('btn-cancel-imp').onclick=()=>{pendingSnap=null;hide('imp-preview')}
-
 // ── RIAPRI BOZZA ──
 async function riapriBozza(vid){
   toast('Caricamento bozza…')
@@ -7832,7 +7706,7 @@ async function riapriBozza(vid){
     if(snapRow?.snapshot){
       snap=snapRow.snapshot
     }else{
-      // 2) Ricostruisce lo snapshot dai dati del DB (stessa logica di exportSnapFromDB)
+      // 2) Ricostruisce lo snapshot dai dati del DB (stessa logica di rebuildSnapFromDB)
       const{data:v}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*)`).eq('visita_id',vid).single()
       if(!v){toast('Visita non trovata','err');return}
       const{data:chkRows}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
@@ -7886,113 +7760,6 @@ async function riapriBozza(vid){
     navTo('form')
     toast(`Bozza ${snap.nr_verbale_origine||''} riaperta — completa e salva come Definitivo`,'ok')
   }catch(e){toast('Errore apertura bozza: '+e.message,'err');console.error(e)}
-}
-
-// ── EXPORT SNAP FROM DB ──
-async function exportSnapFromDB(vid){
-  // 1) Prova prima lo snapshot salvato
-  const{data:snapRow}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).maybeSingle()
-  if(snapRow?.snapshot){
-    const blob=new Blob([JSON.stringify(snapRow.snapshot,null,2)],{type:'application/json'})
-    const url=URL.createObjectURL(blob)
-    const a=document.createElement('a');a.href=url;a.download=`snap_${snapRow.snapshot.nr_verbale_origine||vid}.json`;a.click();URL.revokeObjectURL(url)
-    toast('Snapshot esportato','ok');return
-  }
-  // 2) Fallback: ricostruisce lo snapshot dai dati del DB
-  toast('Ricostruzione snapshot dal DB…')
-  try{
-    const{data:v}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*)`).eq('visita_id',vid).single()
-    if(!v){toast('Visita non trovata','err');return}
-    const{data:chkRows}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
-    const{data:lavRows}=await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid)
-    const{data:impRows}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva)').eq('visita_id',vid).order('ordine')
-    // Ricostruisce checklist e note
-    const checklist={},note_checklist={}
-    ;(chkRows||[]).forEach(r=>{
-      if(r.valore)checklist[r.codice]=r.valore
-      if(r.nota)note_checklist[r.codice]=r.nota
-    })
-    // Ricostruisce imprese
-    const imprese=(impRows||[]).map((im,i)=>({
-      impresa_id:im.impresa_id||'',
-      impresa_nome:im.imprese?.impresa_nome||'',
-      piva:im.imprese?.piva||'',
-      cf_imp:im.imprese?.impresa_cf||'',
-      att:im.att||'',
-      nr_lav:+im.nr_lav||0,nr_lav_str:+im.nr_lav_str||0,
-      is_principale:i===0
-    }))
-    const cant=v.cantieri||{}
-    const snap={
-      visita_id:vid,
-      nr_verbale_origine:v.nr_verbale||'',
-      data_visita:v.data_visita||null,
-      ora_visita:v.ora_visita||null,
-      ora_fine:v.ora_fine||null,
-      tipo_accesso:v.tipo_accesso||null,
-      acc_cant:v.acc_cant||null,
-      rlst_sn:v.rlst_sn,
-      stage_vis:v.stage_vis,
-      nom_stage:v.nom_stage||null,
-      ..._figSnap('ppre',v.ppre_titolo,v.ppre_nome,v.ppre_cog,v.nom_ppre),
-      nom_ppre:v.nom_ppre||null,
-      qual_ppre:v.qual_ppre||null,
-      tel_ppre:v.tel_ppre||null,
-      tecnico_id:v.tecnico_id||null,
-      tecnico_email:v.tecnici?.email||null,
-      tec_display:v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():null,
-      cantiere_id:v.cantiere_id||null,
-      cantiere_label:cant.cantiere_etichetta||`${cant.cantiere_indirizzo||''} ${cant.cantiere_civico||''}`.trim(),
-      cantiere_detail:'',
-      prot_int:cant.prot_int||null,
-      cnce:cant.cantiere_cnce||null,
-      cod_uni:cant.nodo_id||null,
-      comm_tipo_sogg:v.comm_tipo_sogg||'PF',
-      comm_tipo:v.comm_tipo||null,
-      comm_titolo:v.comm_titolo||null,
-      comm_nome:v.comm_nome||null,
-      comm_cog:v.comm_cog||null,
-      comm_cf:v.comm_cf||null,
-      comm_email:v.comm_email||null,
-      comm_tel:v.comm_tel||null,
-      comm_rag_soc:v.comm_rag_soc||null,
-      comm_piva:v.comm_piva||null,
-      coord:v.coord||false,
-      ..._figSnap('rl',v.rl_titolo,v.rl_nome,v.rl_cog,v.resp_lav),
-      rl_email:v.rl_email||null,
-      rl_tel:v.rl_tel||null,
-      ..._figSnap('csp',v.csp_titolo,v.csp_nome,v.csp_cog,v.csp),
-      csp_email:v.csp_email||null,
-      csp_tel:v.csp_tel||null,
-      ..._figSnap('cse',v.cse_titolo,v.cse_nome,v.cse_cog,v.cse),
-      cse_email:v.cse_email||null,
-      cse_tel:v.cse_tel||null,
-      nr_imp:v.nr_imp||0,
-      nr_ind:v.nr_ind||0,
-      nr_lavoratori:v.nr_lavoratori||0,
-      nr_lavoratori_stranieri:v.nr_lavoratori_stranieri||0,
-      importo:v.importo||null,
-      costi:v.costi||null,
-      stato_lav:v.stato_lav||null,
-      note_lav:null,
-      imprese,
-      checklist,
-      note_checklist,
-      lavorazioni:(lavRows||[]).map(l=>({genere:l.genere,fase:l.fase,lavorazione:l.lavorazione})),
-      oss_tec:v.oss_tec||null,
-      oss_int:v.oss_tec_int||null,
-      note_for_sn:v.note_for_sn||false,
-      note_for_m:v.note_for_m||null,
-      segnalazione:v.segnalazione||false,
-      data_ritorno:v.data_ritorno||null,
-      exported_at:new Date().toISOString(),
-      _rebuilt_from_db:true
-    }
-    const blob=new Blob([JSON.stringify(snap,null,2)],{type:'application/json'})
-    const url=URL.createObjectURL(blob)
-    const a=document.createElement('a');a.href=url;a.download=`snap_${snap.nr_verbale_origine||vid}.json`;a.click();URL.revokeObjectURL(url)
-    toast('Snapshot ricostruito ed esportato','ok')
-  }catch(e){toast('Errore esportazione: '+e.message,'err');console.error(e)}
 }
 
 // ── PDF ──
@@ -11773,8 +11540,9 @@ $('rub-search')?.addEventListener('keydown',e=>{if(e.key==='Enter')loadRubrica()
 
 // Funzioni usate da onclick inline nei modal – devono essere globali
 // ── NUOVA VISITA DI RITORNO (da un verbale esistente) ──
-// Ricostruisce lo snapshot completo di una visita dal DB (stessa logica di
-// exportSnapFromDB) SENZA scaricarlo: usato per precompilare una nuova visita.
+// Ricostruisce lo snapshot completo di una visita dal DB: serve a
+// precompilare la nuova visita di ritorno. (Export e import dello snapshot
+// come file sono stati tolti il 10/09/2026: il meccanismo interno resta.)
 async function rebuildSnapFromDB(vid){
   const{data:v}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*)`).eq('visita_id',vid).single()
   if(!v)return null
@@ -11890,7 +11658,6 @@ async function nuovaVisitaDaVerbale(vid, mode){
 window.genPDF=genPDF
 window.riapriBozza=riapriBozza
 window.inviEmailVerbaleFromList=inviEmailVerbaleFromList
-window.exportSnapFromDB=exportSnapFromDB
 window.showVisitaDetail=showVisitaDetail
 window.chiediNuovaVisitaRitorno=chiediNuovaVisitaRitorno
 window.nuovaVisitaDaVerbale=nuovaVisitaDaVerbale
@@ -12011,7 +11778,6 @@ async function showVisitaDetail(vid){
       `<button class="btn-primary btn-sm" onclick="chiediNuovaVisitaRitorno('${vid}','${(v.nr_verbale||'').replace(/'/g,'')}')">➕ Nuova visita di ritorno</button>`,
       `<button class="btn-primary btn-sm" onclick="genPDF('${vid}');hide('modal-qd')">📄 PDF</button>`,
       `<button class="btn-outline btn-sm" onclick="inviEmailVerbaleFromList('${vid}');hide('modal-qd')">📧 Email</button>`,
-      `<button class="btn-outline btn-sm" onclick="exportSnapFromDB('${vid}');hide('modal-qd')">📤 Snapshot</button>`,
     ]
     if(isBozza) acts.push(`<button class="btn-warn btn-sm" onclick="riapriBozza('${vid}');hide('modal-qd')">✏️ Riapri</button>`)
     else if(window.__isCoord) acts.push(`<button class="btn-warn btn-sm" onclick="modificaVisitaCoord('${vid}');hide('modal-qd')">✏️ Modifica</button>`)
