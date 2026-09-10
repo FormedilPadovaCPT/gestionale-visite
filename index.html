@@ -2781,9 +2781,26 @@ function renderZoneTab(ti){
     </div>`).join('')
   con.querySelectorAll('input[type=radio]').forEach(r=>{
     r.onchange=()=>{
+      // Se il click l'ha appena deselezionata, alcuni browser mandano comunque
+      // il «change»: senza questa guardia la voce tornerebbe in S.checklist
+      // (e verrebbe salvata) pur restando senza spunta a video.
+      if(!r.checked)return
       S.checklist[r.dataset.c]=r.value
       const nw=$(`nw-${r.dataset.c}`)
       if(nw)nw.classList.toggle('show',r.value!=='NA')
+      updateIPCLive();updateZoneDots()
+    }
+    // Secondo clic sulla voce gia' scelta: la deseleziona (10/09/2026, chiesto
+    // dall'utente). Un radio gia' spuntato non genera «change», quindi lo si
+    // riconosce dal valore gia' registrato: il click arriva prima del change,
+    // e su una voce nuova S.checklist ha ancora il valore vecchio.
+    r.onclick=()=>{
+      const c=r.dataset.c
+      if(S.checklist[c]!==r.value)return
+      r.checked=false
+      delete S.checklist[c]
+      const nw=$(`nw-${c}`)
+      if(nw)nw.classList.toggle('show',!!(S.noteChk[c]||'').trim())
       updateIPCLive();updateZoneDots()
     }
   })
