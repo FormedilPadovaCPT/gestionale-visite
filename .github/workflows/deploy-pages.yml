@@ -15,6 +15,7 @@ on:
       - 'app-data.js'
       - 'stage-relazione.js'
       - 'osservatorio.js'
+      - 'manuali.js'
       - '*.png'
       - '.github/workflows/deploy-pages.yml'
       - 'tools/valida_index.py'
@@ -51,7 +52,7 @@ jobs:
           # Tutto ciò che index.html carica va pubblicato: il 05/09/2026
           # stage-relazione.js era in repo ma 404 su Pages (la relazione stage
           # non esisteva in produzione e il typeof lo nascondeva).
-          for f in app-data.js stage-relazione.js osservatorio.js *.png; do
+          for f in app-data.js stage-relazione.js osservatorio.js manuali.js *.png; do
             [ -f "$f" ] && cp "$f" _site/ || true
           done
           # .nojekyll evita l'elaborazione Jekyll (serve i file così come sono)
