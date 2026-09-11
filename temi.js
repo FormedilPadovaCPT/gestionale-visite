@@ -82,6 +82,7 @@
   }
   function aggiornaTutto() {
     try {
+      aggiornaStruttura()
       pulisciApertura()
       if (visibile('view-form')) apertura()
       contaSezioni()
@@ -170,40 +171,228 @@
       }
       else if (tipo === 'tab') { mostraApertura(arg) }
       else if (tipo === 'zona') { if (tema() === 'taccuino') { segnaPrima(arg); micZona(arg) } }
-      else if (tipo === 'dots') { contaSezioni() }
+      else if (tipo === 'dots') { contaSezioni(); copertura() }
     } catch (e) { log('evento ' + tipo, e) }
   }
 
   var stato = { cantiere: null, ultima: null, prima: {}, scelte: {} }
 
-  function contenitore() {
+  /* colonna dei temi nella visita: a destra su schermi larghi, sopra il modulo
+     sui passi Visita/Cantiere/Imprese su quelli stretti */
+  function colonna() {
     var box = $('tema-apertura')
     if (box) return box
     var form = $('view-form')
     var lay = form && form.querySelector('.form-layout')
     if (!lay) return null
-    box = document.createElement('div')
+    box = document.createElement('aside')
     box.id = 'tema-apertura'
+    box.innerHTML = '<div class="tm-principale"></div><div class="tm-cop"></div>'
     lay.parentNode.insertBefore(box, lay)
     return box
   }
-  function pulisciApertura() { var b = $('tema-apertura'); if (b) b.innerHTML = '' }
+  function contenitore() { var c = colonna(); return c ? c.querySelector('.tm-principale') : null }
+  function pulisciApertura() {
+    var b = $('tema-apertura')
+    if (b) b.querySelectorAll('.tm-principale,.tm-cop').forEach(function (x) { x.innerHTML = '' })
+  }
   function mostraApertura(n) {
     var b = $('tema-apertura')
-    if (b) b.style.display = (n == null || n <= 2) ? '' : 'none'
+    if (b) { if (n != null && n > 2) b.setAttribute('data-lontano', ''); else b.removeAttribute('data-lontano') }
   }
   function apertura() {
-    var t = tema()
-    if (!formNuova()) return
     var A = app()
     var cid = (A && A.vGet('f-cant-id')) || null
-    if (t === 'mappa' && !cid) vicini()
-    if (t === 'taccuino' && cid) quandoCantiere(cid)
+    if (cid) { quandoCantiere(cid); return }
+    if (tema() === 'mappa' && formNuova()) vicini()
+    copertura()
   }
   function quandoCantiere(cid) {
     var t = tema()
-    if (t === 'mappa') { if (cid) pulisciApertura(); else if (formNuova()) vicini() }
-    if (t === 'taccuino') { if (cid && formNuova()) ripresa(cid); else pulisciApertura() }
+    if (t === 'scrivania') { if (cid) storico(cid); else pulisciApertura() }
+    if (t === 'mappa') { if (cid) cantiereSullaMappa(cid); else if (formNuova()) vicini(); else pulisciApertura() }
+    if (t === 'taccuino') { if (cid && formNuova()) ripresa(cid); else if (cid) storico(cid); else { var p = contenitore(); if (p) p.innerHTML = '' } copertura() }
+  }
+
+
+  /* ── struttura: gruppi del menu, logo nel menu laterale, titolo ──
+     Niente si sposta: si aggiungono elementi che gli altri temi nascondono,
+     e l'ordine nel menu laterale lo decide il CSS (data-ord). */
+  var GRUPPI = [
+    { nome: 'Lavoro', viste: ['dashboard', 'form', 'lista', 'scadenze', 'incarichi'] },
+    { nome: 'Cantieri', viste: ['cantieri', 'rubrica'] },
+    { nome: 'Coordinamento', viste: ['admin', 'committenti', 'segreteria', 'assev'] }
+  ]
+  function vistaDi(btn) { return btn.dataset.view || (btn.id === 'nav-assev' ? 'assev' : '') }
+  function montaStruttura() {
+    var nav = document.querySelector('#screen-app > nav')
+    var header = document.querySelector('#screen-app > header')
+    if (!nav || !header || nav.dataset.tmPronta) return
+    nav.dataset.tmPronta = '1'
+    var ord = 0
+    var logo = header.querySelector('.header-logo')
+    if (logo) {
+      var l = document.createElement('div')
+      l.className = 'tm-nav-logo'
+      l.dataset.ord = String(ord++)
+      var im = logo.cloneNode(true)
+      im.removeAttribute('id'); im.className = ''; im.alt = 'Formedil Padova'
+      l.appendChild(im)
+      nav.insertBefore(l, nav.firstChild)
+    }
+    GRUPPI.forEach(function (g) {
+      var et = document.createElement('div')
+      et.className = 'tm-grp'
+      et.dataset.grpNome = g.nome
+      et.dataset.ord = String(ord++)
+      et.textContent = g.nome
+      nav.appendChild(et)
+      g.viste.forEach(function (v) {
+        nav.querySelectorAll('button').forEach(function (b) {
+          if (vistaDi(b) === v) { b.dataset.ord = String(ord++); b.dataset.grp = g.nome }
+        })
+      })
+    })
+    var st = document.createElement('div')
+    st.className = 'tm-nav-stato'
+    st.dataset.ord = '40'
+    nav.appendChild(st)
+    var aggRete = function () {
+      st.textContent = navigator.onLine ? '● Collegato: i dati si salvano sul server' : '○ Senza rete: non si salva finché non torna'
+      st.classList.toggle('tm-offline', !navigator.onLine)
+    }
+    window.addEventListener('online', aggRete); window.addEventListener('offline', aggRete); aggRete()
+
+    var tit = document.createElement('div')
+    tit.id = 'tm-titolo'
+    var box = header.querySelector('.header-logo-box')
+    header.insertBefore(tit, box ? box.nextSibling : header.firstChild)
+
+    var gr = document.createElement('div')
+    gr.id = 'tm-gruppi'
+    gr.setAttribute('role', 'tablist')
+    nav.parentNode.insertBefore(gr, nav)
+
+    new MutationObserver(function () { aggiornaStruttura() }).observe(nav, { subtree: true, attributes: true, attributeFilter: ['class', 'style'] })
+    aggiornaStruttura()
+  }
+  var inStruttura = false
+  function aggiornaStruttura() {
+    if (inStruttura) return
+    var nav = document.querySelector('#screen-app > nav')
+    var gr = $('tm-gruppi'), tit = $('tm-titolo')
+    if (!nav || !gr) return
+    inStruttura = true
+    try {
+      var attivo = nav.querySelector('button.active')
+      var gAtt = attivo ? attivo.dataset.grp : 'Lavoro'
+      if (nav.dataset.tmGrp !== gAtt) nav.dataset.tmGrp = gAtt || 'Lavoro'
+      var html = ''
+      GRUPPI.forEach(function (g) {
+        var visibili = [].filter.call(nav.querySelectorAll('button[data-grp="' + g.nome + '"]'), function (b) { return b.style.display !== 'none' })
+        var et = nav.querySelector('.tm-grp[data-grp-nome="' + g.nome + '"]')
+        if (et) et.classList.toggle('tm-vuoto', !visibili.length)
+        if (visibili.length) html += '<button type="button" role="tab" aria-selected="' + (g.nome === gAtt) + '" data-g="' + g.nome + '">' + g.nome + '</button>'
+      })
+      if (gr.dataset.html !== html) {
+        gr.dataset.html = html
+        gr.innerHTML = html
+        gr.querySelectorAll('button[data-g]').forEach(function (b) {
+          b.onclick = function () {
+            var primo = [].filter.call(nav.querySelectorAll('button[data-grp="' + b.dataset.g + '"][data-view]'), function (x) { return x.style.display !== 'none' })[0]
+            if (primo) primo.click()
+          }
+        })
+      }
+      if (tit) {
+        var t = tema()
+        var testo = t === 'scrivania' ? 'Visite in cantiere' : (attivo ? attivo.textContent.replace(/^[^\wÀ-ÿ]+/, '').replace(/\d+$/, '').trim() : '')
+        if (tit.textContent !== testo) tit.textContent = testo
+      }
+    } finally { inStruttura = false }
+  }
+
+  /* ── SCRIVANIA (e Taccuino in modifica): storico del cantiere ── */
+  async function storico(cid) {
+    var sb = window.sb
+    var box = contenitore()
+    if (!sb || !box) return
+    try {
+      var q = await sb.from('visite').select('visita_id,nr_verbale,data_visita,acc_cant,ipc,ipc_nc_plus,ipc_nc_minus,ipc_oss,elimina')
+        .eq('cantiere_id', cid).eq('elimina', 0).order('data_visita', { ascending: false }).order('nr_verbale', { ascending: false }).limit(12)
+      if (String(stato.cantiere) !== String(cid)) return
+      var righe = q.data || []
+      var S = window.S, corrente = S && S.fd && S.fd.visita_id
+      box.innerHTML = '<div class="tm-card tm-storico"><h3>Storico del cantiere</h3>' +
+        (righe.length ? '<div class="tbl-wrap"><table><thead><tr><th>Verbale</th><th>Data</th><th>Acc.</th><th>IPC</th><th>Rilievi</th></tr></thead><tbody>' +
+          righe.map(function (v) {
+            var ril = [v.ipc_nc_plus ? v.ipc_nc_plus + ' NC+' : '', v.ipc_nc_minus ? v.ipc_nc_minus + ' NC−' : '', v.ipc_oss ? v.ipc_oss + ' OSS' : ''].filter(Boolean).join(' · ') || '—'
+            return '<tr' + (v.visita_id === corrente ? ' class="tm-qui"' : '') + '><td>' + h(nrBreve(v.nr_verbale)) + '</td><td>' + h(dataIt(v.data_visita)) + '</td><td>' + h(v.acc_cant || '') + '</td><td>' + h(v.ipc || '') + '</td><td>' + h(ril) + '</td></tr>'
+          }).join('') + '</tbody></table></div>'
+          : '<p class="tm-sotto" style="margin:0">Nessun verbale su questo cantiere: questo è il primo accesso.</p>') +
+        '</div>'
+    } catch (e) { log('storico', e) }
+  }
+
+  /* ── MAPPA: il cantiere scelto sulla mappa, con i suoi accessi ── */
+  async function cantiereSullaMappa(cid) {
+    var sb = window.sb
+    var box = contenitore()
+    if (!sb || !box) return
+    try {
+      var r = await Promise.all([
+        sb.from('cantieri').select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,lat,lng,geocode_status,nodo_id,cantiere_cnce').eq('cantiere_id', cid).maybeSingle(),
+        sb.from('visite').select('visita_id,nr_verbale,data_visita,acc_cant,ipc,ipc_oss,ipc_nc_minus,ipc_nc_plus').eq('cantiere_id', cid).eq('elimina', 0).order('data_visita', { ascending: false }).limit(8)
+      ])
+      if (String(stato.cantiere) !== String(cid)) return
+      var c = r[0].data
+      if (!c) { box.innerHTML = ''; return }
+      var vis = r[1].data || []
+      var ind = ((c.cantiere_indirizzo || '') + ' ' + (c.cantiere_civico || '')).trim()
+      box.innerHTML = '<div class="tm-card"><h3>📍 ' + h(c.cantiere_etichetta || ind) + '</h3>' +
+        '<p class="tm-sotto">' + h([ind, c.comune_nome, c.cantiere_cnce || c.nodo_id].filter(Boolean).join(' · ')) + (c.geocode_status === 'comune' ? ' · posizione al centro del comune' : '') + '</p>' +
+        (c.lat != null ? '<div class="tm-map" data-tm="mappa"></div>' : '<p class="tm-sotto">Questo cantiere non ha ancora una posizione sulla mappa.</p>') +
+        '<b style="font-size:13px">Accessi</b>' +
+        (vis.length ? vis.map(function (v) {
+          var ril = [v.ipc_nc_plus ? v.ipc_nc_plus + ' NC+' : '', v.ipc_nc_minus ? v.ipc_nc_minus + ' NC−' : '', v.ipc_oss ? v.ipc_oss + ' OSS' : ''].filter(Boolean).join(' · ')
+          return '<div class="tm-ril"><span class="badge ' + (v.ipc === 'ALTO' ? 'badge-alto' : v.ipc === 'MEDIO' ? 'badge-medio' : v.ipc === 'BASSO' ? 'badge-basso' : 'badge-nr') + '">' + h(v.ipc || 'NR') + '</span><span>' + h(nrBreve(v.nr_verbale)) + ' · ' + h(dataIt(v.data_visita)) + (v.acc_cant ? ' · ' + h(v.acc_cant) + '° accesso' : '') + '</span>' + (ril ? '<small>' + h(ril) + '</small>' : '') + '</div>'
+        }).join('') : '<p class="tm-sotto" style="margin:4px 0 0">Nessun verbale: è il primo accesso.</p>') +
+        (formNuova() ? '<div class="tm-azioni"><button type="button" class="btn-outline btn-sm" data-tm="altri">Cantieri vicino a te</button></div>' : '') +
+        '</div>'
+      var bAltri = box.querySelector('[data-tm="altri"]')
+      if (bAltri) bAltri.onclick = function () { vicini(); var g = box.querySelector('[data-tm="gps"]'); if (g) g.click() }
+      if (c.lat != null && window.L) {
+        var L = window.L, el = box.querySelector('[data-tm="mappa"]')
+        if (mappaVicini) { try { mappaVicini.remove() } catch (e) { /* niente */ } }
+        mappaVicini = L.map(el)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(mappaVicini)
+        L.circleMarker([+c.lat, +c.lng], { radius: 11, color: '#fff', weight: 3, fillColor: '#e7500f', fillOpacity: 1 }).addTo(mappaVicini)
+        mappaVicini.setView([+c.lat, +c.lng], c.geocode_status === 'comune' ? 13 : 16)
+        setTimeout(function () { try { mappaVicini.invalidateSize() } catch (e) { /* niente */ } }, 150)
+      }
+    } catch (e) { log('cantiereSullaMappa', e) }
+  }
+
+  /* ── TACCUINO: voci guardate per macroarea, mentre si compila ── */
+  function copertura() {
+    var col = colonna()
+    var cop = col && col.querySelector('.tm-cop')
+    var S = window.S
+    if (!cop || !S || !S.byZona) return
+    if (tema() !== 'taccuino' || !visibile('view-form')) { if (cop.innerHTML) cop.innerHTML = ''; return }
+    var z = window.ZONE_LBL || (typeof ZONE_LBL !== 'undefined' ? ZONE_LBL : {})
+    var tot = 0, righe = ''
+    for (var i = 1; i <= 10; i++) {
+      var voci = (S.byZona[i] || []).filter(function (v) { return !v.is_nota })
+      var fatte = voci.filter(function (v) { return S.checklist[v.codice] }).length
+      var ril = voci.filter(function (v) { return ['OSS', 'NC-', 'NC+'].indexOf(S.checklist[v.codice]) >= 0 }).length
+      tot += fatte
+      var pc = voci.length ? Math.round(100 * fatte / voci.length) : 0
+      righe += '<div class="tm-cop-riga' + (fatte ? '' : ' tm-zero') + '"><span>' + h(z[i] || ('Area ' + i)) + '</span><i><b style="width:' + pc + '%"></b></i><em>' + fatte + '/' + voci.length + (ril ? ' · ' + ril + ' ril.' : '') + '</em></div>'
+    }
+    var S2 = window.S, cid = app() && app().vGet('f-cant-id')
+    if (!tot && !cid) { cop.innerHTML = ''; return }
+    cop.innerHTML = '<div class="tm-card"><h3>Voci guardate per macroarea</h3><p class="tm-sotto">Le aree a zero sono quelle non ancora guardate: se non c\'entrano, chiudile come «non applicabile».</p>' + righe + '</div>'
   }
 
   /* ════ SCRIVANIA: conteggio per sezione e barra di stato ════ */
@@ -706,6 +895,7 @@
   function avvia() {
     montaPulsante()
     vestiNav()
+    montaStruttura()
     osservaScadenze()
     applica(leggi())
   }
