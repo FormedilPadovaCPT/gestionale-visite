@@ -10,6 +10,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- temi scelti dal tecnico (Scrivania, Mappa, Taccuino): senza data-tema non cambia niente -->
+<link rel="stylesheet" href="temi.css"/>
 <style>
 :root{
   --orange:#E7500F;--grey:#565C66;--green:#95C22F;--white:#fff;
@@ -2264,7 +2266,7 @@ function ipcCls(ipc){return{ALTO:'badge-alto',MEDIO:'badge-medio',BASSO:'badge-b
 // Etichetta IPC da mostrare: NR → "Nessun Rilievo"
 function ipcLbl(ipc){return(!ipc||ipc==='NR')?'Nessun Rilievo':ipc}
 function vGet(id){return $(id)?.value}
-function vSet(id,v){if($(id))$(id).value=v??''}
+function vSet(id,v){if($(id))$(id).value=v??'';if(id==='f-cant-id'&&window.temaEvento)window.temaEvento('cantiere',v)}
 function cGet(id){return $(id)?.checked}
 function cSet(id,v){if($(id))$(id).checked=!!v}
 
@@ -2653,6 +2655,7 @@ function activateTab(n){
   if(n===2)renderImpreseAccordion()
   if(n===14)initFotoTab()
   if(n===13)suggerisciDataRientro()
+  if(window.temaEvento)window.temaEvento('tab',n)
 }
 
 function suggerisciDataRientro(){
@@ -2752,6 +2755,7 @@ function renderZoneTab(ti){
   con.querySelectorAll('input[data-nota]').forEach(i=>{
     i.oninput=()=>S.noteChk[i.dataset.nota]=i.value
   })
+  if(window.temaEvento)window.temaEvento('zona',ti)
 }
 
 function setGruppoVer(btn){
@@ -2798,6 +2802,7 @@ function updateZoneDots(){
     const btn=document.querySelector(`.tab-btn[data-ti="${ti}"]`)
     if(btn)btn.classList.toggle('has-rilievi',hr)
   }
+  if(window.temaEvento)window.temaEvento('dots')
 }
 
 // ── FORM NAV ──
@@ -2859,6 +2864,7 @@ async function initForm(snap=null){
 
   activateTab(0)
   updateIPCLive()
+  if(window.temaEvento)window.temaEvento('form')
 }
 
 async function nextVerbale(){
@@ -13542,6 +13548,10 @@ window.incVerificaProt=incVerificaProt
    riferimento e' sicuro. */
 window.sb=sb; window.S=S; window.toast=toast
 window.SB_URL=SB_URL; window.SB_KEY=SB_KEY
+/* temi.js (Mappa, Taccuino) riempie il modulo con le stesse funzioni che
+   usa l'app: si espongono qui, senza copiarle. */
+window.__app={vSet,vGet,initForm,applySnap,buildSnap,rebuildSnapFromDB,autoAccCant,renderCantCard,
+  proponiImportoCantiere,caricaProposteImprese,proponiCommittenteCantiere,saveTabData,renderImpreseAccordion,calcIPC}
 
 document.addEventListener('change',function(ev){
   if(ev.target&&ev.target.id==='f-prot-inc'){
@@ -13562,5 +13572,7 @@ document.addEventListener('input',function(ev){
 <script src="stage-relazione.js"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
+<!-- temi: pulsante 🎨 nella testata; Scrivania, Mappa e Taccuino (temi.css) -->
+<script src="temi.js"></script>
 </body>
 </html>

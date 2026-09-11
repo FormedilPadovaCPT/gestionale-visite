@@ -1,0 +1,196 @@
+/* ============================================================
+   Temi del Gestionale Visite (11/09/2026)
+
+   Tre vesti che ogni tecnico sceglie dal pulsante 🎨 nella testata:
+   Scrivania, Mappa, Taccuino. La scelta vale sul dispositivo
+   (localStorage «visite.tema») e «Attuale» resta la predefinita.
+
+   Tutto e' sotto html[data-tema="..."]: senza l'attributo questo
+   file non cambia niente. Le funzioni dei temi stanno in temi.js.
+   Proposte d'origine: proposte_grafiche/2026_09_11_app-visite/.
+   ============================================================ */
+
+/* ── comuni a tutti: selettore del tema ─────────────────────── */
+#btn-tema{font-size:14px;padding:4px 9px}
+/* telefono: la testata era gia' piena (logo schiacciato); col pulsante in piu'
+   si toglie il nome dell'utente, che su un telefono personale non serve */
+@media(max-width:600px){
+  #lbl-user{display:none}
+  #btn-tema{padding:4px 7px;font-size:13px}
+}
+.tm-menu{position:fixed;z-index:500;background:#fff;color:#2b2f36;border-radius:10px;box-shadow:0 12px 32px -8px rgba(0,0,0,.35);padding:6px;width:min(320px,calc(100vw - 20px));font-family:inherit}
+.tm-menu h4{margin:6px 8px 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280}
+.tm-menu button{display:grid;grid-template-columns:18px 1fr;gap:2px 8px;width:100%;text-align:left;background:none;border-radius:8px;padding:8px;white-space:normal;color:#2b2f36}
+.tm-menu button:hover,.tm-menu button:focus-visible{background:#f4f5f7;outline:none}
+.tm-menu button i{grid-row:span 2;font-style:normal;width:16px;height:16px;border-radius:50%;border:2px solid #9aa0a8;margin-top:2px}
+.tm-menu button[aria-checked="true"] i{border-color:#e7500f;box-shadow:inset 0 0 0 3px #fff;background:#e7500f}
+.tm-menu button b{font-size:14px}
+.tm-menu button small{font-size:12px;color:#6b7280;line-height:1.35}
+.tm-menu p{margin:4px 8px 6px;font-size:11px;color:#8b9199}
+
+/* elementi dei temi: nascosti se il tema non e' il loro */
+#tema-apertura:empty{display:none}
+#tm-stato,.tm-mic,#tm-scad{display:none}
+.tm-prima{display:none}
+
+/* blocchi usati da Mappa e Taccuino */
+.tm-card{background:#fff;border:1px solid #e3e1dc;border-radius:14px;padding:12px 14px;margin-bottom:14px}
+.tm-card h3{margin:0 0 2px;font-size:16px;color:#2b2f36;text-transform:none;letter-spacing:0;border:0;padding:0}
+.tm-card .tm-sotto{font-size:12.5px;color:#6b7280;margin:0 0 10px}
+.tm-azioni{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.tm-azioni .tm-nota{font-size:12px;color:#6b7280}
+.tm-map{height:260px;border-radius:12px;border:1px solid #dde1e5;margin:10px 0;position:relative;z-index:0;isolation:isolate}
+.tm-vic{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:center;padding:9px 10px;border:1px solid #eef0f2;border-radius:12px;margin-bottom:6px}
+.tm-vic i{grid-row:span 2;font-style:normal;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700;background:#2e7d4f}
+.tm-vic i span{transform:rotate(45deg)}
+.tm-vic b{font-size:14px;color:#2b2f36}
+.tm-vic small{grid-column:2;color:#6b7280;font-size:12px}
+.tm-vic button{grid-row:span 2}
+.tm-vic.tm-oggi i{background:#9aa0a8}
+.tm-riga{display:grid;grid-template-columns:minmax(110px,150px) 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid #efede8;font-size:13px}
+.tm-riga>span:first-child{color:#6b7280;font-size:12px}
+.tm-riga.tm-no{background:#fffaf0}
+.tm-riga.tm-no b{text-decoration:line-through;color:#9aa0a8}
+.tm-due{display:inline-flex;border-radius:9px;background:#f1efea;padding:2px}
+.tm-due button{font-size:12px;font-weight:600;padding:5px 10px;border-radius:7px;color:#8b9199;background:none}
+.tm-due button[aria-pressed="true"]{background:#fff;color:#2e7d4f;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.tm-due button.tm-cambia[aria-pressed="true"]{color:#a8410b}
+.tm-ril{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;padding:7px 0;border-top:1px solid #efede8;font-size:13px}
+.tm-ril small{grid-column:2;color:#6b7280;font-size:12px;white-space:pre-wrap}
+.tm-fatto{display:flex;gap:8px;align-items:center;font-size:13px;color:#2e7d4f}
+@media(max-width:600px){
+  .tm-riga{grid-template-columns:1fr;gap:6px}
+  .tm-due{display:flex}
+  .tm-due button{flex:1;padding:8px 10px}
+  .tm-map{height:220px}
+}
+
+/* ════════════════════════════════════════════════════════════
+   SCRIVANIA — gemella dell'app segreteria
+   ════════════════════════════════════════════════════════════ */
+html[data-tema="scrivania"]{--radius:2px;--shadow:none;--header-h:52px;--nav-h:40px;--light:#f4f5f7;--border:#d7dbe0}
+html[data-tema="scrivania"] body{font-family:Barlow,'Segoe UI',system-ui,sans-serif;background:#eef0f2;color:#2b2f36;font-variant-numeric:tabular-nums}
+html[data-tema="scrivania"] input,html[data-tema="scrivania"] select,html[data-tema="scrivania"] textarea,html[data-tema="scrivania"] button{font-family:inherit}
+html[data-tema="scrivania"] input,html[data-tema="scrivania"] select,html[data-tema="scrivania"] textarea{padding:6px 8px;font-size:13.5px}
+html[data-tema="scrivania"] header{box-shadow:none;padding:0 12px}
+html[data-tema="scrivania"] .header-logo-box{height:40px;border-radius:2px;padding:3px 8px;box-shadow:none}
+html[data-tema="scrivania"] .header-logo{height:32px}
+html[data-tema="scrivania"] .user-area button{border-radius:2px}
+html[data-tema="scrivania"] nav{gap:2px;padding:0 10px;align-items:stretch}
+html[data-tema="scrivania"] nav button{border:0;border-radius:0;color:#dfe2e6;font-weight:600;padding:0 14px}
+html[data-tema="scrivania"] nav button.active{background:#eef0f2;color:#2b2f36}
+html[data-tema="scrivania"] nav button:hover:not(.active){background:rgba(255,255,255,.1);color:#fff}
+html[data-tema="scrivania"] nav .nav-ico{display:none}
+html[data-tema="scrivania"] label{font-size:11px;letter-spacing:.3px;margin-bottom:3px}
+html[data-tema="scrivania"] .field{margin-bottom:9px}
+html[data-tema="scrivania"] .card{border:1px solid #dfe2e7;padding:12px}
+html[data-tema="scrivania"] .card h3,html[data-tema="scrivania"] #view-dashboard .card h3{font-family:'Barlow Condensed',Barlow,sans-serif;font-size:17px;text-transform:none;letter-spacing:0;color:#3d434c;border-bottom:1px solid #dfe2e7;border-left:4px solid #565c66;padding:0 0 6px 9px}
+html[data-tema="scrivania"] #view-dashboard .card h3::after{display:none}
+html[data-tema="scrivania"] .sect-title,html[data-tema="scrivania"] .zona-gruppo h4{background:#f4f5f7;border-left:4px solid #565c66;border-radius:0;padding:4px 9px;font-size:12px;letter-spacing:.06em;color:#3d434c}
+html[data-tema="scrivania"] .stat-card{border:1px solid #dfe2e7;box-shadow:none}
+html[data-tema="scrivania"] #dash-kpi .stat-card{border-left-width:1px}
+html[data-tema="scrivania"] #dash-kpi .stat-card:nth-child(1){background:#fff;border-left-color:#dfe2e7}
+html[data-tema="scrivania"] #dash-kpi .stat-card:nth-child(1) .num{color:var(--orange)!important}
+html[data-tema="scrivania"] #dash-kpi .stat-card:nth-child(1) .lbl{color:var(--grey)!important}
+html[data-tema="scrivania"] .dash-head{border-radius:0;box-shadow:none;background:#565c66}
+html[data-tema="scrivania"] th{background:#fafbfc;border-bottom:1px solid #dfe2e7;padding:5px 8px}
+html[data-tema="scrivania"] td{padding:5px 8px;border-bottom-color:#eef0f3}
+html[data-tema="scrivania"] tr:hover td{background:#f4f5f7}
+html[data-tema="scrivania"] .modal-box{border-radius:4px}
+/* nuova visita: sezioni in una fila con il conteggio delle voci */
+html[data-tema="scrivania"] .form-header{background:#fff;border:1px solid #dfe2e7;border-left:4px solid #565c66;padding:8px 12px}
+html[data-tema="scrivania"] .form-header h2{font-family:'Barlow Condensed',Barlow,sans-serif;font-size:20px;color:#3d434c}
+html[data-tema="scrivania"] .form-layout{flex-direction:column}
+html[data-tema="scrivania"] .tab-bar{flex-direction:row;flex-wrap:wrap;width:100%;border-right:0;border-bottom:2px solid #565c66;margin:0 0 12px;padding:0;position:sticky;top:calc(var(--header-h) + var(--nav-h));background:#eef0f2;z-index:50;max-height:none;overflow:visible}
+html[data-tema="scrivania"] .tab-btn{border:0;margin:0;padding:6px 9px;font-size:12px;width:auto;white-space:nowrap}
+html[data-tema="scrivania"] .tab-btn.active{background:#565c66;color:#fff}
+html[data-tema="scrivania"] .tab-btn.has-rilievi{color:#b3261e}
+html[data-tema="scrivania"] .tab-btn.has-rilievi.active{background:#b3261e;color:#fff}
+html[data-tema="scrivania"] .tab-btn[data-n]::after{content:attr(data-n);margin-left:5px;font-size:10.5px;color:#8b9199}
+html[data-tema="scrivania"] .tab-btn.active[data-n]::after{color:#dfe2e6}
+@media(max-width:700px){
+  html[data-tema="scrivania"] .tab-bar{flex-wrap:nowrap;overflow-x:auto}
+}
+html[data-tema="scrivania"] .check-item{padding:3px 2px}
+html[data-tema="scrivania"] .check-radios{gap:0;border:1px solid #cfd3d8}
+html[data-tema="scrivania"] .radio-chip{border:0;border-right:1px solid #e3e5e8;border-radius:0;padding:5px 7px;color:#8b9199}
+html[data-tema="scrivania"] .check-radios label:last-child .radio-chip{border-right:0}
+html[data-tema="scrivania"] .check-radios input[type=radio]:checked+.radio-chip.na{background:#8b9199;color:#fff}
+html[data-tema="scrivania"] .check-radios input[type=radio]:checked+.radio-chip.ver{background:#2e7d4f;color:#fff}
+html[data-tema="scrivania"] .check-radios input[type=radio]:checked+.radio-chip.ncm{background:#c96a1b;color:#fff}
+html[data-tema="scrivania"] .check-radios input[type=radio]:checked+.radio-chip.ncp{background:#b3261e;color:#fff}
+html[data-tema="scrivania"] .check-radios input[type=radio]:checked+.radio-chip.oss{background:#b58a00;color:#fff}
+/* barra in fondo al modulo come barra di stato */
+html[data-tema="scrivania"] #form-nav-bar{background:#2b2f36!important;border-top:0!important;box-shadow:none!important;padding:6px 14px!important}
+html[data-tema="scrivania"] #form-nav-bar button{border-radius:2px}
+html[data-tema="scrivania"] #form-nav-bar .btn-outline{background:transparent;border-color:#8b9199;color:#dfe2e6}
+html[data-tema="scrivania"] #tm-stato{display:block;color:#c9ccd1;font-size:12.5px;text-align:center;flex:1;padding:0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[data-tema="scrivania"] #tm-stato b{color:#fff}
+
+/* ════════════════════════════════════════════════════════════
+   MAPPA — chiaro, a pastiglie, si parte dal territorio
+   ════════════════════════════════════════════════════════════ */
+html[data-tema="mappa"]{--radius:12px;--light:#f1f3f5;--border:#dde1e5;--shadow:0 1px 2px rgba(20,30,40,.05),0 8px 20px -14px rgba(20,30,40,.35);--header-h:60px;--nav-h:52px}
+html[data-tema="mappa"] body{font-family:Barlow,'Segoe UI',system-ui,sans-serif;background:#e9ecef;color:#2b2f36}
+html[data-tema="mappa"] input,html[data-tema="mappa"] select,html[data-tema="mappa"] textarea,html[data-tema="mappa"] button{font-family:inherit}
+html[data-tema="mappa"] header{background:#fff;box-shadow:0 1px 0 #dde1e5}
+html[data-tema="mappa"] .header-logo-box{box-shadow:none;height:46px}
+html[data-tema="mappa"] .header-logo{height:38px}
+html[data-tema="mappa"] .user-area{color:#2f343d}
+html[data-tema="mappa"] .user-area button{background:#f1f3f5;color:#2f343d;border-radius:999px}
+html[data-tema="mappa"] #btn-firme{border-color:#cfd4da!important;color:#2f343d!important}
+html[data-tema="mappa"] nav{background:#fff;border-bottom:1px solid #dde1e5;gap:4px}
+html[data-tema="mappa"] nav button{color:#3d434c;border:0;border-radius:999px;font-weight:600}
+html[data-tema="mappa"] nav button:hover:not(.active){background:#f1f3f5;color:#2b2f36}
+html[data-tema="mappa"] nav button.active{background:#2f343d;color:#fff}
+html[data-tema="mappa"] .card{border-radius:16px;border:1px solid #dde1e5}
+html[data-tema="mappa"] .stat-card{border-radius:14px}
+html[data-tema="mappa"] .tab-btn{border-right:0;border-radius:10px;margin:1px 6px 1px 0;padding:8px 10px}
+html[data-tema="mappa"] .tab-bar{border-right:0}
+html[data-tema="mappa"] .tab-btn.active{background:#2f343d;color:#fff}
+html[data-tema="mappa"] .tab-btn.has-rilievi.active{background:#b3261e;color:#fff}
+@media(max-width:700px){
+  html[data-tema="mappa"] .tab-bar{border-bottom:0;gap:4px}
+  html[data-tema="mappa"] .tab-btn{border-bottom:0;margin:0}
+}
+html[data-tema="mappa"] .radio-chip{border-radius:999px;padding:4px 8px}
+html[data-tema="mappa"] .modal-box{border-radius:18px}
+html[data-tema="mappa"] #form-nav-bar{border-top:1px solid #dde1e5!important;box-shadow:0 -6px 20px -12px rgba(0,0,0,.3)!important}
+html[data-tema="mappa"] #form-nav-bar button{border-radius:12px}
+html[data-tema="mappa"] #tm-scad{display:block}
+html[data-tema="mappa"] #tm-scad .tm-map{height:380px}
+html[data-tema="mappa"] .tm-card{border-color:#dde1e5}
+@media(max-width:600px){html[data-tema="mappa"] #tm-scad .tm-map{height:300px}}
+
+/* ════════════════════════════════════════════════════════════
+   TACCUINO — carta chiara, schede morbide, si parte dal verbale prima
+   ════════════════════════════════════════════════════════════ */
+html[data-tema="taccuino"]{--radius:12px;--light:#f7f6f3;--border:#e3e1dc;--shadow:none;--header-h:60px}
+html[data-tema="taccuino"] body{font-family:Barlow,'Segoe UI',system-ui,sans-serif;background:#f7f6f3;color:#2b2f36}
+html[data-tema="taccuino"] input,html[data-tema="taccuino"] select,html[data-tema="taccuino"] textarea,html[data-tema="taccuino"] button{font-family:inherit}
+html[data-tema="taccuino"] header{box-shadow:none}
+html[data-tema="taccuino"] .header-logo-box{box-shadow:none;height:46px}
+html[data-tema="taccuino"] .header-logo{height:38px}
+html[data-tema="taccuino"] .user-area button{border-radius:999px}
+html[data-tema="taccuino"] nav{background:#fff;border-bottom:1px solid #e7e5e0;gap:4px}
+html[data-tema="taccuino"] nav button{color:#34373c;border:0;border-radius:10px;font-weight:500}
+html[data-tema="taccuino"] nav button:hover:not(.active){background:#f1efea;color:#2b2f36}
+html[data-tema="taccuino"] nav button.active{background:#2f343d;color:#fff;font-weight:600}
+html[data-tema="taccuino"] #btn-firme{border-color:rgba(255,255,255,.6)!important}
+html[data-tema="taccuino"] .card{border-radius:14px;border:1px solid #e7e5e0}
+html[data-tema="taccuino"] .stat-card{border-radius:14px;border:1px solid #e7e5e0}
+html[data-tema="taccuino"] .sect-title,html[data-tema="taccuino"] .zona-gruppo h4{background:#f1efea;border-radius:8px}
+html[data-tema="taccuino"] .tab-bar{border-right-color:#e7e5e0}
+html[data-tema="taccuino"] .tab-btn.active{background:#fff;border-right-color:#2f343d;color:#2b2f36;font-weight:700}
+@media(max-width:700px){
+  html[data-tema="taccuino"] .tab-btn.active{border-bottom-color:#2f343d}
+}
+html[data-tema="taccuino"] .check-item{background:#fff;border:1px solid #efede8;border-radius:10px;margin-bottom:5px}
+html[data-tema="taccuino"] .radio-chip{border-radius:8px}
+html[data-tema="taccuino"] .check-nota-wrap textarea{background:#fffdf7;border-color:#e3d9c4;border-radius:10px}
+html[data-tema="taccuino"] .modal-box{border-radius:18px}
+html[data-tema="taccuino"] .tm-prima{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:6px;border:1px dashed #c9c5bb;background:#fffaf0;color:#6b5e3d;white-space:nowrap;vertical-align:middle}
+html[data-tema="taccuino"] .tm-prima.tm-ncp{border-color:#e6a39e;color:#b3261e}
+html[data-tema="taccuino"] .tm-prima.tm-ncm{border-color:#f0bf94;color:#a8410b}
+html[data-tema="taccuino"] .tm-mic{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;padding:5px 11px;border-radius:999px;background:#fff;border:1px solid #e0ded8;color:#34373c}
+html[data-tema="taccuino"] .tm-mic.tm-on{background:#b3261e;border-color:#b3261e;color:#fff}
