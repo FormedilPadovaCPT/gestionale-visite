@@ -29,6 +29,10 @@ function b64urlBytes(bytes: Uint8Array): string {
 function b64urlUtf8(s: string): string {
   return b64urlBytes(new TextEncoder().encode(s))
 }
+/* nome ed email li scrive chi chiede l'accesso, senza account: nella mail
+   alla segreteria restano testo, non HTML (un link finto sembrerebbe nostro).
+   Trovato nella revisione di sicurezza del 13/09/2026. */
+const escHtml = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -86,7 +90,7 @@ serve(async (req) => {
       const html =
         `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#333">`
         + `<p>È pervenuta una nuova <strong>richiesta di accesso alla dashboard</strong> (sola lettura):</p>`
-        + `<ul><li><strong>Nome:</strong> ${nomeSafe || '–'}</li><li><strong>Email:</strong> ${email}</li></ul>`
+        + `<ul><li><strong>Nome:</strong> ${escHtml(nomeSafe) || '–'}</li><li><strong>Email:</strong> ${escHtml(emailNorm)}</li></ul>`
         + `<p style="color:#666">Per abilitarla: creare l'account e aggiungerlo come <code>viewer</code> in <code>app_ruoli</code>.</p>`
         + `</div>`
       const mime = [
