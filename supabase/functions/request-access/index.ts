@@ -86,7 +86,8 @@ serve(async (req) => {
     if (SA_JSON) {
       const sa = JSON.parse(SA_JSON)
       const token = await getToken(sa, 'https://www.googleapis.com/auth/gmail.send')
-      const subject = `Richiesta accesso dashboard – ${nomeSafe || email}`
+      /* ogni oggetto comincia con «FORMEDIL Padova -AREA SICUREZZA E SALUTE-» (14/09/2026) */
+      const subject = `FORMEDIL Padova -AREA SICUREZZA E SALUTE- Richiesta accesso dashboard – ${nomeSafe || email}`
       const html =
         `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#333">`
         + `<p>È pervenuta una nuova <strong>richiesta di accesso alla dashboard</strong> (sola lettura):</p>`

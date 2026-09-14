@@ -43,7 +43,10 @@ function b64urlUtf8(s: string): string { const b=new TextEncoder().encode(s); le
 async function sendMail(token: string, to: string, subject: string, html: string, bcc?: string) {
   const headers = [ 'MIME-Version: 1.0', `From: Gestionale Visite <${COORD}>`, `To: ${to}` ]
   if(bcc && bcc.toLowerCase()!==String(to).toLowerCase()) headers.push(`Bcc: ${bcc}`)
-  headers.push('Reply-To: cpt@formedilpadova.it', `Subject: =?UTF-8?B?${b64urlUtf8(subject)}?=`, 'Content-Type: text/html; charset=UTF-8', '', html)
+  // ogni oggetto comincia con «FORMEDIL Padova -AREA SICUREZZA E SALUTE-» (regola dell'utente, 14/09/2026)
+  const PREFISSO = 'FORMEDIL Padova -AREA SICUREZZA E SALUTE-'
+  const oggetto = subject.startsWith(PREFISSO) ? subject : `${PREFISSO} ${subject}`
+  headers.push('Reply-To: cpt@formedilpadova.it', `Subject: =?UTF-8?B?${b64urlUtf8(oggetto)}?=`, 'Content-Type: text/html; charset=UTF-8', '', html)
   const mime = headers.join('\r\n')
   const raw = b64urlUtf8(mime)
   const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', { method:'POST', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, body: JSON.stringify({ raw }) })

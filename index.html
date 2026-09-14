@@ -3299,6 +3299,16 @@ async function aggiungiImpresaProposta(r){
   toast('Impresa aggiunta: '+(row.impresa_nome||cf),'ok')
 }
 // Calcolo fascia durata (1-7) da data inizio e ultimazione, stessa logica del DB
+/* L'oggetto di ogni mail dell'ufficio comincia con «FORMEDIL Padova -AREA SICUREZZA E SALUTE-»
+   (regola dell'utente, 14/09/2026). La mail del verbale lo propone già nel campo; se chi scrive
+   l'ha tolto o l'ha scritto in un'altra forma, qui lo si rimette prima dell'invio. */
+function _oggettoUfficioVerbale(){
+  const P='FORMEDIL Padova -AREA SICUREZZA E SALUTE-'
+  const resto=String($('email-verbale-oggetto')?.value||'').replace(/[\r\n]+/g,' ').trim()
+    .replace(/^formedil\s+padova\b(\s*[-–—]\s*area\s+sicurezza\s+e\s+salute\b)?\s*[-–—]?\s*/i,'')
+  return resto?`${P} ${resto}`:P
+}
+
 function _fasciaDurata(inizio,ult){
   if(!inizio||!ult)return ''
   const di=new Date(inizio),du=new Date(ult)
@@ -7258,7 +7268,7 @@ async function inviEmailVerbaleFromList(vid){
   const cant=v.cantieri?.cantiere_etichetta||_eInd||''
 
   // Oggetto
-  $('email-verbale-oggetto').value=[`Cantiere di ${_eInd} ${_eNr}`.trim(),_eImp,_eCom,_eTec,_eData].filter(Boolean).join(' - ')
+  $('email-verbale-oggetto').value='FORMEDIL Padova -AREA SICUREZZA E SALUTE- '+[`Cantiere di ${_eInd} ${_eNr}`.trim(),_eImp,_eCom,_eTec,_eData].filter(Boolean).join(' - ')
 
   // Testo lettera (preview nel textarea – il vero HTML è costruito dalla Edge Function)
   const testaEl=$('email-verbale-testo')
@@ -7420,7 +7430,7 @@ function apriEmailRettifica(p){
   if(_fDsRaw){const _fd=new Date(_fDsRaw+'T00:00:00');if(!isNaN(_fd))_fData=`${String(_fd.getDate()).padStart(2,'0')}/${String(_fd.getMonth()+1).padStart(2,'0')}/${_fd.getFullYear()}`}
   const r=window._evRettifica||{}
 
-  $('email-verbale-oggetto').value=['RETTIFICA verbale',`Cantiere di ${_fInd} ${nrVerb}`.trim(),_fImp,_fCom,_fTec,_fData].filter(Boolean).join(' - ')
+  $('email-verbale-oggetto').value='FORMEDIL Padova -AREA SICUREZZA E SALUTE- '+['RETTIFICA verbale',`Cantiere di ${_fInd} ${nrVerb}`.trim(),_fImp,_fCom,_fTec,_fData].filter(Boolean).join(' - ')
 
   const testaEl=$('email-verbale-testo')
   if(testaEl)testaEl.value=
@@ -7518,7 +7528,7 @@ function inviEmailVerbale(){
   if(_fDsRaw){const _fd=new Date(_fDsRaw+'T00:00:00');if(!isNaN(_fd))_fData=`${String(_fd.getDate()).padStart(2,'0')}/${String(_fd.getMonth()+1).padStart(2,'0')}/${_fd.getFullYear()}`}
 
   // Oggetto
-  $('email-verbale-oggetto').value=[`Cantiere di ${_fInd} ${nrVerb}`.trim(),_fImp,_fCom,_fTec,_fData].filter(Boolean).join(' - ')
+  $('email-verbale-oggetto').value='FORMEDIL Padova -AREA SICUREZZA E SALUTE- '+[`Cantiere di ${_fInd} ${nrVerb}`.trim(),_fImp,_fCom,_fTec,_fData].filter(Boolean).join(' - ')
 
   // Testo lettera (preview nel textarea)
   const letteraImpresa=
@@ -7638,7 +7648,7 @@ $('btn-ev-invia').onclick=async()=>{
         headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`,'apikey':SB_KEY},
         body:JSON.stringify({
           to: emails.map(e=>e.email),
-          subject: $('email-verbale-oggetto')?.value||'',
+          subject: _oggettoUfficioVerbale(),
           nrVerbale: window._evContext?.nr_verbale||vGet('f-verbale')||'',
           cantiere: window._evContext?.cantiere||vGet('f-cant-search')||'',
           impresa: window._evContext?.impresa||'',
@@ -7675,7 +7685,7 @@ $('btn-ev-invia').onclick=async()=>{
         inviato_at:new Date().toISOString(),
         email_dest:emails.map(e=>e.email),
         dest:emails,
-        oggetto:$('email-verbale-oggetto')?.value||'',
+        oggetto:_oggettoUfficioVerbale(),
         tipo:_ret?'rettifica':'invio',
         motivo:_ret?.note||null,
         modifiche:_ret?.modifiche||null,

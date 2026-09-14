@@ -158,7 +158,8 @@ serve(async (req) => {
     const dIt = (s: string) => (s ? String(s).slice(0, 10).split('-').reverse().join('/') : '')
     const dest = [dati.richiedente_email]
     const cc = [cfg.stage_relazione_cc, dati.tecnico_email].filter(Boolean)
-    const oggetto = `FORMEDIL PADOVA - Area Sicurezza e Salute - Relazione visita allo stagista `
+    /* ogni oggetto comincia con «FORMEDIL Padova -AREA SICUREZZA E SALUTE-» (14/09/2026) */
+    const oggetto = `FORMEDIL Padova -AREA SICUREZZA E SALUTE- Relazione visita allo stagista `
       + `${dati.stagista || ''} presso ${dati.azienda || ''}`
       + (dati.richiedente ? ` - alla c.a. ${dati.richiedente}` : '')
 
