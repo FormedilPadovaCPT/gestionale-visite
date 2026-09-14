@@ -49,6 +49,16 @@ Deno.serve(async (req) => {
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '40'), 60);
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
 
+  // ⚠️ 14/09/2026: la chiama solo public.geocode_tick(), con l'header
+  // X-Geocode-Token uguale a s_config.geocode_token. Prima bastava la chiave
+  // anon (pubblica): chiunque poteva lanciare giri di geocodifica, scrivere
+  // coordinate e consumare la quota Nominatim, che su abuso blocca l'IP.
+  const dato = req.headers.get('x-geocode-token') || '';
+  const { data: t } = await db.from('s_config').select('valore').eq('chiave', 'geocode_token').maybeSingle();
+  if (!dato || !t?.valore || dato !== t.valore) {
+    return new Response(JSON.stringify({ error: 'accesso non autorizzato' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+  }
+
   const { data: rows, error } = await db.rpc('cantieri_da_geocodificare', { p_limit: limit });
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
 

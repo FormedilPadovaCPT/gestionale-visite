@@ -17,8 +17,38 @@ import { getAccessToken } from '../_shared/google.ts'
 // (audit 05/09/2026: il token Google viene dal modulo condiviso, non piu' copiato qui)
 
 // ── Handler principale ───────────────────────────────────────────────────────
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+/* ⚠️ CHI PUO' CHIAMARLA (14/09/2026). verify_jwt=true lasciava passare la
+   chiave anon, che sta in chiaro nel repository pubblico del gestionale:
+   chiunque poteva caricare file sul Drive dell'ente (con link pubblico) o
+   scaricare foto per id. Ora serve un utente autenticato del personale
+   (is_personale: tecnici, segreteria, coordinamento). Il ruolo lo dice il
+   database, eseguito COME l'utente: con la sola anon risponde errore = «no». */
+async function nonPersonale(req: Request): Promise<Response | null> {
+  const nega = (status: number, error: string) =>
+    new Response(JSON.stringify({ ok: false, error }), { status, headers: { 'Content-Type': 'application/json', ...CORS } })
+  try {
+    const auth = req.headers.get('Authorization') || ''
+    if (!auth.startsWith('Bearer ')) return nega(401, 'accesso non autorizzato')
+    const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: auth } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    const { data: u, error: eu } = await sb.auth.getUser()
+    if (eu || !u?.user?.email) return nega(401, 'accesso non autorizzato')
+    const { data, error } = await sb.rpc('is_personale')
+    if (error || data !== true) return nega(403, 'utente non abilitato')
+    return null
+  } catch {
+    return nega(401, 'accesso non autorizzato')
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+  const no = await nonPersonale(req)
+  if (no) return no
 
   try {
     // Leggi secrets
