@@ -32,6 +32,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .btn-success{background:var(--ok);color:#fff}
 .btn-danger{background:var(--danger);color:#fff}
 .btn-outline{background:transparent;border:2px solid var(--orange);color:var(--orange)}
+body.viewer-mode #btn-diniego-dash{display:none!important}
 .btn-warn{background:var(--warn);color:#fff}
 .btn-sm{padding:5px 11px;font-size:12px}
 .btn-icon{background:none;padding:4px 8px;font-size:16px;border:none}
@@ -295,7 +296,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
      colonne: «Segnala un cantiere attivo» a tutta larghezza, sotto QR e «Vai ai servizi». */
   #dash-segnala-wrap{gap:8px;display:grid!important;grid-template-columns:1fr 1fr}
   #dash-segnala-wrap button{min-width:0!important;flex:none!important;width:100%;padding:11px 8px!important;font-size:14px!important;border-radius:8px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #dash-segnala-wrap #btn-segnala-dash{grid-column:1/-1}
+  #dash-segnala-wrap #btn-segnala-dash,#dash-segnala-wrap #btn-diniego-dash{grid-column:1/-1}
   /* filtri dashboard compatti: griglia 2x2, testi piccoli */
   #dash-filtri{padding:10px 10px 6px}
   #dash-filtri div[style*="grid-template-columns"]{grid-template-columns:1fr 1fr!important;gap:6px 8px!important}
@@ -454,7 +455,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 
     <!-- DASHBOARD -->
     <section id="view-dashboard">
-      <div id="dash-segnala-wrap" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" id="btn-segnala-dash" style="flex:2;min-width:220px;padding:12px;font-size:15px;border-radius:10px">&#128205; Segnala un cantiere attivo</button><button id="btn-qr-servizi" title="Mostra il QR del portale servizi a chi è in cantiere" style="flex:1;min-width:160px;padding:12px;font-size:15px;border-radius:10px;background:#fff;border:2px solid #e7500f;color:#e7500f;font-weight:600;cursor:pointer">&#128241; QR servizi CPT</button><button id="btn-servizi-cpt" style="flex:1;min-width:180px;padding:12px;font-size:15px;border-radius:10px;background:#95C22F;border:1px solid #7aa527;color:#fff;font-weight:600;cursor:pointer" onclick="window.open('https://formedilpadovacpt.github.io/servizi/','_blank')">Vai ai servizi CPT ↗</button></div>
+      <div id="dash-segnala-wrap" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" id="btn-segnala-dash" style="flex:2;min-width:220px;padding:12px;font-size:15px;border-radius:10px">&#128205; Segnala un cantiere attivo</button><button id="btn-diniego-dash" title="Segnala alla segreteria che ti è stato negato l'accesso a un cantiere" style="flex:2;min-width:220px;padding:12px;font-size:15px;border-radius:10px;background:#fff;border:2px solid #c0392b;color:#c0392b;font-weight:600;cursor:pointer">&#128683; Accesso negato al cantiere</button><button id="btn-qr-servizi" title="Mostra il QR del portale servizi a chi è in cantiere" style="flex:1;min-width:160px;padding:12px;font-size:15px;border-radius:10px;background:#fff;border:2px solid #e7500f;color:#e7500f;font-weight:600;cursor:pointer">&#128241; QR servizi CPT</button><button id="btn-servizi-cpt" style="flex:1;min-width:180px;padding:12px;font-size:15px;border-radius:10px;background:#95C22F;border:1px solid #7aa527;color:#fff;font-weight:600;cursor:pointer" onclick="window.open('https://formedilpadovacpt.github.io/servizi/','_blank')">Vai ai servizi CPT ↗</button></div>
       <div id="avvisi-banner"></div>
       <div id="dash-autorizzazioni" style="display:none;margin-bottom:14px"></div>
       <div id="dash-fatture" style="display:none;margin-bottom:14px"></div>
@@ -13019,6 +13020,8 @@ document.addEventListener('input',function(ev){
 </script>
 <!-- relazione di visita allo stagista: apre dalla pagina Incarichi -->
 <script src="stage-relazione.js"></script>
+<!-- accesso negato al cantiere: il tecnico segnala, la segreteria gestisce -->
+<script src="diniego-accesso.js?v=1"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
