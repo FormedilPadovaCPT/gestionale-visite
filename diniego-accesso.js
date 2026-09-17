@@ -116,8 +116,12 @@
       .din-sel{font-size:12px;margin-top:4px}
       .din-sel b{color:#27ae60}
       .din-mia{font-size:12px;padding:6px 0;border-top:1px solid #f0f0f0}
-      .din-motivi{display:flex;flex-direction:column;gap:4px;font-size:13px}
-      .din-motivi label{display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer}
+      /* i campi dell'app sono larghi 100% e le etichette maiuscole: qui i pallini
+         devono restare piccoli, a sinistra, col testo accanto */
+      #modal-diniego .din-motivi{display:flex;flex-direction:column;gap:8px;margin-top:2px}
+      #modal-diniego .din-motivi label{display:flex;align-items:center;justify-content:flex-start;gap:8px;margin:0;
+        font-size:14px;font-weight:400;text-transform:none;letter-spacing:normal;color:inherit;cursor:pointer;text-align:left}
+      #modal-diniego .din-motivi input[type=radio]{width:18px;height:18px;min-width:18px;flex:0 0 18px;margin:0;padding:0;accent-color:#e7500f}
       .din-ev{color:#565c66;margin-top:2px;padding-left:8px;border-left:2px solid #e7500f}
       .din-stato{display:inline-block;padding:1px 7px;border-radius:10px;color:#fff;font-size:11px}`;
     document.head.appendChild(stile);
