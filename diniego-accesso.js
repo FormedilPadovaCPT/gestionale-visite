@@ -230,7 +230,7 @@
       const email = String(window.S?.user?.email || '').toLowerCase();
       const { data, error } = await window.sb.from('s_cantieri_critici')
         .select('id, created_at, origine, data_evento, impresa_nome, cantiere_desc, stato, gestione_note')
-        .eq('segnalato_da', email).order('created_at', { ascending: false }).limit(6);
+        .eq('segnalato_da', email).neq('stato', 'annullato').order('created_at', { ascending: false }).limit(6);
       if (error) throw error;
       if (!data?.length) { box.innerHTML = ''; return; }
       /* decisioni e risposte dell'ufficio: la cronologia che il tecnico può leggere */
