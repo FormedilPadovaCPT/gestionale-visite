@@ -459,6 +459,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div id="avvisi-banner"></div>
       <div id="dash-autorizzazioni" style="display:none;margin-bottom:14px"></div>
       <div id="dash-fatture" style="display:none;margin-bottom:14px"></div>
+      <div id="dash-critici" style="display:none;margin-bottom:14px"></div>
       <div id="dash-stage-sr" style="display:none;margin-bottom:14px"></div>
       
 
@@ -2391,7 +2392,7 @@ function navTo(view){
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
   if(view==='dashboard')loadAutorizzazioni().catch(e=>console.warn('autorizzazioni:',e))
-  if(view==='dashboard'){loadFattureCoord().catch(e=>console.warn('fatture:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))}
+  if(view==='dashboard'){loadFattureCoord().catch(e=>console.warn('fatture:',e));if(window.loadCriticiCoord)window.loadCriticiCoord().catch(e=>console.warn('critici:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))}
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='cantieri'&&typeof loadCantMap==='function')loadCantMap().catch(e=>console.error('loadCantMap:',e))
@@ -13022,6 +13023,7 @@ document.addEventListener('input',function(ev){
 <script src="stage-relazione.js"></script>
 <!-- accesso negato al cantiere: il tecnico segnala, la segreteria gestisce -->
 <script src="diniego-accesso.js?v=4"></script>
+<script src="cantieri-critici-coord.js?v=1"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
