@@ -8,12 +8,21 @@
    Essenziali, come chiesto: DATA, IMPRESA, CANTIERE e NOTE.
    Impresa e cantiere si cercano nell'anagrafica; se non ci sono,
    si scrivono a mano e vanno bene lo stesso. Chi segnala e il
-   tecnico non si scelgono: li mette il database dall'accesso.
+   tecnico non si scelgono: li mette il database dall'accesso
+   (la maschera lo mostra: «Segnali come…»).
 
-   Tabella s_dinieghi_accesso (SQL in segreteria-app/supabase/sql/
-   2026_09_16_dinieghi_accesso_cantiere.sql): il tecnico inserisce
-   e rilegge le proprie, la segreteria gestisce. Una segnalazione
-   non si cancella: la segreteria la chiude.
+   Dal 17/09/2026: il MOTIVO (una persona ha negato l'accesso /
+   cantiere chiuso o nessuno presente) e la PERSONA PRESENTE, con
+   gli stessi titoli e le stesse qualifiche del verbale (si leggono
+   dalle tendine del verbale, non si ricopiano qui).
+
+   Tabella s_cantieri_critici — il registro unico dei cantieri
+   critici (SQL in segreteria-app/supabase/sql/
+   2026_09_17_cantieri_critici.sql): oltre agli accessi negati ci
+   finiscono da sole le proposte di segnalazione a SPISAL / ITL
+   spuntate nel verbale. Il tecnico inserisce e rilegge le proprie,
+   segreteria e coordinatore gestiscono e rispondono. Un caso non
+   si cancella: si chiude.
 
    Script classico, come stage-relazione.js: usa window.sb, window.S
    e window.toast esposti dal modulo principale di index.html.
@@ -28,7 +37,14 @@
   const pulito = (q) => String(q || '').replace(/[,()%*\\]/g, ' ').replace(/\s+/g, ' ').trim();
   const avviso = (msg, tipo) => (window.toast ? window.toast(msg, tipo) : alert(msg));
 
-  const STATI = { nuovo: ['#e7500f', 'inviata'], in_gestione: ['#D9A400', 'in gestione'], chiuso: ['#27ae60', 'gestita'] };
+  const STATI = {
+    nuovo: ['#e7500f', 'inviata'], in_gestione: ['#D9A400', 'in gestione'],
+    attesa_impresa: ['#2980b9', "in attesa dell'impresa"], attesa_decisione: ['#8e44ad', 'in attesa di decisione'],
+    chiuso: ['#27ae60', 'gestita'],
+  };
+  /* gli eventi della cronologia che al tecnico dicono qualcosa (gli altri sono passaggi d'ufficio) */
+  const EVENTI_TECNICO = { decisione: 'Decisione', risposta_tecnico: 'Risposta', visita_riprogrammata: 'Visita riprogrammata',
+    conferenza_proposta: 'Proposta conferenza di cantiere', segnalazione_organi: 'Segnalazione a SPISAL / ITL', visita_successiva: 'Verbale successivo' };
 
   let impresa = null;   // { impresa_id, impresa_nome, ... } scelta dall'anagrafica
   let cantiere = null;  // { cantiere_id, ... } scelto dall'anagrafica
@@ -43,6 +59,7 @@
   <div class="modal-box" style="max-width:560px">
     <h3>&#128683; Accesso negato al cantiere</h3>
     <p style="font-size:12px;color:#666;margin:0 0 12px">La segnalazione arriva alla segreteria, che la gestisce. Impresa e cantiere si cercano in anagrafica; se non li trovi, scrivili come li hai visti.</p>
+    <div id="din-chi" style="font-size:12px;color:#565c66;background:#f6f7f8;border-radius:6px;padding:6px 10px;margin:0 0 10px"></div>
     <div class="field" style="max-width:190px"><label>Data *</label><input type="date" id="din-data"></div>
 
     <div class="field" style="position:relative"><label>Impresa *</label>
@@ -57,8 +74,29 @@
       <div id="din-cant-sel" class="din-sel"></div>
     </div>
 
+    <div class="field"><label>Che cosa è successo *</label>
+      <div class="din-motivi">
+        <label><input type="radio" name="din-motivo" value="rifiutato"> Una persona mi ha negato l'accesso</label>
+        <label><input type="radio" name="din-motivo" value="nessuno_presente"> Cantiere chiuso o nessuno presente</label>
+        <label><input type="radio" name="din-motivo" value="altro"> Altro</label>
+      </div>
+    </div>
+
+    <div id="din-presente" style="display:none">
+      <div style="font-size:12px;font-weight:600;color:#565c66;margin:2px 0 4px">Persona presente <span style="font-weight:400;color:#888">— quello che sai: anche solo il cognome o la qualifica</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="field" style="flex:0 0 100px"><label>Titolo</label><select id="din-pp-titolo"><option value="">–</option></select></div>
+        <div class="field" style="flex:1 1 130px"><label>Nome</label><input type="text" id="din-pp-nome" maxlength="80"></div>
+        <div class="field" style="flex:1 1 130px"><label>Cognome</label><input type="text" id="din-pp-cog" maxlength="80"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="field" style="flex:2 1 200px"><label>In qualità di</label><select id="din-pp-qual"><option value="">– Seleziona qualifica –</option></select></div>
+        <div class="field" style="flex:1 1 130px"><label>Telefono</label><input type="tel" id="din-pp-tel" maxlength="40" placeholder="se te l'ha lasciato"></div>
+      </div>
+    </div>
+
     <div class="field"><label>Note *</label>
-      <textarea id="din-note" rows="4" maxlength="2000" style="width:100%" placeholder="Chi ha negato l'accesso e con quale motivo, cosa hai visto, se hai lasciato recapiti…"></textarea></div>
+      <textarea id="din-note" rows="4" maxlength="2000" style="width:100%" placeholder="Con quale motivo è stato negato l'accesso, cosa hai visto, se hai lasciato recapiti…"></textarea></div>
 
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap">
       <button class="btn-secondary btn-sm" id="din-annulla">Annulla</button>
@@ -78,8 +116,17 @@
       .din-sel{font-size:12px;margin-top:4px}
       .din-sel b{color:#27ae60}
       .din-mia{font-size:12px;padding:6px 0;border-top:1px solid #f0f0f0}
+      .din-motivi{display:flex;flex-direction:column;gap:4px;font-size:13px}
+      .din-motivi label{display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer}
+      .din-ev{color:#565c66;margin-top:2px;padding-left:8px;border-left:2px solid #e7500f}
       .din-stato{display:inline-block;padding:1px 7px;border-radius:10px;color:#fff;font-size:11px}`;
     document.head.appendChild(stile);
+
+    /* titoli e qualifiche sono quelli del verbale: si leggono dalle sue tendine */
+    const copia = (da, a) => { const src = $(da); if (src) $(a).innerHTML = src.innerHTML; };
+    copia('f-ppre-titolo', 'din-pp-titolo');
+    copia('f-qual-ppre', 'din-pp-qual');
+    div.querySelectorAll('input[name="din-motivo"]').forEach((r) => r.addEventListener('change', mostraPresente));
 
     $('din-annulla').onclick = () => div.classList.add('hidden');
     $('din-salva').onclick = salva;
@@ -95,6 +142,21 @@
       if (!e.target.closest('#din-imp, #din-imp-ris')) $('din-imp-ris').style.display = 'none';
       if (!e.target.closest('#din-cant, #din-cant-ris')) $('din-cant-ris').style.display = 'none';
     });
+  }
+
+  const motivo = () => document.querySelector('input[name="din-motivo"]:checked')?.value || '';
+  /* con «nessuno presente» la persona non c'è: il riquadro sparisce e non si salva */
+  function mostraPresente() { $('din-presente').style.display = motivo() && motivo() !== 'nessuno_presente' ? 'block' : 'none'; }
+
+  async function chiSegnala() {
+    const email = String(window.S?.user?.email || '').toLowerCase();
+    const box = $('din-chi');
+    box.textContent = `Segnali come: ${email}`;
+    try {
+      const { data } = await window.sb.from('tecnici').select('titolo, tecnico_nome, tecnico_cognome').ilike('email', email).limit(1);
+      const t = data && data[0];
+      if (t) box.innerHTML = `Segnali come: <b>${esc([t.titolo, t.tecnico_nome, t.tecnico_cognome].filter(Boolean).join(' '))}</b> <span style="color:#888">(${esc(email)})</span>`;
+    } catch (e) { /* resta la mail: è quella che conta */ }
   }
 
   function etichettaCantiere(c) {
@@ -166,17 +228,26 @@
     const box = $('din-mie');
     try {
       const email = String(window.S?.user?.email || '').toLowerCase();
-      const { data, error } = await window.sb.from('s_dinieghi_accesso')
-        .select('id, created_at, data_diniego, impresa_nome, cantiere_desc, stato, gestione_note')
-        .eq('segnalato_da', email).order('created_at', { ascending: false }).limit(5);
+      const { data, error } = await window.sb.from('s_cantieri_critici')
+        .select('id, created_at, origine, data_evento, impresa_nome, cantiere_desc, stato, gestione_note')
+        .eq('segnalato_da', email).order('created_at', { ascending: false }).limit(6);
       if (error) throw error;
       if (!data?.length) { box.innerHTML = ''; return; }
+      /* decisioni e risposte dell'ufficio: la cronologia che il tecnico può leggere */
+      let eventi = [];
+      try {
+        const r = await window.sb.from('s_cantieri_critici_eventi').select('critico_id, created_at, tipo, testo')
+          .in('critico_id', data.map((x) => x.id)).in('tipo', Object.keys(EVENTI_TECNICO)).order('created_at');
+        eventi = r.data || [];
+      } catch (e) { /* senza cronologia resta la risposta */ }
       box.innerHTML = '<div style="font-size:12px;font-weight:600;color:#565c66;margin-bottom:4px">Le tue ultime segnalazioni</div>'
         + data.map((r) => {
           const [col, lbl] = STATI[r.stato] || ['#888', r.stato];
+          const ev = eventi.filter((e) => e.critico_id === r.id);
           return `<div class="din-mia"><span class="din-stato" style="background:${col}">${esc(lbl)}</span>
-            <b>${dIt(r.data_diniego)}</b> — ${esc(r.impresa_nome)} · ${esc(r.cantiere_desc)}
-            ${r.gestione_note ? `<div style="color:#666;margin-top:2px">Segreteria: ${esc(r.gestione_note)}</div>` : ''}</div>`;
+            <b>${dIt(r.data_evento)}</b> — ${r.origine === 'proposta_segnalazione' ? '<i>proposta SPISAL / ITL</i> · ' : ''}${esc(r.impresa_nome)} · ${esc(r.cantiere_desc)}
+            ${ev.map((e) => `<div class="din-ev"><b>${esc(EVENTI_TECNICO[e.tipo])}</b> ${dIt(e.created_at)}${e.testo ? ': ' + esc(e.testo) : ''}</div>`).join('')}
+            ${r.gestione_note ? `<div style="color:#666;margin-top:2px">Ufficio: ${esc(r.gestione_note)}</div>` : ''}</div>`;
         }).join('');
     } catch (e) { box.innerHTML = ''; /* elenco di cortesia: se non si legge non si allarma nessuno */ }
   }
@@ -187,7 +258,10 @@
     impresa = null; cantiere = null;
     $('din-data').value = oggi();
     $('din-data').max = oggi();
-    ['din-imp', 'din-cant', 'din-note'].forEach((id) => { $(id).value = ''; });
+    ['din-imp', 'din-cant', 'din-note', 'din-pp-titolo', 'din-pp-nome', 'din-pp-cog', 'din-pp-qual', 'din-pp-tel'].forEach((id) => { $(id).value = ''; });
+    document.querySelectorAll('input[name="din-motivo"]').forEach((r) => { r.checked = false; });
+    mostraPresente();
+    chiSegnala();
     $('din-imp-ris').style.display = 'none';
     $('din-cant-ris').style.display = 'none';
     mostraScelta();
@@ -205,13 +279,23 @@
     if (data > oggi()) return avviso('La data non può essere nel futuro.', 'err');
     if (!impNome) return avviso('Indica l\'impresa.', 'err');
     if (!cantDesc) return avviso('Indica il cantiere.', 'err');
+    if (!motivo()) return avviso('Indica che cosa è successo: accesso negato da una persona, o cantiere chiuso.', 'err');
     if (!note) return avviso('Scrivi nelle note che cosa è successo.', 'err');
     btn.disabled = true;
     const testo = btn.textContent;
     btn.textContent = 'Invio…';
     try {
-      const { data: r, error } = await window.sb.from('s_dinieghi_accesso').insert({
-        data_diniego: data,
+      const c = (id) => $(id).value.trim() || null;
+      const conPersona = motivo() !== 'nessuno_presente';
+      const { data: r, error } = await window.sb.from('s_cantieri_critici').insert({
+        origine: 'accesso_negato',
+        data_evento: data,
+        motivo: motivo(),
+        presente_titolo: conPersona ? c('din-pp-titolo') : null,
+        presente_nome: conPersona ? c('din-pp-nome') : null,
+        presente_cognome: conPersona ? c('din-pp-cog') : null,
+        presente_qualifica: conPersona ? c('din-pp-qual') : null,
+        presente_tel: conPersona ? c('din-pp-tel') : null,
         impresa_id: impresa && impresa.impresa_nome === impNome ? impresa.impresa_id : null,
         impresa_nome: impNome,
         cantiere_id: cantiere && etichettaCantiere(cantiere) === cantDesc ? cantiere.cantiere_id : null,
