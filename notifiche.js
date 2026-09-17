@@ -154,7 +154,7 @@
       } else if (q) {
         esitoProva = '&#9888; La notifica è arrivata a questo dispositivo ma <b>non è stata mostrata</b>: ' + String(q.ultima_ricezione_esito || '').replace(/[<>&]/g, ' ') + '. Segnalalo alla segreteria.';
       } else {
-        esitoProva = '&#9888; La prova è partita, ma <b>questo dispositivo non ha ancora confermato di averla ricevuta</b>. Di solito è il risparmio energetico che ferma il browser: toglilo per Chrome (Impostazioni &rarr; App &rarr; Chrome &rarr; Batteria &rarr; «Senza restrizioni») e riprova. Se arriva più tardi, il ritardo è del telefono.';
+        esitoProva = '&#9888; La prova è partita, ma <b>questo dispositivo non ha ancora confermato di averla ricevuta</b>. Quasi sempre è una modalità del telefono che ferma le notifiche: <b>modalità relax, Non disturbare, modalità riposo o risparmio energetico</b>. Toglila e riprova. Se non basta, togli le restrizioni di batteria a Chrome (Impostazioni &rarr; App &rarr; Chrome &rarr; Batteria &rarr; «Senza restrizioni»).';
       }
     } catch (e) { esitoProva = '&#9888; Prova non spedita: ' + String(e.message || e).replace(/[<>&]/g, ' '); } finally { btn.disabled = false; disegna().catch(() => {}); }
   }
