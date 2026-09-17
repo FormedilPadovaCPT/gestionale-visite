@@ -149,7 +149,10 @@ async function manda(sb: SB, iscritti: Iscrizione[], messaggio: string, chiavi: 
   const campioni: string[] = []
   await Promise.all(iscritti.map(async (s) => {
     try {
-      const r = await inviaNotifica(s, messaggio, chiavi, contatto, { urgenza: 'normal' })
+      // urgenza ALTA: con «normal» un Android in risparmio energetico trattiene la notifica finché
+      // non si sveglia (prima prova vera, 17/09: accettata da Google, mai arrivata al telefono).
+      // Qui ogni notifica è per una persona e la riguarda adesso: è il caso per cui «high» esiste.
+      const r = await inviaNotifica(s, messaggio, chiavi, contatto, { urgenza: 'high' })
       if (r.consegnata) ok.push(s.id)
       else if (r.morta) morte.push(s.id)
       else { ko.push(s.id); if (campioni.length < 3) campioni.push(r.stato + ' ' + new URL(s.endpoint).hostname + ' ' + r.testo.slice(0, 80)) }
