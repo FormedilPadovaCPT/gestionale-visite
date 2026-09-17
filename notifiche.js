@@ -40,7 +40,7 @@
   let riallineata = false;
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then((r) => { registrazione = r; }).catch((e) => console.warn('[notifiche] service worker:', e));
+    navigator.serviceWorker.register('sw.js?v=2').then((r) => { registrazione = r; }).catch((e) => console.warn('[notifiche] service worker:', e));
     navigator.serviceWorker.addEventListener('message', (ev) => {
       if (ev.data && ev.data.tipo === 'apri-vista') apriVista(ev.data.vista);
     });
@@ -125,13 +125,38 @@
     } catch (e) { avviso('Non riuscito: ' + (e.message || e), 'err'); } finally { btn.disabled = false; disegna().catch(() => {}); }
   }
 
+  /* La prova non si ferma a «spedita»: aspetta la ricevuta di ritorno di QUESTO dispositivo
+     (la manda il service worker quando la notifica arriva) e scrive nel riquadro che cosa è
+     successo davvero. «Spedita» e «arrivata» sono due fatti diversi. */
+  let esitoProva = '';
   async function prova(btn) {
     btn.disabled = true;
     try {
+      const iscr = await iscrizioneAttuale();
+      const endpoint = iscr && iscr.endpoint;
+      const prima = endpoint ? ((await chiama({ azione: 'stato', endpoint }).catch(() => ({}))).questo || {}).ultima_ricezione_il : null;
       const j = await chiama({ azione: 'prova' });
-      avviso(j.consegnate ? `Prova spedita a ${j.consegnate} ${j.consegnate === 1 ? 'dispositivo' : 'dispositivi'}: deve arrivare entro qualche secondo.`
-        : 'La prova non è stata consegnata: spegni e riattiva le notifiche su questo dispositivo.', j.consegnate ? 'ok' : 'err');
-    } catch (e) { avviso('Prova non spedita: ' + (e.message || e), 'err'); } finally { btn.disabled = false; }
+      if (!j.consegnate) {
+        esitoProva = '&#9888; La prova non è stata presa in carico dal servizio di notifica: spegni e riattiva le notifiche su questo dispositivo.';
+        return;
+      }
+      esitoProva = '&#8987; Prova spedita: aspetto la conferma da questo dispositivo…';
+      if ($('ntf-esito')) { $('ntf-esito').innerHTML = esitoProva; $('ntf-esito').style.display = ''; }
+      let q = null;
+      for (let i = 0; i < 8 && endpoint; i++) {
+        await new Promise((ok) => setTimeout(ok, 2500));
+        q = (await chiama({ azione: 'stato', endpoint }).catch(() => ({}))).questo || null;
+        if (q && q.ultima_ricezione_il && q.ultima_ricezione_il !== prima) break;
+        q = null;
+      }
+      if (q && q.ultima_ricezione_esito === 'mostrata') {
+        esitoProva = '&#9989; <b>Questo dispositivo ha ricevuto la notifica e l\'ha mostrata.</b> Se non la vedi, è il dispositivo che la nasconde: abbassa la tendina delle notifiche; poi controlla in Impostazioni &rarr; Notifiche che quelle di <b>Chrome</b> (o dell\'app <b>Visite</b>) siano attive e non «silenziose», e che non sia acceso «Non disturbare».';
+      } else if (q) {
+        esitoProva = '&#9888; La notifica è arrivata a questo dispositivo ma <b>non è stata mostrata</b>: ' + String(q.ultima_ricezione_esito || '').replace(/[<>&]/g, ' ') + '. Segnalalo alla segreteria.';
+      } else {
+        esitoProva = '&#9888; La prova è partita, ma <b>questo dispositivo non ha ancora confermato di averla ricevuta</b>. Di solito è il risparmio energetico che ferma il browser: toglilo per Chrome (Impostazioni &rarr; App &rarr; Chrome &rarr; Batteria &rarr; «Senza restrizioni») e riprova. Se arriva più tardi, il ritardo è del telefono.';
+      }
+    } catch (e) { esitoProva = '&#9888; Prova non spedita: ' + String(e.message || e).replace(/[<>&]/g, ' '); } finally { btn.disabled = false; disegna().catch(() => {}); }
   }
 
   /* lo stesso telefono, un'altra persona: l'iscrizione segue chi è entrato adesso. Una volta per sessione. */
@@ -159,7 +184,8 @@
         riallinea(iscr);
         html = `<div style="${stile};color:#2d7a06"><span style="flex:1;min-width:200px">&#128276; Notifiche <b>attive</b> su questo dispositivo.</span>
           <button class="btn-outline btn-sm" id="ntf-prova">Mandami una prova</button>
-          <button class="btn-outline btn-sm" id="ntf-spegni">Spegni</button>${installa}</div>`;
+          <button class="btn-outline btn-sm" id="ntf-spegni">Spegni</button>${installa}
+          <div id="ntf-esito" style="flex-basis:100%;color:#333;line-height:1.45;${esitoProva ? '' : 'display:none'}">${esitoProva}</div></div>`;
       } else {
         html = `<div style="${stile}"><span style="flex:1;min-width:220px">&#128276; Vuoi sapere subito quando ti arriva un <b>incarico</b>, un <b>avviso</b> o una <b>risposta dell'ufficio</b>? Le mail restano: questo è in più, e vale per questo dispositivo.</span>
           <button class="btn-primary btn-sm" id="ntf-attiva">Attiva le notifiche</button>${installa}</div>`;

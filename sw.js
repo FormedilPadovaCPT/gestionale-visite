@@ -37,8 +37,23 @@ self.addEventListener('push', (e) => {
     renotify: true,
     lang: 'it',
     data: { url: typeof d.url === 'string' ? d.url : './' },
-  }));
+  }).then(() => ricevuta('mostrata'), (err) => ricevuta('errore', err)));
 });
+
+// Ricevuta di ritorno: il «201» del servizio di notifica dice solo che Google o Apple
+// hanno preso in carico il messaggio. Che sia arrivato QUI e sia stato mostrato lo può
+// dire solo questo telefono. Non deve mai far fallire la notifica: se non parte, pazienza.
+const FUNZIONE = 'https://utdantrfugnmqsuujxbe.supabase.co/functions/v1/push-visite';
+async function ricevuta(esito, err) {
+  try {
+    const iscr = await self.registration.pushManager.getSubscription();
+    if (!iscr) return;
+    await fetch(FUNZIONE, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+      body: JSON.stringify({ azione: 'ricevuta', endpoint: iscr.endpoint, esito, errore: err ? String(err.message || err) : undefined }),
+    });
+  } catch (e) { /* la ricevuta è un di più */ }
+}
 
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();

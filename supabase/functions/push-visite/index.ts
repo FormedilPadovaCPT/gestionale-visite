@@ -14,7 +14,9 @@
 //                                  salva il telefono legandolo alla SUA email
 //   POST {azione:'cancella'}       con l'accesso: toglie quel telefono (solo se e' suo)
 //   POST {azione:'prova'}          con l'accesso: una notifica di prova AI SOLI suoi telefoni
-//   POST {azione:'stato'}          con l'accesso: quanti telefoni ha iscritti
+//   POST {azione:'stato'}          con l'accesso: quanti telefoni ha iscritti (+ la ricevuta di questo)
+//   POST {azione:'ricevuta'}       dal service worker, senza accesso: «arrivata e mostrata» su
+//                                  QUEL telefono (vale solo per un indirizzo d'iscrizione già noto)
 //   POST {azione:'invia'}          con X-Campanello: svuota push_coda. La chiamano i
 //                                  trigger (pg_net, dopo il commit) e il giro pg_cron
 //
@@ -233,14 +235,32 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, accettata: true }, 202)
     }
 
+    /* ricevuta di ritorno dal service worker: «la notifica è arrivata a QUESTO telefono».
+       Senza accesso (il service worker non ha la sessione), ma può riguardare solo un
+       indirizzo d'iscrizione già noto, che conoscono soltanto quel telefono e il database:
+       chi non lo ha non scrive niente, e chi lo ha può solo aggiornare una data. */
+    if (d.azione === 'ricevuta') {
+      const endpoint = typeof d.endpoint === 'string' ? d.endpoint.slice(0, 1000) : ''
+      if (!endpoint) return json({ error: 'manca il telefono' }, 400)
+      const esito = d.esito === 'mostrata' ? 'mostrata'
+        : 'errore: ' + String(d.errore || 'non precisato').replace(/[^\x20-\x7e]/g, ' ').slice(0, 120)
+      await sb.from('push_iscrizioni').update({ ultima_ricezione_il: new Date().toISOString(), ultima_ricezione_esito: esito }).eq('endpoint', endpoint)
+      return json({ ok: true })
+    }
+
     const chi = await chiChiama(sb, req)
     if (!chi) return json({ error: 'accesso non valido' }, 401)
     if (d.azione === 'iscrivi') return await iscrivi(sb, chi, d)
     if (d.azione === 'cancella') return await cancella(sb, chi, d)
     if (d.azione === 'prova') return await prova(sb, imp, chi)
     if (d.azione === 'stato') {
-      const { data } = await sb.from('push_iscrizioni').select('id, dispositivo, created_at, ultima_consegna_il').eq('email', chi.email)
-      return json({ ok: true, telefoni: data || [] })
+      const { data } = await sb.from('push_iscrizioni').select('id, dispositivo, created_at, ultima_consegna_il, ultima_ricezione_il, ultima_ricezione_esito, endpoint').eq('email', chi.email)
+      const questo = typeof d.endpoint === 'string' ? (data || []).find((r) => r.endpoint === d.endpoint) : null
+      return json({
+        ok: true,
+        telefoni: (data || []).map(({ endpoint: _e, ...r }) => r),   // l'indirizzo d'iscrizione non torna al client
+        questo: questo ? { ultima_consegna_il: questo.ultima_consegna_il, ultima_ricezione_il: questo.ultima_ricezione_il, ultima_ricezione_esito: questo.ultima_ricezione_esito } : null,
+      })
     }
     return json({ error: 'azione sconosciuta' }, 400)
   } catch (e) {
