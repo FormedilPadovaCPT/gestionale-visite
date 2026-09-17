@@ -2071,7 +2071,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <h3 style="margin:0;font-size:15px">✍️ Firme tecnici</h3>
       <button class="btn-outline btn-sm" id="btn-firme-close">✕ Chiudi</button>
     </div>
-    <p style="font-size:12px;color:#888;margin:0 0 12px">Carica o sostituisci la firma di ogni tecnico (PNG/JPG/WEBP). La firma viene usata nei verbali PDF.</p>
+    <p id="firme-sub" style="font-size:12px;color:#888;margin:0 0 12px">Carica o sostituisci la tua firma (PNG/JPG/WEBP). La firma viene usata nei verbali PDF.</p>
     <div id="firme-list" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>
 </div>
@@ -8123,8 +8123,22 @@ async function openModalFirme(){
   const tecMap={}
   if(tecRows)tecRows.forEach(r=>{tecMap[r.email]={...r}})
 
+  // Un tecnico vede e gestisce SOLO la propria firma: il database gli impedisce
+  // comunque di toccare quella degli altri (policy su tecnici e sul bucket firme-tecnici).
+  const _tutteLeFirme=!!(window.__isCoord||window.__isSegreteria||(typeof isCoordPageUser==='function'&&isCoordPageUser()))
+  const _miaMail=((S.user&&S.user.email)||'').toLowerCase()
+  const _elencoFirme=_tutteLeFirme?TECNICI_LIST:TECNICI_LIST.filter(t=>(t.email||'').toLowerCase()===_miaMail)
+  const _sub=$('firme-sub')
+  if(_sub)_sub.textContent=_tutteLeFirme
+    ?'Carica o sostituisci la firma di ogni tecnico (PNG/JPG/WEBP). La firma viene usata nei verbali PDF.'
+    :'Carica o sostituisci la tua firma (PNG/JPG/WEBP). La firma viene usata nei verbali PDF.'
+
   list.innerHTML=''
-  for(const t of TECNICI_LIST){
+  if(!_elencoFirme.length){
+    list.innerHTML='<div style="text-align:center;color:#888;font-size:12px;padding:12px">Nessuna firma da gestire per questo account.</div>'
+    return
+  }
+  for(const t of _elencoFirme){
     const dbTec=tecMap[t.email]||{}
     const firmaUrl=dbTec.firma_url||null
     // Genera preview se c'è una firma
