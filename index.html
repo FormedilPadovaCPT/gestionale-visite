@@ -3041,6 +3041,8 @@ function renderImpreseAccordion(){
     const tiEl=$(`im-tipo-${idx}`)
     if(tiEl)tiEl.onchange=()=>S.imprese[idx].tipo_imp=tiEl.value
   })
+  // scheda impresa pre-visita: si legge dal DB solo per le imprese già scelte
+  if(window.SchedaImpresa) S.imprese.forEach((im,idx)=>{ SchedaImpresa.mostra(idx, im.impresa_id, sb) })
   caricaProposteImprese()
 }
 
@@ -3068,6 +3070,8 @@ function impreseAccordionHTML(im,idx){
           <button class="btn-outline btn-sm" data-imp-new="${idx}" type="button" style="white-space:nowrap;margin-top:1px">+ Nuova</button>
         </div>
       </div>
+      <!-- scheda impresa pre-visita (scheda-impresa.js): quello che l'ufficio sa già di questa impresa -->
+      <div id="imp-scheda-${idx}"></div>
       <div class="row">
         <div class="field"><label>Partita IVA</label><input type="text" id="im-piva-${idx}" value="${im.piva||''}" placeholder="IT…" readonly style="background:#f8f8f8"></div>
         <div class="field"><label>Codice fiscale</label><input type="text" id="im-cf_imp-${idx}" value="${im.cf_imp||''}" placeholder="CF…" readonly style="background:#f8f8f8"></div>
@@ -13078,6 +13082,7 @@ document.addEventListener('input',function(ev){
 <script src="diniego-accesso.js?v=4"></script>
 <script src="cantieri-critici-coord.js?v=2"></script>
 <script src="controllo-verbale.js?v=1"></script>
+<script src="scheda-impresa.js?v=1"></script>
 <script src="notifiche.js?v=1"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
