@@ -4068,6 +4068,27 @@ async function saveVisita(stato){
   if(!data_v){toast('Inserisci la data della visita','warn');activateTab(0);return}
   if(!tec_id){toast('Seleziona il tecnico (Tab Visita)','warn');activateTab(0);return}
 
+  // controllo di coerenza prima del definitivo (controllo-verbale.js, 17/09/2026):
+  // avvisa, non blocca; un errore del controllo non ferma mai il salvataggio
+  if(stato==='definitivo'&&window.ControlloVerbale){
+    let _cvOk=true
+    try{
+      _cvOk=await window.ControlloVerbale.verifica({
+        checklist:S.checklist, noteChk:S.noteChk,
+        descrizioni:Object.fromEntries((S.voci||[]).map(v=>[v.codice,v.descrizione])),
+        ossTec:vGet('f-oss-tec'), noteLav:vGet('f-note-lav'),
+        dataVisita:data_v, oraDa:vGet('f-da'), oraA:vGet('f-a'),
+        dataRitorno:vGet('f-data-ritorno'), accCant:vGet('f-acc-cant'),
+        ppreNome:[vGet('f-ppre-nome'),vGet('f-ppre-cog')].map(x=>(x||'').trim()).filter(Boolean).join(' '),
+        ppreQual:vGet('f-qual-ppre'),
+        oggi:new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Rome'}),
+        cantiereId:cant_id, visitaId:S.fd.visita_id||S.savedId||null,
+        impresaId:S.imprese[0].impresa_id, tecnicoId:tec_id
+      })
+    }catch(_cv){console.warn('controllo verbale:',_cv)}
+    if(!_cvOk)return
+  }
+
   // numero verbale corretto a mano dalla segreteria: verifica che sia libero
   const _nrNow=vGet('f-verbale').trim()
   if(_nrVerbEditVid&&_nrNow!==_nrVerbOrig){
@@ -13042,6 +13063,7 @@ document.addEventListener('input',function(ev){
 <!-- accesso negato al cantiere: il tecnico segnala, la segreteria gestisce -->
 <script src="diniego-accesso.js?v=4"></script>
 <script src="cantieri-critici-coord.js?v=2"></script>
+<script src="controllo-verbale.js?v=1"></script>
 <script src="notifiche.js?v=1"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
