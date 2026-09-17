@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Gestionale Visite – Formedil Padova · v2026-07-21f</title>
+<!-- App installabile (17/09/2026): manifest + icone. Il service worker (sw.js) serve
+     SOLO alle notifiche e non mette niente in cache: il gestionale si carica dalla rete come prima. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#e7500f">
+<link rel="icon" type="image/png" sizes="192x192" href="icona-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Visite">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -461,6 +471,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <!-- fatture da approvare e cantieri critici stanno nella Zona Coordinatore
            (17/09/2026): qui resta solo l'avviso che c'e' qualcosa da guardare -->
       <div id="dash-coord-avviso" style="display:none;margin-bottom:14px"></div>
+      <!-- notifiche sul telefono e installazione dell'app (notifiche.js) -->
+      <div id="dash-notifiche" style="display:none;margin-bottom:14px"></div>
       <div id="dash-stage-sr" style="display:none;margin-bottom:14px"></div>
       
 
@@ -2398,7 +2410,7 @@ function navTo(view){
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
   if(view==='dashboard')loadAutorizzazioni().catch(e=>console.warn('autorizzazioni:',e))
-  if(view==='dashboard'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))}
+  if(view==='dashboard'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.notificheBox)window.notificheBox().catch(e=>console.warn('notifiche:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))}
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='cantieri'&&typeof loadCantMap==='function')loadCantMap().catch(e=>console.error('loadCantMap:',e))
@@ -13030,6 +13042,7 @@ document.addEventListener('input',function(ev){
 <!-- accesso negato al cantiere: il tecnico segnala, la segreteria gestisce -->
 <script src="diniego-accesso.js?v=4"></script>
 <script src="cantieri-critici-coord.js?v=2"></script>
+<script src="notifiche.js?v=1"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

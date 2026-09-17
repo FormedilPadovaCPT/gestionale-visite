@@ -1,0 +1,17 @@
+{
+  "name": "Gestionale Visite — Formedil Padova",
+  "short_name": "Visite",
+  "description": "Visite in cantiere dell'Area Sicurezza e Salute di Formedil Padova",
+  "lang": "it",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#e7500f",
+  "icons": [
+    { "src": "icona-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icona-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icona-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
