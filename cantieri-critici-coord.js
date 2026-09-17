@@ -5,8 +5,12 @@
    Il coordinatore lavora dal gestionale visite, non entra nell'app
    Segreteria: senza questo riquadro un accesso negato o una proposta
    di segnalazione a SPISAL / ITL li vedrebbe solo se qualcuno glieli
-   gira per mail. Sta in Dashboard, sotto le fatture da approvare, e
-   lo vedono il coordinatore e la segreteria.
+   gira per mail. Sta nella ZONA COORDINATORE, sotto le fatture da
+   approvare (tutte e due spostate lì dalla Dashboard il 17/09/2026:
+   la Dashboard resta del lavoro da tecnico); lo vedono il coordinatore
+   e la segreteria. Perché non restino lì senza che nessuno le guardi,
+   in Dashboard compare una riga d'avviso e il pulsante «Coordinatore»
+   del menu porta il numero delle cose in attesa.
 
    Che cosa fa da qui:
    · legge il caso: note del tecnico, persona presente, verbali del
@@ -164,7 +168,7 @@
     document.body.appendChild(div);
     $('ccc-chiudi').onclick = () => div.remove();
 
-    const dopo = () => { carica().catch(() => {}); apri(id); };
+    const dopo = () => { aggiorna().catch(() => {}); apri(id); };
     const con = async (btn, lavoro) => {
       btn.disabled = true;
       try { await lavoro(); } catch (e) { avviso('Non salvato: ' + (e.message || e), 'err'); } finally { btn.disabled = false; }
@@ -203,5 +207,53 @@
     });
   }
 
+  /* quante cose aspettano: le fatture si contano dai pulsanti «Approva» del
+     riquadro (lo riempie loadFattureCoord di index.html), i casi dalle righe */
+  function conta() {
+    const vis = (id) => { const b = $(id); return b && b.style.display !== 'none' ? b : null; };
+    const f = vis('dash-fatture'), c = vis('dash-critici');
+    return { fatture: f ? f.querySelectorAll('button[onclick*="approvata"]').length : 0, critici: c ? c.querySelectorAll('[data-cc]').length : 0 };
+  }
+
+  function avvisa() {
+    const { fatture, critici } = conta();
+    const tot = fatture + critici;
+    const nav = $('nav-admin');
+    if (nav) {
+      nav.innerHTML = '&#128272; Coordinatore' + (tot ? ` <span style="background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700">${tot}</span>` : '');
+    }
+    const box = $('dash-coord-avviso');
+    if (!box) return;
+    if (!tot || !nav || nav.style.display === 'none') { box.style.display = 'none'; return; }
+    const pezzi = [];
+    if (fatture) pezzi.push(`<strong>${fatture}</strong> ${fatture === 1 ? 'fattura da approvare' : 'fatture da approvare'}`);
+    if (critici) pezzi.push(`<strong>${critici}</strong> ${critici === 1 ? 'cantiere critico' : 'cantieri critici'}`);
+    box.innerHTML = `<div class="card" style="border-left:4px solid #e7500f;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:pointer" id="dash-coord-vai">
+      <span style="font-size:13px;flex:1;min-width:220px">&#128272; Nella <strong>Zona Coordinatore</strong> ti aspettano: ${pezzi.join(' &middot; ')}</span>
+      <button class="btn-primary btn-sm">Apri</button></div>`;
+    box.style.display = '';
+    $('dash-coord-vai').onclick = () => nav.click();
+  }
+
+  /* un giro solo: riempie i due riquadri (che stanno nella Zona Coordinatore)
+     e aggiorna avviso e numero. Lo chiamano la Dashboard e la Zona. */
+  async function aggiorna() {
+    await Promise.allSettled([
+      typeof window.loadFattureCoord === 'function' ? window.loadFattureCoord() : Promise.resolve(),
+      carica(),
+    ]);
+    avvisa();
+  }
+
+  /* la Zona Coordinatore ha fondo scuro e testo chiaro: dentro i riquadri bianchi
+     il testo deve tornare scuro, altrimenti le righe non si leggono */
+  (function coloriZona() {
+    const st = document.createElement('style');
+    st.textContent = '#view-admin #dash-fatture .card,#view-admin #dash-critici .card{color:#222;text-align:left}'
+      + '#view-admin #dash-fatture .card h3,#view-admin #dash-critici .card h3{color:#565c66}';
+    document.head.appendChild(st);
+  })();
+
   window.loadCriticiCoord = carica;
+  window.aggiornaZonaCoord = aggiorna;
 })();
