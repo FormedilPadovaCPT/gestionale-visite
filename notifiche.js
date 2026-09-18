@@ -88,7 +88,19 @@
 
   /* Si iscrive e lo dice al server. Se il server non la salva, il browser non
      deve credersi iscritto: si disiscrive e si segnala. */
-  async function sottoscrivi() {
+  /* ⚠️ 18/09/2026 - Una iscrizione alla volta. Il riquadro si ridisegna da
+     piu' punti quasi insieme (apertura della Dashboard, invito a installare):
+     due chiamate vedevano entrambe «nessuna iscrizione» e ne creavano DUE,
+     con indirizzi diversi, nello stesso secondo (visto nel database: quattro
+     coppie in un giorno). Chi arriva secondo aspetta la prima e ne prende
+     il risultato. */
+  let iscrizioneInCorso = null;
+  function sottoscrivi() {
+    if (!iscrizioneInCorso) iscrizioneInCorso = sottoscriviDavvero().finally(() => { iscrizioneInCorso = null; });
+    return iscrizioneInCorso;
+  }
+
+  async function sottoscriviDavvero() {
     const reg = registrazione || await navigator.serviceWorker.ready;
     let iscr = await reg.pushManager.getSubscription();
     if (!iscr) {
