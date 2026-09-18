@@ -86,24 +86,43 @@
     return reg.pushManager.getSubscription();
   }
 
+  /* Si iscrive e lo dice al server. Se il server non la salva, il browser non
+     deve credersi iscritto: si disiscrive e si segnala. */
+  async function sottoscrivi() {
+    const reg = registrazione || await navigator.serviceWorker.ready;
+    let iscr = await reg.pushManager.getSubscription();
+    if (!iscr) {
+      const j = await (await fetch(FUNZIONE)).json();
+      if (!j.chiave) throw new Error('chiave delle notifiche non disponibile');
+      iscr = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: daB64u(j.chiave) });
+    }
+    try {
+      await chiama({ azione: 'iscrivi', iscrizione: iscr.toJSON(), dispositivo });
+    } catch (e) {
+      await iscr.unsubscribe().catch(() => {});
+      throw e;
+    }
+    try { localStorage.setItem('visite.notifiche.attivateUnaVolta', '1'); } catch (e) {}
+    return iscr;
+  }
+
+  /* ⚠️ 18/09/2026 - La sottoscrizione sparisce, il permesso no.
+     Sul telefono dell'utente il riquadro tornava a chiedere «Attiva» a ogni
+     apertura: il browser perde la sottoscrizione (dati del sito ripuliti,
+     service worker reinstallato) mentre il permesso resta concesso. Se il
+     permesso c'è, non si chiede niente: ci si riscrive in silenzio. */
+  async function riprendiInSilenzio() {
+    if (!supportate || Notification.permission !== 'granted') return null;
+    try { return await sottoscrivi(); }
+    catch (e) { console.warn('[notifiche] riscrizione in silenzio:', e.message || e); return null; }
+  }
+
   async function attiva(btn) {
     btn.disabled = true;
     try {
       const permesso = await Notification.requestPermission();
       if (permesso !== 'granted') { avviso('Permesso non concesso: le notifiche restano spente su questo dispositivo.', 'err'); return; }
-      const reg = registrazione || await navigator.serviceWorker.ready;
-      let iscr = await reg.pushManager.getSubscription();
-      if (!iscr) {
-        const j = await (await fetch(FUNZIONE)).json();
-        if (!j.chiave) throw new Error('chiave delle notifiche non disponibile');
-        iscr = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: daB64u(j.chiave) });
-      }
-      try {
-        await chiama({ azione: 'iscrivi', iscrizione: iscr.toJSON(), dispositivo });
-      } catch (e) {
-        await iscr.unsubscribe().catch(() => {});   /* iscrizione non salvata = iscrizione che non serve */
-        throw e;
-      }
+      await sottoscrivi();
       avviso('Notifiche attive su questo dispositivo. Prova con «Mandami una prova».', 'ok');
     } catch (e) {
       avviso('Notifiche non attivate: ' + (e.message || e), 'err');
@@ -121,6 +140,7 @@
         await chiama({ azione: 'cancella', endpoint: iscr.endpoint }).catch(() => {});
         await iscr.unsubscribe();
       }
+      try { localStorage.removeItem('visite.notifiche.attivateUnaVolta'); } catch (e) {}
       avviso('Notifiche spente su questo dispositivo.', 'ok');
     } catch (e) { avviso('Non riuscito: ' + (e.message || e), 'err'); } finally { btn.disabled = false; disegna().catch(() => {}); }
   }
@@ -179,7 +199,8 @@
     } else if (Notification.permission === 'denied') {
       html = `<div style="${stile}"><span style="flex:1;min-width:220px">&#128277; Le notifiche sono <b>bloccate</b> per questo sito: si riattivano dalle impostazioni del browser (il lucchetto accanto all'indirizzo).</span>${installa}</div>`;
     } else {
-      const iscr = await iscrizioneAttuale().catch(() => null);
+      let iscr = await iscrizioneAttuale().catch(() => null);
+      if (!iscr) iscr = await riprendiInSilenzio();
       if (iscr && Notification.permission === 'granted') {
         riallinea(iscr);
         html = `<div style="${stile};color:#2d7a06"><span style="flex:1;min-width:200px">&#128276; Notifiche <b>attive</b> su questo dispositivo.</span>
@@ -187,7 +208,15 @@
           <button class="btn-outline btn-sm" id="ntf-spegni">Spegni</button>${installa}
           <div id="ntf-esito" style="flex-basis:100%;color:#333;line-height:1.45;${esitoProva ? '' : 'display:none'}">${esitoProva}</div></div>`;
       } else {
-        html = `<div style="${stile}"><span style="flex:1;min-width:220px">&#128276; Vuoi sapere subito quando ti arriva un <b>incarico</b>, un <b>avviso</b> o una <b>risposta dell'ufficio</b>? Le mail restano: questo è in più, e vale per questo dispositivo.</span>
+        /* Il permesso e' tornato daccapo, ma su questo telefono le notifiche erano
+           state attivate: non le abbiamo spente noi, le ha cancellate il telefono
+           insieme ai dati del sito. Dirlo, invece di far finta che sia la prima volta. */
+        let riattiva = false;
+        try { riattiva = Notification.permission === 'default' && localStorage.getItem('visite.notifiche.attivateUnaVolta') === '1'; } catch (e) {}
+        html = riattiva
+          ? `<div style="${stile}"><span style="flex:1;min-width:220px">&#128276; Le notifiche su questo dispositivo <b>si sono spente</b>: il telefono ha cancellato i dati del sito, e con loro il permesso. Succede quando il browser è impostato per cancellare i dati alla chiusura${installata ? '' : ", oppure quando il gestionale si apre dal browser invece che dall'app installata"}.</span>
+          <button class="btn-primary btn-sm" id="ntf-attiva">Riattiva le notifiche</button>${installa}</div>`
+          : `<div style="${stile}"><span style="flex:1;min-width:220px">&#128276; Vuoi sapere subito quando ti arriva un <b>incarico</b>, un <b>avviso</b> o una <b>risposta dell'ufficio</b>? Le mail restano: questo è in più, e vale per questo dispositivo.</span>
           <button class="btn-primary btn-sm" id="ntf-attiva">Attiva le notifiche</button>${installa}</div>`;
       }
     }
