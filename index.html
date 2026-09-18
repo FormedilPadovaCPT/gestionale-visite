@@ -7680,6 +7680,15 @@ $('btn-ev-invia').onclick=async()=>{
     const upData=await upResp.json()
     if(!upData.ok||!upData.drive_file_id) throw new Error('Upload Drive fallito: '+(upData.error||'risposta non valida'))
 
+    /* il link firmato del questionario: se per qualunque motivo non si
+       ottiene, la mail parte lo stesso senza il riquadro — un verbale non si
+       blocca per un questionario */
+    let linkValuta=''
+    try{
+      const{data:lv,error:errLv}=await sb.rpc('questionario_link',{p_visita_id:vid})
+      if(errLv) console.warn('questionario_link:',errLv.message); else linkValuta=lv||''
+    }catch(eLv){ console.warn('questionario_link:',eLv?.message||eLv) }
+
     btn.textContent='⏳ Invio email…'
 
     // 3. Chiama send-verbale passando solo driveFileId (niente PDF base64 → body piccolo)
@@ -7704,6 +7713,7 @@ $('btn-ev-invia').onclick=async()=>{
           dataVisita: window._evContext?.dataVisita||'',
           campagna: await _evCampagnaPayload(),
           rettifica: window._evRettifica||undefined,
+          linkValuta,
           driveFileId: upData.drive_file_id,
           fileName: (function(){const _ev=window._evContext||{};const _c=s=>(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim();const _cd=(_ev.nr_verbale||vGet('f-verbale')||'').replace(/\D/g,'').slice(-4);const _nm=[`Verb_${_cd}`+(window._evRettifica?' RETTIFICA':''),_c(_ev.impresa).slice(0,30).trim(),_c(_ev.comune),_c(_ev.tecnico),(_ev.dataVisita||'').replace(/\//g,'-')].filter(Boolean).join(' - ')+'.pdf';return _cd?_nm:upData.file_name})()
         })
