@@ -11588,40 +11588,19 @@ async function showRubricaDetail(tipo, id){
         ['Data iscrizione CCIA',r.data_iscrizione_ccia?fmtDate(r.data_iscrizione_ccia):''],
       ])
       if(r.note?.trim()) html+=qdSec('Note')+`<div class="qd-note">${esc(r.note)}</div>`
-      // Cantieri collegati
-      const{data:cants}=await sb.from('cantieri')
-        .select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,prot_int')
-        .eq('impresa_id',id).eq('elimina',0).order('cantiere_id',{ascending:false}).limit(10)
-      if(cants&&cants.length){
-        html+=qdSec(`Cantieri collegati (${cants.length})`)
-        html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr>'
-        html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Ubicazione</th>'
-        html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Comune</th>'
-        html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Prot.</th>'
-        html+='</tr></thead><tbody>'
-        cants.forEach(c=>{
-          const loc=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()||'–'
-          html+=`<tr style="border-top:1px solid #f0f0f0">
-            <td style="padding:5px 6px">${esc(loc)}</td>
-            <td style="padding:5px 6px">${esc(c.comune_nome||'–')}</td>
-            <td style="padding:5px 6px">${esc(c.prot_int||'–')}</td>
-          </tr>`
-        })
-        html+='</tbody></table>'
-      } else {
-        html+=qdSec('Cantieri')+'<div style="color:#aaa;font-size:13px;padding:6px 0">Nessun cantiere collegato.</div>'
-      }
       // ── Visite effettuate: principale sul verbale + presente in cantiere
       window._RUBIMP_VIS=[]
+      let _visRaw=[],_visErr=false
       try{
         const{data:_vip}=await sb.from('visite_imprese_presenti').select('visita_id,ruolo,is_principale').eq('impresa_id',id)
         const _ruoloBy={};(_vip||[]).forEach(x=>{_ruoloBy[x.visita_id]=x.ruolo||''})
         const _vids=[...new Set((_vip||[]).map(x=>x.visita_id))]
         let _vis=[]
-        if(_vids.length)_vis=await _inChunks('visite','visita_id,nr_verbale,data_visita,ipc,impresa_id,tecnico_id,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome)','visita_id',_vids,q=>q.eq('elimina',0))
-        const{data:_vp}=await sb.from('visite').select('visita_id,nr_verbale,data_visita,ipc,impresa_id,tecnico_id,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome)').eq('impresa_id',id).eq('elimina',0)
+        if(_vids.length)_vis=await _inChunks('visite','visita_id,nr_verbale,data_visita,ipc,impresa_id,tecnico_id,cantiere_id,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_chiuso)','visita_id',_vids,q=>q.eq('elimina',0))
+        const{data:_vp}=await sb.from('visite').select('visita_id,nr_verbale,data_visita,ipc,impresa_id,tecnico_id,cantiere_id,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_chiuso)').eq('impresa_id',id).eq('elimina',0)
         const _seen=new Set(_vis.map(x=>x.visita_id))
         ;(_vp||[]).forEach(x=>{if(!_seen.has(x.visita_id)){_seen.add(x.visita_id);_vis.push(x)}})
+        _visRaw=_vis
         _vis.sort((a,b)=>String(b.data_visita||'').localeCompare(String(a.data_visita||'')))
         window._RUBIMP_VIS=_vis.map(v=>({
           vid:v.visita_id,nr:v.nr_verbale||'-',d:v.data_visita,ipc:v.ipc||'NR',
@@ -11630,7 +11609,40 @@ async function showRubricaDetail(tipo, id){
           loc:v.cantieri?.cantiere_etichetta||((v.cantieri?.cantiere_indirizzo||'')+' '+(v.cantieri?.cantiere_civico||'')).trim()||'-',
           com:v.cantieri?.comune_nome||''
         }))
-      }catch(_ev){console.error('rubrica impresa - visite:',_ev)}
+      }catch(_ev){_visErr=true;console.error('rubrica impresa - visite:',_ev)}
+      /* I CANTIERI DELL'IMPRESA SI RICAVANO DALLE VISITE (19/09/2026). La tabella
+         cantieri non ha una colonna impresa_id: nello stesso cantiere lavorano
+         ditte diverse nel tempo. La ricerca di prima la usava lo stesso, falliva
+         sempre, e per OGNI impresa usciva «Nessun cantiere collegato». Un cantiere
+         e' dell'impresa se lei compare in un suo verbale, da principale o fra le
+         presenti. Se le visite non si sono caricate lo si dice: non e' «nessuno». */
+      let _cantHtml=''
+      if(_visErr){
+        _cantHtml=qdSec('Cantieri')+'<div style="color:#c0392b;font-size:13px;padding:6px 0">Non sono riuscito a leggere le visite: i cantieri non si possono elencare. Riprova.</div>'
+      }else{
+        const _byC=new Map()
+        _visRaw.forEach(v=>{
+          if(!v.cantiere_id)return
+          let c=_byC.get(v.cantiere_id)
+          if(!c){c={n:0,ult:'',princ:false,chiuso:!!v.cantieri?.cantiere_chiuso,com:v.cantieri?.comune_nome||'',loc:v.cantieri?.cantiere_etichetta||((v.cantieri?.cantiere_indirizzo||'')+' '+(v.cantieri?.cantiere_civico||'')).trim()||'–'};_byC.set(v.cantiere_id,c)}
+          c.n++
+          if(String(v.data_visita||'')>c.ult)c.ult=String(v.data_visita||'')
+          if(v.impresa_id===id)c.princ=true
+        })
+        const _cl=[..._byC.values()].sort((x,y)=>y.ult.localeCompare(x.ult))
+        if(_cl.length){
+          const _th='padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px'
+          _cantHtml=qdSec(`Cantieri in cui ha lavorato (${_cl.length}${_cl.length>15?' – ultimi 15':''})`)
+          _cantHtml+=`<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th style="${_th}">Ubicazione</th><th style="${_th}">Comune</th><th style="${_th}">Visite</th><th style="${_th}">Ultima</th><th style="${_th}">Come</th></tr></thead><tbody>`
+          _cl.slice(0,15).forEach(c=>{
+            _cantHtml+=`<tr style="border-top:1px solid #f0f0f0"><td style="padding:5px 6px">${esc(c.loc)}${c.chiuso?' <span style="font-size:10px;color:#888">(chiuso)</span>':''}</td><td style="padding:5px 6px">${esc(c.com||'–')}</td><td style="padding:5px 6px">${c.n}</td><td style="padding:5px 6px;white-space:nowrap">${c.ult?fmtDate(c.ult):'–'}</td><td style="padding:5px 6px">${c.princ?'impresa principale':'presente in cantiere'}</td></tr>`
+          })
+          _cantHtml+='</tbody></table>'
+        }else{
+          _cantHtml=qdSec('Cantieri')+'<div style="color:#aaa;font-size:13px;padding:6px 0">Nessun cantiere: questa impresa non compare in nessun verbale.</div>'
+        }
+      }
+      html+=_cantHtml
       html+='<div id="rub-imp-visite"></div>'
       $('rub-detail-body').innerHTML=html
       rubImpVisiteRender(false)
@@ -11657,10 +11669,16 @@ async function showRubricaDetail(tipo, id){
       ])
       if(r.note?.trim()) html+=qdSec('Note')+`<div class="qd-note">${esc(r.note)}</div>`
       // Cantieri come committente
-      const{data:cants}=await sb.from('cantieri')
+      /* 19/09/2026: la colonna e' cantiere_committente_id. Con «committente_id», che
+         non esiste, la ricerca falliva sempre e la sezione non compariva MAI: stesso
+         difetto dei cantieri dell'impresa. E l'errore ora si dice, non si ingoia. */
+      const{data:cants,error:_cantErr}=await sb.from('cantieri')
         .select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,prot_int')
-        .eq('committente_id',id).eq('elimina',0).order('cantiere_id',{ascending:false}).limit(10)
-      if(cants&&cants.length){
+        .eq('cantiere_committente_id',id).eq('elimina',0).order('cantiere_id',{ascending:false}).limit(10)
+      if(_cantErr){
+        console.error('rubrica committente - cantieri:',_cantErr)
+        html+=qdSec('Cantieri come committente')+'<div style="color:#c0392b;font-size:13px;padding:6px 0">Non sono riuscito a leggere i cantieri. Riprova.</div>'
+      }else if(cants&&cants.length){
         html+=qdSec(`Cantieri come committente (${cants.length})`)
         html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr>'
         html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Ubicazione</th>'
