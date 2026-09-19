@@ -2246,7 +2246,19 @@ const TOTAL_TABS=15 // 0..14
 // ── UTILS ──
 const $=id=>document.getElementById(id)
 function uuid(){return crypto.randomUUID()}
-function today(){return new Date().toISOString().slice(0,10)}
+function today(){return new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Rome'})}
+// Supabase restituisce al massimo 1000 righe per lettura, e NON lo dice: chi vuole tutte le
+// righe le chiede a pagine. `fai(da,a)` costruisce la query, gia' ordinata, con .range(da,a).
+async function sbTutte(fai){
+  const out=[]
+  for(let da=0;;da+=1000){
+    const{data,error}=await fai(da,da+999)
+    if(error)throw error
+    out.push(...(data||[]))
+    if(!data||data.length<1000)break
+  }
+  return out
+}
 function fmtDate(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateString('it-IT')}
 function toast(msg,type='',ms=3500){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;$('toast-area').appendChild(t);setTimeout(()=>t.remove(),ms)}
 function show(id){$(id).classList.remove('hidden')}
@@ -2554,7 +2566,11 @@ async function loadFattureCoord(){
 }
 async function fattDecidi(id,esito){
   let motivo=null
-  if(esito==='standby'){motivo=prompt('Motivo dello stand-by (anomalia da risolvere col tecnico):');if(motivo===null)return}
+  if(esito==='standby'){
+    motivo=prompt('Motivo dello stand-by (anomalia da risolvere col tecnico):');if(motivo===null)return
+    motivo=motivo.trim()
+    if(motivo.length<5){toast('Scrivi il motivo dello stand-by: e\u2019 la riga che rileggeranno il tecnico e la segreteria','warn');return}
+  }
   if(esito==='approvata'&&!confirm('Approvi la fattura per il pagamento? Vuol dire che tutte le attivita\' del mese sono a posto.'))return
   const{error}=await sb.rpc('s_fattura_decisione',{p_id:id,p_esito:esito,p_motivo:motivo||null})
   if(error){toast('Non riuscito: '+error.message,'err');return}
@@ -2827,13 +2843,24 @@ function updateZoneDots(){
 $('btn-prev').onclick=()=>{saveTabData();const t=S.tab-1;activateTab(t);renderZoneTab(t)}
 $('btn-next').onclick=()=>{saveTabData();const t=S.tab+1;activateTab(t);renderZoneTab(t)}
 
+// la data decide l'esercizio: su una visita nuova il numero provvisorio la segue
+document.addEventListener('change',async e=>{
+  if(!e.target||e.target.id!=='f-data'||!S.nrAuto||S.savedId||S.fd.visita_id)return
+  const att=vGet('f-verbale')||''
+  if(att.startsWith(prefissoVerbale(vGet('f-data'))))return
+  try{const nr=await nextVerbale(vGet('f-data'));vSet('f-verbale',nr);S.fd.nr_verbale=nr}catch(_e){console.warn('numero verbale:',_e)}
+})
+
 // ── INIT FORM ──
 async function initForm(snap=null){
   S.fd={}; S.checklist={}; S.noteChk={}; S.imprese=[]; S.lavorazioni=[]; S.savedId=null; S.foto={}
   hide('btn-pdf')
   hide('btn-email-verbale')
 
-  const nr=await nextVerbale()
+  // numero PROVVISORIO: quello vero si fissa al primo salvataggio, sulla data della visita
+  // (S.nrAuto = il numero l'ha proposto l'app, non viene da un verbale gia' esistente)
+  S.nrAuto=!(snap&&(snap.visita_id||snap._tieniNumero))
+  const nr=await nextVerbale(today())
   vSet('f-verbale',nr)
   S.fd.nr_verbale=nr
   bloccaNrVerbale()
@@ -2885,10 +2912,16 @@ async function initForm(snap=null){
   if(window.mappaEvento)window.mappaEvento('form')
 }
 
-async function nextVerbale(){
-  const n=new Date();const start=(n.getMonth()+1)>=10?n.getFullYear():n.getFullYear()-1
-  const es=String(start%100).padStart(2,'0')+'_'+String((start+1)%100).padStart(2,'0')
-  const pref=`CPT/${es}/`
+// L'esercizio del verbale (1/10 - 30/9) lo decide la DATA DELLA VISITA, non il giorno
+// in cui la si inserisce: una visita del 30/9 registrata il 2/10 e' un verbale 25_26.
+function prefissoVerbale(dataISO){
+  const d=/^\d{4}-\d{2}-\d{2}$/.test(dataISO||'')?dataISO:today()
+  const y=+d.slice(0,4),m=+d.slice(5,7)
+  const start=m>=10?y:y-1
+  return 'CPT/'+String(start%100).padStart(2,'0')+'_'+String((start+1)%100).padStart(2,'0')+'/'
+}
+async function nextVerbale(dataISO){
+  const pref=prefissoVerbale(dataISO)
   const{data}=await sb.from('visite').select('nr_verbale').like('nr_verbale',pref+'%').order('nr_verbale',{ascending:false}).limit(1)
   if(!data?.length)return pref+'0001'
   const last=parseInt(data[0].nr_verbale.split('/')[2])||0
@@ -4101,6 +4134,9 @@ async function saveVisita(stato){
     if(_dup&&_dup.length){toast('Numero verbale gi\u00e0 usato da un\u2019altra visita','err');activateTab(0);return}
   }
 
+  if((S.fd.visita_id||S.savedId)&&_nrNow.startsWith('CPT/')&&!_nrNow.startsWith(prefissoVerbale(data_v))&&!_nrVerbEditVid){
+    toast('Attenzione: il verbale '+_nrNow+' non e\u2019 dell\u2019esercizio della data indicata. Se la data e\u2019 giusta, il numero lo corregge la segreteria.','warn')
+  }
   try{
     let vid=S.fd.visita_id||S.savedId||null
     if(!vid){vid=uuid();S.fd.visita_id=vid}
@@ -4182,8 +4218,11 @@ async function saveVisita(stato){
       if(error)throw error
     } else {
       // 2) Esiste già una riga con questo nr_verbale (snap senza visita_id)?
+      // ⚠️ Solo per un numero che NON ha proposto l'app (import di un verbale esistente):
+      // con un numero proposto dall'app, trovarlo gia' usato vuol dire che un collega ha
+      // salvato per primo — e aggiornare «per numero» sovrascriverebbe il SUO verbale.
       const nrv=vistaRow.nr_verbale
-      const{data:byNr}=nrv?await sb.from('visite').select('visita_id').eq('nr_verbale',nrv).maybeSingle():{data:null}
+      const{data:byNr}=(nrv&&!S.nrAuto)?await sb.from('visite').select('visita_id').eq('nr_verbale',nrv).maybeSingle():{data:null}
       if(byNr?.visita_id){
         // Usa il visita_id esistente e aggiorna
         vid=byNr.visita_id
@@ -4192,9 +4231,22 @@ async function saveVisita(stato){
         const{error}=await sb.from('visite').update(vistaRow).eq('visita_id',vid)
         if(error)throw error
       } else {
-        // 3) Visita davvero nuova: inserisci
-        const{error}=await sb.from('visite').insert(vistaRow)
+        // 3) Visita davvero nuova: inserisci. Il numero si prende ADESSO, sulla data della
+        //    visita; se nel frattempo l'ha preso un altro verbale (indice unico), si riprova.
+        let error=null
+        for(let giro=0;giro<6;giro++){
+          if(S.nrAuto){
+            const nrPrima=vistaRow.nr_verbale
+            vistaRow.nr_verbale=await nextVerbale(data_v)
+            if(vistaRow.nr_verbale!==nrPrima){vSet('f-verbale',vistaRow.nr_verbale);S.fd.nr_verbale=vistaRow.nr_verbale}
+          }
+          ;({error}=await sb.from('visite').insert(vistaRow))
+          const doppio=error&&(error.code==='23505')&&/nr_verbale/.test((error.message||'')+(error.details||''))
+          if(!doppio||!S.nrAuto)break
+        }
         if(error)throw error
+        if(S.nrAuto&&vistaRow.nr_verbale!==_nrNow)toast('Numero del verbale: '+vistaRow.nr_verbale,'ok')
+        S.nrAuto=false
       }
     }
     S.savedId=vid
@@ -4376,9 +4428,10 @@ function applySnap(snap){
   }
   // Mantieni SEMPRE la numerazione originale del verbale: niente rinumerazione
   // automatica in modifica; solo la segreteria può correggerla a mano.
-  if(snap.nr_verbale_origine){
+  if(snap.nr_verbale_origine&&(snap.visita_id||snap._tieniNumero)){
     vSet('f-verbale',snap.nr_verbale_origine)
     S.fd.nr_verbale=snap.nr_verbale_origine
+    S.nrAuto=false
   }
 
   // ── Checklist, lavorazioni, imprese ──────────────────────────────────────
@@ -5837,14 +5890,14 @@ function bindRowActions(){
   })
 }
 async function softDeleteVisita(id,nr){
-  if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
+  if(!window.__isCoord){toast('Azione riservata alla segreteria','err');return}
   if(!confirm('Mettere la visita '+(nr||'')+' in stato "eliminata"?\n\nI dati restano nel database ma la visita sara esclusa da statistiche e conteggi. Potrai ripristinarla dal filtro "Mostra eliminate".'))return
   const{error}=await sb.from('visite').update({elimina:1}).eq('visita_id',id)
   if(error){toast('Errore: '+error.message,'err');return}
   toast('Visita messa in eliminata','ok');loadLista()
 }
 async function restoreVisita(id,nr){
-  if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
+  if(!window.__isCoord){toast('Azione riservata alla segreteria','err');return}
   if(!confirm('Ripristinare la visita '+(nr||'')+'? Tornera visibile e conteggiata nelle statistiche.'))return
   const{error}=await sb.from('visite').update({elimina:0}).eq('visita_id',id)
   if(error){toast('Errore: '+error.message,'err');return}
@@ -5852,7 +5905,7 @@ async function restoreVisita(id,nr){
 }
 // Modifica di una visita gia definitiva (solo coordinatore): riusa il caricamento della bozza
 async function modificaVisitaCoord(vid){
-  if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
+  if(!window.__isCoord){toast('Azione riservata alla segreteria','err');return}
   if(!confirm('Modificare questa visita gia definitiva?\n\nVerra ricaricata nel form di inserimento: dopo le correzioni ricordati di salvarla per aggiornare la visita.'))return
   await riapriBozza(vid)
   sbloccaNrVerbale(vid)
@@ -6115,8 +6168,15 @@ window.fondiSelezionati=async function(){
   if(!window.__isSegreteria){toast('Funzione riservata alla segreteria','err');return}
   const ids=[..._giroSel.keys()]
   if(ids.length<2){toast('Seleziona almeno 2 cantieri da unire','warn');return}
-  const{data:cs,error}=await sb.from('cantieri').select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,created_at').in('cantiere_id',ids)
+  const{data:cs,error}=await sb.from('cantieri').select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,lotto,created_at').in('cantiere_id',ids)
   if(error){toast('Errore: '+error.message,'err');return}
+  // Lotti diversi dello stesso complesso NON sono doppioni (regola dell'08/09/2026): ognuno ha i suoi
+  // rientri. Il «Controllo duplicati CNCE» lo sapeva gia', questa unione no.
+  const _lotti=[...new Set((cs||[]).map(c=>String(c.lotto||'').trim().toLowerCase()).filter(Boolean))]
+  if(_lotti.length>1){
+    alert('Questi cantieri sono LOTTI DIVERSI ('+(cs||[]).filter(c=>String(c.lotto||'').trim()).map(c=>'lotto '+c.lotto).join(', ')+'): non sono doppioni e non si uniscono.\n\nOgni lotto ha le sue visite di ritorno. Se uno dei lotti e\u2019 scritto male, correggilo prima da Modifica cantiere.')
+    return
+  }
   const{data:vs}=await sb.from('visite').select('cantiere_id').in('cantiere_id',ids).eq('elimina',0)
   const nv={};(vs||[]).forEach(v=>nv[v.cantiere_id]=(nv[v.cantiere_id]||0)+1)
   const rows=(cs||[]).sort((a,b)=>(nv[b.cantiere_id]||0)-(nv[a.cantiere_id]||0)||String(a.created_at||'').localeCompare(String(b.created_at||'')))
@@ -6127,7 +6187,7 @@ window.fondiSelezionati=async function(){
     +rows.map((c,i)=>'<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:5px 0;cursor:pointer;border-bottom:1px solid #f0f0f0">'
       +'<input type="radio" name="fsel-keep" value="'+esc(c.cantiere_id)+'"'+(i===0?' checked':'')+' style="width:auto;margin-top:3px">'
       +'<span><b>'+esc(c.cantiere_etichetta||((c.cantiere_indirizzo||'')+' '+(c.cantiere_civico||'')).trim()||'(senza indirizzo)')+'</b> · '+esc(c.comune_nome||'–')
-      +'<br><span style="font-size:11px;color:#888">CNCE: '+esc(c.cantiere_cnce||'–')+' · visite: '+(nv[c.cantiere_id]||0)+'</span></span></label>').join('')
+      +'<br><span style="font-size:11px;color:#888">CNCE: '+esc(c.cantiere_cnce||'–')+(String(c.lotto||'').trim()?' · lotto: '+esc(c.lotto):'')+' · visite: '+(nv[c.cantiere_id]||0)+'</span></span></label>').join('')
     +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">'
     +'<button class="btn-outline btn-sm" onclick="this.closest(\'.modal-overlay\').remove()">Annulla</button>'
     +'<button class="btn-warn btn-sm" id="fsel-go">🔗 Unisci sul selezionato</button></div></div>'
@@ -6535,7 +6595,7 @@ $('segn-salva').onclick=salvaSegnalazione
 function _segnDist(la1,lo1,la2,lo2){const R=6371,toR=x=>x*Math.PI/180;const dLa=toR(la2-la1),dLo=toR(lo2-lo1);const h=Math.sin(dLa/2)**2+Math.cos(toR(la1))*Math.cos(toR(la2))*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
 
 async function segnApriAggancio(id){
-  if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
+  if(!window.__isCoord){toast('Azione riservata alla segreteria','err');return}
   _segnAggId=id
   const s=(_cmSegn||[]).find(x=>x.id===id)
   $('segn-agg-info').textContent=s?('Segnalazione del '+new Date(s.created_at).toLocaleString('it-IT')+' — '+(s.tecnico_nome||s.segnalata_da||'')+(s.note?' — '+s.note:'')):''
@@ -6584,7 +6644,7 @@ async function segnAggancia(cantId){
 }
 
 async function segnScarta(id){
-  if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
+  if(!window.__isCoord){toast('Azione riservata alla segreteria','err');return}
   if(!confirm('Scartare questa segnalazione?\nIl pin sparirà dalla mappa (foto e note restano archiviate nel database).'))return
   const{error}=await sb.from('segnalazioni_cantiere').update({stato:'scartata',gestita_da:S.user?.email||null,gestita_il:new Date().toISOString()}).eq('id',id)
   if(error){toast('Errore: '+error.message,'err');return}
@@ -6618,7 +6678,7 @@ async function editPersona(id){
   const qEl=$('mp-qualifica');if(qEl){qEl.readOnly=false;qEl.style.background='';qEl.title=''}
   const coord=!!window.__isCoord
   $('mp-cf').disabled=!coord
-  $('mp-cf-note').textContent=coord?'':'(modificabile solo dal coordinatore)'
+  $('mp-cf-note').textContent=coord?'':'(modificabile solo dalla segreteria)'
   const _rw=$('mp-ruoli-edit-wrap');if(_rw)_rw.style.display=coord?'':'none'
   $('mp-ruoli').textContent=coord?'':'Ruoli visti nelle visite: '+((r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')||'–')
   show('modal-persona')
@@ -6716,7 +6776,7 @@ function _dedupGroupHtml(kid,rows,rapMap){
 }
 window._dedupKeys={}
 async function apriDedupPersone(){
-  if(!window.__isCoord){toast('Funzione riservata al coordinatore','err');return}
+  if(!window.__isCoord){toast('Funzione riservata alla segreteria','err');return}
   window._dedupFromSel=false
   // Legge TUTTE le persone attive (paginato: sono oltre 8.000 dopo l'import ufficio)
   let data=[],_pf=0
@@ -6953,7 +7013,7 @@ window.nuovaPersona=function(ruolo){
   }
   const coord=!!window.__isCoord
   $('mp-cf').disabled=!coord
-  $('mp-cf-note').textContent=coord?'':'(modificabile solo dal coordinatore)'
+  $('mp-cf-note').textContent=coord?'':'(modificabile solo dalla segreteria)'
   $('mp-ruoli').textContent='Verrà salvata in anagrafica con il ruolo: '+(_PERS_RUOLI[ruolo]||ruolo)
   const t=$('mp-title');if(t)t.textContent='👥 Nuova persona — '+(_PERS_RUOLI[ruolo]||ruolo)
   show('modal-persona')
@@ -7171,7 +7231,7 @@ function _cmpResetForm(){
   const pv=$('cmp-img-prev');if(pv)pv.innerHTML=''
 }
 async function admSalvaCampagna(){
-  if(!window.__isCoord){toast('Funzione riservata al coordinatore','err');return}
+  if(!window.__isCoord){toast('Funzione riservata alla segreteria','err');return}
   const titolo=vGet('cmp-titolo').trim()
   if(!titolo){toast('Il titolo della campagna è obbligatorio','warn');return}
   const st=$('cmp-status');if(st)st.textContent='⏳ Salvataggio…'
@@ -8440,10 +8500,10 @@ async function admLoadStats(){
   if(!dal||!al){toast('Seleziona entrambe le date','err');return}
   try{
     // Visite nel periodo
-    const{data:visite,error:ev}=await sb.from('visite').select('visita_id,data_visita,ipc,cantiere_id,tecnico_id',{count:'exact'})
-      .gte('data_visita',dal).lte('data_visita',al)
-    if(ev)throw ev
+    const visite=await sbTutte((da,a)=>sb.from('visite').select('visita_id,data_visita,ipc,cantiere_id,tecnico_id,stato')
+      .gte('data_visita',dal).lte('data_visita',al).eq('elimina',0).order('visita_id').range(da,a))
     const nVisite=visite?.length||0
+    const nBozze=(visite||[]).filter(v=>v.stato&&v.stato!=='definitivo').length
     const nAlto=(visite||[]).filter(v=>v.ipc==='ALTO').length
     const nMedio=(visite||[]).filter(v=>v.ipc==='MEDIO').length
     const nBasso=(visite||[]).filter(v=>v.ipc==='BASSO'||v.ipc==='NR'||!v.ipc).length
@@ -8455,7 +8515,7 @@ async function admLoadStats(){
     ;[['adm-n-visite',nVisite],['adm-n-cant',nCant],['adm-n-tec',nTec],
       ['adm-n-alto',nAlto],['adm-n-medio',nMedio],['adm-n-basso',nBasso]]
       .forEach(([id,v])=>{const el=$(id);if(el)el.textContent=v})
-    toast(`Statistiche aggiornate (${nVisite} visite nel periodo)`,'ok')
+    toast(`Statistiche aggiornate: ${nVisite} visite nel periodo`+(nBozze?`, di cui ${nBozze} in bozza`:'')+' (eliminate escluse)','ok')
   }catch(e){
     console.error('admLoadStats:',e)
     toast('Errore caricamento statistiche: '+(e.message||e),'err')
@@ -8824,7 +8884,7 @@ async function admGeneraReport(){
   try{
 
     // ── 1. Visite nel periodo ──
-    const{data:visite,error:e1}=await sb.from('visite')
+    const visite=await sbTutte((da,a)=>sb.from('visite')
       .select([
         'visita_id','data_visita','ipc','tipo_accesso','rlst_sn',
         'nom_ppre','qual_ppre','cantiere_id','tecnico_id','tecnico2_id',
@@ -8832,8 +8892,7 @@ async function admGeneraReport(){
         'tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome)',
         'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_durata,cantiere_importo,comune_nome,committenti(committente_tipo))'
       ].join(','))
-      .gte('data_visita',dal).lte('data_visita',al).eq('elimina',0)
-    if(e1)throw e1
+      .gte('data_visita',dal).lte('data_visita',al).eq('elimina',0).order('visita_id').range(da,a))
     if(!visite||!visite.length){toast('Nessuna visita nel periodo selezionato','warn');return}
 
     // ── 2. Mapping codice-prefix → zona_osserv da checklist_voci ──
@@ -10606,7 +10665,7 @@ async function admLoadCantieri() {
 
 // Riaggancio cantieri senza CNCE a cantiere codificato simile (solo coordinatore)
 async function admCaricaRiaggancio(){
-  if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
+  if(!window.__isCoord){toast('Azione riservata alla segreteria','err');return}
   const wrap=$('adm-riaggancio-list');if(!wrap)return
   wrap.innerHTML='<div style="color:rgba(255,255,255,.4);font-size:13px;padding:8px">Caricamento…</div>'
   const{data:senza,error}=await sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,cantiere_comune_cod,cantiere_committente_id').eq('elimina',0).is('cantiere_cnce',null).order('comune_nome')
@@ -10663,10 +10722,12 @@ async function admCaricaRiaggancio(){
   wrap.innerHTML=html
 }
 async function admRiaggancia(sourceId,targetId,nv){
-  if(!window.__isCoord){toast('Azione riservata al coordinatore','err');return}
-  if(!confirm('Spostare '+nv+' visita/e sul cantiere CNCE e archiviare il cantiere provvisorio senza codice?\n\nOperazione reversibile: il cantiere resta recuperabile dalle eliminate.'))return
+  if(!window.__isCoord){toast('Azione riservata alla segreteria','err');return}
+  if(!confirm('Spostare '+nv+' visita/e (e le eventuali segnalazioni GPS) sul cantiere CNCE e archiviare il cantiere provvisorio senza codice?\n\nIl cantiere provvisorio resta nel database, ma dal gestionale NON si torna indietro: fallo solo se sei sicuro che sia lo stesso cantiere.'))return
   const{error:e1}=await sb.from('visite').update({cantiere_id:targetId}).eq('cantiere_id',sourceId)
   if(e1){toast('Errore spostamento visite: '+e1.message,'err');return}
+  const{error:e1b}=await sb.from('segnalazioni_cantiere').update({cantiere_id:targetId}).eq('cantiere_id',sourceId)
+  if(e1b)console.warn('riaggancio, segnalazioni non spostate:',e1b.message)
   const{error:e2}=await sb.from('cantieri').update({elimina:1}).eq('cantiere_id',sourceId)
   if(e2){toast('Visite spostate, ma cantiere non archiviato: '+e2.message,'warn')}
   else toast('Riaggancio completato','ok')
@@ -12192,12 +12253,11 @@ function _ceivPeriodo(){
   return { dal: dal||'1900-01-01', al: al||today(), etichetta: (dal?fmtDate(dal):'inizio') + ' – ' + (al?fmtDate(al):fmtDate(today())) };
 }
 async function _ceivFetch(dal, al){
-  const { data:vis, error } = await sb.from('visite')
+  const vis = await sbTutte((da,a)=>sb.from('visite')
     .select('visita_id,nr_verbale,data_visita,ipc,acc_cant,nr_imp,nr_ind,nr_lavoratori,impresa_id,comm_rag_soc,comm_piva,comm_cf,comm_nome,comm_cog,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri!inner(cantiere_cnce,cantiere_indirizzo,cantiere_civico,comune_nome),imprese!visite_impresa_id_fkey(impresa_nome,piva,impresa_email_ref)')
     .gte('data_visita', dal).lte('data_visita', al).eq('elimina', 0)
     .ilike('cantieri.cantiere_cnce', 'cnce%')
-    .order('data_visita', { ascending:false });
-  if(error) throw error;
+    .order('data_visita', { ascending:false }).order('visita_id').range(da,a));
   const rows = vis||[];
   const byVis = {};
   const ids = rows.map(r=>r.visita_id);
@@ -12230,7 +12290,7 @@ function _ceivBuildDoc(data, p){
   return doc;
 }
 async function ceivEsportaExcel(){
-  if(!window.__isCoord){ toast('Funzione riservata al coordinatore','err'); return; }
+  if(!window.__isCoord){ toast('Funzione riservata alla segreteria','err'); return; }
   const p=_ceivPeriodo(); _ceivStatus('⏳ Estrazione dati…');
   try{
     const data = await _ceivFetch(p.dal, p.al);
@@ -12241,7 +12301,7 @@ async function ceivEsportaExcel(){
   }catch(e){ console.error('ceivEsportaExcel',e); _ceivStatus('Errore: '+(e.message||e), true); toast('Errore: '+(e.message||e),'err'); }
 }
 async function ceivEsportaPdf(){
-  if(!window.__isCoord){ toast('Funzione riservata al coordinatore','err'); return; }
+  if(!window.__isCoord){ toast('Funzione riservata alla segreteria','err'); return; }
   const p=_ceivPeriodo(); _ceivStatus('⏳ Estrazione dati…');
   try{
     const data = await _ceivFetch(p.dal, p.al);
@@ -12252,7 +12312,7 @@ async function ceivEsportaPdf(){
   }catch(e){ console.error('ceivEsportaPdf',e); _ceivStatus('Errore: '+(e.message||e), true); toast('Errore: '+(e.message||e),'err'); }
 }
 async function ceivInviaMail(){
-  if(!window.__isCoord){ toast('Funzione riservata al coordinatore','err'); return; }
+  if(!window.__isCoord){ toast('Funzione riservata alla segreteria','err'); return; }
   const to=($('ceiv-mail-to')?.value||'').trim();
   const cc=($('ceiv-mail-cc')?.value||'').trim();
   if(!to){ _ceivStatus('Inserisci l’email del destinatario CEIV.', true); toast('Manca l’email CEIV','warn'); return; }
@@ -12260,6 +12320,10 @@ async function ceivInviaMail(){
   try{
     const data = await _ceivFetch(p.dal, p.al);
     if(!data.length){ _ceivStatus('Nessuna visita su cantieri con codice CNCE nel periodo.', true); toast('Nessuna visita trovata','warn'); return; }
+    if(!confirm('Invio a CEIV\n\nA: '+to+(cc?'\nIn copia: '+cc:'')+'\nPeriodo: '+p.etichetta+'\nVisite: '+data.length+
+      '\nAllegati: '+_ceivFname('Q','xlsx')+' e '+_ceivFname('R','pdf')+
+      '\n\nLa mail parte SUBITO e non si richiama. Hai gia\u2019 guardato i due file?\n\nOK = invia, Annulla = non inviare')){
+      _ceivStatus('Invio annullato: non e\u2019 partito niente.'); return; }
     _ceivStatus('⏳ Generazione allegati…');
     const xlsxB64 = XLSX.write(_ceivBuildWb(data), { type:'base64', bookType:'xlsx' });
     const pdfB64 = _ceivBuildDoc(data, p).output('datauristring').split(',')[1];
@@ -12396,8 +12460,11 @@ document.getElementById('btn-adm-load-xlsx')?.addEventListener('click',function(
   const snap=Object.assign({},_xlsxPending);delete snap.visita_id
   const p=document.getElementById('adm-xlsx-preview');if(p)p.style.display='none'
   _xlsxPending=null;if(_fi)_fi.value=''
-  const t=document.querySelector('[data-tab="form"]');if(t)t.click()
-  setTimeout(function(){applySnap(snap);toast('Visita caricata da Excel','ok')},300)
+  snap._tieniNumero=true
+  ;(async function(){
+    try{await initForm(snap);navTo('form');toast('Visita caricata da Excel: controlla tecnico e cantiere, poi salva','ok')}
+    catch(err){toast('Errore nel caricamento: '+err.message,'err');console.error('import xlsx:',err)}
+  })()
 })
 document.getElementById('btn-adm-cancel-xlsx')?.addEventListener('click',function(){
   const p=document.getElementById('adm-xlsx-preview');if(p)p.style.display='none'
@@ -12822,13 +12889,18 @@ async function incRiassegna(id){
   if(scelta===null)return
   const t=lista[parseInt(scelta,10)-1]
   if(!t){toast('Numero non valido','warn');return}
+  // la traccia: senza, fra un mese nessuno sa perche' l'incarico ha cambiato mano
+  const{data:_prima}=await sb.from('incarichi').select('tecnico_nome,note_comunicazione,rifiuto_motivo').eq('id',id).maybeSingle()
+  const _chi=[t.tecnico_nome,t.tecnico_cognome].filter(Boolean).join(' ')
+  const _riga='['+new Date().toLocaleDateString('it-IT')+'] Riassegnato dal gestionale: da '+((_prima&&_prima.tecnico_nome)||'?')+' a '+_chi+((_prima&&_prima.rifiuto_motivo)?' (il precedente non era disponibile: '+_prima.rifiuto_motivo+')':'')+'. Nessuna mail inviata da qui.'
   const{error}=await sb.from('incarichi').update({
+    note_comunicazione:[(_prima&&_prima.note_comunicazione)||'',_riga].filter(Boolean).join('\n'),
     tecnico_email:t.email,tecnico_nome:[t.tecnico_nome,t.tecnico_cognome].filter(Boolean).join(' '),
     rifiutato_il:null,rifiutato_da:null,rifiuto_motivo:null,
     accettato_il:null,accettato_da:null,presa_visione_il:null,presa_visione_da:null
   }).eq('id',id)
   if(error){toast('Errore: '+error.message,'err');return}
-  toast('Incarico riassegnato a '+[t.tecnico_nome,t.tecnico_cognome].filter(Boolean).join(' '),'ok')
+  toast('Incarico riassegnato a '+_chi+'. Da qui non parte nessuna mail: per avvisare i due tecnici usa la pratica nell\u2019app Segreteria.','ok')
   await loadIncarichi()
 }
 window.incRiassegna=incRiassegna
