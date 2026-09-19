@@ -14,7 +14,7 @@ E' un setaccio: legge .from('t').select('...') e i filtri subito dopo; le
 ricerche costruite a pezzi non le vede.
 """
 import io, re, json, glob, sys
-file = ['index.html'] + [f for f in glob.glob('*.js') if f != 'sw.js']
+file = ['index.html'] + [f for f in glob.glob('*.js') if f != 'sw.js' and not f.startswith('_')]  # i file _*.js sono copie di lavoro ignorate da git
 coppie = {}
 for f in file:
     s = io.open(f, encoding='utf-8', errors='replace').read()
