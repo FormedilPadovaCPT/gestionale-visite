@@ -2038,7 +2038,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center">
       <span id="email-verbale-status" style="font-size:12px;color:var(--grey);flex:1"></span>
-      <button class="btn-outline btn-sm" id="btn-ev-copia" type="button">📋 Copia indirizzi</button>
       <button class="btn-primary btn-sm" id="btn-ev-invia" type="button">📤 Invia ora</button>
       <button class="btn-secondary btn-sm" id="btn-ev-close" type="button">Chiudi</button>
     </div>
@@ -7667,12 +7666,6 @@ Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle per
 
 $('btn-email-verbale').onclick=inviEmailVerbale
 $('btn-ev-close').onclick=()=>{hide('modal-email-verbale');window._evRettifica=null;_setEvModalRett(false)}
-$('btn-ev-copia').onclick=()=>{
-  const lista=(window._evEmails||[]).map(e=>e.email).join('; ')
-  navigator.clipboard?.writeText(lista)
-    .then(()=>toast('Indirizzi copiati negli appunti','ok'))
-    .catch(()=>toast('Copia non disponibile in questo contesto','warn'))
-}
 $('btn-ev-invia').onclick=async()=>{
   const emails=window._evEmails||[]
   if(!emails.length){toast('Nessun destinatario','warn');return}
