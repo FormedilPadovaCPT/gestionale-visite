@@ -6163,6 +6163,13 @@ function aggiornaGiroBar(){
   const bf=$('btn-fondi-sel');if(bf)bf.style.display=(window.__isSegreteria&&n>=2)?'':'none'
 }
 window._giroClear=function(){_giroSel.clear();document.querySelectorAll('.giro-chk').forEach(c=>c.checked=false);aggiornaGiroBar()}
+// riepilogo leggibile di cio' che un'unione ha spostato (dalla risposta delle RPC fondi_*)
+function _riepUnione(res){
+  const t=(res&&res.toccate)||{}
+  const voci=Object.entries(t).map(([k,v])=>v+' in '+k.split('.')[0])
+  const note=((res&&res.note)||[]).map(n=>n.lasciata_sul_doppione?('ATTENZIONE: '+n.lasciata_sul_doppione+' e\u2019 rimasta sulla scheda unita ('+n.perche+')'):n.da_guardare?('da guardare: '+n.da_guardare):n.ereditato?('ereditato '+n.ereditato+' '+(n.valore||'')):'').filter(Boolean)
+  return (voci.length?voci.join(', '):'nessuna riga collegata')+(note.length?' — '+note.join('; '):'')
+}
 // ── FUSIONE CANTIERI SELEZIONATI (solo segreteria) ──
 window.fondiSelezionati=async function(){
   if(!window.__isSegreteria){toast('Funzione riservata alla segreteria','err');return}
@@ -6199,29 +6206,15 @@ window.fondiSelezionati=async function(){
     // Se il cantiere mantenuto non ha CNCE ma uno dei doppioni si, il codice viene ereditato: lo dico prima.
     const _kr=rows.find(c=>c.cantiere_id===keeper)
     const _cnceEred=(_kr&&!String(_kr.cantiere_cnce||'').trim())?(rows.find(c=>c.cantiere_id!==keeper&&String(c.cantiere_cnce||'').trim())||{}).cantiere_cnce||'':''
-    if(!confirm('Unire '+losers.length+' cantiere/i su quello selezionato?\nVisite e segnalazioni verranno spostate, gli altri cantieri archiviati.'+(_cnceEred?'\n\nIl cantiere mantenuto non ha codice CNCE: eredita il codice '+_cnceEred+' dal doppione.':'')+'\n\nOperazione non reversibile dalla lista.'))return
+    if(!confirm('Unire '+losers.length+' cantiere/i su quello selezionato?\nVisite, segnalazioni, incarichi e cantieri critici verranno spostati, gli altri cantieri archiviati.'+(_cnceEred?'\n\nIl cantiere mantenuto non ha codice CNCE: eredita il codice '+_cnceEred+' dal doppione.':'')+'\n\nOperazione non reversibile dalla lista.'))return
     const go=ov.querySelector('#fsel-go');go.disabled=true;go.textContent='Fusione…'
     try{
-      const{data:all}=await sb.from('cantieri').select('*').in('cantiere_id',ids)
-      const k=(all||[]).find(c=>c.cantiere_id===keeper)
-      const FIELDS=['cantiere_committente_id','cantiere_importo','cantiere_durata','cantiere_tip_int','cantiere_tip_ope','cantiere_tip_ope_altro','cantiere_cap','cantiere_comune_cod','comune_nome','data_ult','data_inizio_lavori','lat','lng','nodo_id','cantiere_descrizione','cantiere_cnce','cantiere_etichetta']
-      const upd={}
-      FIELDS.forEach(f=>{
-        if(k&&(k[f]==null||k[f]==='')){
-          const s2=(all||[]).find(c=>c.cantiere_id!==keeper&&c[f]!=null&&c[f]!=='')
-          if(s2)upd[f]=s2[f]
-        }
-      })
-      // 1) sposto visite e segnalazioni sul cantiere mantenuto
-      let r=await sb.from('visite').update({cantiere_id:keeper}).in('cantiere_id',losers);if(r.error)throw r.error
-      r=await sb.from('segnalazioni_cantiere').update({cantiere_id:keeper}).in('cantiere_id',losers);if(r.error)throw r.error
-      // 2) archivio i doppioni PRIMA di completare il keeper: il CNCE ereditato
-      //    violerebbe l'indice unico ux_cantieri_cnce_attivi finche' i doppioni sono attivi
-      r=await sb.from('cantieri').update({elimina:1}).in('cantiere_id',losers);if(r.error)throw r.error
-      // 3) completo i campi mancanti del cantiere mantenuto (CNCE ed etichetta compresi)
-      if(Object.keys(upd).length){const r0=await sb.from('cantieri').update(upd).eq('cantiere_id',keeper);if(r0.error)throw r0.error}
+      // tutto sul database, in un colpo solo: visite, segnalazioni, incarichi, cantieri critici, notifiche…
+      const{data:_ru,error:_eu}=await sb.rpc('fondi_cantieri',{p_master_id:keeper,p_dupe_ids:losers,p_origine:'unione'})
+      if(_eu)throw _eu
+      console.info('fondi_cantieri:',_ru)
       ov.remove()
-      toast('Fusione completata: '+losers.length+' cantiere/i uniti e archiviati','ok')
+      toast('Fusione completata: '+losers.length+' cantiere/i uniti e archiviati ('+_riepUnione(_ru)+')','ok')
       _giroClear()
       if(typeof loadCantieri==='function')loadCantieri()
     }catch(e){console.error('fondiSelezionati:',e);go.disabled=false;go.textContent='🔗 Unisci sul selezionato';toast('Errore fusione: '+(e.message||e),'err')}
@@ -6838,27 +6831,11 @@ async function dedupMerge(kid){
   const others=rows.filter(r=>r.persona_id!==sel.value)
   if(!others.length)return
   if(!confirm(`Unire ${others.length} sched${others.length===1?'a':'e'} su "${[master.titolo,master.nome,master.cognome].filter(Boolean).join(' ')}"?`))return
-  // 1) sposta i rapporti di lavoro dei doppioni sulla scheda scelta
-  //    (così restano validi anche per l'app Asseverazione e le interviste)
-  const{error:eR}=await sb.from('persone_imprese').update({persona_id:master.persona_id}).in('persona_id',others.map(o=>o.persona_id))
-  if(eR){toast('Errore spostamento rapporti: '+eR.message,'err');return}
-  // 2) prima i doppioni in elimina=1: l'indice unico sul CF impedirebbe
-  //    di ereditare il CF finché il doppione risulta ancora attivo
-  const{error:e2}=await sb.from('persone').update({elimina:1,updated_at:new Date().toISOString(),updated_by:S.user?.email||null}).in('persona_id',others.map(o=>o.persona_id))
-  if(e2){toast('Errore eliminazione doppioni: '+e2.message,'err');return}
-  // 3) eredita i campi mancanti (compresa l'anagrafica estesa)
-  const upd={}
-  ;['titolo','cf','email','email2','email3','telefono','telefono2','qualifica','data_nascita','comune_nascita','sesso'].forEach(f=>{
-    if(!master[f]){const v=others.map(o=>o[f]).find(Boolean);if(v)upd[f]=v}
-  })
-  const ruoli=new Set(master.ruoli||[]);others.forEach(o=>(o.ruoli||[]).forEach(x=>ruoli.add(x)))
-  if(ruoli.size!==(master.ruoli||[]).length)upd.ruoli=[...ruoli]
-  if(Object.keys(upd).length){
-    upd.updated_at=new Date().toISOString();upd.updated_by=S.user?.email||null
-    const{error}=await sb.from('persone').update(upd).eq('persona_id',master.persona_id)
-    if(error){toast('Errore aggiornamento: '+error.message,'err');return}
-  }
-  toast('Schede unite ✓ (rapporti di lavoro spostati)','ok')
+  // tutto sul database: rapporti di lavoro, nomine, iscrizioni ai corsi, docenze, pratiche dei servizi
+  const{data:_ru,error:eR}=await sb.rpc('fondi_persone',{p_master_id:master.persona_id,p_dupe_ids:others.map(o=>o.persona_id)})
+  if(eR){toast('Unione non riuscita: '+eR.message,'err');return}
+  console.info('fondi_persone:',_ru)
+  toast('Schede unite ✓ ('+_riepUnione(_ru)+')','ok')
   if(window._dedupFromSel){window._dedupFromSel=false;hide('modal-dedup');loadRubrica()}
   else apriDedupPersone()
 }
@@ -8584,25 +8561,13 @@ async function sgrFondiDupCnce(gi,cnce){
   if(!keeper||!ids.includes(keeper)){toast('Seleziona il cantiere da mantenere','warn');return}
   const losers=ids.filter(id=>id!==keeper)
   if(!losers.length)return
-  if(!confirm('Fondere '+losers.length+' doppione/i di '+cnce+' sul cantiere selezionato?\nVisite e segnalazioni verranno spostate, i doppioni archiviati.'))return
+  if(!confirm('Fondere '+losers.length+' doppione/i di '+cnce+' sul cantiere selezionato?\nVisite, segnalazioni, incarichi e cantieri critici verranno spostati, i doppioni archiviati.'))return
   const st=$('dupst'+gi);if(st)st.textContent='Fusione…'
   try{
-    const{data:all}=await sb.from('cantieri').select('*').in('cantiere_id',ids)
-    const k=(all||[]).find(c=>c.cantiere_id===keeper)
-    const FIELDS=['cantiere_committente_id','cantiere_importo','cantiere_durata','cantiere_tip_int','cantiere_tip_ope','cantiere_tip_ope_altro','cantiere_cap','cantiere_comune_cod','comune_nome','data_ult','data_inizio_lavori','lat','lng','nodo_id','cantiere_descrizione','cantiere_cnce','cantiere_etichetta']
-    const upd={}
-    FIELDS.forEach(f=>{
-      if(k&&(k[f]==null||k[f]==='')){
-        const src=(all||[]).find(c=>c.cantiere_id!==keeper&&c[f]!=null&&c[f]!=='')
-        if(src)upd[f]=src[f]
-      }
-    })
-    let r=await sb.from('visite').update({cantiere_id:keeper}).in('cantiere_id',losers);if(r.error)throw r.error
-    r=await sb.from('segnalazioni_cantiere').update({cantiere_id:keeper}).in('cantiere_id',losers);if(r.error)throw r.error
-    // archivio i doppioni prima di completare il keeper (indice unico sul CNCE dei cantieri attivi)
-    r=await sb.from('cantieri').update({elimina:1}).in('cantiere_id',losers);if(r.error)throw r.error
-    if(Object.keys(upd).length){const r0=await sb.from('cantieri').update(upd).eq('cantiere_id',keeper);if(r0.error)throw r0.error}
-    toast('Fusione completata: '+losers.length+' doppione/i archiviati','ok')
+    const{data:_ru,error:_eu}=await sb.rpc('fondi_cantieri',{p_master_id:keeper,p_dupe_ids:losers,p_origine:'duplicati_cnce'})
+    if(_eu)throw _eu
+    console.info('fondi_cantieri:',_ru)
+    toast('Fusione completata: '+losers.length+' doppione/i archiviati ('+_riepUnione(_ru)+')','ok')
     sgrCercaDupCnce()
   }catch(e){console.error('sgrFondiDupCnce:',e);if(st)st.textContent='';toast('Errore fusione: '+(e.message||e),'err')}
 }
@@ -10397,11 +10362,11 @@ async function admFondiImprese(){
   if(isNaN(idx)||idx<0||idx>=ids.length){toast('Scelta non valida','err');return}
   const masterId=ids[idx]
   const dupeIds=ids.filter(x=>x!==masterId)
-  if(!confirm('Confermi l\'unione?\n\nPRINCIPALE (tenuta): '+_impSel.get(masterId)+'\n\nUnite e archiviate ('+dupeIds.length+'): \n'+dupeIds.map(x=>'• '+_impSel.get(x)).join('\n')+'\n\nTutte le visite, presenze e certificazioni delle imprese archiviate verranno spostate sulla principale. Operazione non automaticamente reversibile.'))return
+  if(!confirm('Confermi l\'unione?\n\nPRINCIPALE (tenuta): '+_impSel.get(masterId)+'\n\nUnite e archiviate ('+dupeIds.length+'): \n'+dupeIds.map(x=>'• '+_impSel.get(x)).join('\n')+'\n\nTutto cio’ che e’ collegato alle imprese archiviate (visite, presenze, certificazioni, rapporti di lavoro, nomine, ATECO, pratiche dei servizi e di asseverazione, corsi, incarichi) verra’ spostato sulla principale. Operazione non automaticamente reversibile.'))return
   try{
     const{data,error}=await sb.rpc('fondi_imprese',{p_master_id:masterId,p_dupe_ids:dupeIds})
     if(error)throw error
-    toast('Unione completata: '+((data&&data.imprese_archiviate)||dupeIds.length)+' impresa/e archiviata/e','ok')
+    toast('Unione completata: '+((data&&data.imprese_archiviate)||dupeIds.length)+' impresa/e archiviata/e ('+_riepUnione(data)+')','ok')
     _impSelClear()
     admLoadImprese()
   }catch(e){toast('Errore unione: '+(e.message||e),'err')}
@@ -10724,13 +10689,9 @@ async function admCaricaRiaggancio(){
 async function admRiaggancia(sourceId,targetId,nv){
   if(!window.__isCoord){toast('Azione riservata alla segreteria','err');return}
   if(!confirm('Spostare '+nv+' visita/e (e le eventuali segnalazioni GPS) sul cantiere CNCE e archiviare il cantiere provvisorio senza codice?\n\nIl cantiere provvisorio resta nel database, ma dal gestionale NON si torna indietro: fallo solo se sei sicuro che sia lo stesso cantiere.'))return
-  const{error:e1}=await sb.from('visite').update({cantiere_id:targetId}).eq('cantiere_id',sourceId)
-  if(e1){toast('Errore spostamento visite: '+e1.message,'err');return}
-  const{error:e1b}=await sb.from('segnalazioni_cantiere').update({cantiere_id:targetId}).eq('cantiere_id',sourceId)
-  if(e1b)console.warn('riaggancio, segnalazioni non spostate:',e1b.message)
-  const{error:e2}=await sb.from('cantieri').update({elimina:1}).eq('cantiere_id',sourceId)
-  if(e2){toast('Visite spostate, ma cantiere non archiviato: '+e2.message,'warn')}
-  else toast('Riaggancio completato','ok')
+  const{data:_ru,error:e1}=await sb.rpc('fondi_cantieri',{p_master_id:targetId,p_dupe_ids:[sourceId],p_origine:'riaggancio'})
+  if(e1){toast('Riaggancio non riuscito: '+e1.message,'err');return}
+  toast('Riaggancio completato ('+_riepUnione(_ru)+')','ok')
   admCaricaRiaggancio()
 }
 
