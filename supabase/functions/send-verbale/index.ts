@@ -223,16 +223,26 @@ serve(async (req) => {
        cercava. Il link arriva firmato da questionario_link e porta con sé la
        visita, così la risposta si sa sempre a quale sopralluogo si riferisce.
        ⚠️ Non in rettifica: una rettifica è un errore nostro, e chiedere lì
-       «com'è andata» stonerebbe. */
+       «com'è andata» stonerebbe.
+
+       Il pulsante (21/09/2026) ha il RILIEVO fatto con un bordo inferiore
+       pieno, non con un'ombra: Outlook per Windows disegna le mail col motore
+       di Word e le ombre le ignora. Sotto c'è sempre l'indirizzo scritto,
+       perché qualche programma di posta blocca i link nei riquadri colorati.
+       ⚠️ È la stessa forma di bloccoAzioneMail() in segreteria-app/js/firma.js,
+       ricopiata a mano: questa funzione sta in un altro repo e non può
+       importare da lì. Se cambia una, va cambiata anche l'altra. */
     const linkOk = typeof linkValuta === 'string' && /^https:\/\//.test(linkValuta) && linkValuta.length < 500
     const valutaHtml = (!isRett && linkOk) ? `
     <table width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 26px">
     <tr><td style="background:#faf8f4;border:1px solid #e2dfd6;border-radius:8px;padding:18px 20px">
       <p style="margin:0 0 5px;font-size:15px;font-weight:bold;color:#333">Com'è andata la visita?</p>
       <p style="margin:0 0 15px;line-height:1.6;color:#555">Un minuto del Vostro tempo ci aiuta a fare meglio il prossimo sopralluogo. Le risposte servono solo a noi e non vengono comunicate a nessuno.</p>
-      <table cellpadding="0" cellspacing="0"><tr><td style="background:#e7500f;border-radius:6px">
-        <a href="${linkValuta}" style="display:inline-block;padding:13px 24px;color:#ffffff;font-size:14px;font-weight:bold;text-decoration:none">Valuta la visita &rarr;</a>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td align="center" bgcolor="#e7500f" style="background:#e7500f;border-radius:6px;border-bottom:3px solid #a83a0b">
+        <a href="${linkValuta}" style="display:inline-block;padding:13px 26px;color:#ffffff;font-size:14px;font-weight:bold;text-decoration:none">Valuta la visita &rarr;</a>
       </td></tr></table>
+      <p style="margin:12px 0 0;font-size:12px;line-height:17px;color:#8a9099">Se il pulsante non si apre, copiate questo indirizzo nel browser:<br><a href="${linkValuta}" style="color:#e7500f">${linkValuta}</a></p>
     </td></tr>
     </table>` : ''
 
