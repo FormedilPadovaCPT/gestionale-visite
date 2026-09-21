@@ -474,6 +474,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <!-- notifiche sul telefono e installazione dell'app (notifiche.js) -->
       <div id="dash-notifiche" style="display:none;margin-bottom:14px"></div>
       <div id="dash-stage-sr" style="display:none;margin-bottom:14px"></div>
+      <!-- i verbali la cui mail e' tornata indietro (mail-respinte-tec.js, 21/09/2026) -->
+      <div id="dash-respinte" style="display:none;margin-bottom:14px"></div>
       
 
             <!-- FILTRI DASHBOARD -->
@@ -2422,7 +2424,7 @@ function navTo(view){
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
   if(view==='dashboard')loadAutorizzazioni().catch(e=>console.warn('autorizzazioni:',e))
-  if(view==='dashboard'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.notificheBox)window.notificheBox().catch(e=>console.warn('notifiche:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))}
+  if(view==='dashboard'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.notificheBox)window.notificheBox().catch(e=>console.warn('notifiche:',e));if(window.respinteBox)window.respinteBox().catch(e=>console.warn('mail respinte:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))}
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='cantieri'&&typeof loadCantMap==='function')loadCantMap().catch(e=>console.error('loadCantMap:',e))
@@ -2581,6 +2583,7 @@ window.loadFattureCoord=loadFattureCoord
 window.fattDecidi=fattDecidi
 
 // ── VISITA STAGE FUORI PROVINCIA, SENZA VERBALE (tecnico) ──
+let _stageIncAperti=[]   // gli incarichi stage aperti del tecnico (21/09/2026)
 // Deciso dall'utente il 04/09/2026: la visita allo stagista fuori
 // provincia non ha il rapporto (non e' una visita ordinaria) ma una
 // relazione via mail, e va pagata come le altre. Qui il tecnico la
@@ -2589,7 +2592,33 @@ window.fattDecidi=fattDecidi
 async function loadStageSr(){
   const box=$('dash-stage-sr')
   if(!box)return
-  if(!S.tecnico?.tecnico_id||window.__isCoord){box.style.display='none';return}
+  box.style.display='none'; _stageIncAperti=[]
+  if(!S.tecnico?.tecnico_id||window.__isCoord)return
+  /* IL RIQUADRO COMPARE SOLO SE IL TECNICO HA UN INCARICO STAGE APERTO
+     (regola dell'utente, 21/09/2026). La visita allo stagista nasce da un
+     incarico della didattica (s_stage_conferma: tipo «…AUDIT ASL/STAGE»,
+     stato «aperto»), non si registra di propria iniziativa: senza incarico
+     non c'e' niente da registrare, e il riquadro sparisce dalla Dashboard.
+     La RLS di «incarichi» mostra al tecnico solo i suoi; il filtro per email
+     e' scritto lo stesso, perche' la regola si legga qui.
+     ⚠️ Se la LETTURA FALLISCE il riquadro si mostra lo stesso, dicendolo:
+     nasconderlo per un errore di rete toglierebbe una funzione al tecnico
+     facendogli credere che non ci sia nulla da fare (regola del 19/09 —
+     un errore ingoiato non deve diventare un «nessuno»). */
+  let inc=[], errInc=''
+  try{
+    const{data,error}=await sb.from('incarichi')
+      .select('id,data_richiesta,testo_richiesta,impresa,comune,indirizzo,note_comunicazione,tecnico_email,rifiutato_il')
+      .eq('stato','aperto').ilike('tipo_richiesta','%stage%')
+      .order('data_richiesta',{ascending:false}).limit(50)
+    if(error) errInc=error.message||'lettura non riuscita'
+    else{
+      const mia=String(S.user?.email||'').toLowerCase()
+      inc=(data||[]).filter(r=>!r.rifiutato_il&&String(r.tecnico_email||'').toLowerCase()===mia)
+    }
+  }catch(e){ errInc=e.message||String(e) }
+  if(!errInc&&!inc.length)return
+  _stageIncAperti=inc
   let righe=[]
   try{
     const{data}=await sb.from('s_visite_stage').select('*').eq('tecnico_id',S.tecnico.tecnico_id).order('data',{ascending:false}).limit(8)
@@ -2598,11 +2627,17 @@ async function loadStageSr(){
   const dIt=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):''
   const esc_=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
   const oggi=new Date().toISOString().slice(0,10)
+  const rel=typeof window.stageRelApri==='function'
+  const elenco=inc.map(r=>`<li style="margin:2px 0">n. ${r.id}${r.testo_richiesta?' — <strong>'+esc_(r.testo_richiesta)+'</strong>':''}${r.impresa?' presso '+esc_(r.impresa):''}${r.comune?' ('+esc_(r.comune)+')':''}${rel?` <a href="#" onclick="stageRelApri(${r.id});return false" style="margin-left:6px">&#9998; relazione completa</a>`:''}</li>`).join('')
   box.innerHTML=`<div class="card">
     <h3>&#127891; Visite stage fuori provincia (senza verbale)</h3>
-    <p style="font-size:12px;color:#666;margin:4px 0 8px">Per lo stagista seguito fuori provincia non si compila il rapporto di visita: si registra qui la visita con due righe di relazione. Vale come visita stage nel riepilogo del mese da fatturare.</p>
+    ${errInc?`<p style="font-size:12px;color:#c0392b;margin:4px 0 8px">Non sono riuscito a leggere i tuoi incarichi stage (${esc_(errInc)}): il riquadro resta aperto per prudenza, ma controlla in <em>Incarichi</em> che ce ne sia uno.</p>`
+      :`<p style="font-size:12px;color:#666;margin:4px 0 8px">Hai ${inc.length===1?'un incarico stage aperto':inc.length+' incarichi stage aperti'}. Per lo stagista seguito fuori provincia non si compila il rapporto di visita: si registra qui la visita con due righe di relazione. Vale come visita stage nel riepilogo del mese da fatturare.</p>
+       <ul style="font-size:12px;color:#555;margin:0 0 8px 18px;padding:0">${elenco}</ul>
+       ${rel?'<p style="font-size:12px;color:#888;margin:0 0 8px">La <strong>relazione completa</strong> (PDF alla didattica, chiusura dell&rsquo;incarico) si fa dalla pagina Incarichi o dal collegamento qui sopra; qui sotto resta la registrazione rapida.</p>':''}`}
     <button class="btn-outline btn-sm" onclick="stageSrToggle()">+ Registra una visita stage senza verbale</button>
     <div id="stage-sr-form" style="display:none;margin-top:10px">
+      ${inc.length?`<div class="field"><label>Incarico</label><select id="ssr-inc" onchange="stageSrDaIncarico()">${inc.map((r,k)=>`<option value="${r.id}"${k?'':' selected'}>n. ${r.id}${r.testo_richiesta?' — '+esc_(r.testo_richiesta):''}${r.impresa?' — '+esc_(r.impresa):''}</option>`).join('')}<option value="">— nessun incarico —</option></select></div>`:''}
       <div class="row">
         <div class="field" style="flex:0 0 150px"><label>Data</label><input type="date" id="ssr-data" value="${oggi}"></div>
         <div class="field"><label>Azienda / impresa</label><input type="text" id="ssr-azienda" placeholder="ragione sociale"></div>
@@ -2618,14 +2653,26 @@ async function loadStageSr(){
       <tbody>${righe.map(r=>`<tr style="border-top:1px solid #f0e6dd${r.stato==='annullata'?';opacity:.5;text-decoration:line-through':''}"><td style="padding:4px 6px;white-space:nowrap">${dIt(r.data)}</td><td style="padding:4px 6px">${esc_(r.azienda)}</td><td style="padding:4px 6px">${esc_([r.comune,r.provincia].filter(Boolean).join(' '))}</td><td style="padding:4px 6px">${esc_(r.stagista)}</td><td style="padding:4px 6px;color:#666">${esc_((r.relazione||'').slice(0,120))}</td></tr>`).join('')}</tbody></table>`:''}
   </div>`
   box.style.display=''
+  stageSrDaIncarico()
 }
 function stageSrToggle(){const f=$('stage-sr-form');if(f)f.style.display=f.style.display==='none'?'':'none'}
+/* Scelto l'incarico, i campi si riempiono da li': stagista, azienda e comune
+   sono gia' scritti nell'incarico e riscriverli a mano e' solo un modo di
+   sbagliarli. Restano correggibili — e' una proposta, non un dato certo. */
+function stageSrDaIncarico(){
+  const sel=$('ssr-inc'); if(!sel)return
+  const r=(_stageIncAperti||[]).find(x=>String(x.id)===String(sel.value))
+  if(!r)return
+  const set=(id,v)=>{const el=$(id); if(el&&!el.value&&v)el.value=v}
+  set('ssr-azienda',r.impresa||''); set('ssr-comune',r.comune||''); set('ssr-stagista',r.testo_richiesta||'')
+}
 async function stageSrSalva(){
   const v=id=>($(id)?.value||'').trim()
   if(!v('ssr-data')||!v('ssr-azienda')){toast('Servono la data e l\'azienda','warn');return}
   const{error}=await sb.from('s_visite_stage').insert({
     tecnico_id:S.tecnico.tecnico_id,data:v('ssr-data'),azienda:v('ssr-azienda'),comune:v('ssr-comune')||null,
     provincia:(v('ssr-prov')||'').toUpperCase()||null,stagista:v('ssr-stagista')||null,relazione:v('ssr-rel')||null,
+    incarico_id:+v('ssr-inc')||null,
     creato_da:S.user?.email||null})
   if(error){toast('Salvataggio non riuscito: '+error.message,'err');return}
   toast('Visita stage registrata: entra nel riepilogo del mese','ok')
@@ -2633,6 +2680,7 @@ async function stageSrSalva(){
 }
 window.loadStageSr=loadStageSr
 window.stageSrToggle=stageSrToggle
+window.stageSrDaIncarico=stageSrDaIncarico
 window.stageSrSalva=stageSrSalva
 
 // ── VOCI CHECKLIST ──
@@ -13141,6 +13189,7 @@ document.addEventListener('input',function(ev){
 <script src="riepilogo-verbali.js?v=1"></script>
 <script src="scheda-impresa.js?v=1"></script>
 <script src="notifiche.js?v=3"></script>
+<script src="mail-respinte-tec.js?v=1"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
