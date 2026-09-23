@@ -2828,7 +2828,7 @@ function renderZoneTab(ti){
           <div style="display:flex;align-items:center;gap:8px;padding:5px 4px">
             <span class="check-label">${item.descrizione}</span>
             <div class="check-radios">
-              ${[['NA','na'],['VER','ver'],['NC-','ncm'],['NC+','ncp'],['OSS','oss']].map(([o,cls])=>`
+              ${[['NA','na'],['VER','ver'],['OSS','oss'],['NC-','ncm'],['NC+','ncp']].map(([o,cls])=>`
                 <label><input type="radio" name="c_${item.codice}" value="${o}" data-c="${item.codice}" ${cur===o?'checked':''}>
                 <span class="radio-chip ${cls}">${o}</span></label>`).join('')}
             </div>
