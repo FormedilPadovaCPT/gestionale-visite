@@ -730,7 +730,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
           <div class="row">
             <div class="field"><label>Codice CNCE <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="text" id="f-cnce" placeholder="–" readonly style="background:#f8f8f8"></div>
-            <div class="field"><label>Codice univoco <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="text" id="f-cod-uni" placeholder="–" readonly style="background:#f8f8f8"></div>
+            <div class="field"><label>Codice univoco <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="f-cod-uni" placeholder="–" readonly style="background:#f8f8f8;flex:1"><button type="button" class="btn-outline btn-sm" id="btn-cod-uni-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
             <div class="field" style="flex:0 0 230px"><label>Data ultimazione lavori <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="date" id="f-data-ult" readonly style="background:#f8f8f8"></div>
           </div>
           <div class="sect-title">Committente</div>
@@ -1692,7 +1692,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <div class="row">
       <div class="field"><label>Codice CNCE</label><input type="text" id="mc-cnce" placeholder="Cod. CNCE" maxlength="50"></div>
       <div class="field"><label>Lotto <span style="font-weight:400;font-size:11px;color:#aaa">(se il complesso ha più lotti con lo stesso CNCE)</span></label><input type="text" id="mc-lotto" placeholder="es. 1, 2, A…" maxlength="30"></div>
-      <div class="field"><label>Codice univoco cantiere</label><input type="text" id="mc-cod-uni" placeholder="Codice univoco" maxlength="50"></div>
+      <div class="field"><label>Codice univoco cantiere</label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="mc-cod-uni" placeholder="Codice univoco" maxlength="50" style="flex:1"><button type="button" class="btn-outline btn-sm" id="btn-mc-cod-uni-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
     </div>
     <div class="field"><label>Data inizio lavori</label><input type="date" id="mc-data-inizio" onchange="_autoDurataCantiere()"></div>
     <div class="field"><label>Data prevista ultimazione lavori</label><input type="date" id="mc-data-ult" onchange="_autoDurataCantiere()"></div>
@@ -13194,10 +13194,12 @@ document.addEventListener('input',function(ev){
 <script src="riepilogo-verbali.js?v=1"></script>
 <script src="scheda-impresa.js?v=1"></script>
 <script src="notifiche.js?v=3"></script>
-<script src="aiuto.js?v=2"></script>
+<script src="aiuto.js?v=3"></script>
 <script src="mail-respinte-tec.js?v=1"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
+<!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
+<script src="codice-univoco.js?v=1"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
