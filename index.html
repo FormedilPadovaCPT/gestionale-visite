@@ -1015,7 +1015,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="search-bar">
           <input type="text" id="q-cant" placeholder="Indirizzo, comune, etichetta o codice CNCE…" style="flex:1">
           <button class="btn-primary btn-sm" id="btn-cerca-cant">Cerca</button>
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer;white-space:nowrap"><input type="checkbox" id="chk-cant-chiusi"> Includi chiusi 🔒</label><button class="btn-outline btn-sm" id="btn-tutti-cant">Mostra tutti</button>
+          <button class="btn-outline btn-sm" id="btn-tutti-cant">Mostra tutti</button>
+          <label id="lbl-cant-chiusi" style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--border,#ddd);border-radius:20px;font-size:12px;cursor:pointer;background:#fff;white-space:nowrap;flex:0 0 auto;width:auto"><input type="checkbox" id="chk-cant-chiusi" style="width:auto;margin:0"> Includi chiusi 🔒</label>
         </div>
         <div id="cant-list-filters" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px"></div>
         <div id="cant-list-count" style="font-size:12px;color:#888;margin-bottom:8px"></div>
@@ -6102,6 +6103,7 @@ function _clBuildFilters(rows){
   const imps=[...new Set(rows.map(r=>r.cantiere_importo).filter(v=>v!=null))].sort((a,b)=>a-b)
   const hasNoImp=rows.some(r=>r.cantiere_importo==null)
   _clState.comSel=new Set([..._clState.comSel].filter(c=>comuni.includes(c)))
+  const _lblChiusi=$('lbl-cant-chiusi');if(_lblChiusi&&_lblChiusi.parentNode)_lblChiusi.parentNode.removeChild(_lblChiusi)
   fdiv.innerHTML=''
   const mkSel=(key,html)=>{const el=document.createElement('select');el.style.cssText=pill;el.innerHTML=html;el.value=_clState[key];el.addEventListener('change',()=>{_clState[key]=el.value;_clRender()});fdiv.appendChild(el)}
   // multi-selezione comuni con checkbox + "La mia zona" (identico alla mappa)
@@ -6137,6 +6139,7 @@ function _clBuildFilters(rows){
   mkSel('sca','<option value="">🗓️ Tutte le scadenze</option>'+_CM_SCAD.map(x=>`<option value="${x.k}">${x.label}</option>`).join(''))
   mkSel('orig','<option value="">🏷️ Origine: tutti</option><option value="cnce">Cantieri CNCE/CEIV</option><option value="segn">Non codificati CNCE</option>')
   mkSel('vis','<option value="">👷 Visite: tutti</option><option value="si">Con visite</option><option value="no">Senza visite</option>')
+  if(_lblChiusi)fdiv.appendChild(_lblChiusi)  // «Includi chiusi» dopo Visite (23/09/2026)
 }
 function _clRender(){
   const tbody=$('tbody-cantieri'),empty=$('cantieri-empty')
