@@ -5542,7 +5542,7 @@ function _ceivDash(v){
 
 // ── MAPPA CANTIERI (dashboard) ──
 let _dashMap=null, _dashMapLayers=null
-let _dashMapRows=null, _dashMapOrder=['NR','BASSO','MEDIO','ALTO'], _dashMapIpcOn={NR:true,BASSO:true,MEDIO:true,ALTO:true}, _dashMapTec=''
+let _dashMapRows=null, _dashMapOrder=['NR','BASSO','MEDIO','ALTO'], _dashMapIpcOn={NR:true,BASSO:true,MEDIO:true,ALTO:true}, _dashMapTec='', _dashMapCom=''
 async function loadDashMap(){
   if(typeof L==='undefined'){console.warn('Leaflet non caricato');return}
   let data  // a blocchi (23/09/2026): 1.172 cantieri visitati, una lettura sola ne dava 1.000
@@ -5576,6 +5576,7 @@ async function loadDashMap(){
   _dashMapOrder=order
   _dashMapIpcOn={NR:true,BASSO:true,MEDIO:true,ALTO:true}
   _dashMapTec=$('dash-map-tec')?.value||''
+  _dashMapCom=$('dash-map-com')?.value||''
   renderDashMapMarkers()
   setTimeout(()=>_dashMap.invalidateSize(),200)
 
@@ -5592,15 +5593,31 @@ async function loadDashMap(){
       })
       fdiv.appendChild(lab)
     })
-    // Menu tecnico
-    const tecs=[...new Set(rows.map(d=>d.tecnico).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'))
-    const sel=document.createElement('select')
-    sel.id='dash-map-tec'
-    sel.style.cssText='padding:4px 9px;border:1px solid var(--line,#e3e3e6);border-radius:20px;font-size:12px;margin-left:4px;cursor:pointer'
-    sel.innerHTML='<option value="">👷 Tutti i tecnici</option>'+tecs.map(t=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join('')
-    if(_dashMapTec&&tecs.includes(_dashMapTec))sel.value=_dashMapTec
-    sel.addEventListener('change',()=>{_dashMapTec=sel.value;renderDashMapMarkers()})
-    fdiv.appendChild(sel)
+    // Menu tecnico e comune (23/09/2026: con etichetta, prima il tecnico non si notava)
+    const _q=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')
+    const _conta=k=>{const m={};rows.forEach(d=>{const v=d[k];if(v)m[v]=(m[v]||0)+1});return m}
+    const _menu=(id,etich,tutti,conti,val,su)=>{
+      const lab=document.createElement('label')
+      lab.style.cssText='display:inline-flex;align-items:center;gap:5px'
+      lab.innerHTML=etich+' '
+      const sel=document.createElement('select')
+      sel.id=id
+      sel.style.cssText='padding:4px 9px;border:1px solid var(--line,#e3e3e6);border-radius:20px;font-size:12px;cursor:pointer;max-width:210px'
+      const chiavi=Object.keys(conti).sort((a,b)=>a.localeCompare(b,'it'))
+      sel.innerHTML='<option value="">'+tutti+'</option>'+chiavi.map(t=>`<option value="${_q(t)}">${_q(t)} (${conti[t]})</option>`).join('')
+      if(val&&chiavi.includes(val))sel.value=val
+      sel.addEventListener('change',()=>{su(sel.value);renderDashMapMarkers()})
+      lab.appendChild(sel);fdiv.appendChild(lab)
+      return sel
+    }
+    const _st=_menu('dash-map-tec','👷 Tecnico','Tutti',_conta('tecnico'),_dashMapTec,v=>{_dashMapTec=v})
+    if(_dashMapTec&&!_st.value)_dashMapTec=''
+    const _sc=_menu('dash-map-com','🏘️ Comune','Tutti',_conta('comune_nome'),_dashMapCom,v=>{_dashMapCom=v})
+    if(_dashMapCom&&!_sc.value)_dashMapCom=''
+    const cnt=document.createElement('span')
+    cnt.id='dash-map-conta';cnt.style.cssText='color:#888;font-size:12px'
+    fdiv.appendChild(cnt)
+    renderDashMapMarkers(!!(_dashMapTec||_dashMapCom))
   }
 }
 
@@ -5614,6 +5631,7 @@ function renderDashMapMarkers(fit=true){
     const k=_DM_IPC[d.ipc]?d.ipc:'NR'
     if(!_dashMapIpcOn[k])return
     if(_dashMapTec&&d.tecnico!==_dashMapTec)return
+    if(_dashMapCom&&d.comune_nome!==_dashMapCom)return
     const c=_DM_IPC[k].color
     const approx=d.geocode_status==='comune'
     const m=L.circleMarker([d.lat,d.lng],{radius:7,color:approx?'#777':'#fff',weight:2,dashArray:approx?'3 2':null,fillColor:c,fillOpacity:0.9})
@@ -5630,7 +5648,8 @@ function renderDashMapMarkers(fit=true){
     m.addTo(_dashMapLayers[k])
     bounds.push([d.lat,d.lng])
   })
-  if(fit&&bounds.length)_dashMap.fitBounds(bounds,{padding:[30,30]})
+  if(fit&&bounds.length)_dashMap.fitBounds(bounds,{padding:[30,30],maxZoom:15})
+  const _cn=$('dash-map-conta');if(_cn)_cn.textContent=bounds.length+(bounds.length===1?' cantiere':' cantieri')+' sulla mappa'
 }
 
 // ── SCADENZE VISITE DI RITORNO ──
