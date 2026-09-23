@@ -5468,9 +5468,12 @@ let _dashMap=null, _dashMapLayers=null
 let _dashMapRows=null, _dashMapOrder=['NR','BASSO','MEDIO','ALTO'], _dashMapIpcOn={NR:true,BASSO:true,MEDIO:true,ALTO:true}, _dashMapTec=''
 async function loadDashMap(){
   if(typeof L==='undefined'){console.warn('Leaflet non caricato');return}
-  const{data,error}=await sb.from('v_mappa_cantieri')
-    .select('cantiere_id,lat,lng,ipc,geocode_status,indirizzo,comune_nome,tecnico,data_visita,nr_verbale')
-  if(error){console.error('v_mappa_cantieri:',error);return}
+  let data  // a blocchi (23/09/2026): 1.172 cantieri visitati, una lettura sola ne dava 1.000
+  try{
+    data=await sbTutte((da,a)=>sb.from('v_mappa_cantieri')
+      .select('cantiere_id,lat,lng,ipc,geocode_status,indirizzo,comune_nome,tecnico,data_visita,nr_verbale')
+      .order('cantiere_id').order('nr_verbale').range(da,a))
+  }catch(error){console.error('v_mappa_cantieri:',error);toast('Mappa: non sono riuscito a leggere i cantieri visitati','err');return}
   const rows=(data||[]).filter(r=>r.lat!=null&&r.lng!=null)
   const order=['NR','BASSO','MEDIO','ALTO']
 
@@ -6012,7 +6015,7 @@ async function loadCantieri(q=''){
   // devono vedere l'intero set, non solo le prime N righe per updated_at.
   let rows=[],_fromC=0
   for(;;){
-    let qb=sb.from('cantieri').select(_selC).eq('elimina',0).order('updated_at',{ascending:false}).range(_fromC,_fromC+999)
+    let qb=sb.from('cantieri').select(_selC).eq('elimina',0).order('updated_at',{ascending:false}).order('cantiere_id').range(_fromC,_fromC+999)
     if(!_incChiusi)qb=qb.or('cantiere_chiuso.is.null,cantiere_chiuso.eq.false')
     if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*`)
     const{data,error}=await qb
@@ -6343,10 +6346,15 @@ function _cmColor(k){const s=_CM_SCAD.find(x=>x.k===k);return s?s.color:'#9aa0a6
 
 async function loadCantMap(){
   if(typeof L==='undefined'){console.warn('Leaflet non caricato');return}
-  const{data,error}=await sb.from('cantieri')
-    .select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,lat,lng,geocode_status,cantiere_importo,cantiere_tip_ope,cantiere_tip_ope_altro,data_ult,cantiere_descrizione')
-    .eq('elimina',0).not('cantiere_chiuso','is',true).not('lat','is',null).limit(3000)
-  if(error){console.error('loadCantMap:',error);return}
+  /* A blocchi fino alla fine (23/09/2026): il server non da' piu' di 1.000 righe per lettura, e con
+     .limit(3000) la mappa riceveva 1.000 cantieri attivi su 5.300 - l'elenco sotto li vedeva tutti,
+     la mappa no (Casalserugo: pochi pin in mappa, molti in elenco). Ordine per id: blocchi senza buchi. */
+  let data
+  try{
+    data=await sbTutte((da,a)=>sb.from('cantieri')
+      .select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,lat,lng,geocode_status,cantiere_importo,cantiere_tip_ope,cantiere_tip_ope_altro,data_ult,cantiere_descrizione')
+      .eq('elimina',0).not('cantiere_chiuso','is',true).not('lat','is',null).order('cantiere_id').range(da,a))
+  }catch(error){console.error('loadCantMap:',error);toast('Mappa: non sono riuscito a leggere i cantieri ('+(error.message||error)+')','err');return}
   const rows=(data||[]).filter(r=>r.lat!=null&&r.lng!=null).map(r=>({...r}))
 
   // spread a raggiera per marker a livello comune sovrapposti
@@ -6375,10 +6383,10 @@ async function loadCantMap(){
 
   // conteggio visite per cantiere (per filtro e popup)
   try{
-    const{data:_vv}=await sb.from('visite').select('cantiere_id').eq('elimina',0).limit(10000)
+    const _vv=await sbTutte((da,a)=>sb.from('visite').select('cantiere_id').eq('elimina',0).order('visita_id').range(da,a))
     const _nv={};(_vv||[]).forEach(v=>{if(v.cantiere_id)_nv[v.cantiere_id]=(_nv[v.cantiere_id]||0)+1})
     rows.forEach(r=>r.n_visite=_nv[r.cantiere_id]||0)
-  }catch(_e){rows.forEach(r=>r.n_visite=0)}
+  }catch(_e){console.warn('mappa, conteggio visite:',_e);toast('Mappa: conteggio delle visite non riuscito, il filtro Visite non è affidabile','warn');rows.forEach(r=>r.n_visite=0)}
   // zona: per Padova usa il quartiere ricavato dallo stradario ufficiale
   rows.forEach(r=>{
     let zk=r.comune_nome||''
@@ -8572,8 +8580,10 @@ async function sgrCercaDupCnce(){
   if(!window.__isSegreteria){toast('Funzione riservata alla segreteria','err');return}
   const box=$('sgr-dupcnce-list');if(!box)return
   box.innerHTML='<div style="color:rgba(255,255,255,.5);font-size:12px">Ricerca in corso…</div>'
-  const{data,error}=await sb.from('cantieri').select('cantiere_id,cantiere_cnce,lotto,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,created_at').eq('elimina',0).ilike('cantiere_cnce','CNCE%').limit(10000)
-  if(error){box.innerHTML='';toast('Errore: '+error.message,'err');return}
+  let data  // a blocchi (23/09/2026): 4.731 cantieri CNCE, una lettura sola ne controllava 1.000 e diceva «nessun duplicato»
+  try{
+    data=await sbTutte((da,a)=>sb.from('cantieri').select('cantiere_id,cantiere_cnce,lotto,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,created_at').eq('elimina',0).ilike('cantiere_cnce','CNCE%').order('cantiere_id').range(da,a))
+  }catch(error){box.innerHTML='';toast('Errore: '+(error.message||error),'err');return}
   const grp={}
   ;(data||[]).forEach(c=>{let k=(c.cantiere_cnce||'').replace(/\s+/g,'').toUpperCase();if(!k)return;if(c.lotto)k+=' · lotto '+String(c.lotto).trim();(grp[k]=grp[k]||[]).push(c)}) // stesso CNCE con lotti diversi = lotti di un complesso, non doppioni (08/09/2026)
   const dupli=Object.entries(grp).filter(([,v])=>v.length>1)
@@ -10675,7 +10685,10 @@ async function admCaricaRiaggancio(){
   if(!window.__isCoord){toast('Azione riservata alla segreteria','err');return}
   const wrap=$('adm-riaggancio-list');if(!wrap)return
   wrap.innerHTML='<div style="color:rgba(255,255,255,.4);font-size:13px;padding:8px">Caricamento…</div>'
-  const{data:senza,error}=await sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,cantiere_comune_cod,cantiere_committente_id').eq('elimina',0).is('cantiere_cnce',null).order('comune_nome')
+  let senza=null,error=null  // a blocchi (23/09/2026): 1.114 cantieri senza CNCE, una lettura sola ne dava 1.000
+  try{
+    senza=await sbTutte((da,a)=>sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,cantiere_comune_cod,cantiere_committente_id').eq('elimina',0).is('cantiere_cnce',null).order('comune_nome').order('cantiere_id').range(da,a))
+  }catch(e){error=e}
   if(error){wrap.innerHTML='<div style="color:#e67e22;font-size:13px">Errore: '+esc(error.message)+'</div>';return}
   const rows=senza||[]
   if(!rows.length){wrap.innerHTML='<div style="color:rgba(255,255,255,.4);font-size:13px;padding:8px">Nessun cantiere senza CNCE. ✔</div>';return}

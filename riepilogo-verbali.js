@@ -156,11 +156,17 @@
 
     const ids = vive.map((v) => v.visita_id);
     const righeChk = [];
-    for (let i = 0; i < ids.length; i += 200) {        /* Supabase dà al massimo 1.000 righe per lettura */
-      const { data, error: e2 } = await radice.sb.from('visite_checklist')
-        .select('visita_id, codice, valore, nota').in('visita_id', ids.slice(i, i + 200)).limit(20000);
-      if (e2) throw e2;
-      righeChk.push(...(data || []));
+    /* Supabase dà al massimo 1.000 righe per lettura, e una visita ha fino a ~300 righe di checklist:
+       spezzare le visite a gruppi non basta, ogni gruppo va letto a blocchi (23/09/2026). */
+    for (let i = 0; i < ids.length; i += 50) {
+      for (let da = 0; ; da += 1000) {
+        const { data, error: e2 } = await radice.sb.from('visite_checklist')
+          .select('visita_id, codice, valore, nota').in('visita_id', ids.slice(i, i + 50))
+          .order('id').range(da, da + 999);
+        if (e2) throw e2;
+        righeChk.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
     }
     const { data: voci } = await radice.sb.from('checklist_voci').select('codice, descrizione').limit(2000);
     const descrizioni = Object.fromEntries((voci || []).map((v) => [v.codice, v.descrizione]));
