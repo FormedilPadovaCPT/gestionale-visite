@@ -5223,6 +5223,7 @@ async function loadDash(){
   loadAvvisi&&loadAvvisi().catch(e=>console.warn('loadAvvisi:',e))
   loadIncarichi&&loadIncarichi().catch(e=>console.warn('loadIncarichi:',e))
   _incApertiCache=null
+  if(window.appuntiCantiere)window.appuntiCantiere.elenco().catch(e=>console.warn('appunti:',e))   // «I miei appunti» sotto la mappa
   await loadDashMap()
 }
 
@@ -13313,7 +13314,7 @@ document.addEventListener('input',function(ev){
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
 <script src="codice-univoco.js?v=2"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
-<script src="appunti-cantiere.js?v=2"></script>
+<script src="appunti-cantiere.js?v=3"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

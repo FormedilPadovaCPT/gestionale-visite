@@ -140,13 +140,6 @@
       <button class="btn-outline btn-sm" id="ap-nuovo">➕ Nuovo</button>
       <button class="btn-primary btn-sm" id="ap-salva">💾 Salva</button>
     </div>
-    <div style="border-top:1px solid #eee;margin-top:14px;padding-top:10px">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
-        <b style="font-size:13px;flex:1 1 auto">I miei appunti <span id="ap-conta" style="font-weight:400;color:#888"></span></b>
-        <input type="search" id="ap-cerca" placeholder="Cerca per etichetta, indirizzo, testo…" style="flex:1 1 200px;padding:6px 9px;border:1px solid #ddd;border-radius:8px;font-size:13px">
-      </div>
-      <div id="ap-elenco" style="max-height:40vh;overflow-y:auto"></div>
-    </div>
   </div>
 </div>`;
     while (box.firstElementChild) document.body.appendChild(box.firstElementChild);
@@ -156,13 +149,12 @@
     $('ds-maps').onclick = () => { if (ultima) window.open('https://www.google.com/maps?q=' + ultima.pos.lat + ',' + ultima.pos.lng, '_blank', 'noopener'); };
     $('ds-appunto').onclick = () => { $('modal-dovesono').classList.add('hidden'); apriAppunti(ultima); };
 
-    $('ap-chiudi').onclick = () => $('modal-appunti').classList.add('hidden');
+    $('ap-chiudi').onclick = () => { $('modal-appunti').classList.add('hidden'); disegnaElenco(); };
     $('ap-gps-btn').onclick = () => rilevaPerAppunto();
     $('ap-nuovo').onclick = () => { if (!confermaSeModificato()) return; pulisci(); if (mobile()) rilevaPerAppunto(); };
     $('ap-salva').onclick = salva;
     $('ap-elimina').onclick = elimina;
     $('ap-copia').onclick = copia;
-    $('ap-cerca').oninput = disegnaElenco;
     ['ap-etichetta', 'ap-indirizzo', 'ap-comune', 'ap-testo'].forEach((id) => { $(id).oninput = salvaBozza; });
     $('ap-indirizzo').onchange = aggiornaQuartiere;
     $('ap-comune').onchange = aggiornaQuartiere;
@@ -176,13 +168,49 @@
       else if (az === 'riprova') riprovaFoto(k);
     };
     $('ap-foto-grande').onclick = () => { $('ap-foto-grande').style.display = 'none'; };
+  }
+
+  /* ── elenco «I miei appunti» in Dashboard, sotto la mappa (23/09/2026, chiesto dall'utente) ── */
+  function riquadroElenco() {
+    if ($('dash-appunti-card')) return;
+    const card = document.createElement('div');
+    card.className = 'card'; card.id = 'dash-appunti-card';
+    card.innerHTML = `
+      <h3>📝 I miei appunti <span id="ap-conta" style="font-weight:400;color:#888;text-transform:none;letter-spacing:normal"></span></h3>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <input type="search" id="ap-cerca" placeholder="Cerca per etichetta, indirizzo, testo…" style="flex:1 1 220px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px">
+        <button type="button" class="btn-primary btn-sm" id="ap-dash-nuovo">➕ Nuovo appunto</button>
+      </div>
+      <div style="font-size:11.5px;color:#999;margin:-2px 0 8px">Li vedi solo tu. Tocca un appunto per rileggerlo, correggerlo, aggiungere foto o eliminarlo.</div>
+      <div id="ap-elenco" style="max-height:60vh;overflow-y:auto"></div>`;
+    const mappa = $('dash-map-card'), wrap = $('dash-segnala-wrap');
+    if (mappa && mappa.parentNode) mappa.parentNode.insertBefore(card, mappa.nextSibling);
+    else if (wrap && wrap.parentNode) wrap.parentNode.appendChild(card);
+    else return;
+    $('ap-cerca').oninput = disegnaElenco;
+    $('ap-dash-nuovo').onclick = () => apriAppunti();
     $('ap-elenco').onclick = (e) => {
       const r = e.target.closest('[data-ap-id]');
       if (!r) return;
-      if (!confermaSeModificato()) return;
       const a = elenco.find((x) => String(x.id) === r.dataset.apId);
-      if (a) carica(a);
+      if (a) apriAppunto(a);
     };
+  }
+
+  /* apre la maschera su un appunto dell'elenco */
+  function apriAppunto(a) {
+    finestre();
+    const aperta = !$('modal-appunti').classList.contains('hidden');
+    if (aperta && !confermaSeModificato()) return;
+    const b = leggiBozza();
+    if (!aperta && b && String(b.id || '') !== String(a.id)
+      && !confirm('C\'è un appunto non salvato del ' + dataOra(b.il) + '. Aprendo questo lo perdi: continuo?')) { apriAppunti(); return; }
+    $('modal-appunti').classList.remove('hidden');
+    const nome = nomeAutore();
+    $('ap-autore').textContent = nome ? 'Autore: ' + nome + '.' : '';
+    pulisci();
+    carica(a);
+    disegnaElenco();
   }
 
   /* ── Dove sono? ─────────────────────────────────────────────── */
@@ -337,7 +365,9 @@
   }
 
   async function caricaElenco() {
+    riquadroElenco();
     const el = $('ap-elenco');
+    if (!el || !window.sb) return;
     el.innerHTML = '<div style="color:#999;font-size:12px;padding:6px">Caricamento…</div>';
     const { data, error } = await window.sb.from('appunti_cantiere')
       .select('id,etichetta,indirizzo,comune,quartiere,lat,lng,precisione_m,testo,creato_il,aggiornato_il,appunti_cantiere_foto(count)')
@@ -354,15 +384,17 @@
 
   function disegnaElenco() {
     const el = $('ap-elenco');
+    if (!el) return;
+    const cur = $('ap-id') && $('modal-appunti') && !$('modal-appunti').classList.contains('hidden') ? $('ap-id').value : '';
     const q = ($('ap-cerca').value || '').trim().toLowerCase();
     const righe = elenco.filter((a) => !q || [a.etichetta, a.indirizzo, a.comune, a.quartiere, a.testo].join(' ').toLowerCase().includes(q));
     $('ap-conta').textContent = elenco.length ? '(' + (q ? righe.length + ' di ' : '') + elenco.length + ')' : '';
-    if (!elenco.length) { el.innerHTML = '<div style="color:#999;font-size:12px;padding:6px">Non hai ancora appunti.</div>'; return; }
+    if (!elenco.length) { el.innerHTML = '<div style="color:#999;font-size:12px;padding:6px">Non hai ancora appunti: premi «📝 Appunti cantiere» o «➕ Nuovo appunto» per scriverne uno.</div>'; return; }
     if (!righe.length) { el.innerHTML = '<div style="color:#999;font-size:12px;padding:6px">Nessun appunto con questa ricerca.</div>'; return; }
     el.innerHTML = righe.map((a) => {
       const testo = String(a.testo || '');
       const nf = (a.appunti_cantiere_foto && a.appunti_cantiere_foto[0] && a.appunti_cantiere_foto[0].count) || 0;
-      return '<div data-ap-id="' + a.id + '" style="padding:8px 10px;border:1px solid #eee;border-radius:8px;margin-bottom:6px;cursor:pointer;background:' + (String(a.id) === $('ap-id').value ? '#fff4ee' : '#fff') + '">'
+      return '<div data-ap-id="' + a.id + '" style="padding:8px 10px;border:1px solid #eee;border-radius:8px;margin-bottom:6px;cursor:pointer;background:' + (String(a.id) === cur ? '#fff4ee' : '#fff') + '">'
         + '<div style="display:flex;gap:8px;justify-content:space-between;align-items:baseline"><b style="font-size:13px">' + esc(a.etichetta || '(senza etichetta)') + (nf ? ' <span style="font-weight:400;color:#888">📷 ' + nf + '</span>' : '') + '</b>'
         + '<span style="font-size:11px;color:#999;white-space:nowrap">' + dataOra(a.aggiornato_il) + '</span></div>'
         + '<div style="font-size:12px;color:#555">' + esc([a.indirizzo, a.comune].filter(Boolean).join(', ')) + (a.quartiere ? ' · ' + esc(a.quartiere) : '') + '</div>'
@@ -557,6 +589,7 @@
     a.id = 'btn-appunti'; a.type = 'button'; a.style.cssText = stile; a.textContent = '📝 Appunti cantiere';
     a.onclick = () => apriAppunti();
     wrap.appendChild(d); wrap.appendChild(a);
+    riquadroElenco();
     const vedi = () => { d.style.display = mobile() ? '' : 'none'; a.style.gridColumn = mobile() ? '' : '1/-1'; };
     vedi();
     if (MOBILE && MOBILE.addEventListener) MOBILE.addEventListener('change', vedi);
@@ -564,5 +597,5 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pulsanti); else pulsanti();
 
-  window.appuntiCantiere = { apri: apriAppunti, doveSono, indirizzoDa, descrivi };
+  window.appuntiCantiere = { apri: apriAppunti, doveSono, indirizzoDa, descrivi, elenco: caricaElenco };
 })();
