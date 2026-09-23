@@ -47,7 +47,11 @@ window.AIUTO_TESTI = {
 
   /* ── dashboard ── */
   'btn-segnala-dash': 'Segnala alla segreteria un cantiere attivo che hai visto passando: prende la posizione dal GPS e apre una scheda breve. Non è un verbale.',
-  'btn-qr-servizi': 'Mostra sullo schermo il codice QR del portale servizi, da far inquadrare all\'impresa in cantiere: da lì l\'impresa manda richieste e segnalazioni.',
+  'btn-dove-sono': 'Legge il GPS e ti dice indirizzo, comune e quartiere di Padova in cui sei. Non salva niente: da lì puoi prendere un appunto sul posto.',
+  'btn-appunti': 'I tuoi appunti di cantiere, con l\'indirizzo preso dal GPS: li vedi solo tu, e li rileggi a casa quando scrivi il verbale.',
+  'ap-salva': 'Salva l\'appunto a tuo nome: lo vedi solo tu. Se manca la linea non si perde: il testo resta nel telefono e riprovi.',
+  'ap-elimina': 'Elimina l\'appunto per sempre: non si recupera.',
+  'btn-qr-servizi':'Mostra sullo schermo il codice QR del portale servizi, da far inquadrare all\'impresa in cantiere: da lì l\'impresa manda richieste e segnalazioni.',
   'btn-servizi-cpt': 'Apre il portale servizi pubblico, quello che vedono le imprese.',
   't:registra una visita stage senza verbale': 'Per gli stage fuori provincia, dove non si fa il verbale: registra che la visita è stata fatta, così l\'incarico si chiude e la visita conta.',
   't:la mia zona': 'Filtra i cantieri sulla tua zona di competenza.',
