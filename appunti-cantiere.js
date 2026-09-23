@@ -126,6 +126,12 @@
     <div id="ap-quartiere" style="font-size:12px;color:#555;margin:-4px 0 8px"></div>
     <div class="field"><label>Appunti</label><textarea id="ap-testo" rows="8" maxlength="20000" placeholder="Quello che vedi e che ti servirà per il verbale: imprese presenti, lavorazioni, rilievi, persone incontrate…"></textarea></div>
     <div id="ap-bozza-info" style="font-size:11px;color:#999;margin:-4px 0 6px"></div>
+    <div class="field" style="margin-bottom:10px"><label>Foto</label>
+      <div id="ap-foto" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px"></div>
+      <label id="ap-foto-btn" class="btn-outline btn-sm" style="display:inline-block;cursor:pointer;text-transform:none;letter-spacing:normal;font-size:13px;margin:0">📷 Aggiungi foto<input type="file" id="ap-foto-input" accept="image/*" multiple style="display:none"></label>
+      <span style="font-size:11px;color:#999;margin-left:6px">Vanno su Drive, senza link pubblico: le vedi solo tu.</span>
+    </div>
+    <div id="ap-foto-grande" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:100000;align-items:center;justify-content:center;cursor:zoom-out"><img style="max-width:96vw;max-height:92vh;border-radius:6px"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
       <button class="btn-secondary btn-sm" id="ap-chiudi">Chiudi</button>
       <button class="btn-outline btn-sm" id="ap-gps-btn">📍 Usa la mia posizione</button>
@@ -160,6 +166,16 @@
     ['ap-etichetta', 'ap-indirizzo', 'ap-comune', 'ap-testo'].forEach((id) => { $(id).oninput = salvaBozza; });
     $('ap-indirizzo').onchange = aggiornaQuartiere;
     $('ap-comune').onchange = aggiornaQuartiere;
+    $('ap-foto-input').onchange = (e) => { const f = Array.from(e.target.files || []); e.target.value = ''; if (f.length) aggiungiFoto(f); };
+    $('ap-foto').onclick = (e) => {
+      const t = e.target.closest('[data-foto-az]');
+      if (!t) return;
+      const k = t.dataset.fotoK, az = t.dataset.fotoAz;
+      if (az === 'vedi') vediFoto(k);
+      else if (az === 'togli') togliFoto(k);
+      else if (az === 'riprova') riprovaFoto(k);
+    };
+    $('ap-foto-grande').onclick = () => { $('ap-foto-grande').style.display = 'none'; };
     $('ap-elenco').onclick = (e) => {
       const r = e.target.closest('[data-ap-id]');
       if (!r) return;
@@ -224,6 +240,7 @@
     $('ap-gps').textContent = mobile() ? '' : 'Al computer la posizione non serve: rileggi i tuoi appunti qui sotto, o scrivine uno a mano.';
     $('ap-elimina').style.display = 'none';
     $('ap-bozza-info').textContent = '';
+    foto = []; disegnaFoto();
     fotografia = statoModulo();
     try { localStorage.removeItem(BOZZA); } catch (_e) { /* niente */ }
   }
@@ -242,6 +259,7 @@
     $('ap-elimina').style.display = '';
     $('ap-bozza-info').textContent = '';
     fotografia = statoModulo();
+    caricaFoto(a.id);
     $('ap-testo').focus();
   }
 
@@ -305,6 +323,7 @@
       posAppunto = b.pos || null; quartiereAppunto = b.quartiere || null;
       $('ap-quartiere').textContent = b.quartiere ? '📍 ' + b.quartiere : '';
       $('ap-elimina').style.display = b.id ? '' : 'none';
+      if (b.id) caricaFoto(b.id);
       $('ap-gps').style.color = '#b35c00';
       $('ap-gps').textContent = 'Ho ritrovato un appunto non salvato del ' + dataOra(b.il) + ': controllalo e premi Salva.';
       fotografia = '';   // e' da salvare
@@ -321,7 +340,7 @@
     const el = $('ap-elenco');
     el.innerHTML = '<div style="color:#999;font-size:12px;padding:6px">Caricamento…</div>';
     const { data, error } = await window.sb.from('appunti_cantiere')
-      .select('id,etichetta,indirizzo,comune,quartiere,lat,lng,precisione_m,testo,creato_il,aggiornato_il')
+      .select('id,etichetta,indirizzo,comune,quartiere,lat,lng,precisione_m,testo,creato_il,aggiornato_il,appunti_cantiere_foto(count)')
       .order('aggiornato_il', { ascending: false }).order('id', { ascending: false }).limit(1000);
     if (error) {
       elenco = [];
@@ -342,8 +361,9 @@
     if (!righe.length) { el.innerHTML = '<div style="color:#999;font-size:12px;padding:6px">Nessun appunto con questa ricerca.</div>'; return; }
     el.innerHTML = righe.map((a) => {
       const testo = String(a.testo || '');
+      const nf = (a.appunti_cantiere_foto && a.appunti_cantiere_foto[0] && a.appunti_cantiere_foto[0].count) || 0;
       return '<div data-ap-id="' + a.id + '" style="padding:8px 10px;border:1px solid #eee;border-radius:8px;margin-bottom:6px;cursor:pointer;background:' + (String(a.id) === $('ap-id').value ? '#fff4ee' : '#fff') + '">'
-        + '<div style="display:flex;gap:8px;justify-content:space-between;align-items:baseline"><b style="font-size:13px">' + esc(a.etichetta || '(senza etichetta)') + '</b>'
+        + '<div style="display:flex;gap:8px;justify-content:space-between;align-items:baseline"><b style="font-size:13px">' + esc(a.etichetta || '(senza etichetta)') + (nf ? ' <span style="font-weight:400;color:#888">📷 ' + nf + '</span>' : '') + '</b>'
         + '<span style="font-size:11px;color:#999;white-space:nowrap">' + dataOra(a.aggiornato_il) + '</span></div>'
         + '<div style="font-size:12px;color:#555">' + esc([a.indirizzo, a.comune].filter(Boolean).join(', ')) + (a.quartiere ? ' · ' + esc(a.quartiere) : '') + '</div>'
         + (testo ? '<div style="font-size:12px;color:#777;margin-top:3px;white-space:pre-wrap">' + esc(testo.length > 160 ? testo.slice(0, 160) + '…' : testo) + '</div>' : '')
@@ -351,7 +371,9 @@
     }).join('');
   }
 
-  async function salva() {
+  /* true se salvato; silenzioso = prima di caricare una foto (serve l'id dell'appunto) */
+  async function salva(silenzioso) {
+    if (silenzioso !== true) silenzioso = false;
     const riga = {
       etichetta: $('ap-etichetta').value.trim() || null,
       indirizzo: $('ap-indirizzo').value.trim() || null,
@@ -362,7 +384,7 @@
       lng: posAppunto ? posAppunto.lng : null,
       precisione_m: posAppunto && posAppunto.acc != null ? posAppunto.acc : null,
     };
-    if (!riga.etichetta && !riga.indirizzo && !riga.testo) { avviso('Scrivi almeno un\'etichetta, un indirizzo o un appunto', 'warn'); return; }
+    if (!riga.etichetta && !riga.indirizzo && !riga.testo) { avviso('Scrivi almeno un\'etichetta, un indirizzo o un appunto' + (silenzioso ? ' prima di aggiungere foto' : ''), 'warn'); return false; }
     const id = $('ap-id').value;
     const bt = $('ap-salva'); bt.disabled = true;
     let res;
@@ -375,23 +397,144 @@
     if (res.error || !res.data) {
       avviso('Appunto NON salvato: ' + ((res.error && res.error.message) || 'nessuna risposta') + '. Il testo resta nel telefono: riprova quando c\'è linea.', 'err');
       salvaBozza();
-      return;
+      return false;
     }
     try { localStorage.removeItem(BOZZA); } catch (_e) { /* niente */ }
-    avviso('Appunto salvato', 'ok');
+    if (!silenzioso) avviso('Appunto salvato', 'ok');
     await caricaElenco();
-    carica(res.data);
+    if (silenzioso) {   // resta com'e' sullo schermo, prende solo l'id
+      $('ap-id').value = res.data.id; $('ap-elimina').style.display = ''; $('ap-bozza-info').textContent = '';
+      fotografia = statoModulo();
+    } else carica(res.data);
+    return true;
   }
 
   async function elimina() {
     const id = $('ap-id').value;
     if (!id) return;
-    if (!confirm('Eliminare questo appunto? Non si recupera.')) return;
+    const nf = foto.filter((f) => f.id).length;
+    if (!confirm('Eliminare questo appunto' + (nf ? ' e le sue ' + nf + ' foto' : '') + '? Dall\'app non si recupera.')) return;
+    // prima le foto (vanno nel cestino di Drive), poi l'appunto: se una foto non si toglie ci si ferma
+    for (const f of foto.filter((x) => x.id)) {
+      const r = await funzione({ azione: 'elimina', foto_id: f.id });
+      if (!r.ok) { avviso('Non sono riuscito a togliere una foto (' + r.error + '): l\'appunto resta, riprova.', 'err'); await caricaFoto(id); return; }
+    }
     const { error } = await window.sb.from('appunti_cantiere').delete().eq('id', id);
     if (error) { avviso('Non sono riuscito a eliminare l\'appunto: ' + error.message, 'err'); return; }
     avviso('Appunto eliminato', 'ok');
     pulisci();
     await caricaElenco();
+  }
+
+  /* ── foto (funzione foto-appunti: Drive senza link pubblico) ── */
+  let foto = [];   // {k, id?, src?, b64?, stato:'ok'|'carico'|'errore'|'leggo', err?}
+  let fotoSeq = 0;
+
+  async function funzione(body) {
+    try {
+      const { data, error } = await window.sb.functions.invoke('foto-appunti', { body });
+      if (error) {
+        let msg = error.message || 'errore';
+        try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (_e) { /* niente */ }
+        return { ok: false, error: msg };
+      }
+      return data && data.ok ? data : { ok: false, error: (data && data.error) || 'nessuna risposta' };
+    } catch (e) { return { ok: false, error: (e && e.message) || 'rete assente' }; }
+  }
+
+  function disegnaFoto() {
+    const el = $('ap-foto');
+    if (!el) return;
+    el.innerHTML = foto.map((f) => {
+      const base = 'position:relative;width:84px;height:84px;border-radius:8px;overflow:hidden;background:#f1f1f1;display:flex;align-items:center;justify-content:center;font-size:11px;color:#888;text-align:center;';
+      const x = f.stato !== 'carico' ? '<button type="button" data-foto-az="togli" data-foto-k="' + f.k + '" title="Togli la foto" style="position:absolute;top:2px;right:2px;width:24px;height:24px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:22px;padding:0;cursor:pointer">×</button>' : '';
+      if (f.stato === 'ok' && f.src) return '<div style="' + base + '"><img src="' + f.src + '" data-foto-az="vedi" data-foto-k="' + f.k + '" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in">' + x + '</div>';
+      if (f.stato === 'carico') return '<div style="' + base + '">⌛<br>carico…</div>';
+      if (f.stato === 'leggo') return '<div style="' + base + '">⌛</div>' ;
+      return '<div style="' + base + 'border:2px solid #c0392b;flex-direction:column;gap:4px;padding:4px">'
+        + (f.src ? '<img src="' + f.src + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.35">' : '')
+        + '<span style="position:relative;color:#c0392b;font-weight:600">' + (f.id ? 'non letta' : 'non caricata') + '</span>'
+        + (f.b64 ? '<button type="button" data-foto-az="riprova" data-foto-k="' + f.k + '" style="position:relative;font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid #c0392b;background:#fff;color:#c0392b;cursor:pointer">Riprova</button>' : '')
+        + x + '</div>';
+    }).join('');
+  }
+
+  async function caricaFoto(appuntoId) {
+    foto = []; disegnaFoto();
+    const { data, error } = await window.sb.from('appunti_cantiere_foto').select('id').eq('appunto_id', appuntoId).order('id');
+    if (String(appuntoId) !== $('ap-id').value) return;   // nel frattempo si e' aperto un altro appunto
+    if (error) { $('ap-foto').innerHTML = '<span style="font-size:12px;color:#c0392b">Non sono riuscito a leggere le foto: ' + esc(error.message) + '</span>'; return; }
+    foto = (data || []).map((r) => ({ k: 'f' + (++fotoSeq), id: r.id, stato: 'leggo' }));
+    disegnaFoto();
+    for (const f of foto.slice()) {
+      const r = await funzione({ azione: 'scarica', foto_id: f.id });
+      if (String(appuntoId) !== $('ap-id').value) return;
+      if (r.ok) { f.src = 'data:image/jpeg;base64,' + r.base64; f.stato = 'ok'; } else { f.stato = 'errore'; f.err = r.error; }
+      disegnaFoto();
+    }
+  }
+
+  /* riduce la foto (lato lungo 1600 px, JPEG 0.82), come le foto delle segnalazioni */
+  function comprimi(file) {
+    return new Promise((ok, ko) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1600;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) { const r = Math.min(MAX / w, MAX / h); w = Math.round(w * r); h = Math.round(h * r); }
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(img.src);
+        ok(c.toDataURL('image/jpeg', 0.82).split(',')[1]);
+      };
+      img.onerror = () => ko(new Error('immagine non leggibile'));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  async function mandaFoto(f) {
+    f.stato = 'carico'; disegnaFoto();
+    const r = await funzione({ azione: 'carica', appunto_id: Number($('ap-id').value), image_base64: f.b64 });
+    if (r.ok && r.foto) { f.id = r.foto.id; f.stato = 'ok'; f.b64 = null; }
+    else { f.stato = 'errore'; f.err = r.error; avviso('Foto NON caricata: ' + r.error + '. Premi «Riprova» sulla foto quando c\'è linea.', 'err'); }
+    disegnaFoto();
+    caricaElenco();
+  }
+
+  async function aggiungiFoto(files) {
+    if (!$('ap-id').value) {   // la foto si aggancia all'appunto: prima lo si salva
+      const ok = await salva(true);
+      if (!ok) return;
+    }
+    for (const file of files) {
+      const f = { k: 'f' + (++fotoSeq), stato: 'carico' };
+      foto.push(f); disegnaFoto();
+      try { f.b64 = await comprimi(file); f.src = 'data:image/jpeg;base64,' + f.b64; } catch (e) {
+        f.stato = 'errore'; f.err = e.message; disegnaFoto(); avviso('Foto non leggibile: ' + e.message, 'err'); continue;
+      }
+      await mandaFoto(f);
+    }
+  }
+
+  function riprovaFoto(k) { const f = foto.find((x) => x.k === k); if (f && f.b64) mandaFoto(f); }
+
+  function vediFoto(k) {
+    const f = foto.find((x) => x.k === k);
+    if (!f || !f.src) return;
+    const g = $('ap-foto-grande'); g.querySelector('img').src = f.src; g.style.display = 'flex';
+  }
+
+  async function togliFoto(k) {
+    const f = foto.find((x) => x.k === k);
+    if (!f) return;
+    if (f.id) {
+      if (!confirm('Togliere questa foto dall\'appunto?')) return;
+      const r = await funzione({ azione: 'elimina', foto_id: f.id });
+      if (!r.ok) { avviso('Non sono riuscito a togliere la foto: ' + r.error, 'err'); return; }
+    }
+    foto = foto.filter((x) => x !== f);
+    disegnaFoto();
+    caricaElenco();
   }
 
   async function copia() {
