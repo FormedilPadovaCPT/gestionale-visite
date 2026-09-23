@@ -705,32 +705,37 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="tab-content" data-tab="1">
         <div class="card">
           <div class="sect-title">Cantiere *</div>
+          <div style="font-size:12px;color:#888;margin:-4px 0 8px">Ricerca per comune e/o indirizzo. I cantieri terminati sono esclusi.</div>
           <div class="row">
           <div class="field" style="flex:0 1 300px">
             <label>Comune</label>
             <input type="text" id="f-cant-comune" placeholder="Es. Padova, Abano Terme…" autocomplete="off">
           </div>
-          <div class="field" style="flex:2 1 380px">
+          <div class="field" style="flex:1 1 300px">
             <label>Indirizzo cantiere (anche parziale)</label>
             <div class="autocomplete-wrap">
               <input type="text" id="f-cant-search" placeholder="Es. via Roma — doppio click = tutti i cantieri attivi" autocomplete="off">
               <div class="ac-list hidden" id="cant-list"></div>
             </div>
-            <div style="font-size:11px;color:#aaa;margin-top:3px">Ricerca per comune e/o indirizzo. I cantieri terminati sono esclusi.</div>
             <input type="hidden" id="f-cant-id">
             <div id="cant-detail" style="font-size:12px;color:var(--grey);margin-top:5px"></div>
             <div id="cant-quartiere" style="margin-top:4px"></div>
             <div id="cant-info-card" class="hidden" style="margin-top:10px;padding:10px 14px;background:#f8f8f8;border-radius:8px;border-left:3px solid var(--orange);font-size:12px;line-height:1.8;color:#333"></div>
           </div>
+          <div class="field" style="flex:0 0 auto;align-self:flex-start">
+            <label>&nbsp;</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;min-height:42px;align-items:center">
+              <button class="btn-outline btn-sm" id="btn-new-cant">+ Nuovo cantiere</button><button class="btn-outline btn-sm" id="btn-edit-cant" type="button" onclick="editCantiereForm()" style="display:none" title="Modifica i dati del cantiere selezionato">✏️ Modifica cantiere</button>
+            </div>
           </div>
-          <button class="btn-outline btn-sm" id="btn-new-cant">+ Nuovo cantiere</button><button class="btn-outline btn-sm" id="btn-edit-cant" type="button" onclick="editCantiereForm()" style="display:none;margin-left:6px" title="Modifica i dati del cantiere selezionato">✏️ Modifica cantiere</button>
+          </div>
           <div class="row" style="margin-top:12px">
             <div class="field"><label>Accesso cantiere n° (dal DB cantiere)</label><input type="text" id="f-acc-cant2" placeholder="Codice accesso interno" readonly style="background:#f8f8f8"></div>
             <div class="field"><label>Protocollo interno <span style="font-weight:400;font-size:11px;color:#aaa">(n° richiesta)</span></label><div style="display:flex;gap:6px"><input type="text" id="f-prot-int" placeholder="Prot. richiesta" style="flex:1;min-width:0"><select id="f-prot-inc" title="Scegli fra i tuoi incarichi aperti" style="flex:1.4;min-width:0;display:none"></select></div><div id="f-prot-msg" style="font-size:11px;margin-top:3px"></div></div>
           </div>
           <div class="row">
-            <div class="field"><label>Codice CNCE <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="text" id="f-cnce" placeholder="–" readonly style="background:#f8f8f8"></div>
-            <div class="field"><label>Codice univoco <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="f-cod-uni" placeholder="–" readonly style="background:#f8f8f8;flex:1"><button type="button" class="btn-outline btn-sm" id="btn-cod-uni-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
+            <div class="field" style="flex:0 1 260px"><label>Codice CNCE <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="text" id="f-cnce" placeholder="–" readonly style="background:#f8f8f8"></div>
+            <div class="field" style="flex:0 1 440px"><label>Codice univoco <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="f-cod-uni" placeholder="–" readonly style="background:#f8f8f8;flex:1 1 120px;min-width:0"><button type="button" class="btn-outline btn-sm" id="btn-cod-uni-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
             <div class="field" style="flex:0 0 230px"><label>Data ultimazione lavori <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="date" id="f-data-ult" readonly style="background:#f8f8f8"></div>
           </div>
           <div class="sect-title">Committente</div>
@@ -1692,7 +1697,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <div class="row">
       <div class="field"><label>Codice CNCE</label><input type="text" id="mc-cnce" placeholder="Cod. CNCE" maxlength="50"></div>
       <div class="field"><label>Lotto <span style="font-weight:400;font-size:11px;color:#aaa">(se il complesso ha più lotti con lo stesso CNCE)</span></label><input type="text" id="mc-lotto" placeholder="es. 1, 2, A…" maxlength="30"></div>
-      <div class="field"><label>Codice univoco cantiere</label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="mc-cod-uni" placeholder="Codice univoco" maxlength="50" style="flex:1"><button type="button" class="btn-outline btn-sm" id="btn-mc-cod-uni-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
+      <div class="field"><label>Codice univoco cantiere</label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="mc-cod-uni" placeholder="Codice univoco" maxlength="50" style="flex:1 1 120px;min-width:0"><button type="button" class="btn-outline btn-sm" id="btn-mc-cod-uni-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
     </div>
     <div class="field"><label>Data inizio lavori</label><input type="date" id="mc-data-inizio" onchange="_autoDurataCantiere()"></div>
     <div class="field"><label>Data prevista ultimazione lavori</label><input type="date" id="mc-data-ult" onchange="_autoDurataCantiere()"></div>
