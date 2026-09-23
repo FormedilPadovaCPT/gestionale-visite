@@ -2912,7 +2912,7 @@ document.addEventListener('change',async e=>{
 
 // ── INIT FORM ──
 async function initForm(snap=null){
-  S.fd={}; S.checklist={}; S.noteChk={}; S.imprese=[]; S.lavorazioni=[]; S.savedId=null; S.foto={}
+  S.fd={}; S.checklist={}; S.noteChk={}; S.imprese=[]; S.lavorazioni=[]; S.savedId=null; S.foto={}; S._impOpen=0
   hide('btn-pdf')
   hide('btn-email-verbale')
 
@@ -3076,8 +3076,11 @@ function renderImpreseAccordion(){
   // Events
   wrap.querySelectorAll('.imp-acc-header').forEach(h=>{
     h.onclick=()=>{
-      const body=h.nextElementSibling
-      body.classList.toggle('open')
+      const i=+h.dataset.impIdx
+      const apri=!h.nextElementSibling.classList.contains('open')
+      wrap.querySelectorAll('.imp-acc-body').forEach(b=>b.classList.remove('open'))
+      if(apri)h.nextElementSibling.classList.add('open')
+      S._impOpen=apri?i:-1
     }
   })
   // Nuova impresa btns
@@ -3103,6 +3106,8 @@ function renderImpreseAccordion(){
       const idx=+b.dataset.impRemove
       if(idx===0){toast('L\'impresa principale non può essere rimossa','warn');return}
       S.imprese.splice(idx,1)
+      if(S._impOpen===idx)S._impOpen=idx-1
+      else if(S._impOpen>idx)S._impOpen--
       renderImpreseAccordion()
     }
   })
@@ -3119,6 +3124,7 @@ function renderImpreseAccordion(){
       if(item.cf&&!S.imprese[idx].cf_imp)S.imprese[idx].cf_imp=item.cf
       if(item.piva&&!S.imprese[idx].piva)S.imprese[idx].piva=item.piva
       $(`im-search-${idx}`).value=item.label
+      S._impOpen=idx
       renderImpreseAccordion()
     })
     // Field listeners
@@ -3144,14 +3150,14 @@ function impreseAccordionHTML(im,idx){
   const capNome=im.capo_nome||''
   const capCog=im.capo_cog||''
   return`<div class="imp-accordion">
-    <div class="imp-acc-header">
+    <div class="imp-acc-header" data-imp-idx="${idx}">
       <span class="imp-name">${isPrinc?'1️⃣ Principale – ':''+(idx+1)+'. '}${title}</span>
       <div class="imp-actions">
         ${!isPrinc?`<button class="btn-danger btn-sm" data-imp-remove="${idx}" title="Rimuovi">✕</button>`:''}
         <span style="color:#aaa;font-size:18px">▾</span>
       </div>
     </div>
-    <div class="imp-acc-body${idx===0?' open':''}">
+    <div class="imp-acc-body${idx===(S._impOpen==null?0:S._impOpen)?' open':''}">
       <div class="field">
         <label>Ragione sociale${isPrinc?' *':''}</label>
         <div style="display:flex;gap:8px;align-items:flex-start">
@@ -3191,7 +3197,11 @@ function impreseAccordionHTML(im,idx){
 
 $('btn-add-imp').onclick=()=>{
   S.imprese.push({impresa_id:'',impresa_nome:'',piva:'',cf_imp:'',ind_imp:'',com_imp:'',att:'',capo_nome:'',capo_cog:'',badge:'',pat:'',note_fasilav:'',tipo_imp:'',certif:[],ceiv:'',stage_imp:'',is_principale:false,nr_lav:0,nr_lav_str:0})
+  const _nuova=S.imprese.length-1
+  S._impOpen=_nuova
   renderImpreseAccordion()
+  const _in=$(`im-search-${_nuova}`)
+  if(_in){try{_in.scrollIntoView({behavior:'smooth',block:'center'})}catch(_e){};_in.focus({preventScroll:true})}
 }
 
 // Totali lavoratori/imprese calcolati dalle imprese inserite
@@ -4498,6 +4508,7 @@ function applySnap(snap){
   S.noteChk={...(snap.note_checklist||{})}
   S.lavorazioni=[...(snap.lavorazioni||[])]
   S.imprese=(snap.imprese||[]).map((im,i)=>({...im,is_principale:i===0}))
+  S._impOpen=0
   if(!S.imprese.length)S.imprese=[{impresa_id:'',impresa_nome:'',piva:'',cf_imp:'',ind_imp:'',com_imp:'',att:'',capo_nome:'',capo_cog:'',badge:'',pat:'',note_fasilav:'',tipo_imp:'',certif:[],ceiv:'',stage_imp:'',is_principale:true}]
 
   // ── Tab 0 – Dati visita ───────────────────────────────────────────────────
