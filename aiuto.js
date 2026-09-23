@@ -29,7 +29,8 @@
 
 window.AIUTO_TESTI = {
   /* ── menu ── */
-  'v:dashboard': 'Torna alla pagina iniziale: i tuoi contatori del mese, gli avvisi del coordinatore, i cantieri da rivedere e i pulsanti rapidi.',
+  'v:dashboard': 'Torna alla pagina iniziale: pulsanti rapidi, avvisi, il tuo obiettivo del mese e la mappa dei cantieri aperti con l\'IPC dell\'ultima visita.',
+  'v:statistiche': 'Contatori, grafici e tabelle delle visite (per esercizio, tecnico, IPC, comuni, imprese ricorrenti). Si calcolano quando apri la scheda.',
   'v:form': 'Apre un verbale nuovo. Dal telefono ti propone i cantieri vicino a te; il numero del verbale nasce dal giorno di apertura e non si assegna due volte.',
   'v:lista': 'L\'elenco dei tuoi verbali, bozze comprese. Da ogni riga apri la scheda, il PDF, la mail all\'impresa o una visita di ritorno.',
   'v:cantieri': 'Tutti i cantieri conosciuti, con stato e ultima visita. Da qui parte la mappa, il navigatore e il giro a tappe.',

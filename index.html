@@ -299,7 +299,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
   main{padding:8px}
   .riepilogo-grid{grid-template-columns:1fr}
   /* DASHBOARD: grafici impilati su una colonna */
-  #view-dashboard div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+  #view-dashboard div[style*="grid-template-columns:1fr 1fr"],#view-statistiche div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+  /* mappa della Dashboard: sul telefono alta quanto lo schermo lascia (23/09/2026) */
+  #dash-map{height:62vh!important;min-height:320px}
   .dash-row-2,.dash-row-3{grid-template-columns:1fr!important}
   /* pulsanti Segnala/Servizi compatti su una riga */
   /* Telefono (06/09/2026): tre pulsanti su una riga sola si tagliavano. Griglia a due
@@ -327,8 +329,11 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 .dash-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
 .dash-row-2>.card,.dash-row-3>.card{margin-bottom:0;min-width:0}
 .chbox{position:relative;width:100%}
-#view-dashboard .card h3{font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:#333;position:relative;padding-bottom:9px;margin-bottom:12px}
-#view-dashboard .card h3::after{content:"";position:absolute;left:0;bottom:0;width:52px;height:3px;background:var(--orange);border-radius:2px}
+#view-dashboard .card h3,#view-statistiche .card h3{font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:#333;position:relative;padding-bottom:9px;margin-bottom:12px}
+#dash-map-filters label{text-transform:none;letter-spacing:normal;font-size:12px;font-weight:500;color:#333;white-space:nowrap;margin:0}
+#dash-map-filters input[type=checkbox]{width:auto!important;min-width:0!important;margin:0!important;padding:0!important}
+#dash-map-filters select{width:auto!important}
+#view-dashboard .card h3::after,#view-statistiche .card h3::after{content:"";position:absolute;left:0;bottom:0;width:52px;height:3px;background:var(--orange);border-radius:2px}
 #dash-kpi{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 #dash-kpi .stat-card{text-align:left;display:flex;flex-direction:column;padding:12px 14px;border-left:4px solid var(--grey)}
 #dash-kpi .stat-card .lbl{order:-1;margin:0 0 6px;font-size:10.5px;letter-spacing:.4px}
@@ -456,6 +461,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="rubrica">📒 Rubrica</button>
     <button data-view="scadenze">⏰ Scadenze</button>
     <button data-view="incarichi" id="nav-incarichi">📋 Incarichi<span id="nav-inc-badge" style="display:none;background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px">0</span></button>
+    <button data-view="statistiche" id="nav-statistiche">📊 Statistiche</button>
     <button id="nav-assev" style="display:none;background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600" onclick="window.open('https://webapp-asseverazione.vercel.app/dashboard','_blank')">✅ Asseverazione</button>
     <button data-view="admin" id="nav-admin" style="display:none">🔐 Coordinatore</button>
     <button data-view="committenti" id="nav-committenti" style="display:none">👤 Committenti</button>
@@ -480,28 +486,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div id="dash-prop-chiusura" style="display:none;margin-bottom:14px"></div>
       
 
-            <!-- FILTRI DASHBOARD -->
-      <div class="card" id="dash-filtri" style="margin-bottom:14px">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
-          <div class="field"><label>Esercizio</label><select id="fd-eserc" style="font-size:13px"></select></div>
-          <div class="field"><label>Tecnico</label><select id="fd-tec" style="font-size:13px"></select></div>
-          <div class="field"><label>Tipo visita</label><select id="fd-tipo" style="font-size:13px"></select></div>
-          <div class="field"><label>Pericolosità (IPC)</label><select id="fd-ipc" style="font-size:13px"></select></div>
-        </div>
-        <div id="fd-count" style="text-align:right;font-size:12px;color:#888;margin-top:8px;font-style:italic"></div>
-      </div>
-      <!-- KPI -->
-      <div class="stats-grid" id="dash-kpi">
-        <div class="stat-card"><div class="num" id="k-sopr" style="color:var(--orange)">–</div><div class="lbl">Sopralluoghi</div></div>
-        <div class="stat-card"><div class="num" id="k-ncplus" style="color:var(--danger)">–</div><div class="pct" id="k-ncplus-pct" style="color:var(--danger)"></div><div class="lbl">NC+ totali</div></div>
-        <div class="stat-card"><div class="num" id="k-ncminus" style="color:#ED7D31">–</div><div class="lbl">NC- totali</div></div>
-        <div class="stat-card"><div class="num" id="k-oss" style="color:#D9A400">–</div><div class="lbl">Osservazioni</div></div>
-        <div class="stat-card"><div class="num" id="k-ver" style="color:#7AA527">–</div><div class="lbl">Verifiche conformi</div></div>
-        <div class="stat-card"><div class="num" id="k-ipcam" style="color:var(--warn)">–</div><div class="pct" id="k-ipcam-pct" style="color:var(--warn)"></div><div class="lbl">IPC Alto + Medio</div></div>
-        <div class="stat-card"><div class="num" id="k-rlst" style="color:#95C22F">–</div><div class="pct" id="k-rlst-pct" style="color:#95C22F"></div><div class="lbl">Affiancamento RLST</div></div>
-        <div class="stat-card"><div class="num" id="k-comuni" style="color:var(--grey)">–</div><div class="lbl">Comuni serviti</div></div>
-        <div class="stat-card"><div class="num" id="k-cant" style="color:var(--orange)">–</div><div class="lbl">Cantieri visitati</div></div>
-      </div>
       <div class="card" id="card-target-mese" style="display:none;margin-bottom:14px">
         <h3 style="margin-bottom:2px">🎯 Obiettivo mensile — <span id="tgt-tec-nome"></span> · <span id="tgt-mese-lbl" style="text-transform:capitalize"></span></h3>
         <div class="tgt-grid">
@@ -521,39 +505,12 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
         </div>
       </div>
-      <div class="dash-row-2">
-        <div class="card"><h3>Visite per esercizio (1 ott – 30 set)</h3><div class="chbox" style="height:240px"><canvas id="ch-esercizio"></canvas></div></div>
-        <div class="card"><h3>Attività mensile sopralluoghi</h3><div class="chbox" style="height:240px"><canvas id="ch-mesi"></canvas></div></div>
-      </div>
-      <div class="dash-row-3">
-        <div class="card"><h3>Sopralluoghi per tecnico</h3><div class="chbox" style="height:260px"><canvas id="ch-tecnico"></canvas></div></div>
-        <div class="card"><h3>Affiancamento con RLST</h3><div class="chbox" style="height:260px"><canvas id="ch-rlst"></canvas></div></div>
-        <div class="card"><h3>IPC — Indice di Pericolosità Cantiere</h3><div class="chbox" style="height:260px"><canvas id="ch-ipc"></canvas></div></div>
-      </div>
-      <div class="card"><h3>Produttività e qualità per tecnico</h3><div id="tbl-prod" style="overflow-x:auto"></div></div>
-      <div class="dash-row-2">
-        <div class="card"><h3>IPC per n° accesso al cantiere</h3><div class="chbox" style="height:240px"><canvas id="ch-accesso"></canvas></div></div>
-        <div class="card"><h3>NC+ / NC− / OSS per macroarea (10 aree) <span style="font-weight:400;font-size:11px;color:#999">· clic sui numeri per l'elenco cantieri</span></h3><div id="tbl-macro" style="overflow-x:auto;max-height:265px;overflow-y:auto"></div></div>
-      </div>
-      <div class="card"><h3>Imprese ricorrenti — cantieri da monitorare</h3><div id="tbl-imprese" style="overflow-x:auto"></div></div>
-      <div class="dash-row-2">
-        <div class="card"><h3>Ruolo impresa visitata</h3><div class="chbox" style="height:260px"><canvas id="ch-ruolo"></canvas></div></div>
-        <div class="card"><h3>Iscrizione Cassa Edile</h3><div class="chbox" style="height:260px"><canvas id="ch-ceiv"></canvas></div></div>
-      </div>
-      <div class="dash-row-2">
-        <div class="card"><h3>Tipologia di visita</h3><div class="chbox" style="height:260px"><canvas id="ch-tipovis"></canvas></div></div>
-        <div class="card"><h3>Top 20 comuni</h3><div id="tbl-comuni" style="overflow-x:auto;max-height:265px;overflow-y:auto"></div></div>
-      </div>
-      <div class="dash-row-3">
-        <div class="card"><h3>Tipo di intervento</h3><div class="chbox" style="height:220px"><canvas id="ch-tipint"></canvas></div></div>
-        <div class="card"><h3>Tipologia di opera</h3><div class="chbox" style="height:220px"><canvas id="ch-tipope"></canvas></div></div>
-        <div class="card"><h3>Importo dei lavori</h3><div class="chbox" style="height:220px"><canvas id="ch-importo"></canvas></div></div>
-      </div>
-<div class="card">
-        <h3>Mappa cantieri visitati &mdash; IPC ultima visita</h3>
+      <div class="card" id="dash-map-card">
+        <h3>🗺️ Cantieri in monitoraggio &mdash; IPC dell'ultima visita</h3>
+        <p id="dash-map-spiega" style="font-size:12.5px;color:#555;margin:-4px 0 8px;line-height:1.45">Ogni pallino è un <b>cantiere aperto</b>, colorato con l'IPC della sua <b>ultima visita</b>, chiunque l'abbia fatta: è la situazione attuale dei cantieri che tutti i tecnici stanno seguendo. I cantieri chiusi non compaiono. Tocca un pallino per verbale, data e tecnico.</p>
         <div id="dash-map-filters" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0 10px;font-size:12px"></div>
         <div id="dash-map" style="height:520px;width:100%;border-radius:8px;border:1px solid var(--line,#e3e3e6);position:relative;z-index:0;isolation:isolate"></div>
-        <div id="dash-map-note" style="font-size:11px;color:#999;margin-top:6px">I segnaposto con bordo tratteggiato sono al centro del comune (indirizzo non geolocalizzabile con precisione); gli altri sono geolocalizzati sull'indirizzo.</div>
+        <div id="dash-map-note" style="font-size:11px;color:#999;margin-top:6px">Bordo tratteggiato = posizione al centro del comune (indirizzo non geolocalizzabile con precisione); gli altri sono sull'indirizzo. Contatori, grafici e tabelle sono nella scheda <b>📊 Statistiche</b>.</div>
       </div>
     </section>
 
@@ -1125,6 +1082,64 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       </div>
       <div id="inc-list"></div>
       <div id="inc-vuoto" style="display:none;text-align:center;color:#aaa;padding:26px;font-size:13px" class="card">Nessun incarico con questi filtri.</div>
+    </section>
+
+    <!-- STATISTICHE (23/09/2026): contatori, grafici e tabelle usciti dalla Dashboard -->
+    <section id="view-statistiche" class="hidden">
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <h2 style="margin:0;font-size:18px;color:var(--orange)">📊 Statistiche delle visite</h2>
+        <span style="font-size:12px;color:#888">Si calcolano quando apri questa scheda; i filtri valgono per tutto quello che sta sotto.</span>
+      </div>
+      <!-- FILTRI STATISTICHE (ex Dashboard, 23/09/2026: gli id restano fd-*/k-*/ch-*) -->
+      <div class="card" id="dash-filtri" style="margin-bottom:14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div class="field"><label>Esercizio</label><select id="fd-eserc" style="font-size:13px"></select></div>
+          <div class="field"><label>Tecnico</label><select id="fd-tec" style="font-size:13px"></select></div>
+          <div class="field"><label>Tipo visita</label><select id="fd-tipo" style="font-size:13px"></select></div>
+          <div class="field"><label>Pericolosità (IPC)</label><select id="fd-ipc" style="font-size:13px"></select></div>
+        </div>
+        <div id="fd-count" style="text-align:right;font-size:12px;color:#888;margin-top:8px;font-style:italic"></div>
+      </div>
+      <!-- KPI -->
+      <div class="stats-grid" id="dash-kpi">
+        <div class="stat-card"><div class="num" id="k-sopr" style="color:var(--orange)">–</div><div class="lbl">Sopralluoghi</div></div>
+        <div class="stat-card"><div class="num" id="k-ncplus" style="color:var(--danger)">–</div><div class="pct" id="k-ncplus-pct" style="color:var(--danger)"></div><div class="lbl">NC+ totali</div></div>
+        <div class="stat-card"><div class="num" id="k-ncminus" style="color:#ED7D31">–</div><div class="lbl">NC- totali</div></div>
+        <div class="stat-card"><div class="num" id="k-oss" style="color:#D9A400">–</div><div class="lbl">Osservazioni</div></div>
+        <div class="stat-card"><div class="num" id="k-ver" style="color:#7AA527">–</div><div class="lbl">Verifiche conformi</div></div>
+        <div class="stat-card"><div class="num" id="k-ipcam" style="color:var(--warn)">–</div><div class="pct" id="k-ipcam-pct" style="color:var(--warn)"></div><div class="lbl">IPC Alto + Medio</div></div>
+        <div class="stat-card"><div class="num" id="k-rlst" style="color:#95C22F">–</div><div class="pct" id="k-rlst-pct" style="color:#95C22F"></div><div class="lbl">Affiancamento RLST</div></div>
+        <div class="stat-card"><div class="num" id="k-comuni" style="color:var(--grey)">–</div><div class="lbl">Comuni serviti</div></div>
+        <div class="stat-card"><div class="num" id="k-cant" style="color:var(--orange)">–</div><div class="lbl">Cantieri visitati</div></div>
+      </div>
+      <div class="dash-row-2">
+        <div class="card"><h3>Visite per esercizio (1 ott – 30 set)</h3><div class="chbox" style="height:240px"><canvas id="ch-esercizio"></canvas></div></div>
+        <div class="card"><h3>Attività mensile sopralluoghi</h3><div class="chbox" style="height:240px"><canvas id="ch-mesi"></canvas></div></div>
+      </div>
+      <div class="dash-row-3">
+        <div class="card"><h3>Sopralluoghi per tecnico</h3><div class="chbox" style="height:260px"><canvas id="ch-tecnico"></canvas></div></div>
+        <div class="card"><h3>Affiancamento con RLST</h3><div class="chbox" style="height:260px"><canvas id="ch-rlst"></canvas></div></div>
+        <div class="card"><h3>IPC — Indice di Pericolosità Cantiere</h3><div class="chbox" style="height:260px"><canvas id="ch-ipc"></canvas></div></div>
+      </div>
+      <div class="card"><h3>Produttività e qualità per tecnico</h3><div id="tbl-prod" style="overflow-x:auto"></div></div>
+      <div class="dash-row-2">
+        <div class="card"><h3>IPC per n° accesso al cantiere</h3><div class="chbox" style="height:240px"><canvas id="ch-accesso"></canvas></div></div>
+        <div class="card"><h3>NC+ / NC− / OSS per macroarea (10 aree) <span style="font-weight:400;font-size:11px;color:#999">· clic sui numeri per l'elenco cantieri</span></h3><div id="tbl-macro" style="overflow-x:auto;max-height:265px;overflow-y:auto"></div></div>
+      </div>
+      <div class="card"><h3>Imprese ricorrenti — cantieri da monitorare</h3><div id="tbl-imprese" style="overflow-x:auto"></div></div>
+      <div class="dash-row-2">
+        <div class="card"><h3>Ruolo impresa visitata</h3><div class="chbox" style="height:260px"><canvas id="ch-ruolo"></canvas></div></div>
+        <div class="card"><h3>Iscrizione Cassa Edile</h3><div class="chbox" style="height:260px"><canvas id="ch-ceiv"></canvas></div></div>
+      </div>
+      <div class="dash-row-2">
+        <div class="card"><h3>Tipologia di visita</h3><div class="chbox" style="height:260px"><canvas id="ch-tipovis"></canvas></div></div>
+        <div class="card"><h3>Top 20 comuni</h3><div id="tbl-comuni" style="overflow-x:auto;max-height:265px;overflow-y:auto"></div></div>
+      </div>
+      <div class="dash-row-3">
+        <div class="card"><h3>Tipo di intervento</h3><div class="chbox" style="height:220px"><canvas id="ch-tipint"></canvas></div></div>
+        <div class="card"><h3>Tipologia di opera</h3><div class="chbox" style="height:220px"><canvas id="ch-tipope"></canvas></div></div>
+        <div class="card"><h3>Importo dei lavori</h3><div class="chbox" style="height:220px"><canvas id="ch-importo"></canvas></div></div>
+      </div>
     </section>
 
     <section id="view-committenti" class="hidden">
@@ -2451,7 +2466,7 @@ function showScr(n){
 }
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
   if(view==='form'&&typeof incCaricaTendina==='function')incCaricaTendina().catch(e=>console.warn('incCaricaTendina:',e))
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
@@ -2463,6 +2478,7 @@ function navTo(view){
   if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
   if(view==='scadenze')loadScadenze().catch(e=>{console.error('loadScadenze:',e);toast('Errore scadenze: '+e.message,'err')})
   if(view==='incarichi'&&typeof loadIncarichi==='function')loadIncarichi().catch(e=>console.warn('loadIncarichi:',e))
+  if(view==='statistiche')loadStat().catch(e=>{console.error('loadStat:',e);toast('Errore caricamento statistiche: '+e.message,'err')})
   if(view==='admin'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
   if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e))}
   if(view==='committenti')admLoadCommittenti().catch(e=>console.error('committenti:',e))
@@ -5199,22 +5215,23 @@ let _dashRaw=null, _dashTecMap={}, _dashLite=null, _dashScopeAll=false
 
 function _esercizioDa(d){if(!d)return null;const y=+d.slice(0,4),m=+d.slice(5,7);const s=m>=10?y:y-1;return s+'/'+(s+1)}
 
+// Dashboard (23/09/2026): pulsanti, avvisi, obiettivo del mese e mappa dei cantieri
+// in monitoraggio. Contatori, grafici e tabelle sono nella scheda Statistiche (loadStat).
 async function loadDash(){
-  if($('fd-count'))$('fd-count').textContent='Caricamento dati…'
-  // mappa tecnici
-  const{data:tecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome')
-  _dashTecMap={}
-  ;(tecs||[]).forEach(t=>{_dashTecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()||t.tecnico_id})
-  // per il tecnico la card obiettivo va in alto: sotto gli avvisi, prima dei filtri
-  if(S.tecnico&&!window.__isCoord){
-    const _ct=$('card-target-mese'),_df=$('dash-filtri')
-    if(_ct&&_df&&_df.parentNode&&_ct.nextElementSibling!==_df)_df.parentNode.insertBefore(_ct,_df)
-  }
   // card obiettivo mensile (non blocca la dashboard se fallisce)
   loadTargetCard&&loadTargetCard().catch(e=>console.warn('loadTargetCard:',e))
   loadAvvisi&&loadAvvisi().catch(e=>console.warn('loadAvvisi:',e))
   loadIncarichi&&loadIncarichi().catch(e=>console.warn('loadIncarichi:',e))
   _incApertiCache=null
+  await loadDashMap()
+}
+
+async function loadStat(){
+  if($('fd-count'))$('fd-count').textContent='Caricamento dati…'
+  // mappa tecnici
+  const{data:tecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome')
+  _dashTecMap={}
+  ;(tecs||[]).forEach(t=>{_dashTecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()||t.tecnico_id})
   // fetch visite con cantiere + impresa principale (paginato).
   // Default: SOLO esercizio corrente per un avvio veloce; lo storico completo
   // viene scaricato solo quando l'utente lo richiede dal menu esercizio.
@@ -5259,7 +5276,6 @@ async function loadDash(){
   }
   _dashFillSelectors()
   applyDashFilters()
-  loadDashMap().catch(e=>console.error('loadDashMap:',e))
 }
 
 function _dashFillSelectors(){
@@ -5275,7 +5291,7 @@ function _dashFillSelectors(){
       if(!_dashScopeAll&&selE.value!==annoEdile().label){
         _dashScopeAll=true
         if($('fd-count'))$('fd-count').textContent='Caricamento storico completo…'
-        try{await loadDash()}catch(e){console.error('loadDash storico:',e);toast('Errore caricamento storico: '+e.message,'err')}
+        try{await loadStat()}catch(e){console.error('loadStat storico:',e);toast('Errore caricamento storico: '+e.message,'err')}
       }else applyDashFilters()
     }
   }
@@ -5531,10 +5547,11 @@ async function loadDashMap(){
   let data  // a blocchi (23/09/2026): 1.172 cantieri visitati, una lettura sola ne dava 1.000
   try{
     data=await sbTutte((da,a)=>sb.from('v_mappa_cantieri')
-      .select('cantiere_id,lat,lng,ipc,geocode_status,indirizzo,comune_nome,tecnico,data_visita,nr_verbale')
+      .select('cantiere_id,lat,lng,ipc,geocode_status,indirizzo,comune_nome,tecnico,data_visita,nr_verbale,cantiere_chiuso')
       .order('cantiere_id').order('nr_verbale').range(da,a))
   }catch(error){console.error('v_mappa_cantieri:',error);toast('Mappa: non sono riuscito a leggere i cantieri visitati','err');return}
-  const rows=(data||[]).filter(r=>r.lat!=null&&r.lng!=null)
+  // solo i cantieri aperti: e' la situazione dei cantieri in monitoraggio (23/09/2026)
+  const rows=(data||[]).filter(r=>r.lat!=null&&r.lng!=null&&!r.cantiere_chiuso)
   const order=['NR','BASSO','MEDIO','ALTO']
 
   if(!_dashMap){
@@ -8492,11 +8509,6 @@ function _meseRange(anno,mese){ // mese 1-12 → {da,a} inclusivi (YYYY-MM-DD)
 async function loadTargetCard(){
   const card=$('card-target-mese')
   if(!card)return
-  // per il tecnico (non coordinatore) la card va sopra i selettori della dashboard
-  if(S.tecnico&&!window.__isCoord){
-    const _df=$('dash-filtri')
-    if(_df&&_df.parentNode&&card.nextElementSibling!==_df)_df.parentNode.insertBefore(card,_df)
-  }
   const tec=S.tecnico
   if(!tec?.tecnico_id){card.style.display='none';return}
   const now=new Date()
@@ -13294,7 +13306,7 @@ document.addEventListener('input',function(ev){
 <script src="riepilogo-verbali.js?v=1"></script>
 <script src="scheda-impresa.js?v=1"></script>
 <script src="notifiche.js?v=3"></script>
-<script src="aiuto.js?v=4"></script>
+<script src="aiuto.js?v=5"></script>
 <script src="mail-respinte-tec.js?v=1"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
