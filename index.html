@@ -2060,12 +2060,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     </div>
     <div id="ev-campagna-wrap" style="display:none;margin-bottom:12px;padding:8px 10px;background:#fff3ee;border-radius:8px;font-size:12px">
       📣 Campagna attiva: <b id="ev-campagna-nome"></b><br>
-      Inserisci in: <select id="ev-campagna-pos" style="margin-top:4px;padding:3px 6px;border-radius:6px;border:1px solid #ddd;font-size:12px">
-        <option value="entrambi">verbale PDF + mail</option>
-        <option value="verbale">solo verbale PDF</option>
-        <option value="email">solo mail</option>
-        <option value="no">non inserire questa volta</option>
-      </select>
+      <span id="ev-campagna-dove" style="color:#666"></span>
+      <input type="hidden" id="ev-campagna-pos">
     </div>
     <div class="field" style="margin-bottom:14px">
       <label>Oggetto email</label>
@@ -7157,7 +7153,7 @@ function _evAnteprima(){
       '[Riquadro «Com\'è andata la visita?» con il pulsante «Valuta la visita →»]')
   }
   const cw=$('ev-campagna-wrap')
-  if(!r&&cw&&cw.style.display!=='none')righe.push('','[Campagna informativa attiva: '+($('ev-campagna-nome')?.textContent||'')+' — dove va lo decide la tendina qui sopra]')
+  if(!r&&cw&&cw.style.display!=='none')righe.push('','[Campagna informativa attiva: '+($('ev-campagna-nome')?.textContent||'')+' — '+($('ev-campagna-dove')?.textContent||'')+']')
   righe.push('','Renato Squizzato','Area Sicurezza e Salute | FORMEDIL PADOVA','Via Basilicata 10 – 35127 Padova (PD)','email: cpt@formedilpadova.it','Tel. 049 - 761168 (int.4)','URL: www.formedilpadova.it',
     '[Pulsante «I nostri servizi →»]','','In allegato: il verbale in PDF.')
   el.value=righe.join('\n')
@@ -7299,7 +7295,11 @@ async function _evSetupCampagna(){
   if(!c){wrap.style.display='none';return}
   $('ev-campagna-nome').textContent=c.titolo||''
   $('ev-campagna-pos').value=c.posizione||'verbale'
+  /* dove e se: lo decidono segreteria e coordinatore sulla campagna, il tecnico lo vede (23/09/2026) */
+  const _dove={entrambi:'nel verbale PDF e nella mail',verbale:'solo nel verbale PDF',email:'solo nella mail',no:'non inserita in questo invio'}[c.posizione||'verbale']||'nel verbale PDF'
+  $('ev-campagna-dove').textContent='Inserita '+_dove+' — lo decidono segreteria e coordinatore.'
   wrap.style.display='block'
+  if(typeof _evAnteprima==='function')_evAnteprima()
 }
 async function _evCampagnaPayload(){
   const wrap=$('ev-campagna-wrap')
