@@ -122,6 +122,13 @@ async function iscrivi(sb: SB, chi: { email: string; tecnico_id: string | null }
   } catch { return json({ error: "chiavi dell'iscrizione non valide" }, 400) }
   const dispositivo = DISPOSITIVI.includes(d.dispositivo) ? d.dispositivo : 'altro'
 
+  // 23/09/2026 — Il browser dice PERCHÉ si iscrive e da dove: è il dato che mancava per
+  // capire le iscrizioni che rinascono. Se ricorda il suo indirizzo precedente
+  // (localStorage), quella riga si toglie: un browser, una riga.
+  const diag = diagnostica(d)
+  const precedente = typeof d.precedente === 'string' && d.precedente !== endpoint ? d.precedente.slice(0, 1000) : null
+  if (precedente) await sb.from('push_iscrizioni').delete().eq('endpoint', precedente).eq('email', chi.email)
+
   const { data: mie } = await sb.from('push_iscrizioni').select('id, endpoint').eq('email', chi.email).order('id')
   const gia = (mie || []).some((r) => r.endpoint === endpoint)
   if (!gia && (mie || []).length >= MAX_TELEFONI) {
@@ -130,10 +137,36 @@ async function iscrivi(sb: SB, chi: { email: string; tecnico_id: string | null }
   }
   // lo stesso telefono passato a un altro account: l'iscrizione segue chi e' entrato adesso
   const { error } = await sb.from('push_iscrizioni').upsert(
-    { email: chi.email, tecnico_id: chi.tecnico_id, endpoint, p256dh, auth, dispositivo, errori: 0 },
+    { email: chi.email, tecnico_id: chi.tecnico_id, endpoint, p256dh, auth, dispositivo, errori: 0,
+      ...diag, sostituisce: precedente, aggiornata_il: new Date().toISOString() },
     { onConflict: 'endpoint' })
   if (error) return json({ error: 'iscrizione non salvata: ' + error.message }, 500)
-  return json({ ok: true })
+  return json({ ok: true, sostituita: !!precedente })
+}
+
+const MOTIVI = ['attiva', 'ripresa-dati-persi', 'ripresa-iscrizione-persa', 'rinnovo', 'cambio']
+function diagnostica(d: Record<string, any>) {
+  const testo = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/[^\x20-\x7e]/g, ' ').slice(0, max) : null)
+  return {
+    motivo: MOTIVI.includes(d.motivo) ? d.motivo : null,
+    origine: testo(d.origine, 300),
+    installata: typeof d.installata === 'boolean' ? d.installata : null,
+    persistente: typeof d.persistente === 'boolean' ? d.persistente : null,
+    user_agent: testo(d.user_agent, 300),
+  }
+}
+
+/* «cambio»: il browser ha sostituito da solo la sottoscrizione (evento pushsubscriptionchange
+   del service worker) e non ha la sessione per dirlo con l'accesso. Può farlo solo chi conosce
+   l'indirizzo VECCHIO, che sta soltanto in quel browser e nel database: la riga vecchia dà
+   l'email, la nuova la eredita, la vecchia sparisce. Senza riga vecchia non si scrive niente. */
+async function cambio(sb: SB, d: Record<string, any>) {
+  const vecchio = typeof d.vecchio_endpoint === 'string' ? d.vecchio_endpoint.slice(0, 1000) : ''
+  if (!vecchio) return json({ error: 'manca l\'indirizzo precedente' }, 400)
+  const { data: riga } = await sb.from('push_iscrizioni').select('email, tecnico_id').eq('endpoint', vecchio).maybeSingle()
+  if (!riga) return json({ error: 'indirizzo precedente sconosciuto' }, 404)
+  const chi = { email: riga.email as string, tecnico_id: (riga.tecnico_id as string) || null }
+  return await iscrivi(sb, chi, { ...d, motivo: 'cambio', precedente: vecchio })
 }
 
 async function cancella(sb: SB, chi: { email: string }, d: Record<string, any>) {
@@ -250,6 +283,10 @@ Deno.serve(async (req: Request) => {
       await sb.from('push_iscrizioni').update({ ultima_ricezione_il: new Date().toISOString(), ultima_ricezione_esito: esito }).eq('endpoint', endpoint)
       return json({ ok: true })
     }
+
+    /* cambio di sottoscrizione deciso dal browser (service worker, senza sessione): vale
+       solo per un indirizzo precedente già noto — stessa regola della ricevuta. */
+    if (d.azione === 'cambio') return await cambio(sb, d)
 
     const chi = await chiChiama(sb, req)
     if (!chi) return json({ error: 'accesso non valido' }, 401)

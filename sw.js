@@ -55,6 +55,41 @@ async function ricevuta(esito, err) {
   } catch (e) { /* la ricevuta è un di più */ }
 }
 
+// 23/09/2026 — Quando è il BROWSER a cambiare la sottoscrizione (scadenza, rotazione
+// del servizio di notifica, reinstallazione del service worker) manda questo evento,
+// che finora nessuno ascoltava: la sottoscrizione nuova restava sconosciuta al server
+// finché la pagina non veniva riaperta, e intanto le notifiche andavano a un indirizzo
+// morto. Qui ci si riscrive con la stessa chiave e si dice al server «cambio», con
+// l'indirizzo vecchio: la riga vecchia viene sostituita, non aggiunta.
+self.addEventListener('pushsubscriptionchange', (e) => {
+  e.waitUntil((async () => {
+    const vecchia = e.oldSubscription;
+    let chiave = vecchia && vecchia.options && vecchia.options.applicationServerKey;
+    if (!chiave) {
+      const j = await fetch(FUNZIONE).then((r) => r.json()).catch(() => ({}));
+      if (!j.chiave) return;
+      chiave = daB64u(j.chiave);
+    }
+    const nuova = e.newSubscription || await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chiave });
+    await fetch(FUNZIONE, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        azione: 'cambio',
+        vecchio_endpoint: vecchia ? vecchia.endpoint : '',
+        iscrizione: nuova.toJSON(),
+        dispositivo: /Android/.test(self.navigator.userAgent || '') ? 'android' : /iPhone|iPad/.test(self.navigator.userAgent || '') ? 'iphone' : 'computer',
+        origine: self.registration.scope,
+        user_agent: String(self.navigator.userAgent || '').slice(0, 300),
+      }),
+    }).catch(() => {});
+  })());
+});
+function daB64u(t) {
+  let s = String(t).replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+}
+
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const scope = self.registration.scope;

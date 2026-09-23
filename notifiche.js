@@ -95,12 +95,42 @@
      coppie in un giorno). Chi arriva secondo aspetta la prima e ne prende
      il risultato. */
   let iscrizioneInCorso = null;
-  function sottoscrivi() {
-    if (!iscrizioneInCorso) iscrizioneInCorso = sottoscriviDavvero().finally(() => { iscrizioneInCorso = null; });
+  function sottoscrivi(motivo) {
+    if (!iscrizioneInCorso) iscrizioneInCorso = sottoscriviDavvero(motivo || 'attiva').finally(() => { iscrizioneInCorso = null; });
     return iscrizioneInCorso;
   }
 
-  async function sottoscriviDavvero() {
+  /* ⚠️ 23/09/2026 - Le iscrizioni RINASCONO: 9 righe in 5 giorni per un solo
+     account, e la correzione del 18/09 nascondeva il sintomo senza dire la
+     causa. Da oggi ogni iscrizione porta al server PERCHÉ nasce e da dove
+     (motivo, pagina, app installata o browser, storage persistente, browser),
+     e l'indirizzo precedente di questo browser, così la riga vecchia viene
+     sostituita invece di accumularsi. Si chiede anche lo storage persistente:
+     senza, Android può cancellare i dati del sito quando lo spazio scarseggia,
+     e con i dati se ne va la sottoscrizione. */
+  const CHIAVE_ENDPOINT = 'visite.notifiche.endpoint';
+  const CHIAVE_FLAG = 'visite.notifiche.attivateUnaVolta';
+  const leggi = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const scrivi = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} };
+
+  async function datiDiagnostici(motivo) {
+    let persistente = null;
+    try {
+      if (navigator.storage && navigator.storage.persist) {
+        persistente = await navigator.storage.persist();   /* chiede; se già concesso torna true */
+      }
+    } catch (e) { persistente = null; }
+    return {
+      motivo,
+      origine: location.origin + location.pathname,
+      installata,
+      persistente,
+      user_agent: String(ua).slice(0, 300),
+      precedente: leggi(CHIAVE_ENDPOINT) || undefined,
+    };
+  }
+
+  async function sottoscriviDavvero(motivo) {
     const reg = registrazione || await navigator.serviceWorker.ready;
     let iscr = await reg.pushManager.getSubscription();
     if (!iscr) {
@@ -109,12 +139,15 @@
       iscr = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: daB64u(j.chiave) });
     }
     try {
-      await chiama({ azione: 'iscrivi', iscrizione: iscr.toJSON(), dispositivo });
+      const diag = await datiDiagnostici(motivo);
+      if (diag.precedente === iscr.endpoint) delete diag.precedente;
+      await chiama(Object.assign({ azione: 'iscrivi', iscrizione: iscr.toJSON(), dispositivo }, diag));
     } catch (e) {
       await iscr.unsubscribe().catch(() => {});
       throw e;
     }
-    try { localStorage.setItem('visite.notifiche.attivateUnaVolta', '1'); } catch (e) {}
+    scrivi(CHIAVE_FLAG, '1');
+    scrivi(CHIAVE_ENDPOINT, iscr.endpoint);
     return iscr;
   }
 
@@ -122,10 +155,15 @@
      Sul telefono dell'utente il riquadro tornava a chiedere «Attiva» a ogni
      apertura: il browser perde la sottoscrizione (dati del sito ripuliti,
      service worker reinstallato) mentre il permesso resta concesso. Se il
-     permesso c'è, non si chiede niente: ci si riscrive in silenzio. */
+     permesso c'è, non si chiede niente: ci si riscrive in silenzio.
+     23/09: e si dice al server QUALE dei due casi è. Se il localStorage è
+     vuoto il telefono ha cancellato i dati del sito; se è pieno e manca
+     solo la sottoscrizione, è sparita lei sola (service worker, servizio
+     di notifica): due cause diverse, due rimedi diversi. */
   async function riprendiInSilenzio() {
     if (!supportate || Notification.permission !== 'granted') return null;
-    try { return await sottoscrivi(); }
+    const motivo = leggi(CHIAVE_FLAG) === '1' ? 'ripresa-iscrizione-persa' : 'ripresa-dati-persi';
+    try { return await sottoscrivi(motivo); }
     catch (e) { console.warn('[notifiche] riscrizione in silenzio:', e.message || e); return null; }
   }
 
@@ -134,7 +172,7 @@
     try {
       const permesso = await Notification.requestPermission();
       if (permesso !== 'granted') { avviso('Permesso non concesso: le notifiche restano spente su questo dispositivo.', 'err'); return; }
-      await sottoscrivi();
+      await sottoscrivi('attiva');
       avviso('Notifiche attive su questo dispositivo. Prova con «Mandami una prova».', 'ok');
     } catch (e) {
       avviso('Notifiche non attivate: ' + (e.message || e), 'err');
@@ -152,7 +190,7 @@
         await chiama({ azione: 'cancella', endpoint: iscr.endpoint }).catch(() => {});
         await iscr.unsubscribe();
       }
-      try { localStorage.removeItem('visite.notifiche.attivateUnaVolta'); } catch (e) {}
+      scrivi(CHIAVE_FLAG, null); scrivi(CHIAVE_ENDPOINT, null);   /* spente di proposito: non è il telefono che ha fatto pulizia */
       avviso('Notifiche spente su questo dispositivo.', 'ok');
     } catch (e) { avviso('Non riuscito: ' + (e.message || e), 'err'); } finally { btn.disabled = false; disegna().catch(() => {}); }
   }
@@ -195,7 +233,12 @@
   async function riallinea(iscr) {
     if (riallineata || !iscr) return;
     riallineata = true;
-    try { await chiama({ azione: 'iscrivi', iscrizione: iscr.toJSON(), dispositivo }); } catch (e) { console.warn('[notifiche] riallineamento:', e.message || e); }
+    try {
+      const diag = await datiDiagnostici('rinnovo');
+      if (diag.precedente === iscr.endpoint) delete diag.precedente;
+      await chiama(Object.assign({ azione: 'iscrivi', iscrizione: iscr.toJSON(), dispositivo }, diag));
+      scrivi(CHIAVE_ENDPOINT, iscr.endpoint);
+    } catch (e) { console.warn('[notifiche] riallineamento:', e.message || e); }
   }
 
   async function disegna() {
