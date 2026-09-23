@@ -11188,6 +11188,7 @@ async function showVisitaDetail(vid){
       sb.from('visite').select(`
         visita_id,nr_verbale,data_visita,ora_visita,ora_fine,ipc,ipc_nc_plus,ipc_nc_minus,ipc_oss,stato,
         tipo_accesso,acc_cant,nr_lavoratori,nr_lavoratori_stranieri,prescrizioni,oss_tec,
+        oss_tec_int,note_for_sn,note_for_m,segnalazione,data_ritorno,
         comm_tipo_sogg,comm_titolo,comm_nome,comm_cog,comm_cf,comm_piva,comm_rag_soc,comm_email,comm_tel,
         tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),
         cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,prot_int),
@@ -11276,6 +11277,15 @@ async function showVisitaDetail(vid){
 
     if(v.prescrizioni?.trim()) html+=qdSec('Prescrizioni')+`<div class="qd-note">${esc(v.prescrizioni)}</div>`
     if(v.oss_tec?.trim()) html+=qdSec('Note tecnico')+`<div class="qd-note" style="border-color:#3498db;background:#f4f8ff">${esc(v.oss_tec)}</div>`
+    // ── NON NEL REPORT (23/09/2026): cio' che il tecnico ha scritto per l'ufficio ──
+    {
+      const _int=[]
+      if(v.oss_tec_int?.trim())_int.push(`<div style="margin-bottom:6px"><b>Osservazioni interne</b><div style="white-space:pre-wrap">${esc(v.oss_tec_int)}</div></div>`)
+      if(v.note_for_sn===true||v.note_for_m?.trim())_int.push(`<div style="margin-bottom:6px"><b>Formazione mancante</b>${v.note_for_sn===true?' — da segnalare all\'ufficio corsi':''}${v.note_for_m?.trim()?`<div style="white-space:pre-wrap">${esc(v.note_for_m)}</div>`:''}</div>`)
+      if(v.segnalazione===true)_int.push(`<div style="margin-bottom:6px"><b>Proposta di segnalazione a SPISAL / ITL</b></div>`)
+      if(v.data_ritorno)_int.push(`<div><b>Visita di ritorno prevista:</b> ${fmtDate(String(v.data_ritorno).slice(0,10))}</div>`)
+      if(_int.length)html+=qdSec('🔒 Solo per l\'ufficio (non nel report)')+`<div class="qd-note" style="border-color:#f39c12;background:#fffef5">${_int.join('')}</div>`
+    }
     $('qd-body').innerHTML=html
     const acts=[
       `<button class="btn-primary btn-sm" onclick="chiediNuovaVisitaRitorno('${vid}','${(v.nr_verbale||'').replace(/'/g,'')}')">➕ Nuova visita di ritorno</button>`,
