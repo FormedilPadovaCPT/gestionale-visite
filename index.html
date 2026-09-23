@@ -476,6 +476,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div id="dash-stage-sr" style="display:none;margin-bottom:14px"></div>
       <!-- i verbali la cui mail e' tornata indietro (mail-respinte-tec.js, 21/09/2026) -->
       <div id="dash-respinte" style="display:none;margin-bottom:14px"></div>
+      <!-- cantieri che un tecnico propone di chiudere: lo vede la segreteria (proposte-chiusura.js, 23/09/2026) -->
+      <div id="dash-prop-chiusura" style="display:none;margin-bottom:14px"></div>
       
 
             <!-- FILTRI DASHBOARD -->
@@ -2433,7 +2435,7 @@ function navTo(view){
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
   if(view==='dashboard')loadAutorizzazioni().catch(e=>console.warn('autorizzazioni:',e))
-  if(view==='dashboard'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.notificheBox)window.notificheBox().catch(e=>console.warn('notifiche:',e));if(window.respinteBox)window.respinteBox().catch(e=>console.warn('mail respinte:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))}
+  if(view==='dashboard'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.notificheBox)window.notificheBox().catch(e=>console.warn('notifiche:',e));if(window.respinteBox)window.respinteBox().catch(e=>console.warn('mail respinte:',e));if(window.propChius)window.propChius.box().catch(e=>console.warn('proposte chiusura:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))}
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
@@ -6089,10 +6091,14 @@ async function loadCantieri(q=''){
     list.forEach((d,i)=>{const a=2*Math.PI*i/list.length;d._mlat=+d.lat+R*Math.cos(a);d._mlng=+d.lng+R*Math.sin(a)/Math.cos(d.lat*Math.PI/180)})
   })
   _cmRows=rows.filter(r=>!r._segn&&r.lat!=null&&r.lng!=null)  // per «Aggancia a cantiere» delle segnalazioni
+  // proposte di chiusura aperte (23/09/2026)
+  try{if(window.propChius){const _pm=await window.propChius.aperte();rows.forEach(r=>{r._prop=_pm.get(r.cantiere_id)||null})}}
+  catch(e){console.warn('proposte chiusura:',e);toast('Non sono riuscito a leggere le proposte di chiusura','warn')}
   _clRows=rows
   _clBuildFilters(rows)
   _clRender()
 }
+window.loadCantieri=loadCantieri
 function _clPass(d){
   const s=_clState
   if(d._segn)return !(s.comSel.size||s.ope||s.imp||s.sca||s.vis||s.orig==='cnce')
@@ -6200,6 +6206,7 @@ function _clRender(){
       <td><div class="tbl-actions">
         <button class="btn-outline btn-sm" data-act="detail-cantiere" data-id="${c.cantiere_id}" title="Visualizza dettaglio">👁</button>
         <button class="btn-primary btn-sm" data-cant-id="${c.cantiere_id}" data-cant-label="${label}" data-cant-detail="${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}${c.comune_nome?' – '+c.comune_nome:''}">+ Visita</button>
+        ${window.propChius?window.propChius.cellaRiga(c):''}
       </div></td>
     </tr>`
   }).join('')+(all.length>_shown?`<tr><td colspan="8" style="text-align:center;padding:12px"><button class="btn-outline btn-sm" id="btn-cant-more" type="button">Mostra tutti i ${all.length} cantieri (altri ${all.length-_shown})</button></td></tr>`:'')
@@ -11490,6 +11497,8 @@ async function showCantiereDetail(cantId){
         const _bc=document.createElement('button');_bc.className='btn-warn btn-sm';_bc.style.marginLeft='8px';_bc.textContent='🔒 Chiudi cantiere (fine lavori)';_bc.onclick=()=>chiudiCantiere(cantId,label);$('qd-actions').appendChild(_bc)
       }
     }
+    // proposta di chiusura: il tecnico la fa, la segreteria la vede e la respinge (23/09/2026)
+    if(window.propChius)window.propChius.scheda(cantId,label,!!c.cantiere_chiuso).catch(e=>console.warn('proposta chiusura:',e))
   }catch(e){
     console.error('showCantiereDetail:',e)
     $('qd-body').innerHTML=`<div style="color:#c0392b;padding:12px">Errore: ${esc(e.message)}</div>`
@@ -11509,6 +11518,7 @@ async function chiudiCantiere(cantId,label){
     if(typeof loadScadenze==='function'&&!$('view-scadenze')?.classList.contains('hidden'))loadScadenze()
   }catch(e){toast('Errore: '+(e.message||e),'err')}
 }
+window.chiudiCantiere=chiudiCantiere
 async function riapriCantiere(cantId,label){
   if(!confirm('Riaprire il cantiere "'+(label||cantId)+'"?\nLe visite collegate verranno riaperte.'))return
   try{
@@ -13156,8 +13166,10 @@ document.addEventListener('input',function(ev){
 <script src="riepilogo-verbali.js?v=1"></script>
 <script src="scheda-impresa.js?v=1"></script>
 <script src="notifiche.js?v=3"></script>
-<script src="aiuto.js?v=1"></script>
+<script src="aiuto.js?v=2"></script>
 <script src="mail-respinte-tec.js?v=1"></script>
+<!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
+<script src="proposte-chiusura.js?v=1"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

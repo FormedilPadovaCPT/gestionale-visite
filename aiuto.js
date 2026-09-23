@@ -88,6 +88,11 @@ window.AIUTO_TESTI = {
   't:riapri': 'Riporta il verbale a bozza per correggerlo. Solo la segreteria può farlo su un verbale definitivo.',
   't:chiudi cantiere (fine lavori)': 'Segna il cantiere come finito: sparisce dalle scadenze e dai cantieri attivi. Le visite fatte restano.',
   'p:chiudi cantiere': 'Segna il cantiere come finito: sparisce dalle scadenze e dai cantieri attivi. Le visite fatte restano.',
+  /* proposta di chiusura (proposte-chiusura.js, 23/09/2026) */
+  't:proponi chiusura': 'Dici alla segreteria che il cantiere è finito, con due parole sul perché. Non chiude niente: decide la segreteria, e fino ad allora il cantiere resta attivo.',
+  't:proponi chiusura alla segreteria': 'Dici alla segreteria che il cantiere è finito, con due parole sul perché. Non chiude niente: decide la segreteria, e fino ad allora il cantiere resta attivo.',
+  't:respingi la proposta': 'Il cantiere resta aperto. Ti chiede il motivo, che resta scritto accanto alla proposta per chi l\'ha fatta.',
+  't:apri scheda': 'Apre la scheda del cantiere: dati, visite fatte e pulsanti per una nuova visita.',
   'btn-mc-geo-gps': 'Prende la posizione dal GPS del dispositivo e la mette sul cantiere: fallo quando sei sul posto.',
   'btn-mc-geo-auto': 'Azzera la posizione: l\'app la ricalcola dall\'indirizzo scritto.',
   'btn-mc-geo-open': 'Apre la posizione in Google Maps per controllarla.',
