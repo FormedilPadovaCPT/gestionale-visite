@@ -1737,6 +1737,22 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <h3>🏢 Nuova impresa</h3>
     <div class="sect-title">Dati anagrafici</div>
     <div class="field"><label>Ragione sociale *</label><input type="text" id="mi-nome" placeholder="Ragione sociale…"></div>
+    <div class="field"><label>Forma giuridica / tipologia</label>
+      <select id="mi-forma">
+        <option value="">— ricavala dalla ragione sociale —</option>
+        <option>S.r.l.</option>
+        <option>S.r.l.s</option>
+        <option>S.r.l. Unipersonale</option>
+        <option>S.n.c.</option>
+        <option>S.A.S.</option>
+        <option>S.p.A.</option>
+        <option>S.coop.</option>
+        <option>Consorzio</option>
+        <option>Ditta Individuale</option>
+        <option>Lavoratore autonomo</option>
+        <option>Altro</option>
+      </select>
+    </div>
     <div class="row">
       <div class="field"><label>Partita IVA</label><input type="text" id="mi-piva" placeholder="IT…"></div>
       <div class="field"><label>Codice fiscale *</label><input type="text" id="mi-cf" placeholder="CF… (identificativo impresa)" style="border-color:var(--orange);text-transform:uppercase"></div>
@@ -3096,7 +3112,7 @@ function renderImpreseAccordion(){
       // pre-compila ragione sociale dal testo cercato
       const searchVal=$(`im-search-${_modalImpIdx}`)?.value||''
       const nomeEl=$('mi-nome');if(nomeEl)nomeEl.value=searchVal
-      ;['mi-piva','mi-cf','mi-ind','mi-com','mi-email','mi-email2','mi-email3','mi-tel','mi-tel2','mi-badge','mi-pat','mi-ceiv','mi-tipo-ccia','mi-ccnl','mi-ccnl-altro'].forEach(id=>{const el=$(id);if(el)el.value=''})
+      ;['mi-piva','mi-cf','mi-ind','mi-com','mi-email','mi-email2','mi-email3','mi-tel','mi-tel2','mi-badge','mi-pat','mi-ceiv','mi-tipo-ccia','mi-ccnl','mi-ccnl-altro','mi-forma'].forEach(id=>{const el=$(id);if(el)el.value=''})
       ;[1,2,3,4,5].forEach(c=>{const el=$(`mi-cert-${c}`);if(el)el.checked=false})
       const stageNo=document.querySelector('input[name="mi-stage"][value="no"]');if(stageNo)stageNo.checked=true
       const ccnlWrap=$('mi-ccnl-altro-wrap');if(ccnlWrap)ccnlWrap.classList.add('hidden')
@@ -3797,6 +3813,7 @@ $('btn-mi-save').onclick=async()=>{
     impresa_telefono2:vGet('mi-tel2').trim()||null,
     cassa_edile:vGet('mi-ceiv')||null,
     tipo_iscrizione_ccia:vGet('mi-tipo-ccia')||null,
+    tipo_impresa:vGet('mi-forma')||null,   // vuoto = la ricava il trigger dalla ragione sociale
     contratto_ccnl:ccnlVal==='13'?'13':ccnlVal,
     contratto_ccnl_altro:ccnlVal==='13'?vGet('mi-ccnl-altro').trim()||null:null,
     elimina:0
