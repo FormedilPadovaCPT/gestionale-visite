@@ -2053,7 +2053,11 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <h3 id="email-verbale-title" style="margin-bottom:10px;color:var(--grey);font-size:15px">📧 Invia verbale</h3>
     <p style="font-size:12px;color:#666;margin-bottom:14px">Il PDF del verbale sarà generato e inviato automaticamente da <strong>cptpd@did.formedilpadova.it</strong> ai seguenti destinatari.</p>
     <div id="email-verbale-rett" class="hidden" style="background:#fdece4;border:1px solid var(--orange);border-radius:6px;padding:8px 12px;margin-bottom:14px;font-size:12px;color:#8a3b12"></div>
-    <div id="email-verbale-list" style="margin-bottom:14px;max-height:220px;overflow-y:auto"></div>
+    <div id="email-verbale-list" style="margin-bottom:8px;max-height:220px;overflow-y:auto"></div>
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <input type="email" id="ev-extra" placeholder="Aggiungi un altro indirizzo email…" style="flex:1;min-width:0" autocomplete="off">
+      <button type="button" class="btn-outline btn-sm" id="btn-ev-extra" style="white-space:nowrap">+ Aggiungi</button>
+    </div>
     <div id="ev-campagna-wrap" style="display:none;margin-bottom:12px;padding:8px 10px;background:#fff3ee;border-radius:8px;font-size:12px">
       📣 Campagna attiva: <b id="ev-campagna-nome"></b><br>
       Inserisci in: <select id="ev-campagna-pos" style="margin-top:4px;padding:3px 6px;border-radius:6px;border:1px solid #ddd;font-size:12px">
@@ -2068,8 +2072,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <input type="text" id="email-verbale-oggetto" placeholder="Verbale sopralluogo…">
     </div>
     <div class="field" style="margin-bottom:14px">
-      <label>Testo della comunicazione <span style="font-weight:400;font-size:11px;color:#aaa">(modificabile prima dell'invio)</span></label>
-      <textarea id="email-verbale-testo" rows="12" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:12px;resize:vertical;line-height:1.5" placeholder="Spett.le impresa…"></textarea>
+      <label>Testo della comunicazione <span style="font-weight:400;font-size:11px;color:#aaa">(anteprima: è il testo standard dell'ente e non si modifica)</span></label>
+      <textarea id="email-verbale-testo" rows="12" readonly style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:12px;resize:vertical;line-height:1.5;background:#f8f8f8;color:#444" placeholder="Spett.le impresa…"></textarea>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center">
       <span id="email-verbale-status" style="font-size:12px;color:var(--grey);flex:1"></span>
@@ -5905,6 +5909,8 @@ async function loadLista(){
   })
   _listaSortInd()
   if(q){const ql=q.toLowerCase();vs=vs.filter(v=>v.nr_verbale?.toLowerCase().includes(ql)||v.cantieri?.cantiere_indirizzo?.toLowerCase().includes(ql)||v.cantieri?.cantiere_etichetta?.toLowerCase().includes(ql)||v.imprese?.impresa_nome?.toLowerCase().includes(ql))}
+  try{await _caricaInvii(vs.map(v=>v.visita_id))}
+  catch(e){console.warn('stato invii:',e);_invMap={};toast('Non sono riuscito a leggere quali verbali sono stati inviati','warn')}
   const tbody=$('tbody-lista')
   if(!vs.length){tbody.innerHTML='';show('lista-empty')}
   else{hide('lista-empty');tbody.innerHTML=vs.map(v=>vtRow(v)).join('');bindRowActions()}
@@ -5982,7 +5988,7 @@ function vtRow(v){
     <td>${cant}</td><td>${v.imprese?.impresa_nome||'-'}</td>
     <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
     ${_lcCell(v)}
-    <td><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span></td>
+    <td><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span>${_invCell(v)}</td>
     <td><div class="tbl-actions">${actions}</div></td>
   </tr>`
 }
@@ -7119,7 +7125,74 @@ function _evRenderList(){
       ${(e.alt&&e.alt.length>1)
         ?`<select onchange="window._evEmails[${i}].email=this.value" title="Questo contatto ha più email: scegli a quale inviare" style="color:var(--orange);font-size:12px;max-width:240px;border:1px solid #f0d9cc;border-radius:6px;padding:2px 4px;background:#fffaf7">${e.alt.map(a=>`<option value="${esc(a)}"${a===e.email?' selected':''}>${esc(a)}</option>`).join('')}</select>`
         :`<span style="color:var(--orange);font-size:12px">${esc(e.email)}</span>`}
+      ${e.extra?`<button type="button" class="btn-outline btn-sm" onclick="window._evTogli(${i})" title="Togli questo indirizzo" style="padding:2px 8px">✕</button>`:''}
     </div>`).join('')
+}
+/* Anteprima del testo che parte davvero: e' la copia di quello composto dalla
+   funzione send-verbale (supabase/functions/send-verbale/index.ts). Se cambia
+   il testo la', va cambiato anche qui. (23/09/2026) */
+function _evAnteprima(){
+  const el=$('email-verbale-testo');if(!el)return
+  const c=window._evContext||{},r=window._evRettifica
+  const due=!!(c.tecnico&&c.tecnico2)
+  const cant=[c.cantIndirizzo,c.comune].filter(Boolean).join(' – ')||c.comune||c.cantiere||''
+  const righe=[`Spett.le impresa${c.impresa?'\n'+c.impresa:''}`,'',`Prevenzione Infortuni${r?' – RETTIFICA VERBALE':''}`,'',
+    'Alla cortese attenzione del','Responsabile del Servizio di Prevenzione e Protezione','e/o del','Coordinatore per la Sicurezza','']
+  if(cant)righe.push('Cantiere di '+cant,'')
+  if(r){
+    righe.push(`Con la presente Vi comunichiamo che il verbale ${c.nr_verbale?'n. '+c.nr_verbale+' ':''}relativo alla visita effettuata${c.dataVisita?' il '+c.dataVisita:''} nel cantiere in oggetto, già trasmesso${r.dataPrimoInvio?' in data '+r.dataPrimoInvio:''}, è stato rettificato.`,'')
+    if((r.modifiche||[]).length)righe.push('Modifiche apportate:',...r.modifiche.map(m=>'• '+m),'')
+    if(r.note)righe.push('Note: '+r.note,'')
+    righe.push('Vi trasmettiamo in allegato il verbale rettificato, che sostituisce integralmente quello precedentemente inviato, da ritenersi privo di validità.','',
+      'Ci scusiamo per l\'inconveniente e rimaniamo a disposizione per ogni eventuale chiarimento.','','Distinti saluti.')
+  }else{
+    const nomi=due?`, ${c.tecnico} e ${c.tecnico2}`:(c.tecnico?`, ${c.tecnico}`:'')
+    righe.push(`${c.dataVisita?'Il giorno '+c.dataVisita+' '+(due?'sono passati':'è passato'):(due?'Sono passati':'È passato')} nel vostro cantiere in oggetto, per fornirvi utili consigli in materia di prevenzione infortuni, ${due?'i nostri tecnici':'uno dei nostri tecnici'}${nomi}.`,'',
+      `${due?'Essi si sono soffermati':'Egli si è soffermato'} ad illustrare al Vostro personale in cantiere le più importanti norme che devono essere tenute presenti per garantire la sicurezza durante le varie fasi lavorative, con particolare riferimento a quelle in corso.`,'',
+      'In base a quanto previsto dalle norme che regolano il funzionamento dello scrivente Comitato Paritetico Territoriale, potrà essere effettuata entro breve termine una successiva visita, per constatare che i consigli forniti siano stati correttamente attuati.','',
+      `Vi trasmettiamo in allegato il rapporto di visita redatto ${due?'dai nostri Tecnici':'dal nostro Tecnico'} in cantiere.`,'',
+      'Evidenziamo che la consulenza che è stata resa alla Vostra impresa è per Voi totalmente gratuita, grazie al contributo versato da imprese e lavoratori iscritti a C.E.I.V.','',
+      'L\'iscrizione a C.E.I.V. offre molti altri vantaggi, come ad esempio la possibilità di accedere alla formazione obbligatoria ex D.Lgs 81/2008, che Formedil Padova offre a tariffe agevolate.','',
+      'Rimanendo a disposizione per ogni eventuale chiarimento porgiamo distinti saluti.','',
+      '[Riquadro «Com\'è andata la visita?» con il pulsante «Valuta la visita →»]')
+  }
+  const cw=$('ev-campagna-wrap')
+  if(!r&&cw&&cw.style.display!=='none')righe.push('','[Campagna informativa attiva: '+($('ev-campagna-nome')?.textContent||'')+' — dove va lo decide la tendina qui sopra]')
+  righe.push('','Renato Squizzato','Area Sicurezza e Salute | FORMEDIL PADOVA','Via Basilicata 10 – 35127 Padova (PD)','email: cpt@formedilpadova.it','Tel. 049 - 761168 (int.4)','URL: www.formedilpadova.it',
+    '[Pulsante «I nostri servizi →»]','','In allegato: il verbale in PDF.')
+  el.value=righe.join('\n')
+}
+/* indirizzi aggiunti a mano, oltre alle figure del verbale (23/09/2026) */
+function _evExtraReset(){const i=$('ev-extra');if(i)i.value=''}
+function _evAggiungi(){
+  const i=$('ev-extra');if(!i)return
+  const em=i.value.trim().toLowerCase()
+  if(!em)return
+  if(!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(em)){toast('Indirizzo non valido: controlla com\'è scritto','warn');i.focus();return}
+  const list=window._evEmails||(window._evEmails=[])
+  if(list.some(e=>String(e.email||'').trim().toLowerCase()===em)){toast('Questo indirizzo è già fra i destinatari','warn');return}
+  list.push({ruolo:'Aggiunto',nome:'Indirizzo aggiunto a mano',email:em,extra:true})
+  i.value='';_evRenderList();i.focus()
+}
+window._evTogli=function(idx){const l=window._evEmails||[];if(l[idx]&&l[idx].extra){l.splice(idx,1);_evRenderList()}}
+/* stato dell'invio nell'elenco Visite (23/09/2026) */
+let _invMap={}
+async function _caricaInvii(ids){
+  const m={}
+  for(let i=0;i<ids.length;i+=200){
+    const{data,error}=await sb.from('verbali').select('visita_id,inviato_at').eq('inviato_email',true).in('visita_id',ids.slice(i,i+200)).order('inviato_at',{ascending:false}).limit(1000)
+    if(error)throw error
+    ;(data||[]).forEach(r=>{if(!m[r.visita_id])m[r.visita_id]=r.inviato_at})
+  }
+  _invMap=m
+}
+const _FINE_MODULO_GOOGLE='2026-09-30'   // fino a qui i verbali partivano col modulo Google
+function _invCell(v){
+  if(+v.elimina===1||(v.stato||'bozza')==='bozza')return ''
+  const at=_invMap[v.visita_id]
+  if(at){const d=new Date(at);return `<div style="font-size:10px;color:#2e7d32;margin-top:3px;white-space:nowrap" title="Inviato dal gestionale il ${d.toLocaleString('it-IT')}">📧 inviato il ${d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'})}</div>`}
+  if(String(v.data_visita||'')<=_FINE_MODULO_GOOGLE)return `<div style="font-size:10px;color:#2e7d32;margin-top:3px;white-space:nowrap" title="Visita fino al 30/09/2026: il verbale è partito col modulo Google">📧 inviato</div>`
+  return `<div style="font-size:10px;color:#c0392b;margin-top:3px;white-space:nowrap;font-weight:600" title="Verbale definitivo non ancora inviato all'impresa: usa il pulsante 📧">✉️ da inviare</div>`
 }
 async function _evArricchisciAlt(emails){
   try{
@@ -7453,7 +7526,7 @@ Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle per
   btnInvia.disabled=false; btnInvia.textContent='📤 Invia ora'
   const evStatus=$('email-verbale-status')
   evStatus.textContent=''; evStatus.style.color=''
-  _evSetupCampagna();show('modal-email-verbale')
+  _evSetupCampagna();_evAnteprima();_evExtraReset();show('modal-email-verbale')
 }
 
 // ── RETTIFICA VERBALE GIÀ INVIATO ──
@@ -7605,7 +7678,7 @@ URL: www.formedilpadova.it`
   btnInvia.disabled=false;btnInvia.textContent='📤 Invia ora'
   const evStatus=$('email-verbale-status')
   evStatus.textContent='';evStatus.style.color=''
-  show('modal-email-verbale')
+  _evAnteprima();_evExtraReset();show('modal-email-verbale')
 }
 
 // ── EMAIL VERBALE ──
@@ -7719,10 +7792,12 @@ Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle per
   const evStatus=$('email-verbale-status')
   evStatus.textContent=''
   evStatus.style.color=''
-  _evSetupCampagna();show('modal-email-verbale')
+  _evSetupCampagna();_evAnteprima();_evExtraReset();show('modal-email-verbale')
 }
 
 $('btn-email-verbale').onclick=inviEmailVerbale
+$('btn-ev-extra').onclick=_evAggiungi
+$('ev-extra').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_evAggiungi()}}
 $('btn-ev-close').onclick=()=>{hide('modal-email-verbale');window._evRettifica=null;_setEvModalRett(false)}
 $('btn-ev-invia').onclick=async()=>{
   const emails=window._evEmails||[]
@@ -7839,6 +7914,7 @@ $('btn-ev-invia').onclick=async()=>{
     window._evRettifica=null
     _setEvModalRett(false)
     setTimeout(()=>hide('modal-email-verbale'), 2000)
+    if(!$('view-lista')?.classList.contains('hidden'))loadLista().catch(()=>{})
 
   }catch(e){
     const msg=e.name==='AbortError'?'Timeout invio email: riprovare':e.message
@@ -13216,7 +13292,7 @@ document.addEventListener('input',function(ev){
 <script src="riepilogo-verbali.js?v=1"></script>
 <script src="scheda-impresa.js?v=1"></script>
 <script src="notifiche.js?v=3"></script>
-<script src="aiuto.js?v=3"></script>
+<script src="aiuto.js?v=4"></script>
 <script src="mail-respinte-tec.js?v=1"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>

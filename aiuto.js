@@ -74,6 +74,7 @@ window.AIUTO_TESTI = {
   'btn-next': 'Va al passo successivo. I campi obbligatori mancanti vengono segnalati.',
   'btn-rett-si': 'Rimanda all\'impresa il verbale corretto, segnando che è una rettifica del precedente.',
   'btn-rett-no': 'Salva la correzione senza rimandare niente all\'impresa.',
+  'btn-ev-extra': 'Aggiunge ai destinatari un indirizzo che non è fra le figure del verbale. Parte insieme agli altri; lo togli con ✕ prima dell\'invio.',
   'btn-ev-invia': 'Manda adesso la mail con il verbale.',
 
   /* ── visite e cantieri ── */
