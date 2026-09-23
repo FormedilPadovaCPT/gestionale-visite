@@ -98,17 +98,47 @@
       const scelto = prompt('Codice univoco proposto per questo cantiere' + (imp ? '' : ' (manca l\'impresa principale: sceglila prima per avere anche la sigla)')
         + ':\niniziali del tecnico - strada e civico - sigla dell\'impresa.\n\nCorreggilo se serve, poi OK per salvarlo sul cantiere.', proposto);
       if (scelto === null || !scelto.trim()) return;
-      const finale = scelto.trim().slice(0, 50);
-      /* solo se è ancora vuoto: non si scrive sopra al codice di un collega */
-      const { data: agg, error: e2 } = await window.sb.from('cantieri').update({ nodo_id: finale })
-        .eq('cantiere_id', cid).or('nodo_id.is.null,nodo_id.eq.').select('nodo_id');
-      if (e2) throw e2;
-      if (!agg || !agg.length) { avviso('Nel frattempo il cantiere ha ricevuto un codice: ricaricalo.', 'warn'); return; }
-      $('f-cod-uni').value = finale;
-      if (window.S && window.S.fd) window.S.fd.cod_uni = finale;
-      avviso('Codice univoco salvato sul cantiere: ' + finale, 'ok');
+      await salvaSulCantiere(cid, scelto);
     } catch (e) { avviso('Codice non salvato: ' + (e.message || e), 'err'); }
   }
+
+  /* salva sul cantiere, solo se è ancora vuoto: non si scrive sopra al codice di un collega */
+  async function salvaSulCantiere(cid, codice) {
+    const finale = String(codice || '').trim().slice(0, 50);
+    if (!finale) return false;
+    const { data: agg, error } = await window.sb.from('cantieri').update({ nodo_id: finale })
+      .eq('cantiere_id', cid).or('nodo_id.is.null,nodo_id.eq.').select('nodo_id');
+    if (error) throw error;
+    if (!agg || !agg.length) { avviso('Nel frattempo il cantiere ha ricevuto un codice: ricaricalo.', 'warn'); return false; }
+    $('f-cod-uni').value = finale;
+    if (window.S && window.S.fd) window.S.fd.cod_uni = finale;
+    avviso('Codice univoco salvato sul cantiere: ' + finale, 'ok');
+    return true;
+  }
+
+  /* Scritto a mano nel verbale (23/09/2026, chiesto dall'utente: «oltre a
+     proponi posso anche inserire direttamente»): uscendo dalla casella si
+     salva sul cantiere, con le stesse cautele di «Proponi». */
+  async function scrittoAMano() {
+    const campo = $('f-cod-uni');
+    const cid = $('f-cant-id') && $('f-cant-id').value;
+    const val = campo.value.trim();
+    if (!cid) { if (val) { campo.value = ''; avviso('Scegli prima il cantiere: il codice univoco è del cantiere.', 'warn'); } return; }
+    try {
+      const { data: c, error } = await window.sb.from('cantieri').select('nodo_id').eq('cantiere_id', cid).maybeSingle();
+      if (error) throw error;
+      const attuale = String((c && c.nodo_id) || '').trim();
+      if (attuale) {
+        if (val !== attuale) { campo.value = attuale; avviso('Il cantiere ha già il codice ' + attuale + ': si cambia da «✏️ Modifica cantiere».', 'warn'); }
+        return;
+      }
+      if (!val) return;
+      const usato = await libero(val, cid);
+      if (usato !== val && !confirm(`Il codice «${val}» c'è già su un altro cantiere.\n\nSalvarlo lo stesso? (Annulla per correggerlo)`)) { campo.focus(); return; }
+      await salvaSulCantiere(cid, val);
+    } catch (e) { avviso('Codice non salvato: ' + (e.message || e), 'err'); }
+  }
+  document.addEventListener('change', (e) => { if (e.target && e.target.id === 'f-cod-uni') scrittoAMano(); });
 
   /* Nella scheda del cantiere: propone nel campo, si salva col cantiere */
   async function daScheda() {

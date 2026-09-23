@@ -711,7 +711,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <label>Comune</label>
             <input type="text" id="f-cant-comune" placeholder="Es. Padova, Abano Terme…" autocomplete="off">
           </div>
-          <div class="field" style="flex:1 1 300px">
+          <div class="field" style="flex:0 1 620px">
             <label>Indirizzo cantiere (anche parziale)</label>
             <div class="autocomplete-wrap">
               <input type="text" id="f-cant-search" placeholder="Es. via Roma — doppio click = tutti i cantieri attivi" autocomplete="off">
@@ -730,13 +730,13 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
           </div>
           <div class="row" style="margin-top:12px">
-            <div class="field"><label>Accesso cantiere n° (dal DB cantiere)</label><input type="text" id="f-acc-cant2" placeholder="Codice accesso interno" readonly style="background:#f8f8f8"></div>
+            <div class="field" style="flex:0 1 420px"><label>Accesso cantiere n° (dal DB cantiere)</label><input type="text" id="f-acc-cant2" placeholder="Codice accesso interno" readonly style="background:#f8f8f8"></div>
             <div class="field"><label>Protocollo interno <span style="font-weight:400;font-size:11px;color:#aaa">(n° richiesta)</span></label><div style="display:flex;gap:6px"><input type="text" id="f-prot-int" placeholder="Prot. richiesta" style="flex:1;min-width:0"><select id="f-prot-inc" title="Scegli fra i tuoi incarichi aperti" style="flex:1.4;min-width:0;display:none"></select></div><div id="f-prot-msg" style="font-size:11px;margin-top:3px"></div></div>
           </div>
           <div class="row">
             <div class="field" style="flex:0 1 260px"><label>Codice CNCE <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="text" id="f-cnce" placeholder="–" readonly style="background:#f8f8f8"></div>
-            <div class="field" style="flex:0 1 440px"><label>Codice univoco <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="f-cod-uni" placeholder="–" readonly style="background:#f8f8f8;flex:1 1 120px;min-width:0"><button type="button" class="btn-outline btn-sm" id="btn-cod-uni-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
-            <div class="field" style="flex:0 0 230px"><label>Data ultimazione lavori <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="date" id="f-data-ult" readonly style="background:#f8f8f8"></div>
+            <div class="field" style="flex:0 1 440px"><label>Codice univoco <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="f-cod-uni" placeholder="Scrivilo o premi Proponi" maxlength="50" style="flex:1 1 120px;min-width:0"><button type="button" class="btn-outline btn-sm" id="btn-cod-uni-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
+            <div class="field" style="flex:0 1 380px"><label style="white-space:nowrap">Data ultimazione lavori <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="date" id="f-data-ult" readonly style="background:#f8f8f8"></div>
           </div>
           <div class="sect-title">Committente</div>
           <!-- 1. Tipologia (prima scelta) -->
@@ -13204,7 +13204,7 @@ document.addEventListener('input',function(ev){
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
-<script src="codice-univoco.js?v=1"></script>
+<script src="codice-univoco.js?v=2"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
