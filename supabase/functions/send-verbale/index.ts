@@ -324,12 +324,18 @@ serve(async (req) => {
           <span style="color:#888;font-size:11px">Organismo Accreditato Regione Veneto per la formazione L.R. n. 19 del 09.08.02 cod. AO119 per i servizi al lavoro codice L236</span>
         </p>
       </td>
-      <td width="120" style="vertical-align:top;text-align:center">
-        <a href="https://formedilpadovacpt.github.io/servizi/#" style="text-decoration:none">
+      <td width="150" style="vertical-align:top;text-align:center">
+        <a href="https://formedilpadovacpt.github.io/servizi/" style="text-decoration:none">
           <img src="https://image.jimcdn.com/app/cms/image/transf/dimension=488x10000:format=png/path/s49ae6d7152f6f900/image/i5c7a83ad82ccbf42/version/1760964835/image.png" width="110" alt="QR Servizi Formedil Padova CPT" style="display:block;margin:0 auto 6px">
           <span style="font-size:9px;color:#e7500f;font-weight:bold;text-transform:uppercase;letter-spacing:.5px">FORMEDIL PADOVA · CPT</span><br>
           <span style="font-size:8px;color:#888">I NOSTRI SERVIZI</span>
         </a>
+        <!-- 23/09/2026, chiesto dall'utente: il QR da telefono non si inquadra, serve un pulsante vero.
+             Stessa forma di «Valuta la visita»: rilievo col bordo inferiore, niente ombre (Outlook). -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto 0"><tr>
+          <td align="center" bgcolor="#e7500f" style="background:#e7500f;border-radius:6px;border-bottom:3px solid #a83a0b">
+          <a href="https://formedilpadovacpt.github.io/servizi/" style="display:inline-block;padding:8px 12px;color:#ffffff;font-size:12px;font-weight:bold;text-decoration:none;white-space:nowrap">I nostri servizi &rarr;</a>
+        </td></tr></table>
       </td>
     </tr>
     </table>
