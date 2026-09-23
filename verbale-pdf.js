@@ -171,6 +171,7 @@
 
     return {
       dataOggi, rettBanner: D.rettBanner || null,
+      bozza: (v.stato || 'bozza') === 'bozza',   // 23/09/2026: il PDF della bozza lo dice su ogni pagina
       impNome: (impPrinc && impPrinc.imprese && impPrinc.imprese.impresa_nome) || (v.imprese && v.imprese.impresa_nome) || '',
       cantDetail: [cantLabel, comune].filter(Boolean).join(' – '),
       dataVisita: fmtDate(v.data_visita) || '–',
@@ -587,8 +588,21 @@
       doc.text(i === 1 ? 'Formedil Padova · Area Sicurezza e Salute' : `Verbale ${d.nrVerbale} · ${d.dataVisita}`, S.L, PH - 9)
       doc.text(`Pagina ${i} di ${n}`, S.R, PH - 9, { align: 'right' })
       if (i === n) { f(doc, 'normal', 6.5, [180, 180, 180]); doc.text(`Generato il ${new Date().toLocaleString('it-IT')} – Formedil Padova CPT`, 105, PH - 9, { align: 'center' }) }
+      if (d.bozza) filigranaBozza(doc)
     }
     doc.setPage(n)
+  }
+
+  /* BOZZA in diagonale, trasparente, e una riga in testa (23/09/2026): una bozza
+     stampata non deve poter passare per un verbale definitivo */
+  function filigranaBozza(doc) {
+    const trasparente = typeof doc.GState === 'function' && typeof doc.setGState === 'function'
+    if (trasparente) doc.setGState(new doc.GState({ opacity: 0.13 }))
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(96); doc.setTextColor(...(trasparente ? [192, 57, 43] : [245, 215, 205]))
+    doc.text('BOZZA', 105, PH / 2 + 20, { align: 'center', angle: 40 })
+    if (trasparente) doc.setGState(new doc.GState({ opacity: 1 }))
+    f(doc, 'bold', 8, [192, 57, 43])
+    doc.text('BOZZA — non valido come verbale: il documento definitivo è quello salvato come «Definitivo»', 105, 6, { align: 'center' })
   }
 
   /* img = { logo, qr, foto: [{tipo, uri}], firme: [uri|null, uri|null], campagna } — tutti facoltativi */

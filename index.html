@@ -7989,6 +7989,7 @@ async function riapriBozza(vid){
     // 3) Carica nel form — il visita_id nel snap garantisce UPDATE invece di INSERT
     await initForm(snap)
     navTo('form')
+    if(S.savedId)show('btn-pdf')   // il PDF della bozza si puo' fare subito (23/09/2026)
     toast(`Bozza ${snap.nr_verbale_origine||''} riaperta — completa e salva come Definitivo`,'ok')
   }catch(e){toast('Errore apertura bozza: '+e.message,'err');console.error(e)}
 }
@@ -8241,10 +8242,11 @@ async function genPDF(vid, output='save'){
     const _tecPdf=_slugPdf([v.tecnici?.tecnico_nome,v.tecnici?.tecnico_cognome].filter(Boolean).join(' '))
     const _dPdf=v.data_visita?new Date(v.data_visita+'T00:00:00'):null
     const _dataFPdf=_dPdf&&!isNaN(_dPdf)?`${String(_dPdf.getDate()).padStart(2,'0')}-${String(_dPdf.getMonth()+1).padStart(2,'0')}-${_dPdf.getFullYear()}`:''
-    const _pdfName=[`Verb_${_codePdf}`,_ragPdf,_comPdf,_tecPdf,_dataFPdf].filter(Boolean).join(' - ')+'.pdf'
+    const _isBozzaPdf=(v.stato||'bozza')==='bozza'
+    const _pdfName=(_isBozzaPdf?'BOZZA - ':'')+[`Verb_${_codePdf}`,_ragPdf,_comPdf,_tecPdf,_dataFPdf].filter(Boolean).join(' - ')+'.pdf'
     doc.save(_pdfName)
-    toast('PDF generato','ok')
-    _uploadPdfDrive(pdfB64)   // upload in background
+    toast(_isBozzaPdf?'PDF della bozza generato (con la scritta BOZZA, non archiviato su Drive)':'PDF generato','ok')
+    if(!_isBozzaPdf)_uploadPdfDrive(pdfB64)   // upload in background; la bozza non va nell'archivio (23/09/2026)
   }catch(e){toast('Errore PDF: '+e.message,'err');console.error(e)}
   finally{_pdfInProgress=false}
 }
@@ -13301,7 +13303,7 @@ document.addEventListener('input',function(ev){
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
-<script src="verbale-pdf.js?v=1"></script>
+<script src="verbale-pdf.js?v=2"></script>
 <!-- mappa sul telefono: cantieri vicino a te (Nuova visita) e rientri sulla mappa (Scadenze) -->
 <script src="mappa.js?v=1"></script>
 </body>
