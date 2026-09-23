@@ -2394,6 +2394,7 @@ async function onLogin(user){
   if(navAsv)navAsv.style.display=ASSEV_EMAILS.includes(_uem)?'':'none'
   await loadVoci()
   showScr('app')
+  await aggiungiTecniciDalDb()
   populateTecnicoSelect()
   populateComuniSelect()
   loadFirmeCache()
@@ -4639,6 +4640,22 @@ async function getOrCreateTecnicoId(t){
     data=nt
   }
   return data?.tecnico_id||''
+}
+/* I tecnici attivi del database che TECNICI_LIST (app-data.js, scritto a mano)
+   non conosce ancora: si aggiungono in coda (23/09/2026, Barellas, Cuccato e
+   Simonetto non comparivano). Fuori i dipendenti d'ufficio e l'account di prova. */
+async function aggiungiTecniciDalDb(){
+  try{
+    const{data,error}=await sb.from('tecnici').select('tecnico_nome,tecnico_cognome,titolo,email,dipendente')
+      .eq('attivo',true).eq('elimina',0).not('email','is',null).order('tecnico_cognome')
+    if(error)throw error
+    ;(data||[]).forEach(t=>{
+      const em=String(t.email||'').trim().toLowerCase()
+      if(!em||t.dipendente===true||em.startsWith('prova.'))return
+      if(TECNICI_LIST.some(x=>String(x.email||'').toLowerCase()===em))return
+      TECNICI_LIST.push({nome:[t.titolo,t.tecnico_nome,t.tecnico_cognome].map(x=>String(x||'').trim()).filter(Boolean).join(' ')||t.email,email:t.email})
+    })
+  }catch(e){console.warn('tecnici dal database:',e);toast('Tendina tecnici: non sono riuscito a leggere i tecnici nuovi, compaiono solo quelli storici','warn')}
 }
 function populateTecnicoSelect(){
   const sel=$('f-tec-select'); if(!sel)return
