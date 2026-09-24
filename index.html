@@ -192,6 +192,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 .tgt-bar{position:relative;height:14px;border-radius:7px;background:#eceef0;overflow:hidden}
 .tgt-bar-fill{height:100%;width:0%;border-radius:7px;transition:width .4s ease}
 .tgt-bar-mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:#565c66;opacity:.55}
+/* menu IPC della mappa in Dashboard: niente triangolino nativo (Safari/iPhone) */
+#dash-map-ipc>summary::-webkit-details-marker{display:none}
+#dash-map-ipc label:hover{background:#f5f5f7}
 .tgt-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:8px}
 @media(max-width:720px){.tgt-grid{grid-template-columns:1fr}}
 .save-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:2px solid var(--border)}
@@ -5574,25 +5577,45 @@ async function loadDashMap(){
   // Stato filtri e dati per il re-render (IPC + tecnico)
   _dashMapRows=rows
   _dashMapOrder=order
-  _dashMapIpcOn={NR:true,BASSO:true,MEDIO:true,ALTO:true}
+  // la scelta dei livelli IPC resta quando si torna in Dashboard, come tecnico e comune (24/09/2026)
   _dashMapTec=$('dash-map-tec')?.value||''
   _dashMapCom=$('dash-map-com')?.value||''
   renderDashMapMarkers()
   setTimeout(()=>_dashMap.invalidateSize(),200)
 
-  // ── Barra filtri: IPC (checkbox) + Tecnico (menu a tendina) ──
+  // ── Barra filtri: IPC + Tecnico + Comune, tutti a tendina ──
+  // IPC in un menu (24/09/2026, chiesto dall'utente: le quattro pillole occupavano
+  // una riga intera sul telefono). Dentro restano le caselle col pallino colorato:
+  // si possono scegliere piu' livelli insieme e il menu fa ancora da legenda.
   const fdiv=$('dash-map-filters');if(fdiv){fdiv.innerHTML=''
-    order.forEach(k=>{
+    const det=document.createElement('details')
+    det.id='dash-map-ipc';det.style.cssText='position:relative'
+    det.innerHTML='<summary style="list-style:none;display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:4px 10px;border:1px solid var(--line,#e3e3e6);border-radius:20px;background:#fff;user-select:none" title="Scegli quali livelli di IPC vedere sulla mappa">🎯 IPC: <b id="dash-map-ipc-txt">tutti</b> ▾</summary>'
+      +'<div style="position:absolute;top:calc(100% + 4px);left:0;z-index:1000;background:#fff;border:1px solid var(--line,#e3e3e6);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.15);padding:6px 4px;min-width:190px"></div>'
+    const pan=det.querySelector('div')
+    const aggiornaTxt=()=>{
+      const on=order.filter(k=>_dashMapIpcOn[k])
+      $('dash-map-ipc-txt').textContent=on.length===order.length?'tutti':on.length?on.slice().reverse().map(k=>_DM_IPC[k].label).join(', '):'nessuno'
+    }
+    order.slice().reverse().forEach(k=>{  // dal piu' grave: Alto, Medio, Basso, Nessun rilievo
       const n=rows.filter(d=>(_DM_IPC[d.ipc]?d.ipc:'NR')===k).length
       const lab=document.createElement('label')
-      lab.style.cssText='display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:3px 9px;border:1px solid var(--line,#e3e3e6);border-radius:20px'
-      lab.innerHTML='<input type="checkbox" checked style="margin:0"> <span style="width:12px;height:12px;border-radius:50%;background:'+_DM_IPC[k].color+';border:2px solid #fff;box-shadow:0 0 0 1px #999"></span> '+_DM_IPC[k].label+' ('+n+')'
+      lab.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 10px;border-radius:6px;white-space:nowrap'
+      lab.innerHTML='<input type="checkbox" '+(_dashMapIpcOn[k]?'checked':'')+' style="margin:0"> <span style="width:12px;height:12px;border-radius:50%;background:'+_DM_IPC[k].color+';border:2px solid #fff;box-shadow:0 0 0 1px #999;flex:0 0 auto"></span> '+_DM_IPC[k].label+' <span style="color:#888;margin-left:auto">('+n+')</span>'
       lab.querySelector('input').addEventListener('change',e=>{
         _dashMapIpcOn[k]=e.target.checked
+        aggiornaTxt()
         renderDashMapMarkers(false)
       })
-      fdiv.appendChild(lab)
+      pan.appendChild(lab)
     })
+    fdiv.appendChild(det)
+    aggiornaTxt()
+    // si chiude toccando fuori, come un menu vero
+    if(!window._dashMapIpcFuori){
+      window._dashMapIpcFuori=true
+      document.addEventListener('click',e=>{const d=$('dash-map-ipc');if(d&&d.open&&!d.contains(e.target))d.open=false})
+    }
     // Menu tecnico e comune (23/09/2026: con etichetta, prima il tecnico non si notava)
     const _q=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')
     const _conta=k=>{const m={};rows.forEach(d=>{const v=d[k];if(v)m[v]=(m[v]||0)+1});return m}
