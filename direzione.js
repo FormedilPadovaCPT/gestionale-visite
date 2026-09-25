@@ -556,5 +556,18 @@
     });
   }
 
+  /* sul telefono la pagina si allargava (25/09/2026, visto dal Direttore): i testi
+     delle questioni portano nomi di file lunghi senza spazi, che non vanno a capo e
+     spingono la riga oltre lo schermo. Qui si spezzano, e i riquadri non escono. */
+  (function stileDirezione() {
+    const st = document.createElement('style');
+    st.textContent = '#view-direzione,#adm-decisioni{max-width:100%;overflow-x:hidden}'
+      + '#dir-autorizzazioni,#dir-critici,#dir-decisioni,#adm-decisioni,#dir-finestra{overflow-wrap:anywhere;word-break:break-word}'
+      + '#dir-decisioni .card>div,#adm-decisioni .card>div,#dir-critici .card>div{max-width:100%}'
+      + '#dir-decisioni [style*="flex:1"],#adm-decisioni [style*="flex:1"],#dir-critici [style*="flex:1"]{min-width:0!important}'
+      + '#dir-decisioni details,#adm-decisioni details{max-width:100%;overflow:hidden}';
+    document.head.appendChild(st);
+  })();
+
   window.direzione = { carica, badge, zonaCoord, decisioniBox, obiettivi, kpiCeiv, apriCritico };
 })();
