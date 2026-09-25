@@ -46,6 +46,18 @@ body.viewer-mode #btn-diniego-dash{display:none!important}
 .chips-tipi{display:flex;flex-wrap:wrap;gap:6px}.chips-tipi label{display:inline-flex;align-items:center;gap:6px;margin:0;padding:6px 10px;border:1px solid #ddd;border-radius:18px;font-size:12.5px;font-weight:500;text-transform:none;letter-spacing:0;color:#333;background:#fff;cursor:pointer}.chips-tipi label:has(input:checked){border-color:#e7500f;background:#fff3ec;color:#b33a00}.chips-tipi input{width:auto!important;min-width:0!important;margin:0!important}
 /* sola lettura (Direzione e Consiglio, 25/09/2026): niente riquadri per tecnico; restano Segnala un cantiere, QR e Servizi CPT (chiesto dall'utente) */
 body.viewer-mode #btn-dove-sono,body.viewer-mode #btn-appunti,body.viewer-mode #dash-appunti-card,body.viewer-mode #card-target-mese,body.viewer-mode #dash-notifiche,body.viewer-mode #fld-fd-tec,body.viewer-mode #card-ch-tecnico,body.viewer-mode #card-tbl-prod{display:none!important}
+/* 26/09/2026: chi è di sola lettura non carica firme (la sua è già caricata) */
+body.viewer-mode #btn-firme{display:none!important}
+/* sul telefono l'intestazione non deve schiacciare il logo (26/09/2026: usciva una targhetta bianca illeggibile) */
+@media(max-width:600px){
+  .header-logo-box{flex-shrink:0;max-width:none;padding:3px 8px;height:44px}
+  .header-logo{height:32px}
+  .user-area{gap:5px;min-width:0}
+  .user-area button{padding:4px 7px;font-size:11px}
+  #btn-firme{display:none!important}
+  #lbl-user{max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  body.viewer-mode #lbl-user{display:none}
+}
 #view-direzione h2{margin:0 0 4px;font-size:18px;color:var(--orange)}
 #nav-dir-badge{background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px}
 #view-admin #adm-decisioni .card{color:#222;text-align:left}#view-admin #adm-decisioni .card h3{color:#565c66}
@@ -2455,7 +2467,9 @@ async function onLogin(user){
     // Direttore e Presidenza li dice il database, non la carica scritta a mano (25/09/2026)
     S.direttore=false;S.presidenza=false
     try{const[_d,_p]=await Promise.all([sb.rpc('is_direttore'),sb.rpc('is_presidenza')]);S.direttore=!!_d.data;S.presidenza=!!_p.data}catch(_e){}
-    $('lbl-user').textContent=(_roleRow.nome||user.email)+' — sola lettura'
+    // il nome e la carica, non «sola lettura» (26/09/2026, chiesto dall'utente)
+    const _CARICHE={direttore:'Direttore',presidente:'Presidente',vicepresidente:'Vicepresidente',consigliere:'Consigliere'}
+    $('lbl-user').textContent=(_roleRow.nome||user.email)+(_CARICHE[_roleRow.carica]?' · '+_CARICHE[_roleRow.carica]:'')
     // dal 25/09/2026 il menu resta: Mappa, Statistiche e Prossimi appuntamenti per
     // tutti, piu' la pagina Direzione per il Direttore e la Presidenza. Prima il
     // menu spariva del tutto e con lui le Statistiche, uscite dalla Dashboard il 23/09.

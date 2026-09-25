@@ -59,11 +59,15 @@
   /* ── chi sono: lo dice il database, non un elenco di indirizzi ── */
   let _ruoli = null;
   async function ruoli() {
-    if (_ruoli) return _ruoli;
+    /* la memoria vale per UN utente: se sullo stesso telefono entra un altro
+       account (26/09/2026: il Direttore vedeva «Ritira» e la priorità della
+       segreteria, e non «Rispondi») si rilegge */
+    const email = (window.S && window.S.user && window.S.user.email) || '';
+    if (_ruoli && _ruoli.email === email) return _ruoli;
     const sb = window.sb;
     const chiedi = async (f) => { try { const { data, error } = await sb.rpc(f); return !error && data === true; } catch (_e) { return false; } };
     const [direttore, presidenza, coord, segr] = await Promise.all(['is_direttore', 'is_presidenza', 'is_coordinatore', 'is_segreteria'].map(chiedi));
-    _ruoli = { direttore, presidenza, coord, segr };
+    _ruoli = { email, direttore, presidenza, coord, segr };
     return _ruoli;
   }
   window.addEventListener('gestionale-logout', () => { _ruoli = null; });
