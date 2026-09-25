@@ -882,14 +882,19 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div class="sect-title">Osservazioni del tecnico</div>
           <div class="field"><label>Osservazioni (visibili nel report / PDF)</label><textarea id="f-oss-tec" rows="4"></textarea></div>
           <div class="field"><label>Osservazioni INTERNE (non visibili nel report)</label><textarea id="f-oss-int" rows="3" style="border-color:#f39c12;background:#fffef5"></textarea></div>
-          <div class="sect-title">Formazione e segnalazioni</div>
-          <div class="field"><label><span class="check-inline"><input type="checkbox" id="f-note-for-sn"> Contattare l'ufficio corsi per regolarizzare la formazione mancante</span></label></div>
-          <!-- quale formazione manca (25/09/2026): elenco breve da formazione_tipi. Con la casella
-               spuntata, la mail del verbale propone le date dei corsi e l'ufficio corsi riceve la segnalazione -->
-          <div class="field" id="fld-note-for-tipi"><label>Quale formazione manca? <span style="font-weight:400;text-transform:none;letter-spacing:0">(spunta una o più voci: con la casella qui sopra, l'impresa riceve nella mail del verbale le prossime date dei corsi e l'ufficio corsi viene avvisato)</span></label>
-            <div id="f-note-for-tipi" class="chips-tipi"><span style="font-size:12px;color:#888">Carico l'elenco…</span></div></div>
-          <div class="field"><label>Note sulla formazione mancante</label><textarea id="f-note-for-m" rows="2" placeholder="Es. solo il titolare ha il primo soccorso, e non sta in cantiere"></textarea></div>
+          <div class="sect-title">Segnalazioni</div>
           <div class="field"><label><span class="check-inline"><input type="checkbox" id="f-segnalazione"> Propongo segnalazione a SPISAL / ITL</span></label></div>
+          <!-- formazione mancante (25/09/2026): il blocco sta qui nel sorgente perché i passi della
+               checklist nascono dal codice, ma VIVE nel passo «10. Formazione», in fondo alle voci:
+               ce lo sposta buildTabs. Elenco breve da formazione_tipi; con la casella spuntata la mail
+               del verbale propone le date dei corsi e l'ufficio corsi riceve la segnalazione -->
+          <div id="blk-formazione-mancante" style="margin-top:16px;padding-top:12px;border-top:1px solid #e6e6e6">
+            <div class="sect-title">Formazione mancante: che cosa fare</div>
+            <div class="field"><label><span class="check-inline"><input type="checkbox" id="f-note-for-sn"> Contattare l'ufficio corsi per regolarizzare la formazione mancante</span></label></div>
+            <div class="field" id="fld-note-for-tipi"><label>Quale formazione manca? <span style="font-weight:400;text-transform:none;letter-spacing:0">(spunta una o più voci: con la casella qui sopra, l'impresa riceve nella mail del verbale le prossime date dei corsi e l'ufficio corsi viene avvisato)</span></label>
+              <div id="f-note-for-tipi" class="chips-tipi"><span style="font-size:12px;color:#888">Carico l'elenco…</span></div></div>
+            <div class="field"><label>Note sulla formazione mancante</label><textarea id="f-note-for-m" rows="2" placeholder="Es. solo il titolare ha il primo soccorso, e non sta in cantiere"></textarea></div>
+          </div>
           <div class="sect-title">Visita di ritorno</div>
           <div class="field">
             <label>Data / periodo previsto visita successiva</label>
@@ -2903,6 +2908,8 @@ function buildTabs(){
       d.dataset.tab=ti
       d.innerHTML=`<div class="card"><h3>${ZONE_LBL[z]}</h3><div id="zi-${z}"></div></div>`
       tabArea.insertBefore(d,ref)
+      // 25/09/2026: il blocco «formazione mancante» vive in fondo alla zona 10 (Formazione), non nel passo Note
+      if(z===10){const blk=$('blk-formazione-mancante');if(blk)d.querySelector('.card').appendChild(blk)}
     }
   }
   activateTab(0)
