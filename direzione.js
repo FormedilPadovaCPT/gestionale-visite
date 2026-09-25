@@ -58,6 +58,7 @@
 
   /* ── chi sono: lo dice il database, non un elenco di indirizzi ── */
   let _ruoli = null;
+  const _aperteQ = new Set();   // le questioni aperte col tocco (26/09/2026): restano aperte quando l'elenco si ridisegna
   async function ruoli() {
     /* la memoria vale per UN utente: se sullo stesso telefono entra un altro
        account (26/09/2026: il Direttore vedeva «Ritira» e la priorità della
@@ -245,26 +246,44 @@
     const eta = (gg) => `<span style="display:inline-block;min-width:74px;text-align:center;border-radius:6px;padding:2px 8px;font-size:11.5px;font-weight:700;background:${gg == null ? '#f0f0f3' : gg >= 30 ? '#fdeaea' : gg >= 10 ? '#fff3e0' : '#eef7e6'};color:${gg == null ? '#666' : gg >= 30 ? '#c0392b' : gg >= 10 ? '#b35c00' : '#2d7a06'}" title="giorni di attesa">${gg == null ? '—' : gg + ' g'}</span>`;
     const decBadge = (d) => `<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:#888">${esc(DECISORI[d] || d)}</span>`;
 
+    /* LA RIGA (26/09/2026, proposta B scelta dall'utente: «elenco che si apre»).
+       Chiusa: titolo su due righe al massimo, una riga di dati (priorità alta,
+       scadenza, giorni di attesa in grigio), barra rossa a sinistra se la priorità
+       è alta. Un tocco la apre: riassunto, chi l'ha aperta, cronologia e i
+       pulsanti. I giorni sono un dato, non un allarme: niente pillole colorate. */
     const rigaHtml = (x, i) => {
       const r = x.r;
-      const apri = x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:#e7500f;text-decoration:none" data-aiuto="Apre la pratica nell'app che la gestisce, con lo stesso accesso.">apri ↗</a>` : '';
+      const id = r ? String(r.id) : 'a' + i;
+      const apertaQ = _aperteQ.has(id);
+      const alta = !!(r && r.priorita === 'alta');
+      const apri = x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener" class="btn-outline btn-sm" style="text-decoration:none" data-aiuto="Apre la pratica nell'app che la gestisce, con lo stesso accesso.">Apri la pratica ↗</a>` : '';
       const critico = x.critico ? `<button type="button" class="btn-primary btn-sm" data-crit-apri="${x.critico}" data-aiuto="Apre il caso critico: verbali, cronologia e i pulsanti «Confermo» / «Non confermo».">Apri il caso</button>` : '';
       const azioni = [];
-      if (r && puoRispondere(r.decisore)) azioni.push(`<button type="button" class="btn-primary btn-sm" data-rispondi="${r.id}" data-aiuto="Apre due righe per scrivere la decisione, oppure per rinviare a una data: fino a quel giorno la questione non compare fra quelle in attesa. Chi l'ha aperta riceve un avviso.">✍️ Rispondi</button>`);
-      if (r && gestisce) azioni.push(`<button type="button" class="btn-outline btn-sm" data-ritira="${r.id}" data-aiuto="Toglie la questione dal registro scrivendo perché (superata, risolta altrove). Non si cancella: resta in cronologia come ritirata.">Ritira</button>`);
-      const entro = r && r.entro_il ? ` <span style="font-size:11.5px;color:${r.entro_il < T ? '#c0392b' : '#888'}">entro il ${dIt(r.entro_il)}</span>` : '';
+      if (r && puoRispondere(r.decisore)) {
+        azioni.push(`<button type="button" class="btn-primary btn-sm" data-rispondi="${r.id}" data-aiuto="Apre due righe per scrivere la decisione: resta col tuo nome, data e ora, e chi ha aperto la questione riceve un avviso.">✅ Decidi</button>`);
+        azioni.push(`<button type="button" class="btn-outline btn-sm" data-rispondi="${r.id}" data-rinvia="1" data-aiuto="Rinvia la questione a una data: fino a quel giorno non compare fra quelle in attesa, poi torna con i giorni contati da quando è stata aperta.">⏳ Rinvia</button>`);
+      }
+      if (r && gestisce) azioni.push(`<button type="button" class="btn-outline btn-sm" data-gestisci="${r.id}" data-aiuto="Apre le tre cose che spettano a ufficio e coordinatore: la priorità, il titolo, il ritiro dal registro.">Gestisci ▾</button>`);
+      const scad = r && r.entro_il ? (r.entro_il < T ? `<span style="color:#b35c00;font-weight:600">scaduta il ${dIt(r.entro_il)}</span>` : `entro il ${dIt(r.entro_il)}`) : '';
+      const rinv = r && r.stato === 'rinviata' ? `<span style="color:#8e44ad">rinviata al ${dIt(r.rinviata_al)}</span>` : '';
+      const meta = [alta ? '<span class="dq-chip dq-alta" title="priorità alta, impostata da ufficio o coordinatore">alta</span>' : '', x.k === 'auto' ? '<span class="dq-chip dq-auto" title="riga che il database ricava da sola dalle pratiche">automatica</span>' : '', scad, rinv, x.gg != null ? `${x.gg} g di attesa` : ''].filter(Boolean).join(' · ');
       const riservata = r && r.riservata ? ' <span title="riservata: la vedono Direttore e coordinatore" style="font-size:11px">🔒</span>' : '';
-      const alta = r && r.priorita === 'alta' ? ' <span style="background:#fdeaea;color:#c0392b;border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:700" title="priorità alta, impostata da ufficio o coordinatore">⚠️ ALTA</span>' : '';
-      const rinv = r && r.stato === 'rinviata' ? ` <span style="font-size:11.5px;color:#8e44ad">rinviata al ${dIt(r.rinviata_al)}${r.decisione ? ': ' + esc(r.decisione) : ''}</span>` : '';
-      const prio = r && gestisce ? `<select data-prio="${r.id}" style="font-size:11px;padding:1px 3px" data-aiuto="Il grado di priorità della questione: lo imposta l'ufficio o il coordinatore, mai chi decide."><option value="normale"${r.priorita !== 'alta' ? ' selected' : ''}>priorità normale</option><option value="alta"${r.priorita === 'alta' ? ' selected' : ''}>priorità alta</option></select>` : '';
-      return `<div data-dec-attesa="1" style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;padding:8px 0;border-top:1px solid #f0e6dd">
-        ${eta(x.gg)}
-        <div style="flex:1;min-width:240px;font-size:13px;line-height:1.4">
-          <div>${x.k === 'auto' ? '<span style="font-size:10.5px;background:#eef2f7;color:#456;border-radius:4px;padding:1px 5px;margin-right:4px" title="riga che il database ricava da sola dalle pratiche">automatica</span>' : ''}${esc(x.testo)}${riservata}${alta}${entro}${rinv}</div>
-          <div style="font-size:11.5px;color:#888">${decBadge(x.decisore)} · aperta ${x.dal ? 'il ' + dIt(x.dal) : ''} da ${esc(x.chi || '—')}${r && r.riguarda ? ' · riguarda: ' + esc(r.riguarda) : ''}${r && r.dettaglio ? `<div style="white-space:pre-wrap;color:#666;margin-top:2px">${esc(r.dettaglio)}</div>` : ''}${r ? ` · <a href="#" data-cron="${r.id}" style="color:#888">cronologia</a>` : ''}${prio ? '<div style="margin-top:3px">' + prio + '</div>' : ''}</div>
-          <div id="dir-risp-${r ? r.id : 'a' + i}"></div>
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">${apri}${critico}${azioni.join('')}</div></div>`;
+      /* il riassunto: il dettaglio, tolta la parte che ripete il titolo (le
+         questioni importate dal second brain hanno il titolo in testa al dettaglio) */
+      let riass = r && r.dettaglio ? String(r.dettaglio).trim() : '';
+      const tit = r ? String(r.questione || '').trim() : '';
+      if (riass && tit && riass.startsWith(tit)) riass = riass.slice(tit.length).replace(/^[\s—–-]+/, '');
+      if (riass && tit && riass === tit) riass = '';
+      return `<div class="dq-voce${alta ? ' dq-alta-b' : ''}${apertaQ ? ' dq-aperta' : ''}" data-apri-q="${id}" data-aiuto="Un tocco apre la questione: riassunto, chi l'ha aperta e i pulsanti. Un altro la chiude.">
+        <div class="dq-riga1"><div class="dq-titolo${apertaQ ? '' : ' dq-clamp'}">${esc(x.testo)}${riservata}</div><span class="dq-freccia">▾</span></div>
+        <div class="dq-meta">${meta}</div>
+        <div class="dq-dett"${apertaQ ? '' : ' hidden'}>
+          ${riass ? `<div class="dq-riass">${esc(riass)}</div>` : ''}
+          <div class="dq-meta2">${decBadge(x.decisore)} · aperta ${x.dal ? 'il ' + dIt(x.dal) : ''} da ${esc(x.chi || '—')}${r && r.riguarda ? ' · riguarda: ' + esc(r.riguarda) : ''}${r ? ` · <a href="#" data-cron="${r.id}" style="color:#888">cronologia</a>` : ''}</div>
+          <div class="dq-azioni">${apri}${critico}${azioni.join('')}</div>
+          <div id="dir-menu-${id}"></div>
+          <div id="dir-risp-${id}"></div>
+        </div></div>`;
     };
     const rigaDecisa = (r) => `<div data-dec-decisa="1" style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;padding:8px 0;border-top:1px solid #f0e6dd">
         <span style="background:#e8f5e0;color:#2d7a06;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">DECISA</span>
@@ -315,7 +334,44 @@
 
     host.querySelectorAll('[data-crit-apri]').forEach((b) => b.addEventListener('click', () => apriCritico(Number(b.dataset.critApri))));
     host.querySelectorAll('[data-cron]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); cronologia(Number(a.dataset.cron)); }));
-    host.querySelectorAll('[data-rispondi]').forEach((b) => b.addEventListener('click', () => formRisposta(Number(b.dataset.rispondi), host, modo)));
+    /* il tocco sulla riga la apre o la chiude; i pulsanti e i link dentro non la chiudono */
+    host.querySelectorAll('[data-apri-q]').forEach((v) => v.addEventListener('click', (e) => {
+      if (e.target.closest('.dq-dett, button, a, select, input, textarea, label')) return;
+      const id = v.dataset.apriQ; const aperta = v.classList.toggle('dq-aperta');
+      if (aperta) _aperteQ.add(id); else _aperteQ.delete(id);
+      const d = v.querySelector('.dq-dett'); if (d) d.hidden = !aperta;
+      const t = v.querySelector('.dq-titolo'); if (t) t.classList.toggle('dq-clamp', !aperta);
+    }));
+    host.querySelectorAll('[data-rispondi]').forEach((b) => b.addEventListener('click', () => formRisposta(Number(b.dataset.rispondi), host, modo, b.dataset.rinvia ? 'rinvio' : 'decido')));
+    /* «Gestisci» (26/09/2026, al posto di «Ritira»): priorità, titolo, ritiro */
+    host.querySelectorAll('[data-gestisci]').forEach((b) => b.addEventListener('click', () => {
+      const id = Number(b.dataset.gestisci); const r = righe.find((q) => q.id === id); const slot = $('dir-menu-' + id);
+      if (!slot || !r) return;
+      if (slot.innerHTML) { slot.innerHTML = ''; return; }
+      slot.innerHTML = `<div class="dq-menu">
+        <button type="button" data-m="prio" data-aiuto="Cambia il grado di priorità: la «alta» mette la barra rossa e l'etichetta. Lo imposta l'ufficio o il coordinatore, mai chi decide.">${r.priorita === 'alta' ? '⬇️ Priorità: da alta a normale' : '⬆️ Priorità: da normale ad alta'}</button>
+        <button type="button" data-m="titolo" data-aiuto="Riscrive il titolo della questione, in una riga. Il riassunto sotto resta com'è.">✏️ Modifica il titolo</button>
+        <button type="button" data-m="ritira" data-aiuto="Toglie la questione dal registro scrivendo perché (superata, risolta altrove). Non si cancella: resta in cronologia come ritirata.">🗑 Ritira dal registro</button></div>`;
+      slot.querySelector('[data-m="prio"]').addEventListener('click', (ev) => con(ev.currentTarget, async () => {
+        const { error } = await sb.from('s_decisioni').update({ priorita: r.priorita === 'alta' ? 'normale' : 'alta' }).eq('id', id);
+        if (error) throw new Error(error.message);
+        avviso('Priorità aggiornata.', 'ok'); await decisioniBox(host, modo); dopoCambio();
+      }));
+      slot.querySelector('[data-m="titolo"]').addEventListener('click', (ev) => con(ev.currentTarget, async () => {
+        const nuovo = prompt('Il titolo della questione (una riga, breve):', r.questione || '');
+        if (nuovo == null || !nuovo.trim()) return;
+        const { error } = await sb.from('s_decisioni').update({ questione: nuovo.trim().slice(0, 240) }).eq('id', id);
+        if (error) throw new Error(error.message);
+        avviso('Titolo aggiornato.', 'ok'); await decisioniBox(host, modo);
+      }));
+      slot.querySelector('[data-m="ritira"]').addEventListener('click', (ev) => con(ev.currentTarget, async () => {
+        const motivo = prompt('Perché la ritiri? (resta in cronologia)');
+        if (motivo == null) return;
+        const { error } = await sb.from('s_decisioni').update({ stato: 'ritirata', ritirata_motivo: motivo.trim() || null }).eq('id', id);
+        if (error) throw new Error(error.message);
+        avviso('Questione ritirata.', 'ok'); await decisioniBox(host, modo); dopoCambio();
+      }));
+    }));
     host.querySelectorAll('[data-ritira]').forEach((b) => b.addEventListener('click', (ev) => con(ev.currentTarget, async () => {
       const motivo = prompt('Perché la ritiri? (resta in cronologia)');
       if (motivo == null) return;
@@ -367,9 +423,11 @@
     return { attesa: lista.length, daPrendere: decise.length + incontri.length };
   }
 
-  function formRisposta(id, host, modo) {
+  function formRisposta(id, host, modo, cosa) {
     const slot = $('dir-risp-' + id); if (!slot) return;
-    if (slot.innerHTML) { slot.innerHTML = ''; return; }
+    if (slot.innerHTML && !cosa) { slot.innerHTML = ''; return; }
+    if (slot.innerHTML && slot.dataset.cosa === cosa) { slot.innerHTML = ''; slot.dataset.cosa = ''; return; }
+    slot.dataset.cosa = cosa || '';
     const domani = new Date(Date.now() + 864e5).toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
     const oggiV = oggi();
     slot.innerHTML = `<div style="margin-top:6px;padding:8px;border:1px solid #f0e6dd;border-radius:8px;background:#fffaf6">
@@ -382,7 +440,8 @@
         <input type="date" id="dir-ri-${id}" min="${oggiV}" style="width:auto;font-size:12px">
         <button type="button" class="btn-outline btn-sm" data-incontro="${id}" data-aiuto="Propone un incontro a coordinatore e segreteria per discuterne insieme, invece di decidere subito. La data è facoltativa: puoi anche solo segnalare che serve un incontro. Loro ricevono un avviso.">📅 Propongo un incontro</button>
         <button type="button" class="btn-outline btn-sm" data-annulla="${id}">Annulla</button></div></div>`;
-    slot.querySelector('[data-annulla]').addEventListener('click', () => { slot.innerHTML = ''; });
+    slot.querySelector('[data-annulla]').addEventListener('click', () => { slot.innerHTML = ''; slot.dataset.cosa = ''; });
+    if (cosa === 'rinvio') { const d = $('dir-rd-' + id); if (d) d.focus(); } else { const t = $('dir-rt-' + id); if (t) t.focus(); }
     slot.querySelector('[data-decido]').addEventListener('click', (ev) => con(ev.currentTarget, async () => {
       const testo = ($('dir-rt-' + id).value || '').trim();
       if (!testo) { avviso('Scrivi la decisione.', 'warn'); return; }
@@ -569,7 +628,22 @@
       + '#dir-autorizzazioni,#dir-critici,#dir-decisioni,#adm-decisioni,#dir-finestra{overflow-wrap:anywhere;word-break:break-word}'
       + '#dir-decisioni .card>div,#adm-decisioni .card>div,#dir-critici .card>div{max-width:100%}'
       + '#dir-decisioni [style*="flex:1"],#adm-decisioni [style*="flex:1"],#dir-critici [style*="flex:1"]{min-width:0!important}'
-      + '#dir-decisioni details,#adm-decisioni details{max-width:100%;overflow:hidden}';
+      + '#dir-decisioni details,#adm-decisioni details{max-width:100%;overflow:hidden}'
+      /* l'elenco che si apre (26/09/2026) */
+      + '.dq-voce{border-top:1px solid #f0e6dd;padding:9px 6px 9px 10px;border-left:4px solid transparent;cursor:pointer}'
+      + '.dq-voce.dq-alta-b{border-left-color:#c0392b}.dq-voce.dq-aperta{background:#fffaf6}'
+      + '.dq-riga1{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}'
+      + '.dq-titolo{font-size:14.5px;font-weight:600;line-height:1.3;color:#222;flex:1;min-width:0}'
+      + '.dq-clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}'
+      + '.dq-freccia{color:#999;font-size:12px;flex-shrink:0;margin-top:2px;transition:transform .15s}.dq-aperta .dq-freccia{transform:rotate(180deg)}'
+      + '.dq-meta{font-size:12px;color:#888;margin-top:3px}.dq-meta2{font-size:11.5px;color:#888;margin-top:6px}'
+      + '.dq-chip{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:1px 6px;border-radius:5px}'
+      + '.dq-alta{background:#fdeaea;color:#c0392b}.dq-auto{background:#fdf0e7;color:#b35c00}'
+      + '.dq-dett{margin-top:8px;cursor:default}.dq-riass{font-size:13px;color:#555;line-height:1.45;white-space:pre-wrap}'
+      + '.dq-azioni{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}'
+      + '.dq-menu{display:flex;flex-direction:column;gap:2px;margin-top:6px;padding:6px;border:1px solid #f0e6dd;border-radius:8px;background:#fff}'
+      + '.dq-menu button{text-align:left;background:none;border:0;padding:7px 8px;font-size:13.5px;color:#222;border-radius:6px;cursor:pointer}.dq-menu button:hover{background:#fff3ec}'
+      + '@media (prefers-reduced-motion:reduce){.dq-freccia{transition:none}}';
     document.head.appendChild(st);
   })();
 
