@@ -43,6 +43,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .btn-danger{background:var(--danger);color:#fff}
 .btn-outline{background:transparent;border:2px solid var(--orange);color:var(--orange)}
 body.viewer-mode #btn-diniego-dash{display:none!important}
+/* sola lettura (Direzione e Consiglio, 25/09/2026): niente tasti da tecnico, niente riquadri per tecnico */
+body.viewer-mode #btn-segnala-dash,body.viewer-mode #btn-qr-servizi,body.viewer-mode #btn-dove-sono,body.viewer-mode #btn-appunti,body.viewer-mode #dash-appunti-card,body.viewer-mode #card-target-mese,body.viewer-mode #dash-notifiche,body.viewer-mode #fld-fd-tec,body.viewer-mode #card-ch-tecnico,body.viewer-mode #card-tbl-prod{display:none!important}
+#view-direzione h2{margin:0 0 4px;font-size:18px;color:var(--orange)}
+#nav-dir-badge{background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px}
+#view-admin #adm-decisioni .card{color:#222;text-align:left}#view-admin #adm-decisioni .card h3{color:#565c66}
 .btn-warn{background:var(--warn);color:#fff}
 .btn-sm{padding:5px 11px;font-size:12px}
 .btn-icon{background:none;padding:4px 8px;font-size:16px;border:none}
@@ -465,6 +470,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="scadenze">⏰ Scadenze</button>
     <button data-view="incarichi" id="nav-incarichi">📋 Incarichi<span id="nav-inc-badge" style="display:none;background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px">0</span></button>
     <button data-view="statistiche" id="nav-statistiche">📊 Statistiche</button>
+    <button data-view="direzione" id="nav-direzione" style="display:none">🏛️ Direzione<span id="nav-dir-badge" style="display:none">0</span></button>
     <button id="nav-assev" style="display:none;background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600" onclick="window.open('https://webapp-asseverazione.vercel.app/dashboard','_blank')">✅ Asseverazione</button>
     <button data-view="admin" id="nav-admin" style="display:none">🔐 Coordinatore</button>
     <button data-view="committenti" id="nav-committenti" style="display:none">👤 Committenti</button>
@@ -1087,6 +1093,15 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div id="inc-vuoto" style="display:none;text-align:center;color:#aaa;padding:26px;font-size:13px" class="card">Nessun incarico con questi filtri.</div>
     </section>
 
+    <!-- DIREZIONE (25/09/2026): la pagina del Direttore (e della Presidenza) — direzione.js -->
+    <section id="view-direzione" class="hidden">
+      <h2>🏛️ Direzione — <span id="dir-nome"></span></h2>
+      <p id="dir-intro" style="font-size:12.5px;color:#555;margin:0 0 12px;line-height:1.45"></p>
+      <div id="dir-autorizzazioni" style="margin-bottom:14px"></div>
+      <div id="dir-critici" style="margin-bottom:14px"></div>
+      <div id="dir-decisioni" style="margin-bottom:14px"></div>
+    </section>
+
     <!-- STATISTICHE (23/09/2026): contatori, grafici e tabelle usciti dalla Dashboard -->
     <section id="view-statistiche" class="hidden">
       <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px">
@@ -1097,7 +1112,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="card" id="dash-filtri" style="margin-bottom:14px">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
           <div class="field"><label>Esercizio</label><select id="fd-eserc" style="font-size:13px"></select></div>
-          <div class="field"><label>Tecnico</label><select id="fd-tec" style="font-size:13px"></select></div>
+          <div class="field" id="fld-fd-tec"><label>Tecnico</label><select id="fd-tec" style="font-size:13px"></select></div>
           <div class="field"><label>Tipo visita</label><select id="fd-tipo" style="font-size:13px"></select></div>
           <div class="field"><label>Pericolosità (IPC)</label><select id="fd-ipc" style="font-size:13px"></select></div>
         </div>
@@ -1114,17 +1129,18 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="stat-card"><div class="num" id="k-rlst" style="color:#95C22F">–</div><div class="pct" id="k-rlst-pct" style="color:#95C22F"></div><div class="lbl">Affiancamento RLST</div></div>
         <div class="stat-card"><div class="num" id="k-comuni" style="color:var(--grey)">–</div><div class="lbl">Comuni serviti</div></div>
         <div class="stat-card"><div class="num" id="k-cant" style="color:var(--orange)">–</div><div class="lbl">Cantieri visitati</div></div>
+        <div class="stat-card" id="card-k-ceivmin" title="Regola CEIV: 100 visite ogni 50.000 € di contributi Cassa Edile (quota CPT). Le fatte contano tutte le visite dell'esercizio, di tutti i tecnici."><div class="num" id="k-ceivmin" style="color:#95C22F">–</div><div class="pct" id="k-ceivmin-pct" style="color:#888"></div><div class="lbl">Visite fatte / minime CEIV</div></div>
       </div>
       <div class="dash-row-2">
         <div class="card"><h3>Visite per esercizio (1 ott – 30 set)</h3><div class="chbox" style="height:240px"><canvas id="ch-esercizio"></canvas></div></div>
         <div class="card"><h3>Attività mensile sopralluoghi</h3><div class="chbox" style="height:240px"><canvas id="ch-mesi"></canvas></div></div>
       </div>
       <div class="dash-row-3">
-        <div class="card"><h3>Sopralluoghi per tecnico</h3><div class="chbox" style="height:260px"><canvas id="ch-tecnico"></canvas></div></div>
+        <div class="card" id="card-ch-tecnico"><h3>Sopralluoghi per tecnico</h3><div class="chbox" style="height:260px"><canvas id="ch-tecnico"></canvas></div></div>
         <div class="card"><h3>Affiancamento con RLST</h3><div class="chbox" style="height:260px"><canvas id="ch-rlst"></canvas></div></div>
         <div class="card"><h3>IPC — Indice di Pericolosità Cantiere</h3><div class="chbox" style="height:260px"><canvas id="ch-ipc"></canvas></div></div>
       </div>
-      <div class="card"><h3>Produttività e qualità per tecnico</h3><div id="tbl-prod" style="overflow-x:auto"></div></div>
+      <div class="card" id="card-tbl-prod"><h3>Produttività e qualità per tecnico</h3><div id="tbl-prod" style="overflow-x:auto"></div></div>
       <div class="dash-row-2">
         <div class="card"><h3>IPC per n° accesso al cantiere</h3><div class="chbox" style="height:240px"><canvas id="ch-accesso"></canvas></div></div>
         <div class="card"><h3>NC+ / NC− / OSS per macroarea (10 aree) <span style="font-weight:400;font-size:11px;color:#999">· clic sui numeri per l'elenco cantieri</span></h3><div id="tbl-macro" style="overflow-x:auto;max-height:265px;overflow-y:auto"></div></div>
@@ -1197,6 +1213,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
              spostate qui dalla Dashboard su indicazione dell'utente) -->
         <div id="dash-fatture" style="display:none;margin-bottom:14px"></div>
         <div id="dash-critici" style="display:none;margin-bottom:14px"></div>
+        <!-- le questioni in attesa di decisione (direzione.js, 25/09/2026) -->
+        <div id="adm-decisioni" style="margin-bottom:14px"></div>
         <div id="dash-riepilogo-verbali" style="display:none;margin-bottom:14px"></div>
 
         <!-- Intervallo cronologico + statistiche -->
@@ -1253,6 +1271,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <p id="sgr-email-label">Accesso riservato</p>
           </div>
         </div>
+
+        <!-- Obiettivo visite dell'esercizio, regola CEIV (direzione.js, 25/09/2026) -->
+        <div id="sgr-obiettivi"></div>
 
         <!-- Promemoria ricontrolli (interruttore) -->
         <div class="adm-section">
@@ -2406,22 +2427,39 @@ async function onLogin(user){
   S.user=user
   // ── Accesso VIEWER (board: direttore/presidente/vicepresidente, consiglieri) → sola dashboard ──
   let _roleRow=null
-  try{const _r=await sb.from('app_ruoli').select('ruolo,stato,nome').eq('email',user.email).maybeSingle();_roleRow=_r.data}catch(_e){}
+  try{const _r=await sb.from('app_ruoli').select('ruolo,stato,nome,carica').eq('email',user.email).maybeSingle();_roleRow=_r.data}catch(_e){}
   S.viewer=!!(_roleRow&&_roleRow.ruolo==='viewer'&&_roleRow.stato==='attivo')
   if(S.viewer){
     S.tecnico=null
     S.viewerNome=_roleRow.nome||null
+    S.carica=_roleRow.carica||null
+    // Direttore e Presidenza li dice il database, non la carica scritta a mano (25/09/2026)
+    S.direttore=false;S.presidenza=false
+    try{const[_d,_p]=await Promise.all([sb.rpc('is_direttore'),sb.rpc('is_presidenza')]);S.direttore=!!_d.data;S.presidenza=!!_p.data}catch(_e){}
     $('lbl-user').textContent=(_roleRow.nome||user.email)+' — sola lettura'
-    document.querySelector('nav')?.classList.add('hidden')
+    // dal 25/09/2026 il menu resta: due schede (Mappa e Statistiche) piu' la pagina
+    // Direzione per il Direttore e la Presidenza. Prima il menu spariva del tutto e
+    // con lui le Statistiche, uscite dalla Dashboard il 23/09.
+    const _nv=document.querySelector('nav')
+    if(_nv){_nv.classList.remove('hidden')
+      _nv.querySelectorAll('button').forEach(b=>{const v=b.dataset.view
+        b.style.display=(v==='dashboard'||v==='statistiche'||(v==='direzione'&&(S.direttore||S.presidenza)))?'':'none'})
+      const _bd=_nv.querySelector('button[data-view="dashboard"]');if(_bd)_bd.textContent='🗺️ Mappa'
+      const _bdir=_nv.querySelector('button[data-view="direzione"]');if(_bdir&&S.presidenza&&!S.direttore)_bdir.firstChild.textContent='🏛️ Presidenza'
+    }
     document.body.classList.add('viewer-mode')
     await loadVoci().catch(()=>{})
     showScr('app')
-    navTo('dashboard')
+    navTo(S.direttore||S.presidenza?'direzione':'dashboard')
     S.appReady=true
     return
   }
+  S.direttore=false;S.presidenza=false;S.carica=null
   document.querySelector('nav')?.classList.remove('hidden')
   document.body.classList.remove('viewer-mode')
+  // se nella stessa scheda era entrato prima un account di sola lettura, il menu torna quello del tecnico
+  document.querySelectorAll('nav button[data-view]').forEach(b=>{if(['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche'].includes(b.dataset.view))b.style.display=''})
+  {const _bd=document.querySelector('nav button[data-view="dashboard"]');if(_bd)_bd.textContent='🏠 Dashboard'}
   let{data:tec}=await sb.from('tecnici').select('*').eq('email',user.email).maybeSingle()
   if(!tec){
     /* Audit 05/09/2026: un account senza scheda tecnico e senza ruolo NON diventa
@@ -2485,7 +2523,7 @@ function showScr(n){
 }
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','direzione','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
   if(view==='form'&&typeof incCaricaTendina==='function')incCaricaTendina().catch(e=>console.warn('incCaricaTendina:',e))
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
@@ -2498,8 +2536,9 @@ function navTo(view){
   if(view==='scadenze')loadScadenze().catch(e=>{console.error('loadScadenze:',e);toast('Errore scadenze: '+e.message,'err')})
   if(view==='incarichi'&&typeof loadIncarichi==='function')loadIncarichi().catch(e=>console.warn('loadIncarichi:',e))
   if(view==='statistiche')loadStat().catch(e=>{console.error('loadStat:',e);toast('Errore caricamento statistiche: '+e.message,'err')})
+  if(view==='direzione'&&window.direzione)window.direzione.carica().catch(e=>{console.error('direzione:',e);toast('Errore caricamento Direzione: '+e.message,'err')})
   if(view==='admin'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
-  if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e))}
+  if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e));if(window.direzione)window.direzione.obiettivi().catch(e=>console.warn('obiettivi:',e))}
   if(view==='committenti')admLoadCommittenti().catch(e=>console.error('committenti:',e))
 }
 window.navTo=navTo
@@ -2513,8 +2552,13 @@ document.querySelectorAll('nav button[data-view]').forEach(b=>{
 // pratiche vivono nell'app segreteria, per i tecnici l'autorizzata
 // arriva come INCARICO nella scheda Incarichi — qui niente riquadro.
 async function loadAutorizzazioni(){
-  const box=$('dash-autorizzazioni')
+  // dal 25/09/2026 il Direttore ha la sua pagina «Direzione»: il riquadro sta li',
+  // e a scrivania sgombra dice «niente in attesa» invece di sparire
+  const inDir=!!(S.direttore&&$('dir-autorizzazioni'))
+  const box=inDir?$('dir-autorizzazioni'):$('dash-autorizzazioni')
   if(!box)return
+  if(inDir&&$('dash-autorizzazioni'))$('dash-autorizzazioni').style.display='none'
+  const vuoto=()=>{if(inDir){box.innerHTML='<div class="card" style="border-left:4px solid #95C22F"><h3>&#9997;&#65039; Autorizzazioni servizi CPT</h3><p style="font-size:13px;color:#555;margin:0">Niente in attesa del tuo visto.</p></div>';box.style.display=''}else box.style.display='none'}
   try{
     const{data:dir}=await sb.rpc('is_direttore')
     if(!dir){box.style.display='none';return}
@@ -2523,19 +2567,19 @@ async function loadAutorizzazioni(){
   try{
     const[segn,cons,vis,confz,attz]=await Promise.all([
       sb.from('s_segnalazioni')
-        .select('id,progressivo,notificante,comune_cantiere,ind_cantiere,aut_stato,autorizzata_da,data_autorizzazione,stato')
+        .select('id,progressivo,notificante,comune_cantiere,ind_cantiere,aut_stato,aut_richiesta_il,autorizzata_da,data_autorizzazione,stato')
         .not('stato','in','(chiusa,scartata)').order('id',{ascending:false}).limit(30),
       sb.from('s_consulenze')
-        .select('id,progressivo,ragione_sociale,aut_stato,autorizzata_da,data_autorizzazione,stato,corsia')
+        .select('id,progressivo,ragione_sociale,aut_stato,aut_richiesta_il,autorizzata_da,data_autorizzazione,stato,corsia')
         .eq('corsia','uscita').not('stato','in','(chiusa,scartata)').order('id',{ascending:false}).limit(30),
       sb.from('s_visite_richieste')
-        .select('id,progressivo,ragione_sociale,tipo_richiesta,aut_stato,autorizzata_da,data_autorizzazione,stato')
+        .select('id,progressivo,ragione_sociale,tipo_richiesta,aut_stato,aut_richiesta_il,autorizzata_da,data_autorizzazione,stato')
         .not('stato','in','(chiusa,scartata)').order('id',{ascending:false}).limit(30),
       sb.from('s_conferenze_cantiere')
-        .select('id,progressivo,ragione_sociale,aut_stato,autorizzata_da,data_autorizzazione,stato')
+        .select('id,progressivo,ragione_sociale,aut_stato,aut_richiesta_il,autorizzata_da,data_autorizzazione,stato')
         .not('stato','in','(chiusa,scartata)').order('id',{ascending:false}).limit(30),
       sb.from('s_attestazioni_dm132')
-        .select('id,progressivo,ragione_sociale,aut_stato,autorizzata_da,data_autorizzazione,stato')
+        .select('id,progressivo,ragione_sociale,aut_stato,aut_richiesta_il,autorizzata_da,data_autorizzazione,stato')
         .not('stato','in','(chiusa,scartata)').order('id',{ascending:false}).limit(30),
     ])
     righe=[
@@ -2545,13 +2589,13 @@ async function loadAutorizzazioni(){
       ...(confz.data||[]).map(r=>({...r,tipo:'conferenza'})),
       ...(attz.data||[]).map(r=>({...r,tipo:'attestazione'})),
     ]
-    if(!righe.length){box.style.display='none';return}
+    if(!righe.length){vuoto();return}
   }catch(_e){box.style.display='none';return}
   const attesa=righe.filter(r=>['da_richiedere','richiesta'].includes(r.aut_stato))
   const processate=righe.filter(r=>['approvata','respinta'].includes(r.aut_stato))
     .sort((a,b)=>String(b.data_autorizzazione||'').localeCompare(String(a.data_autorizzazione||''))).slice(0,3)
   /* senza nulla in attesa il riquadro sparisce anche al Direttore */
-  if(!attesa.length){box.style.display='none';return}
+  if(!attesa.length){vuoto();return}
   const dIt=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):''
   const badge=st=>st==='approvata'?'<span style="background:#e8f5e0;color:#2d7a06;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">APPROVATA</span>'
     :st==='respinta'?'<span style="background:#fdeaea;color:#c0392b;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">RESPINTA</span>'
@@ -2570,10 +2614,11 @@ async function loadAutorizzazioni(){
       ?('&#129715; attestazione DM 132 &middot; '+esc_(r.ragione_sociale||'impresa da individuare'))
       :('&#128680; segnalazione &middot; '+esc_([r.ind_cantiere,r.comune_cantiere].filter(Boolean).join(' — ')||'cantiere da individuare'))
     const daFare=['da_richiedere','richiesta'].includes(r.aut_stato)
+    const gg=daFare&&r.aut_richiesta_il?Math.floor((Date.now()-new Date(String(r.aut_richiesta_il).slice(0,10)))/864e5):null
     return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid #f0e6dd">
-      <strong style="font-size:12px">n&deg; ${n}</strong>${badge(r.aut_stato)}
+      <strong style="font-size:12px">n&deg; ${n}</strong>${badge(r.aut_stato)}${gg!=null?`<span style="font-size:11px;color:#888">in attesa da ${gg} g</span>`:''}
       <span style="font-size:12px;color:#444;flex:1;min-width:200px">${cosa}${r.data_autorizzazione?` <span style="color:#888">&middot; ${esc_(r.autorizzata_da||'')} il ${dIt(r.data_autorizzazione)}</span>`:''}</span>
-      <a href="https://formedilpadovacpt.github.io/segreteria/#${r.tipo}-${r.id}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:var(--orange,#e7500f);text-decoration:none">${daFare?'Autorizza nell\'app segreteria &#8599;':'apri la pratica &#8599;'}</a>
+      <a href="https://formedilpadovacpt.github.io/segreteria/#${r.tipo}-${r.id}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:var(--orange,#e7500f);text-decoration:none">${daFare?'Autorizza nell\'app segreteria &#8599;':'apri la pratica &#8599;'}</a>${daFare?'<span style="font-size:11px;color:#999">si apre gi&agrave; collegata</span>':''}
     </div>`
   }
   box.innerHTML=`<div class="card" style="border-left:4px solid var(--orange,#e7500f)">
@@ -5388,6 +5433,9 @@ function _dashRenderKpi(F){
   $('k-rlst').textContent=rl;$('k-rlst-pct').textContent=pc(rl)
   $('k-comuni').textContent=com
   if($('k-cant'))$('k-cant').textContent=cant
+  // visite fatte / minime dell'esercizio (regola CEIV): conta TUTTE le visite dell'esercizio
+  // scelto, di tutti i tecnici, qualunque filtro sia impostato (25/09/2026)
+  if(window.direzione&&window.direzione.kpiCeiv){const fE=$('fd-eserc')?$('fd-eserc').value:'';window.direzione.kpiCeiv(fE,fE?_dashRaw.filter(x=>x.eserc===fE).length:null)}
 }
 
 function _dashRenderEsercizio(FE,selE){
@@ -5596,6 +5644,12 @@ async function loadDashMap(){
   // la scelta dei livelli IPC resta quando si torna in Dashboard, come tecnico e comune (24/09/2026)
   _dashMapTec=$('dash-map-tec')?.value||''
   _dashMapCom=$('dash-map-com')?.value||''
+  // la prima volta la mappa si apre sui cantieri del tecnico collegato (25/09/2026,
+  // chiesto dall'utente); «Tutti» resta a un tocco. La segreteria vede tutto.
+  if(!window._dashMapTecInit){window._dashMapTecInit=true
+    if(S.tecnico&&!window.__isCoord&&!_dashMapTec){
+      const _mio=((S.tecnico.tecnico_nome||'')+' '+(S.tecnico.tecnico_cognome||'')).trim()
+      if(_mio&&rows.some(d=>d.tecnico===_mio))_dashMapTec=_mio}}
   renderDashMapMarkers()
   setTimeout(()=>_dashMap.invalidateSize(),200)
 
@@ -13417,6 +13471,7 @@ window.incVerificaProt=incVerificaProt
    S e' un oggetto che si muta e non si riassegna mai: passarlo per
    riferimento e' sicuro. */
 window.sb=sb; window.S=S; window.toast=toast
+window.loadAutorizzazioni=loadAutorizzazioni; window.annoEdile=annoEdile   // direzione.js (25/09/2026)
 window.SB_URL=SB_URL; window.SB_KEY=SB_KEY
 /* mappa.js («Inizia qui» dai cantieri vicini e dai rientri) riempie il modulo
    con le stesse funzioni che usa l'app: si espongono qui, senza copiarle.
@@ -13457,6 +13512,8 @@ document.addEventListener('input',function(ev){
 <script src="codice-univoco.js?v=2"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
+<!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
+<script src="direzione.js?v=1"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

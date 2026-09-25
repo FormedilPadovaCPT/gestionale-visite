@@ -211,13 +211,14 @@
      riquadro (lo riempie loadFattureCoord di index.html), i casi dalle righe */
   function conta() {
     const vis = (id) => { const b = $(id); return b && b.style.display !== 'none' ? b : null; };
-    const f = vis('dash-fatture'), c = vis('dash-critici');
-    return { fatture: f ? f.querySelectorAll('button[onclick*="approvata"]').length : 0, critici: c ? c.querySelectorAll('[data-cc]').length : 0 };
+    const f = vis('dash-fatture'), c = vis('dash-critici'), d = $('adm-decisioni');
+    return { fatture: f ? f.querySelectorAll('button[onclick*="approvata"]').length : 0, critici: c ? c.querySelectorAll('[data-cc]').length : 0,
+      decise: d ? d.querySelectorAll('[data-dec-decisa]').length : 0 };   /* decisioni da prendere in carico (direzione.js, 25/09/2026) */
   }
 
   function avvisa() {
-    const { fatture, critici } = conta();
-    const tot = fatture + critici;
+    const { fatture, critici, decise } = conta();
+    const tot = fatture + critici + decise;
     const nav = $('nav-admin');
     if (nav) {
       nav.innerHTML = '&#128272; Coordinatore' + (tot ? ` <span style="background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700">${tot}</span>` : '');
@@ -228,6 +229,7 @@
     const pezzi = [];
     if (fatture) pezzi.push(`<strong>${fatture}</strong> ${fatture === 1 ? 'fattura da approvare' : 'fatture da approvare'}`);
     if (critici) pezzi.push(`<strong>${critici}</strong> ${critici === 1 ? 'cantiere critico' : 'cantieri critici'}`);
+    if (decise) pezzi.push(`<strong>${decise}</strong> ${decise === 1 ? 'decisione da prendere in carico' : 'decisioni da prendere in carico'}`);
     box.innerHTML = `<div class="card" style="border-left:4px solid #e7500f;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:pointer" id="dash-coord-vai">
       <span style="font-size:13px;flex:1;min-width:220px">&#128272; Nella <strong>Zona Coordinatore</strong> ti aspettano: ${pezzi.join(' &middot; ')}</span>
       <button class="btn-primary btn-sm">Apri</button></div>`;
@@ -241,6 +243,7 @@
     await Promise.allSettled([
       typeof window.loadFattureCoord === 'function' ? window.loadFattureCoord() : Promise.resolve(),
       carica(),
+      window.direzione && typeof window.direzione.zonaCoord === 'function' ? window.direzione.zonaCoord() : Promise.resolve(),
     ]);
     avvisa();
   }
