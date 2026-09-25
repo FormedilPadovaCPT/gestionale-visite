@@ -174,7 +174,7 @@
     const R = await ruoli();
     let righe = [], auto = { autorizzazioni: [], critici: [] }, errore = null;
     try {
-      const { data, error } = await sb.from('s_decisioni').select('*').in('stato', ['aperta', 'rinviata', 'decisa']).order('aperta_il');
+      const { data, error } = await sb.from('s_decisioni').select('*').in('stato', ['proposta', 'aperta', 'rinviata', 'decisa']).order('aperta_il');
       if (error) throw new Error(error.message);
       righe = data || [];
       if (R.direttore || R.coord || R.segr) { try { auto = await inAttesa(); } catch (e) { console.warn('in attesa:', e); } }
@@ -226,6 +226,25 @@
         ${gestisce ? `<button type="button" class="btn-primary btn-sm" data-presa="${r.id}" data-aiuto="Dichiara che la decisione è stata letta e messa in pratica: la riga esce dal registro e resta in cronologia con chi l'ha presa in carico e quando.">✓ Presa in carico</button>` : ''}</div>`;
 
     const nuova = gestisce && modo === 'coord' ? `<div style="margin:6px 0 10px"><button type="button" class="btn-primary btn-sm" id="dir-nuova" data-aiuto="Apre il modulo per scrivere una questione che aspetta una decisione del Direttore, della Presidenza o della Commissione. Da quel momento conta i giorni di attesa.">➕ Nuova questione</button><div id="dir-nuova-form"></div></div>` : '';
+
+    /* LE PROPOSTE (25/09/2026, chiesto dall'utente): le task del second brain che
+       aspettano il Direttore entrano qui come proposte, che vede SOLO la segreteria.
+       Una casella per riga: spuntata = la questione diventa visibile a Direttore e
+       coordinatore; «✕» la scarta scrivendo perché. Così nel registro va solo ciò
+       che la segreteria ritiene opportuno, anche se la task l'ha scritta altri. */
+    const proposte = R.segr && modo === 'coord' ? righe.filter((r) => r.stato === 'proposta') : [];
+    const rigaProposta = (r) => `<div data-prop="${r.id}" style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;padding:8px 0;border-top:1px solid #e9eef3">
+        <label style="display:inline-flex;align-items:center;gap:6px;margin:2px 0 0;text-transform:none;letter-spacing:0;font-size:12px;font-weight:600;color:#456;cursor:pointer"><input type="checkbox" data-pub="${r.id}" style="width:18px;height:18px;margin:0;accent-color:#e7500f" data-aiuto="Spuntando, la questione diventa visibile a Direttore e coordinatore e conta i giorni dalla data indicata. Fino ad allora la vedi solo tu."> rendi visibile</label>
+        <div style="flex:1;min-width:240px;font-size:13px;line-height:1.4">
+          <div data-testo>${esc(r.questione)}</div>
+          <div style="font-size:11.5px;color:#888">${esc(r.riguarda || '')}${r.entro_il ? ' · entro il ' + dIt(r.entro_il) : ''} · in attesa dal <input type="date" data-dal="${r.id}" value="${esc(r.aperta_il || '')}" style="width:auto;font-size:11.5px;padding:1px 4px" data-aiuto="La data da cui la questione aspetta: da qui si contano i giorni. Correggila se quella letta dalla task è sbagliata."> (${giorni(r.aperta_il) != null ? giorni(r.aperta_il) + ' g' : '—'})</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="btn-outline btn-sm" data-modifica="${r.id}" data-aiuto="Riscrive il testo della questione prima di renderla visibile: la task del second brain resta com'è.">✏️</button>
+          <button type="button" class="btn-outline btn-sm" data-scarta="${r.id}" data-aiuto="Scarta la proposta scrivendo perché (non opportuna, superata, doppia): non entra nel registro e non viene riproposta.">✕ Scarta</button></div></div>`;
+    const boxProposte = proposte.length ? `<details open style="margin:8px 0 12px;padding:8px 12px;border:1px solid #d6e0ea;border-radius:8px;background:#f5f8fb">
+        <summary style="cursor:pointer;font-size:13px;font-weight:600;color:#345">📥 Proposte da spuntare — ${proposte.length} task del second brain che aspettano il Direttore <span style="font-weight:400;color:#678">(le vedi solo tu: spunta quelle da rendere visibili, scarta le altre)</span></summary>
+        ${proposte.map(rigaProposta).join('')}</details>` : (R.segr && modo === 'coord' ? '<p style="font-size:12px;color:#888;margin:4px 0 10px">📥 Nessuna proposta da spuntare: le task del second brain che aspettano il Direttore arrivano qui tre volte al giorno.</p>' : '');
     const intro = modo === 'coord'
       ? 'Quello che aspetta una decisione di Direttore, Presidenza o Commissione Sicurezza. Le righe <em>automatiche</em> vengono dalle pratiche (autorizzazioni, conferme sui cantieri critici); le altre le scrivete voi. Si ordina per giorni di attesa.'
       : 'Quello che aspetta una tua decisione, ordinato per giorni di attesa. Le righe <em>automatiche</em> vengono dalle pratiche; le altre le hanno scritte coordinatore e segreteria. Rispondi qui: decidi, oppure rinvia a una data.';
@@ -233,6 +252,7 @@
       <h3>📋 Questioni in attesa di decisione ${lista.length ? `<span style="color:#b35c00">— ${lista.length} in attesa</span>` : '<span style="color:#2d7a06">— niente in attesa</span>'}</h3>
       <p style="font-size:12.5px;color:#555;margin:0 0 6px">${intro}</p>
       ${nuova}
+      ${boxProposte}
       ${lista.map(rigaHtml).join('') || '<p style="font-size:13px;color:#555;margin:6px 0 0">Nessuna questione aperta.</p>'}
       ${decise.length ? `<div style="font-size:12px;font-weight:600;color:#565c66;margin-top:12px">Decise, ${gestisce ? 'da prendere in carico' : 'in attesa che l\'ufficio le prenda in carico'} (${decise.length})</div>${decise.map(rigaDecisa).join('')}` : ''}
       ${rinviate.length ? `<div style="font-size:12px;font-weight:600;color:#565c66;margin-top:12px">Rinviate (${rinviate.length})</div>${rinviate.map((r) => `<div style="font-size:12.5px;color:#666;padding:5px 0;border-top:1px solid #f0e6dd">⏳ <strong>al ${dIt(r.rinviata_al)}</strong> — ${esc(r.questione)}${r.decisione ? ` <span style="color:#888">(${esc(r.decisione)})</span>` : ''} · ${decBadge(r.decisore)}</div>`).join('')}` : ''}
@@ -254,6 +274,35 @@
       avviso('Presa in carico: la decisione resta in cronologia.', 'ok'); await decisioniBox(host, modo); dopoCambio();
     })));
     const bn = $('dir-nuova'); if (bn) bn.addEventListener('click', () => formNuova(host, modo, R));
+    /* le proposte: spunta, correggi, scarta */
+    host.querySelectorAll('[data-pub]').forEach((cb) => cb.addEventListener('change', async () => {
+      if (!cb.checked) return;
+      const id = Number(cb.dataset.pub);
+      const dal = host.querySelector(`[data-dal="${id}"]`);
+      cb.disabled = true;
+      const { error } = await sb.from('s_decisioni').update({ stato: 'aperta', aperta_il: (dal && dal.value) || undefined }).eq('id', id);
+      if (error) { cb.checked = false; cb.disabled = false; avviso('Non riuscito: ' + error.message, 'err'); return; }
+      avviso('Ora la vedono Direttore e coordinatore.', 'ok'); await decisioniBox(host, modo); dopoCambio();
+    }));
+    host.querySelectorAll('[data-dal]').forEach((inp) => inp.addEventListener('change', async () => {
+      const { error } = await sb.from('s_decisioni').update({ aperta_il: inp.value || null }).eq('id', Number(inp.dataset.dal));
+      if (error) avviso('Data non salvata: ' + error.message, 'err'); else avviso('Data aggiornata.', 'ok');
+    }));
+    host.querySelectorAll('[data-modifica]').forEach((b) => b.addEventListener('click', (ev) => con(ev.currentTarget, async () => {
+      const riga = b.closest('[data-prop]'); const attuale = riga ? riga.querySelector('[data-testo]').textContent : '';
+      const nuovo = prompt('Il testo della questione (una riga):', attuale);
+      if (nuovo == null || !nuovo.trim()) return;
+      const { error } = await sb.from('s_decisioni').update({ questione: nuovo.trim().slice(0, 240) }).eq('id', Number(b.dataset.modifica));
+      if (error) throw new Error(error.message);
+      await decisioniBox(host, modo);
+    })));
+    host.querySelectorAll('[data-scarta]').forEach((b) => b.addEventListener('click', (ev) => con(ev.currentTarget, async () => {
+      const motivo = prompt('Perché la scarti? (non opportuna, superata, doppia…)');
+      if (motivo == null) return;
+      const { error } = await sb.from('s_decisioni').update({ stato: 'ritirata', ritirata_motivo: motivo.trim() || 'scartata dalla segreteria' }).eq('id', Number(b.dataset.scarta));
+      if (error) throw new Error(error.message);
+      avviso('Proposta scartata.', 'ok'); await decisioniBox(host, modo);
+    })));
     return { attesa: lista.length, daPrendere: decise.length };
   }
 
