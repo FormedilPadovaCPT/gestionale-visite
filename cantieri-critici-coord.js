@@ -153,6 +153,8 @@
         <div class="field" style="flex:1 1 240px"><input type="text" id="ccc-dec-testo" maxlength="600" placeholder="Indicazioni: quando, con chi parlare, perché…"></div>
         <button class="btn-outline btn-sm" id="ccc-salva-dec" style="margin-bottom:10px">Registra</button>
       </div>
+      ${!['chiuso', 'annullato'].includes(d.stato) ? `<div style="margin-top:6px">
+        <button class="btn-primary btn-sm" id="ccc-coinvolgi-pres" data-aiuto="A differenza di «Demandare» qui sopra (una nota in cronologia), coinvolge davvero Presidente e Vicepresidente: ricevono un avviso e rispondono dall'app, come già fa il Direttore.">🏛 Coinvolgi la Presidenza — avviso reale nell'app</button></div>` : ''}
 
       <div class="cc-sez">Testo di merito della segnalazione a SPISAL / ITL
         <span style="font-weight:400;color:#888">— le criticit&agrave; riscontrate, che cosa &egrave; stato segnalato all'impresa e non sanato. La segreteria lo ritrova nella maschera della segnalazione.${d.merito_il ? ` Ultima modifica ${oraIt(d.merito_il)} (${esc(d.merito_da || '')}).` : ''}</span></div>
@@ -205,6 +207,14 @@
       avviso('Testo di merito salvato: la segreteria lo ritrova nella segnalazione.', 'ok');
       dopo();
     });
+
+    $('ccc-coinvolgi-pres')?.addEventListener('click', (ev) => con(ev.currentTarget, async () => {
+      if (!confirm('Coinvolgo la Presidenza: Presidente e Vicepresidente ricevono un avviso e trovano il caso nella loro pagina. Procedo?')) return;
+      const { error: e } = await window.sb.rpc('s_critico_coinvolgi_presidenza', { p_id: d.id, p_nota: null });
+      if (e) throw e;
+      avviso('Presidenza coinvolta: hanno ricevuto un avviso nell\'app.', 'ok');
+      dopo();
+    }));
   }
 
   /* quante cose aspettano: le fatture si contano dai pulsanti «Approva» del

@@ -115,7 +115,7 @@
     }
     host.innerHTML = `<div class="card" style="border-left:4px solid #8e44ad"><h3>⚠️ Cantieri critici — <span style="color:#8e44ad">${critici.length} ${critici.length === 1 ? 'conferma richiesta' : 'conferme richieste'}</span></h3>
       <p style="font-size:12.5px;color:#555;margin:0 0 6px">Segnalazioni agli organi di vigilanza su cui la segreteria ha chiesto la tua conferma. Tocca la riga: vedi caso, verbali e cronologia, e rispondi.</p>
-      ${critici.map((c) => { const g = giorni(c.dal); return `<div data-crit="${c.id}" data-aiuto="Apre il caso con i verbali del cantiere e la cronologia: da lì premi «Confermo» o «Non confermo». La risposta resta in cronologia col tuo nome, data e ora." style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid #f0e6dd;cursor:pointer">
+      ${critici.map((c) => { const g = giorni(c.dal); return `<div data-crit="${c.id}" data-aiuto="Apre il caso con i verbali del cantiere e la cronologia: da lì rispondi. La risposta resta in cronologia col tuo nome, data e ora." style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid #f0e6dd;cursor:pointer">
         <strong style="font-size:12px">n° ${c.id}</strong>
         <span style="font-size:13px;flex:1;min-width:220px"><strong>${esc(c.impresa || '—')}</strong> — ${esc(c.cantiere || '')}</span>
         <span style="font-size:11.5px;color:#888">evento del ${dIt(c.data_evento)}</span>
@@ -126,6 +126,7 @@
 
   async function apriCritico(id) {
     const sb = window.sb;
+    const R = await ruoli();
     const [{ data: d, error }, { data: eventi }] = await Promise.all([
       sb.from('s_cantieri_critici').select('*').eq('id', id).maybeSingle(),
       sb.from('s_cantieri_critici_eventi').select('*').eq('critico_id', id).order('created_at'),
@@ -137,8 +138,36 @@
       verbali = (r.data || []).filter((v) => !v.elimina);
     }
     const fermo = ['chiuso', 'annullato'].includes(d.stato);
-    const gia = [...(eventi || [])].reverse().find((e) => e.tipo === 'autorizzazione_direttore');
+    /* 25/09/2026: la conferma vera è del Direttore (autorizzazione_direttore) o della
+       Presidenza (decisione_organo, con «chi» = Presidente/Vicepresidente); chi non è
+       né l'uno né l'altra (coordinatore/segreteria, quando apre il caso dalla lista
+       automatica delle questioni) vede solo la cronologia: risponde da dove gestisce
+       davvero il caso — Zona Coordinatore o l'app segreteria. */
+    const perDirettore = R.direttore, perPresidenza = R.presidenza && !R.direttore;
+    const miaCarica = S().carica === 'presidente' ? 'Presidente' : S().carica === 'vicepresidente' ? 'Vicepresidente' : null;
+    const gia = perDirettore
+      ? [...(eventi || [])].reverse().find((e) => e.tipo === 'autorizzazione_direttore')
+      : perPresidenza
+        ? [...(eventi || [])].reverse().find((e) => e.tipo === 'decisione_organo')
+        : null;
     const riga = (k, v) => `<div style="padding:4px 0;border-bottom:1px solid #f2f2f2;font-size:13px"><strong>${k}:</strong> ${v}</div>`;
+    const azioni = fermo ? `<p style="font-size:13px;color:#555">Il caso è ${esc(d.stato)}: non c'è niente da confermare.</p>`
+      : perDirettore ? `
+        ${gia ? `<p style="font-size:12.5px;color:#555">Hai già risposto: ${esc(gia.testo || '')} Puoi rispondere di nuovo: vale l'ultima.</p>` : ''}
+        <p style="font-size:12.5px;color:#555">Se segnalare lo decidono la Presidenza e la Commissione Sicurezza; qui dai la tua conferma. Resta in cronologia col tuo nome, data e ora. La segnalazione la prepara poi la segreteria.</p>
+        <label style="font-size:12px">Una nota (facoltativa)</label><textarea id="dir-cd-nota" rows="3" style="width:100%;box-sizing:border-box"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="btn-outline btn-sm" id="dir-cd-no" data-aiuto="Registra in cronologia che NON confermi la segnalazione agli organi di vigilanza. La segreteria lo vede nel caso.">⛔ Non confermo</button>
+          <button type="button" class="btn-primary btn-sm" id="dir-cd-si" data-aiuto="Registra in cronologia che CONFERMI la segnalazione a SPISAL / ITL. Da qui la segreteria prepara e protocolla la lettera.">✅ Confermo la segnalazione</button>
+          <button type="button" class="btn-outline btn-sm" id="dir-cd-pres" data-aiuto="Coinvolge anche Presidente e Vicepresidente: ricevono un avviso e rispondono dall'app come te. Utile se non riesci a risolvere da solo, o se preferisci decidano loro.">🏛 Coinvolgo la Presidenza</button></div>`
+      : perPresidenza ? `
+        ${gia ? `<p style="font-size:12.5px;color:#555">Hai già risposto (${esc(miaCarica || 'Presidenza')}): ${esc(gia.testo || '')} Puoi rispondere di nuovo: vale l'ultima.</p>` : ''}
+        <p style="font-size:12.5px;color:#555">Decidi tu se segnalare agli organi di vigilanza: resta in cronologia col tuo nome (${esc(miaCarica || 'Presidenza')}), data e ora. Il Direttore vede la tua decisione e conferma.</p>
+        <label style="font-size:12px">Una nota (facoltativa)</label><textarea id="dir-cd-nota" rows="3" style="width:100%;box-sizing:border-box"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="btn-outline btn-sm" id="dir-cd-no" data-aiuto="Registra in cronologia che decidi di NON segnalare agli organi di vigilanza.">⛔ Decido di non segnalare</button>
+          <button type="button" class="btn-primary btn-sm" id="dir-cd-si" data-aiuto="Registra in cronologia che decidi di SEGNALARE agli organi di vigilanza. Il Direttore la vede e conferma.">✅ Decido di segnalare</button></div>`
+      : '<p style="font-size:12.5px;color:#555">Si risponde da dove si gestisce il caso (Zona Coordinatore o app segreteria): qui solo la cronologia.</p>';
     finestra(`⚠️ Cantiere critico n° ${d.id} — conferma della segnalazione`, `
       ${riga('Cantiere', esc(d.cantiere_desc))}
       ${riga('Impresa', esc(d.impresa_nome))}
@@ -148,24 +177,32 @@
       <div style="font-weight:600;margin:10px 0 4px">Cronologia</div>
       ${(eventi || []).filter((e) => e.tipo !== 'stato').map((e) => `<div style="font-size:12.5px;padding:3px 0;white-space:pre-wrap"><span style="color:#888">${oraIt(e.created_at)}</span> <strong>${esc(EV_CRIT[e.tipo] || e.tipo)}</strong>${e.testo ? ' — ' + esc(e.testo) : ''}</div>`).join('') || '<p style="color:#888;font-size:12.5px">Ancora niente.</p>'}
       <hr style="margin:10px 0;border:0;border-top:1px solid #eee">
-      ${fermo ? `<p style="font-size:13px;color:#555">Il caso è ${esc(d.stato)}: non c'è niente da confermare.</p>` : `
-        ${gia ? `<p style="font-size:12.5px;color:#555">Hai già risposto: ${esc(gia.testo || '')} Puoi rispondere di nuovo: vale l'ultima.</p>` : ''}
-        <p style="font-size:12.5px;color:#555">Se segnalare lo decidono la Presidenza e la Commissione Sicurezza; qui dai la tua conferma. Resta in cronologia col tuo nome, data e ora. La segnalazione la prepara poi la segreteria.</p>
-        <label style="font-size:12px">Una nota (facoltativa)</label><textarea id="dir-cd-nota" rows="3" style="width:100%;box-sizing:border-box"></textarea>
-        <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px">
-          <button type="button" class="btn-outline btn-sm" id="dir-cd-no" data-aiuto="Registra in cronologia che NON confermi la segnalazione agli organi di vigilanza. La segreteria lo vede nel caso.">⛔ Non confermo</button>
-          <button type="button" class="btn-primary btn-sm" id="dir-cd-si" data-aiuto="Registra in cronologia che CONFERMI la segnalazione a SPISAL / ITL. Da qui la segreteria prepara e protocolla la lettera.">✅ Confermo la segnalazione</button></div>`}`);
+      ${azioni}`);
     const rispondi = (btn, cosa) => con(btn, async () => {
-      if (!confirm(cosa === 'segnalare' ? 'CONFERMI la segnalazione agli organi di vigilanza per questo cantiere?' : 'NON confermi la segnalazione?')) return;
-      const { error: e } = await sb.rpc('s_critico_conferma_direttore', { p_id: d.id, p_cosa: cosa, p_nota: ($('dir-cd-nota').value || '').trim() || null });
+      const domanda = perDirettore
+        ? (cosa === 'segnalare' ? 'CONFERMI la segnalazione agli organi di vigilanza per questo cantiere?' : 'NON confermi la segnalazione?')
+        : (cosa === 'segnalare' ? 'DECIDI di segnalare agli organi di vigilanza per questo cantiere?' : 'DECIDI di non segnalare?');
+      if (!confirm(domanda)) return;
+      const { error: e } = perDirettore
+        ? await sb.rpc('s_critico_conferma_direttore', { p_id: d.id, p_cosa: cosa, p_nota: ($('dir-cd-nota').value || '').trim() || null })
+        : await sb.rpc('s_critico_decide_presidenza', { p_id: d.id, p_cosa: cosa, p_nota: ($('dir-cd-nota').value || '').trim() || null });
       if (e) throw new Error(e.message);
-      avviso('Registrato in cronologia. La segreteria lo vede nel caso.', 'ok');
+      avviso('Registrato in cronologia.' + (perDirettore ? ' La segreteria lo vede nel caso.' : ' Il Direttore lo vede e conferma.'), 'ok');
       chiudi();
       carica();
     });
     const si = $('dir-cd-si'), no = $('dir-cd-no');
     if (si) si.addEventListener('click', (ev) => rispondi(ev.currentTarget, 'segnalare'));
     if (no) no.addEventListener('click', (ev) => rispondi(ev.currentTarget, 'non_segnalare'));
+    const coinvolgi = $('dir-cd-pres');
+    if (coinvolgi) coinvolgi.addEventListener('click', (ev) => con(ev.currentTarget, async () => {
+      if (!confirm('Coinvolgo la Presidenza: Presidente e Vicepresidente ricevono un avviso e trovano il caso nella loro pagina. Procedo?')) return;
+      const { error: e } = await sb.rpc('s_critico_coinvolgi_presidenza', { p_id: d.id, p_nota: null });
+      if (e) throw new Error(e.message);
+      avviso('Presidenza coinvolta: hanno ricevuto un avviso nell\'app.', 'ok');
+      chiudi();
+      carica();
+    }));
   }
 
   /* ════════════════════════════════════════════════════════════
@@ -416,12 +453,15 @@
     const intro = $('dir-intro');
     if (intro) intro.textContent = R.direttore
       ? 'Quello che aspetta te: autorizzazioni dei servizi CPT, conferme sui cantieri critici e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
-      : 'Le questioni che coordinatore e segreteria hanno aperto per la Presidenza. La mappa e le statistiche sono nelle altre due schede.';
+      : R.presidenza
+        ? 'Quello che aspetta te: cantieri critici demandati alla Presidenza e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
+        : 'Le questioni che coordinatore e segreteria hanno aperto per la Presidenza. La mappa e le statistiche sono nelle altre due schede.';
     const aut = $('dir-autorizzazioni'), cri = $('dir-critici');
-    if (R.direttore) {
-      if (typeof window.loadAutorizzazioni === 'function') window.loadAutorizzazioni().catch((e) => console.warn('autorizzazioni:', e));
+    if (R.direttore && typeof window.loadAutorizzazioni === 'function') window.loadAutorizzazioni().catch((e) => console.warn('autorizzazioni:', e));
+    else if (aut) aut.innerHTML = '';
+    if (R.direttore || R.presidenza) {
       try { const a = await inAttesa(); boxCritici(cri, a.critici || []); } catch (e) { boxCritici(cri, [], e.message || String(e)); }
-    } else { if (aut) aut.innerHTML = ''; if (cri) cri.innerHTML = ''; }
+    } else if (cri) cri.innerHTML = '';
     await decisioniBox($('dir-decisioni'), 'direzione');
     badge().catch(() => {});
   }
@@ -437,6 +477,7 @@
       const { data } = await window.sb.from('s_decisioni').select('id,stato,rinviata_al,decisore').in('stato', ['aperta', 'rinviata']);
       n += (data || []).filter((r) => (r.stato === 'aperta' || (r.rinviata_al && r.rinviata_al <= T)) && ((r.decisore === 'direttore' && R.direttore) || (r.decisore === 'presidenza' && R.presidenza))).length;
       if (R.direttore) { const a = await inAttesa(); n += (a.autorizzazioni || []).length + (a.critici || []).length; }
+      else if (R.presidenza) { const a = await inAttesa(); n += (a.critici || []).length; }
     } catch (e) { console.warn('badge direzione:', e); }
     b.textContent = n; b.style.display = n ? '' : 'none';
   }

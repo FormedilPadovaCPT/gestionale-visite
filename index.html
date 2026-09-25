@@ -2461,7 +2461,12 @@ async function onLogin(user){
     document.body.classList.add('viewer-mode')
     await loadVoci().catch(()=>{})
     showScr('app')
-    navTo('dashboard')
+    // link diretto a un caso critico (#critico-<id>, dalla mail «Chiedi conferma al
+    // Direttore» / «Coinvolgi la Presidenza»): apre già sulla scheda giusta (25/09/2026,
+    // prima il link non faceva niente — nessuna route lo intercettava)
+    const _hc=(location.hash||'').match(/^#critico-(\d+)$/)
+    if(_hc&&(S.direttore||S.presidenza)){navTo('direzione');if(window.direzione&&window.direzione.apriCritico)window.direzione.apriCritico(Number(_hc[1])).catch(e=>console.warn('apriCritico da link:',e))}
+    else navTo('dashboard')
     S.appReady=true
     return
   }
