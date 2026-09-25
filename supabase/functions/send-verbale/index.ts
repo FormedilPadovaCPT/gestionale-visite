@@ -9,6 +9,8 @@
 //      poteva far partire dalla casella dell'ente una mail verso un indirizzo
 //      scelto da lui, con allegato un file qualunque del Drive letto per id.
 //      Ora serve un utente autenticato del personale (is_personale).
+// 25/09/2026 v32: la nota del tecnico sulla formazione mancante NON va all'impresa,
+//      solo all'ufficio corsi (scelta dell'utente: «son utili a noi interni, non all'azienda»).
 //
 // Secret richiesto: GOOGLE_SERVICE_ACCOUNT_JSON
 // Scopes DWD richiesti:
@@ -203,7 +205,7 @@ function formazioneHtml(f: Formazione, proposte: Proposta[], cfg: Record<string,
   const contatto = `${esc(cfg.ufficio_corsi_nomi || 'Ufficio Corsi Sicurezza')} — <a href="mailto:${esc(cfg.ufficio_corsi_email || 'corsi@formedilpadova.it')}" style="color:#e7500f">${esc(cfg.ufficio_corsi_email || 'corsi@formedilpadova.it')}</a>`
   return `
     <h3 style="color:#e7500f;font-size:15px;margin:22px 0 8px;border-bottom:2px solid #e7500f;padding-bottom:5px">Formazione: possiamo aiutarvi</h3>
-    <p style="line-height:1.7;margin:0 0 10px">Durante la visita il nostro tecnico ha rilevato che manca o va aggiornata la formazione per: <strong>${esc(etich.join(', ') || 'vedi rapporto')}</strong>.${f.nota ? ` <span style="color:#555">(${esc(f.nota)})</span>` : ''}</p>
+    <p style="line-height:1.7;margin:0 0 10px">Durante la visita il nostro tecnico ha rilevato che manca o va aggiornata la formazione per: <strong>${esc(etich.join(', ') || 'vedi rapporto')}</strong>.</p>
     <p style="line-height:1.7;margin:0 0 6px">Formedil Padova tiene questi corsi nella propria sede. ${ceiv === 'si' ? 'Per le imprese iscritte alla Cassa Edile la maggior parte dei corsi di sicurezza è <strong>gratuita</strong>.' : 'Per le imprese iscritte alla Cassa Edile la maggior parte dei corsi di sicurezza è <strong>gratuita</strong>: vale la pena tenerne conto.'} Le prossime date in programma:</p>
     <ul style="margin:0 0 12px 18px;padding:0;line-height:1.55">${righe.join('')}</ul>
     <p style="line-height:1.7;margin:0 0 14px">Per iscrizioni e informazioni: ${contatto}${cfg.formazione_programmazione_url ? ` · <a href="${esc(cfg.formazione_programmazione_url)}" style="color:#e7500f">programmazione completa dei corsi</a>` : ''}. L'Ufficio Corsi ha già ricevuto questa segnalazione e può contattarvi.</p>`
@@ -241,7 +243,9 @@ async function formazionePrepara(f: Formazione | undefined, authHeader: string):
   if (ep) console.warn('formazione_proposte:', ep.message)
   const cfg: Record<string, string> = Object.fromEntries((cfgRows || []).map((r: { chiave: string; valore: string }) => [r.chiave, r.valore]))
   const proposte = (Array.isArray(prop) ? prop : []) as Proposta[]
-  return { html: formazioneHtml(f, proposte, cfg), proposte, cfg }
+  /* all'impresa il paragrafo va solo se il tecnico ha spuntato QUALE formazione manca; la sola nota
+     (che dal 25/09/2026 non va mai all'impresa: la legge l'ufficio corsi) fa partire la segnalazione interna */
+  return { html: (f.tipi || []).length ? formazioneHtml(f, proposte, cfg) : '', proposte, cfg }
 }
 
 serve(async (req) => {

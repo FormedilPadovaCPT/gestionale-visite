@@ -893,7 +893,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <div class="field"><label><span class="check-inline"><input type="checkbox" id="f-note-for-sn"> Contattare l'ufficio corsi per regolarizzare la formazione mancante</span></label></div>
             <div class="field" id="fld-note-for-tipi"><label>Quale formazione manca? <span style="font-weight:400;text-transform:none;letter-spacing:0">(spunta una o più voci: con la casella qui sopra, l'impresa riceve nella mail del verbale le prossime date dei corsi e l'ufficio corsi viene avvisato)</span></label>
               <div id="f-note-for-tipi" class="chips-tipi"><span style="font-size:12px;color:#888">Carico l'elenco…</span></div></div>
-            <div class="field"><label>Note sulla formazione mancante</label><textarea id="f-note-for-m" rows="2" placeholder="Es. solo il titolare ha il primo soccorso, e non sta in cantiere"></textarea></div>
+            <div class="field"><label>Note sulla formazione mancante <span style="font-weight:400;text-transform:none;letter-spacing:0">(la legge solo l'Ufficio Corsi, non l'impresa: scrivi liberamente quello che serve per contattarla)</span></label><textarea id="f-note-for-m" rows="2" placeholder="Es. solo il titolare ha il primo soccorso, e non sta in cantiere; chiedere di Mario, il capocantiere"></textarea></div>
           </div>
           <div class="sect-title">Visita di ritorno</div>
           <div class="field">
@@ -2619,7 +2619,7 @@ const _ceivDa=(cassa,stato)=>{const c=String(cassa||'').toLowerCase(),s=String(s
 /* nell'anteprima della mail: che cosa aggiungerà l'app (le date e le quote le legge dal calendario corsi) */
 function _evFormazioneTesto(){
   const f=window._evFormazione;if(!f)return []
-  return ['','[Formazione: possiamo aiutarvi]',`Durante la visita il nostro tecnico ha rilevato che manca o va aggiornata la formazione per: ${f.tipi_etichette.join(', ')||'vedi nota'}.${f.nota?' — '+f.nota:''}`,
+  return ['','[Formazione: possiamo aiutarvi]',`Durante la visita il nostro tecnico ha rilevato che manca o va aggiornata la formazione per: ${f.tipi_etichette.join(', ')||'vedi rapporto'}.`,
     `[L'app aggiunge qui le prossime date in programma dei corsi con la quota: ${f.ceiv==='si'?'gratuito o scontato per la Vostra impresa iscritta CEIV, con il prezzo di listino che risparmiate':'quota di listino, e quanto costerebbe con l\'iscrizione alla Cassa Edile'}. L'ufficio corsi riceve la segnalazione con i contatti dell'impresa.]`]
 }
 
@@ -13616,7 +13616,7 @@ document.addEventListener('input',function(ev){
 <script src="riepilogo-verbali.js?v=1"></script>
 <script src="scheda-impresa.js?v=1"></script>
 <script src="notifiche.js?v=3"></script>
-<script src="aiuto.js?v=8"></script>
+<script src="aiuto.js?v=9"></script>
 <script src="mail-respinte-tec.js?v=1"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
