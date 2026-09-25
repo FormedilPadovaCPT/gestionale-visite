@@ -1570,6 +1570,14 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field" style="flex:1"><label>Email 3</label><input type="email" id="mp-email3"></div>
       <div class="field" style="flex:1"><label>Telefono 2</label><input type="text" id="mp-telefono2"></div>
     </div>
+    <div id="mp-riservati-wrap" style="display:none;background:#faf7fc;border-radius:8px;padding:8px 10px;margin:-4px 0 10px;font-size:12px" title="I campi spuntati non compaiono in Rubrica ai tecnici: solo la segreteria li vede.">
+      <label style="display:block;font-weight:600;color:#8e44ad;margin-bottom:4px">🔒 Nascondi ai tecnici (solo la segreteria vede questi campi)</label>
+      <label style="margin-right:12px"><input type="checkbox" id="mp-ris-email"> Email</label>
+      <label style="margin-right:12px"><input type="checkbox" id="mp-ris-email2"> Email 2</label>
+      <label style="margin-right:12px"><input type="checkbox" id="mp-ris-email3"> Email 3</label>
+      <label style="margin-right:12px"><input type="checkbox" id="mp-ris-telefono"> Telefono</label>
+      <label><input type="checkbox" id="mp-ris-telefono2"> Telefono 2</label>
+    </div>
     <div class="row">
       <div class="field" style="flex:0 0 160px"><label>Data di nascita</label><input type="date" id="mp-nascita"></div>
       <div class="field" style="flex:1"><label>Comune di nascita</label><input type="text" id="mp-comune-nascita" placeholder="Es. Padova (PD)"></div>
@@ -1902,6 +1910,14 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>Email 2</label><input type="email" id="ei-email2"></div>
       <div class="field"><label>Email 3</label><input type="email" id="ei-email3"></div>
       <div class="field"><label>Telefono 2</label><input type="tel" id="ei-tel2"></div>
+    </div>
+    <div id="ei-riservati-wrap" style="display:none;background:#faf7fc;border-radius:8px;padding:8px 10px;margin:-4px 0 10px;font-size:12px" title="I campi spuntati non compaiono in Rubrica ai tecnici: solo la segreteria li vede.">
+      <label style="display:block;font-weight:600;color:#8e44ad;margin-bottom:4px">🔒 Nascondi ai tecnici (solo la segreteria vede questi campi)</label>
+      <label style="margin-right:12px"><input type="checkbox" id="ei-ris-email"> Email</label>
+      <label style="margin-right:12px"><input type="checkbox" id="ei-ris-email2"> Email 2</label>
+      <label style="margin-right:12px"><input type="checkbox" id="ei-ris-email3"> Email 3</label>
+      <label style="margin-right:12px"><input type="checkbox" id="ei-ris-tel"> Telefono</label>
+      <label><input type="checkbox" id="ei-ris-tel2"> Telefono 2</label>
     </div>
     <div class="sect-title" style="margin-top:10px">Dati societari / Contratto</div>
     <div class="row">
@@ -6798,10 +6814,13 @@ const _PERS_RUOLI={presente:'Presente in visita',rl:'Resp. lavori',csp:'CSP',cse
 
 // ── scheda persona (modifica) ──
 let _mpId=null
+let _mpRiservati=[]
 async function editPersona(id){
-  const{data:r,error}=await sb.from('persone').select('*').eq('persona_id',id).single()
+  const{data:rows,error}=await sb.rpc('rubrica_persona_dettaglio',{p_id:id})
+  const r=(rows||[])[0]
   if(error||!r){toast('Persona non trovata','err');return}
   _mpId=id
+  _mpRiservati=r.contatti_riservati||[]
   vSet('mp-titolo',r.titolo||'');vSet('mp-nome',r.nome||'');vSet('mp-cognome',r.cognome||'')
   vSet('mp-cf',r.cf||'');vSet('mp-qualifica',r.qualifica||'');vSet('mp-email',r.email||'');vSet('mp-telefono',r.telefono||'')
   vSet('mp-email2',r.email2||'');vSet('mp-email3',r.email3||'');vSet('mp-telefono2',r.telefono2||'')
@@ -6817,6 +6836,20 @@ async function editPersona(id){
   $('mp-cf-note').textContent=coord?'':'(modificabile solo dalla segreteria)'
   const _rw=$('mp-ruoli-edit-wrap');if(_rw)_rw.style.display=coord?'':'none'
   $('mp-ruoli').textContent=coord?'':'Ruoli visti nelle visite: '+((r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')||'–')
+  // ── riservatezza contatti: solo la segreteria vede e imposta le spunte ──
+  const isSeg=!!window.__isSegreteria
+  const _rrw=$('mp-riservati-wrap');if(_rrw)_rrw.style.display=isSeg?'':'none'
+  ;[['mp-ris-email','email'],['mp-ris-email2','email2'],['mp-ris-email3','email3'],['mp-ris-telefono','telefono'],['mp-ris-telefono2','telefono2']].forEach(([elId,campo])=>{
+    const el=$(elId);if(el)el.checked=_mpRiservati.includes(campo)
+  })
+  // per chi non è segreteria, un campo riservato non deve né vedersi né essere
+  // sovrascritto al salvataggio: si disabilita e si mostra come nascosto
+  ;[['mp-email','email'],['mp-email2','email2'],['mp-email3','email3'],['mp-telefono','telefono'],['mp-telefono2','telefono2']].forEach(([elId,campo])=>{
+    const el=$(elId);if(!el)return
+    const nascosto=!isSeg&&_mpRiservati.includes(campo)
+    el.disabled=nascosto
+    el.placeholder=nascosto?'🔒 riservato: solo la segreteria':''
+  })
   show('modal-persona')
 }
 {const _mpAnn=document.querySelector('#modal-persona [onclick*="modal-persona"]');if(_mpAnn)_mpAnn.addEventListener('click',()=>{_mpFromRuolo=null;_mpNewRuolo=null})}
@@ -6824,18 +6857,28 @@ $('mp-salva').onclick=async()=>{
   const cog=vGet('mp-cognome').trim()
   if(!cog){toast('Il cognome è obbligatorio','warn');return}
   const nome=vGet('mp-nome').trim()
+  const isSeg=!!window.__isSegreteria
   const upd={titolo:vGet('mp-titolo')||null,nome:nome||null,cognome:cog,
-    qualifica:vGet('mp-qualifica').trim()||null,email:vGet('mp-email').trim()||null,telefono:vGet('mp-telefono').trim()||null,
-    email2:vGet('mp-email2').trim()||null,email3:vGet('mp-email3').trim()||null,telefono2:vGet('mp-telefono2').trim()||null,
+    qualifica:vGet('mp-qualifica').trim()||null,
     data_nascita:vGet('mp-nascita')||null,comune_nascita:vGet('mp-comune-nascita').trim()||null,
     sesso:vGet('mp-sesso')||null,note:vGet('mp-note').trim()||null,
     updated_at:new Date().toISOString(),updated_by:S.user?.email||null}
+  // i campi di contatto marcati riservati non si toccano se chi salva non è
+  // segreteria: sono disabilitati in form, ma qui si evita comunque di
+  // scrivere null sopra un valore che non si è nemmeno visto
+  ;[['email','mp-email'],['email2','mp-email2'],['email3','mp-email3'],['telefono','mp-telefono'],['telefono2','mp-telefono2']].forEach(([campo,elId])=>{
+    if(isSeg||!_mpRiservati.includes(campo))upd[campo]=vGet(elId).trim()||null
+  })
   if(window.__isCoord){
     upd.cf=vGet('mp-cf').trim().toUpperCase()||null
     if($('mp-ruoli-edit-wrap')?.style.display!=='none'){
       const _rr=vGet('mp-ruoli-edit').trim()
       upd.ruoli=_rr?_rr.split(',').map(s=>s.trim()).filter(Boolean):[]
     }
+  }
+  if(isSeg){
+    upd.contatti_riservati=[['mp-ris-email','email'],['mp-ris-email2','email2'],['mp-ris-email3','email3'],['mp-ris-telefono','telefono'],['mp-ris-telefono2','telefono2']]
+      .filter(([elId])=>$(elId)?.checked).map(([,campo])=>campo)
   }
   // ── creazione nuova scheda dal form visita ──
   if(!_mpId){
@@ -7136,6 +7179,12 @@ window.nuovaPersona=function(ruolo){
   $('mp-cf-note').textContent=coord?'':'(modificabile solo dalla segreteria)'
   $('mp-ruoli').textContent='Verrà salvata in anagrafica con il ruolo: '+(_PERS_RUOLI[ruolo]||ruolo)
   const t=$('mp-title');if(t)t.textContent='👥 Nuova persona — '+(_PERS_RUOLI[ruolo]||ruolo)
+  // scheda nuova: nessun campo riservato ereditato dall'ultima persona aperta
+  _mpRiservati=[]
+  const isSeg=!!window.__isSegreteria
+  const _rrw=$('mp-riservati-wrap');if(_rrw)_rrw.style.display=isSeg?'':'none'
+  ;['mp-ris-email','mp-ris-email2','mp-ris-email3','mp-ris-telefono','mp-ris-telefono2'].forEach(id=>{const el=$(id);if(el)el.checked=false})
+  ;['mp-email','mp-email2','mp-email3','mp-telefono','mp-telefono2'].forEach(id=>{const el=$(id);if(el){el.disabled=false;el.placeholder=''}})
   show('modal-persona')
 }
 
@@ -10439,6 +10488,7 @@ async function admLoadImprese() {
 }
 
 // Apre il modal di modifica pre-popolato con i dati dell'impresa
+let _eiRiservati=[]
 async function admEditImpresa(impresaId) {
   _editImpId = impresaId
   // Reset modal
@@ -10448,12 +10498,12 @@ async function admEditImpresa(impresaId) {
   const ccnlWrap=$('ei-ccnl-altro-wrap');if(ccnlWrap)ccnlWrap.classList.add('hidden')
 
   try {
-    // Carica dati impresa
-    const { data: imp, error } = await sb.from('imprese')
-      .select('*')
-      .eq('impresa_id', impresaId)
-      .single()
+    // Carica dati impresa (mascherata: chi non è segreteria non riceve i
+    // contatti marcati riservati)
+    const { data: rows, error } = await sb.rpc('rubrica_impresa_dettaglio', { p_id: impresaId })
+    const imp = (rows||[])[0]
     if (error || !imp) { toast('Impresa non trovata','err'); return }
+    _eiRiservati = imp.contatti_riservati||[]
 
     // Popola campi
     vSet('ei-piva', imp.impresa_id || imp.piva || '')
@@ -10466,6 +10516,20 @@ async function admEditImpresa(impresaId) {
     vSet('ei-email2',imp.impresa_email2 || '')
     vSet('ei-email3',imp.impresa_email3 || '')
     vSet('ei-tel2', imp.impresa_telefono2 || '')
+
+    // riservatezza contatti: solo la segreteria vede e imposta le spunte;
+    // gli altri trovano il campo bloccato se marcato riservato
+    const isSeg=!!window.__isSegreteria
+    const _erw=$('ei-riservati-wrap');if(_erw)_erw.style.display=isSeg?'':'none'
+    ;[['ei-ris-email','impresa_email_ref'],['ei-ris-email2','impresa_email2'],['ei-ris-email3','impresa_email3'],['ei-ris-tel','impresa_telefono'],['ei-ris-tel2','impresa_telefono2']].forEach(([elId,campo])=>{
+      const el=$(elId);if(el)el.checked=_eiRiservati.includes(campo)
+    })
+    ;[['ei-email','impresa_email_ref'],['ei-email2','impresa_email2'],['ei-email3','impresa_email3'],['ei-tel','impresa_telefono'],['ei-tel2','impresa_telefono2']].forEach(([elId,campo])=>{
+      const el=$(elId);if(!el)return
+      const nascosto=!isSeg&&_eiRiservati.includes(campo)
+      el.disabled=nascosto
+      el.placeholder=nascosto?'🔒 riservato: solo la segreteria':''
+    })
 
     // CEIV
     const ceivSel = $('ei-ceiv')
@@ -10503,20 +10567,26 @@ async function admSaveEditImpresa() {
   if (!nome) { toast('Ragione sociale obbligatoria','warn'); $('ei-nome').focus(); return }
   const ccnlVal = vGet('ei-ccnl') || null
   const isAltro = ccnlVal === '13'
+  const isSeg = !!window.__isSegreteria
   const updates = {
     impresa_nome: nome,
     impresa_cf:   vGet('ei-cf').trim() || null,
     indirizzo:    vGet('ei-ind').trim() || null,
     comune:       vGet('ei-com').trim() || null,
-    impresa_email_ref: vGet('ei-email').trim() || null,
-    impresa_telefono:  vGet('ei-tel').trim() || null,
-    impresa_email2: vGet('ei-email2').trim() || null,
-    impresa_email3: vGet('ei-email3').trim() || null,
-    impresa_telefono2: vGet('ei-tel2').trim() || null,
     cassa_edile:  vGet('ei-ceiv') || null,
     tipo_iscrizione_ccia: vGet('ei-tipo-ccia') || null,
     contratto_ccnl: isAltro ? 'ALTRO' : ccnlVal,
     contratto_ccnl_altro: isAltro ? (vGet('ei-ccnl-altro').trim() || null) : null,
+  }
+  // i campi marcati riservati non si sovrascrivono se chi salva non è
+  // segreteria: sono disabilitati in form, e qui non si scrive null sopra
+  // un valore che non si è nemmeno visto
+  ;[['impresa_email_ref','ei-email'],['impresa_email2','ei-email2'],['impresa_email3','ei-email3'],['impresa_telefono','ei-tel'],['impresa_telefono2','ei-tel2']].forEach(([campo,elId])=>{
+    if(isSeg||!_eiRiservati.includes(campo))updates[campo]=vGet(elId).trim()||null
+  })
+  if(isSeg){
+    updates.contatti_riservati=[['ei-ris-email','impresa_email_ref'],['ei-ris-email2','impresa_email2'],['ei-ris-email3','impresa_email3'],['ei-ris-tel','impresa_telefono'],['ei-ris-tel2','impresa_telefono2']]
+      .filter(([elId])=>$(elId)?.checked).map(([,campo])=>campo)
   }
   const { error } = await sb.from('imprese').update(updates).eq('impresa_id', _editImpId)
   if (error) { toast('Errore aggiornamento impresa: ' + error.message, 'err'); return }
@@ -11161,14 +11231,13 @@ async function loadRubrica(){
 
   // ── IMPRESE ──
   if(!cat||cat==='impresa'){
-    let qb=sb.from('imprese').select('impresa_id,impresa_nome,piva,impresa_cf,comune,indirizzo,impresa_email_ref,impresa_telefono,contratto_ccnl,tipo_iscrizione_ccia,cassa_edile,cod_ceiv').eq('elimina',0).limit(50)
-    if(q)qb=qb.or(`impresa_nome.ilike.*${q}*,piva.ilike.*${q}*,impresa_cf.ilike.*${q}*,impresa_email_ref.ilike.*${q}*,impresa_email2.ilike.*${q}*,impresa_email3.ilike.*${q}*,impresa_telefono.ilike.*${q}*,impresa_telefono2.ilike.*${q}*,comune.ilike.*${q}*`)
-    const{data}=await qb
+    const{data}=await sb.rpc('rubrica_imprese_cerca',{p_q:q||null,p_limit:50})
     ;(data||[]).forEach(r=>{
+      const ris=r.contatti_riservati||[]
       const sub=[r.comune,r.piva].filter(Boolean).join(' · ')
       const extra=[
-        r.impresa_email_ref?`<a href="mailto:${esc(r.impresa_email_ref)}" style="color:var(--orange)">${esc(r.impresa_email_ref)}</a>`:'',
-        r.impresa_telefono?`<a href="tel:${esc(r.impresa_telefono)}" style="color:var(--orange)">${esc(r.impresa_telefono)}</a>`:'',
+        r.impresa_email_ref?`<a href="mailto:${esc(r.impresa_email_ref)}" style="color:var(--orange)">${esc(r.impresa_email_ref)}</a>`:(ris.includes('impresa_email_ref')?'🔒 email riservata':''),
+        r.impresa_telefono?`<a href="tel:${esc(r.impresa_telefono)}" style="color:var(--orange)">${esc(r.impresa_telefono)}</a>`:(ris.includes('impresa_telefono')?'🔒 telefono riservato':''),
         _CCNL_LBL[r.contratto_ccnl]?`CCNL: ${_CCNL_LBL[r.contratto_ccnl]}`:'',
         _CCIA_LBL[r.tipo_iscrizione_ccia]?`CCIA: ${_CCIA_LBL[r.tipo_iscrizione_ccia]}`:'',
         r.cassa_edile?`Cassa edile: ${esc(r.cassa_edile)}`:'',
@@ -11195,16 +11264,15 @@ async function loadRubrica(){
 
   // ── PERSONE (figure di cantiere) ──
   if(!cat||cat==='persona'){
-    let qb=sb.from('persone').select('*').eq('elimina',0).order('cognome',{ascending:true,nullsFirst:false}).limit(60)
-    if(q)qb=qb.or(`nome.ilike.*${q}*,cognome.ilike.*${q}*,cf.ilike.*${q}*,email.ilike.*${q}*,email2.ilike.*${q}*,email3.ilike.*${q}*,telefono.ilike.*${q}*,telefono2.ilike.*${q}*,qualifica.ilike.*${q}*`)
-    const{data}=await qb
+    const{data}=await sb.rpc('rubrica_persone_cerca',{p_q:q||null,p_limit:60})
     ;(data||[]).forEach(r=>{
+      const ris=r.contatti_riservati||[]
       const nomev=[r.titolo,r.nome,r.cognome].filter(Boolean).join(' ')
       const sub=[(r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', '),r.cf].filter(Boolean).join(' · ')
       const extra=[
         r.qualifica?esc(r.qualifica):'',
-        r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:'',
-        r.telefono?`<a href="tel:${esc(r.telefono)}" style="color:var(--orange)">${esc(r.telefono)}</a>`:'',
+        r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:(ris.includes('email')?'🔒 email riservata':''),
+        r.telefono?`<a href="tel:${esc(r.telefono)}" style="color:var(--orange)">${esc(r.telefono)}</a>`:(ris.includes('telefono')?'🔒 telefono riservato':''),
         `<a href="javascript:void(0)" onclick="event.stopPropagation();editPersona('${r.persona_id}')" style="color:var(--grey)">✏️ Modifica</a>`,
         window.__isCoord?`<a href="javascript:void(0)" onclick="event.stopPropagation();eliminaPersona('${r.persona_id}')" style="color:#c0392b">\uD83D\uDDD1 Elimina</a>`:''
       ].filter(Boolean)
@@ -11790,8 +11858,12 @@ async function showRubricaDetail(tipo, id){
   show('modal-rub-detail')
   try{
     if(tipo==='persona'){
-      const{data:r,error}=await sb.from('persone').select('*').eq('persona_id',id).single()
+      const{data:rows,error}=await sb.rpc('rubrica_persona_dettaglio',{p_id:id})
+      const r=(rows||[])[0]
       if(error||!r){toast('Persona non trovata','err');hide('modal-rub-detail');return}
+      const ris=r.contatti_riservati||[]
+      const _c=(v,campo)=>v?`<a href="mailto:${esc(v)}" style="color:var(--orange)">${esc(v)}</a>`:(ris.includes(campo)?'🔒 riservato (solo segreteria)':'')
+      const _t=(v,campo)=>v?`<a href="tel:${esc(v)}" style="color:var(--orange)">${esc(v)}</a>`:(ris.includes(campo)?'🔒 riservato (solo segreteria)':'')
       $('rub-detail-title').textContent=`👥 ${[r.titolo,r.nome,r.cognome].filter(Boolean).join(' ')}`
       $('rub-detail-badge').innerHTML=`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#f3e8f8;color:#8e44ad">PERSONA</span>`
       let html=qdSec('Anagrafica')
@@ -11799,11 +11871,11 @@ async function showRubricaDetail(tipo, id){
         ['Titolo',r.titolo],['Nome',r.nome],['Cognome',r.cognome],['Codice fiscale',r.cf],
         ['Qualifica',r.qualifica],
         ['Ruoli',(r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')],
-        ['Email (predef.)',r.email?`<a href="mailto:${esc(r.email)}" style="color:var(--orange)">${esc(r.email)}</a>`:''],
-        ['Email 2',r.email2?`<a href="mailto:${esc(r.email2)}" style="color:var(--orange)">${esc(r.email2)}</a>`:''],
-        ['Email 3',r.email3?`<a href="mailto:${esc(r.email3)}" style="color:var(--orange)">${esc(r.email3)}</a>`:''],
-        ['Telefono (predef.)',r.telefono?`<a href="tel:${esc(r.telefono)}" style="color:var(--orange)">${esc(r.telefono)}</a>`:''],
-        ['Telefono 2',r.telefono2?`<a href="tel:${esc(r.telefono2)}" style="color:var(--orange)">${esc(r.telefono2)}</a>`:''],
+        ['Email (predef.)',_c(r.email,'email')],
+        ['Email 2',_c(r.email2,'email2')],
+        ['Email 3',_c(r.email3,'email3')],
+        ['Telefono (predef.)',_t(r.telefono,'telefono')],
+        ['Telefono 2',_t(r.telefono2,'telefono2')],
       ])
       $('rub-detail-body').innerHTML=html
       const be=document.createElement('button');be.className='btn-primary btn-sm';be.textContent='✏️ Modifica'
@@ -11812,8 +11884,12 @@ async function showRubricaDetail(tipo, id){
       return
     }
     if(tipo==='impresa'){
-      const{data:r,error}=await sb.from('imprese').select('*').eq('impresa_id',id).single()
+      const{data:rows,error}=await sb.rpc('rubrica_impresa_dettaglio',{p_id:id})
+      const r=(rows||[])[0]
       if(error||!r){toast('Impresa non trovata','err');hide('modal-rub-detail');return}
+      const ris=r.contatti_riservati||[]
+      const _c=(v,campo)=>v?`<a href="mailto:${esc(v)}" style="color:var(--orange)">${esc(v)}</a>`:(ris.includes(campo)?'🔒 riservato (solo segreteria)':'')
+      const _t=(v,campo)=>v?`<a href="tel:${esc(v)}" style="color:var(--orange)">${esc(v)}</a>`:(ris.includes(campo)?'🔒 riservato (solo segreteria)':'')
       $('rub-detail-title').textContent=`🏢 ${r.impresa_nome||'–'}`
       const _dCeiv=(r.cassa_edile||'').replace(/\./g,'').toUpperCase()==='CEIV'||!!r.cod_ceiv
       $('rub-detail-badge').innerHTML=`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#e8f8ee;color:#27ae60">IMPRESA</span>`+(_dCeiv?` <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#e3f1fb;color:#2471a3" title="Impresa iscritta C.E.I.V.">C.E.I.V.</span>`:'')
@@ -11821,12 +11897,12 @@ async function showRubricaDetail(tipo, id){
       html+=qdDl([
         ['Ragione sociale',r.impresa_nome],['P.IVA',r.piva],['Cod. Fiscale',r.impresa_cf],
         ['Indirizzo',r.indirizzo],['Comune',r.comune],['CAP',r.cap],
-        ['Email (predef.)',r.impresa_email_ref?`<a href="mailto:${esc(r.impresa_email_ref)}" style="color:var(--orange)">${esc(r.impresa_email_ref)}</a>`:''],
-        ['Email 2',r.impresa_email2?`<a href="mailto:${esc(r.impresa_email2)}" style="color:var(--orange)">${esc(r.impresa_email2)}</a>`:''],
-        ['Email 3',r.impresa_email3?`<a href="mailto:${esc(r.impresa_email3)}" style="color:var(--orange)">${esc(r.impresa_email3)}</a>`:''],
-        ['Telefono (predef.)',r.impresa_telefono?`<a href="tel:${esc(r.impresa_telefono)}" style="color:var(--orange)">${esc(r.impresa_telefono)}</a>`:''],
-        ['Telefono 2',r.impresa_telefono2?`<a href="tel:${esc(r.impresa_telefono2)}" style="color:var(--orange)">${esc(r.impresa_telefono2)}</a>`:''],
-        ['PEC',r.pec],['Sito web',r.sito_web],
+        ['Email (predef.)',_c(r.impresa_email_ref,'impresa_email_ref')],
+        ['Email 2',_c(r.impresa_email2,'impresa_email2')],
+        ['Email 3',_c(r.impresa_email3,'impresa_email3')],
+        ['Telefono (predef.)',_t(r.impresa_telefono,'impresa_telefono')],
+        ['Telefono 2',_t(r.impresa_telefono2,'impresa_telefono2')],
+        ['PEC',r.pec],['Sito web',r.pagina_web],
       ])
       html+=qdSec('Dati contrattuali / CCIA')
       html+=qdDl([
