@@ -15,10 +15,14 @@
        lui — la stessa maschera dell'app Segreteria, portata qui);
      · il REGISTRO delle questioni in attesa: le righe automatiche (ciò che
        il database sa già: autorizzazioni e conferme) e quelle scritte a
-       mano da coordinatore e segreteria. Una colonna sola per tutte: i
-       GIORNI di attesa. Niente giudizio di urgenza, si ordina per anzianità.
-       Il Direttore risponde qui (s_decisione_rispondi): decide, oppure
-       rinvia a una data, e il promemoria tace fino a quel giorno.
+       mano da coordinatore e segreteria. Si ordina per giorni di attesa.
+       Il Direttore risponde qui (s_decisione_rispondi) con tre esiti:
+       decide, rinvia a una data (il promemoria tace fino a quel giorno),
+       oppure PROPONE UN INCONTRO a coordinatore e segreteria — data
+       facoltativa, loro ricevono un avviso e chiudono con «Incontro
+       fatto» (25/09/2026, stesso giorno della prima versione). La
+       PRIORITÀ (normale | alta) la impostano ufficio e coordinatore,
+       mai chi decide — stessa scelta a due valori dei cantieri critici.
    La Presidenza (presidente e vicepresidente) vede lo stesso registro per
    le sole questioni che spettano a lei. Coordinatore e segreteria hanno
    il registro nella Zona Coordinatore: aprono, ritirano, prendono in
@@ -46,7 +50,7 @@
   const SEGRETERIA_URL = 'https://formedilpadovacpt.github.io/segreteria/';
 
   const DECISORI = { direttore: 'Direttore', presidenza: 'Presidenza', commissione: 'Commissione Sicurezza' };
-  const EVENTI = { apertura: 'Aperta', modifica: 'Modificata', decisione: 'Decisione', rinvio: 'Rinvio', presa_in_carico: 'Presa in carico', ritiro: 'Ritirata', riapertura: 'Riaperta' };
+  const EVENTI = { apertura: 'Aperta', modifica: 'Modificata', decisione: 'Decisione', rinvio: 'Rinvio', incontro_proposto: 'Incontro proposto', presa_in_carico: 'Presa in carico', ritiro: 'Ritirata', riapertura: 'Riaperta', proposta: 'Proposta dal second brain', pubblicazione: 'Resa visibile' };
   const EV_CRIT = { apertura: 'Apertura', nota: 'Nota', lettera_impresa: "Comunicazione all'impresa", sollecito: 'Sollecito', pec_richiesta: 'PEC chiesta all\'Amministrazione',
     contatto_impresa: "L'impresa ha ricontattato", visita_riprogrammata: 'Visita riprogrammata', visita_successiva: 'Verbale successivo', decisione: 'Decisione',
     risposta_tecnico: 'Risposta al tecnico', conferenza_proposta: 'Proposta di conferenza', demandata: 'Demandata', decisione_organo: 'Decisione di Presidenza / Commissione',
@@ -174,7 +178,7 @@
     const R = await ruoli();
     let righe = [], auto = { autorizzazioni: [], critici: [] }, errore = null;
     try {
-      const { data, error } = await sb.from('s_decisioni').select('*').in('stato', ['proposta', 'aperta', 'rinviata', 'decisa']).order('aperta_il');
+      const { data, error } = await sb.from('s_decisioni').select('*').in('stato', ['proposta', 'aperta', 'rinviata', 'decisa', 'incontro']).order('aperta_il');
       if (error) throw new Error(error.message);
       righe = data || [];
       if (R.direttore || R.coord || R.segr) { try { auto = await inAttesa(); } catch (e) { console.warn('in attesa:', e); } }
@@ -191,6 +195,7 @@
     const aperte = righe.filter((r) => r.stato === 'aperta' || (r.stato === 'rinviata' && r.rinviata_al && r.rinviata_al <= T));
     const rinviate = righe.filter((r) => r.stato === 'rinviata' && r.rinviata_al && r.rinviata_al > T);
     const decise = righe.filter((r) => r.stato === 'decisa');
+    const incontri = righe.filter((r) => r.stato === 'incontro');
     aperte.forEach((r) => lista.push({ k: 'man', gg: giorni(r.aperta_il), r, testo: r.questione, chi: r.aperta_da_nome || r.aperta_da, decisore: r.decisore, link: r.link, dal: r.aperta_il }));
     lista.sort((a, b) => (b.gg || 0) - (a.gg || 0));
 
@@ -208,12 +213,14 @@
       if (r && gestisce) azioni.push(`<button type="button" class="btn-outline btn-sm" data-ritira="${r.id}" data-aiuto="Toglie la questione dal registro scrivendo perché (superata, risolta altrove). Non si cancella: resta in cronologia come ritirata.">Ritira</button>`);
       const entro = r && r.entro_il ? ` <span style="font-size:11.5px;color:${r.entro_il < T ? '#c0392b' : '#888'}">entro il ${dIt(r.entro_il)}</span>` : '';
       const riservata = r && r.riservata ? ' <span title="riservata: la vedono Direttore e coordinatore" style="font-size:11px">🔒</span>' : '';
+      const alta = r && r.priorita === 'alta' ? ' <span style="background:#fdeaea;color:#c0392b;border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:700" title="priorità alta, impostata da ufficio o coordinatore">⚠️ ALTA</span>' : '';
       const rinv = r && r.stato === 'rinviata' ? ` <span style="font-size:11.5px;color:#8e44ad">rinviata al ${dIt(r.rinviata_al)}${r.decisione ? ': ' + esc(r.decisione) : ''}</span>` : '';
+      const prio = r && gestisce ? `<select data-prio="${r.id}" style="font-size:11px;padding:1px 3px" data-aiuto="Il grado di priorità della questione: lo imposta l'ufficio o il coordinatore, mai chi decide."><option value="normale"${r.priorita !== 'alta' ? ' selected' : ''}>priorità normale</option><option value="alta"${r.priorita === 'alta' ? ' selected' : ''}>priorità alta</option></select>` : '';
       return `<div data-dec-attesa="1" style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;padding:8px 0;border-top:1px solid #f0e6dd">
         ${eta(x.gg)}
         <div style="flex:1;min-width:240px;font-size:13px;line-height:1.4">
-          <div>${x.k === 'auto' ? '<span style="font-size:10.5px;background:#eef2f7;color:#456;border-radius:4px;padding:1px 5px;margin-right:4px" title="riga che il database ricava da sola dalle pratiche">automatica</span>' : ''}${esc(x.testo)}${riservata}${entro}${rinv}</div>
-          <div style="font-size:11.5px;color:#888">${decBadge(x.decisore)} · aperta ${x.dal ? 'il ' + dIt(x.dal) : ''} da ${esc(x.chi || '—')}${r && r.riguarda ? ' · riguarda: ' + esc(r.riguarda) : ''}${r && r.dettaglio ? `<div style="white-space:pre-wrap;color:#666;margin-top:2px">${esc(r.dettaglio)}</div>` : ''}${r ? ` · <a href="#" data-cron="${r.id}" style="color:#888">cronologia</a>` : ''}</div>
+          <div>${x.k === 'auto' ? '<span style="font-size:10.5px;background:#eef2f7;color:#456;border-radius:4px;padding:1px 5px;margin-right:4px" title="riga che il database ricava da sola dalle pratiche">automatica</span>' : ''}${esc(x.testo)}${riservata}${alta}${entro}${rinv}</div>
+          <div style="font-size:11.5px;color:#888">${decBadge(x.decisore)} · aperta ${x.dal ? 'il ' + dIt(x.dal) : ''} da ${esc(x.chi || '—')}${r && r.riguarda ? ' · riguarda: ' + esc(r.riguarda) : ''}${r && r.dettaglio ? `<div style="white-space:pre-wrap;color:#666;margin-top:2px">${esc(r.dettaglio)}</div>` : ''}${r ? ` · <a href="#" data-cron="${r.id}" style="color:#888">cronologia</a>` : ''}${prio ? '<div style="margin-top:3px">' + prio + '</div>' : ''}</div>
           <div id="dir-risp-${r ? r.id : 'a' + i}"></div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">${apri}${critico}${azioni.join('')}</div></div>`;
@@ -224,6 +231,12 @@
           <div style="white-space:pre-wrap;color:#333;margin-top:2px"><strong>${esc(r.decisa_da || '')}</strong> il ${oraIt(r.decisa_il)}: ${esc(r.decisione || '')}</div>
           <div style="font-size:11.5px;color:#888">${decBadge(r.decisore)} · aperta il ${dIt(r.aperta_il)} da ${esc(r.aperta_da_nome || r.aperta_da)} · <a href="#" data-cron="${r.id}" style="color:#888">cronologia</a></div></div>
         ${gestisce ? `<button type="button" class="btn-primary btn-sm" data-presa="${r.id}" data-aiuto="Dichiara che la decisione è stata letta e messa in pratica: la riga esce dal registro e resta in cronologia con chi l'ha presa in carico e quando.">✓ Presa in carico</button>` : ''}</div>`;
+    const rigaIncontro = (r) => `<div data-dec-incontro="1" style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;padding:8px 0;border-top:1px solid #f0e6dd">
+        <span style="background:#f3e8f8;color:#8e44ad;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">📅 INCONTRO PROPOSTO</span>
+        <div style="flex:1;min-width:240px;font-size:13px;line-height:1.4"><div>${esc(r.questione)}${r.riservata ? ' 🔒' : ''}${r.priorita === 'alta' ? ' <span style="background:#fdeaea;color:#c0392b;border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:700">⚠️ ALTA</span>' : ''}</div>
+          <div style="white-space:pre-wrap;color:#333;margin-top:2px"><strong>${esc(r.decisa_da || '')}</strong> il ${oraIt(r.decisa_il)}${r.incontro_data ? `: propone il <strong>${dIt(r.incontro_data)}</strong>` : ''}${r.decisione ? (r.incontro_data ? ' — ' : ': ') + esc(r.decisione) : ''}</div>
+          <div style="font-size:11.5px;color:#888">${decBadge(r.decisore)} · aperta il ${dIt(r.aperta_il)} da ${esc(r.aperta_da_nome || r.aperta_da)} · <a href="#" data-cron="${r.id}" style="color:#888">cronologia</a></div></div>
+        ${gestisce ? `<button type="button" class="btn-primary btn-sm" data-presa="${r.id}" data-aiuto="Segna che l'incontro si è tenuto (o che la questione è comunque chiusa): la riga esce dal registro e resta in cronologia.">✓ Incontro fatto</button>` : ''}</div>`;
 
     const nuova = gestisce && modo === 'coord' ? `<div style="margin:6px 0 10px"><button type="button" class="btn-primary btn-sm" id="dir-nuova" data-aiuto="Apre il modulo per scrivere una questione che aspetta una decisione del Direttore, della Presidenza o della Commissione. Da quel momento conta i giorni di attesa.">➕ Nuova questione</button><div id="dir-nuova-form"></div></div>` : '';
 
@@ -255,6 +268,7 @@
       ${boxProposte}
       ${lista.map(rigaHtml).join('') || '<p style="font-size:13px;color:#555;margin:6px 0 0">Nessuna questione aperta.</p>'}
       ${decise.length ? `<div style="font-size:12px;font-weight:600;color:#565c66;margin-top:12px">Decise, ${gestisce ? 'da prendere in carico' : 'in attesa che l\'ufficio le prenda in carico'} (${decise.length})</div>${decise.map(rigaDecisa).join('')}` : ''}
+      ${incontri.length ? `<div style="font-size:12px;font-weight:600;color:#565c66;margin-top:12px">Incontro proposto (${incontri.length})</div>${incontri.map(rigaIncontro).join('')}` : ''}
       ${rinviate.length ? `<div style="font-size:12px;font-weight:600;color:#565c66;margin-top:12px">Rinviate (${rinviate.length})</div>${rinviate.map((r) => `<div style="font-size:12.5px;color:#666;padding:5px 0;border-top:1px solid #f0e6dd">⏳ <strong>al ${dIt(r.rinviata_al)}</strong> — ${esc(r.questione)}${r.decisione ? ` <span style="color:#888">(${esc(r.decisione)})</span>` : ''} · ${decBadge(r.decisore)}</div>`).join('')}` : ''}
     </div>`;
 
@@ -268,6 +282,12 @@
       if (error) throw new Error(error.message);
       avviso('Questione ritirata.', 'ok'); await decisioniBox(host, modo); dopoCambio();
     })));
+    host.querySelectorAll('[data-prio]').forEach((sel) => sel.addEventListener('change', async () => {
+      const id = Number(sel.dataset.prio);
+      const { error } = await sb.from('s_decisioni').update({ priorita: sel.value }).eq('id', id);
+      if (error) { avviso('Non riuscito: ' + error.message, 'err'); return; }
+      avviso('Priorità aggiornata.', 'ok'); await decisioniBox(host, modo); dopoCambio();
+    }));
     host.querySelectorAll('[data-presa]').forEach((b) => b.addEventListener('click', (ev) => con(ev.currentTarget, async () => {
       const { error } = await sb.from('s_decisioni').update({ stato: 'chiusa' }).eq('id', Number(b.dataset.presa));
       if (error) throw new Error(error.message);
@@ -303,20 +323,23 @@
       if (error) throw new Error(error.message);
       avviso('Proposta scartata.', 'ok'); await decisioniBox(host, modo);
     })));
-    return { attesa: lista.length, daPrendere: decise.length };
+    return { attesa: lista.length, daPrendere: decise.length + incontri.length };
   }
 
   function formRisposta(id, host, modo) {
     const slot = $('dir-risp-' + id); if (!slot) return;
     if (slot.innerHTML) { slot.innerHTML = ''; return; }
-    const min = new Date(Date.now() + 864e5).toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+    const domani = new Date(Date.now() + 864e5).toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+    const oggiV = oggi();
     slot.innerHTML = `<div style="margin-top:6px;padding:8px;border:1px solid #f0e6dd;border-radius:8px;background:#fffaf6">
-      <label style="font-size:12px">La decisione (o due righe sul rinvio)</label><textarea id="dir-rt-${id}" rows="3" style="width:100%;box-sizing:border-box"></textarea>
+      <label style="font-size:12px">La decisione, oppure una nota sul rinvio o sull'incontro</label><textarea id="dir-rt-${id}" rows="3" style="width:100%;box-sizing:border-box"></textarea>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
         <button type="button" class="btn-primary btn-sm" data-decido="${id}" data-aiuto="Registra la decisione col tuo nome, data e ora. Chi ha aperto la questione riceve un avviso e la prende in carico.">✅ Decido</button>
-        <span style="font-size:12px;color:#666">oppure</span>
-        <input type="date" id="dir-rd-${id}" min="${min}" style="width:auto;font-size:12px">
-        <button type="button" class="btn-outline btn-sm" data-rinvio="${id}" data-aiuto="Rinvia la questione alla data scelta: fino a quel giorno non compare fra quelle in attesa, poi torna con i giorni contati da quando è stata aperta.">⏳ Rinvio a questa data</button>
+        <span style="font-size:12px;color:#666">oppure, scegliendo una data qui sotto</span>
+        <input type="date" id="dir-rd-${id}" min="${domani}" style="width:auto;font-size:12px">
+        <button type="button" class="btn-outline btn-sm" data-rinvio="${id}" data-aiuto="Rinvia la questione alla data scelta (deve essere futura): fino a quel giorno non compare fra quelle in attesa, poi torna con i giorni contati da quando è stata aperta.">⏳ Rinvio a questa data</button>
+        <input type="date" id="dir-ri-${id}" min="${oggiV}" style="width:auto;font-size:12px">
+        <button type="button" class="btn-outline btn-sm" data-incontro="${id}" data-aiuto="Propone un incontro a coordinatore e segreteria per discuterne insieme, invece di decidere subito. La data è facoltativa: puoi anche solo segnalare che serve un incontro. Loro ricevono un avviso.">📅 Propongo un incontro</button>
         <button type="button" class="btn-outline btn-sm" data-annulla="${id}">Annulla</button></div></div>`;
     slot.querySelector('[data-annulla]').addEventListener('click', () => { slot.innerHTML = ''; });
     slot.querySelector('[data-decido]').addEventListener('click', (ev) => con(ev.currentTarget, async () => {
@@ -334,6 +357,13 @@
       if (error) throw new Error(error.message);
       avviso('Rinviata al ' + dIt(al) + '.', 'ok'); await decisioniBox(host, modo); dopoCambio();
     }));
+    slot.querySelector('[data-incontro]').addEventListener('click', (ev) => con(ev.currentTarget, async () => {
+      const al = $('dir-ri-' + id).value || null;
+      if (!confirm('Propongo un incontro a coordinatore e segreteria' + (al ? ' per il ' + dIt(al) : '') + '?')) return;
+      const { error } = await window.sb.rpc('s_decisione_rispondi', { p_id: id, p_esito: 'incontro', p_testo: ($('dir-rt-' + id).value || '').trim() || null, p_rinvio_al: al });
+      if (error) throw new Error(error.message);
+      avviso('Incontro proposto: coordinatore e segreteria hanno ricevuto un avviso.', 'ok'); await decisioniBox(host, modo); dopoCambio();
+    }));
   }
 
   function formNuova(host, modo, R) {
@@ -345,6 +375,7 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:6px">
         <div><label style="font-size:12px">Riguarda</label><input id="dn-r" maxlength="120" style="width:100%;box-sizing:border-box" placeholder="impresa, tecnico, pratica…"></div>
         <div><label style="font-size:12px">Decide</label><select id="dn-dec" style="width:100%"><option value="direttore">Direttore</option><option value="presidenza">Presidenza</option><option value="commissione">Commissione Sicurezza</option></select></div>
+        <div><label style="font-size:12px">Priorità</label><select id="dn-p" style="width:100%" data-aiuto="Il grado di priorità della questione: lo decide chi la apre o la gestisce, mai chi deve decidere."><option value="normale">normale</option><option value="alta">alta</option></select></div>
         <div><label style="font-size:12px">Entro il (solo se c'è un termine vero)</label><input type="date" id="dn-e" style="width:100%;box-sizing:border-box"></div>
         <div><label style="font-size:12px">Collegamento (facoltativo)</label><input id="dn-l" style="width:100%;box-sizing:border-box" placeholder="link alla pratica"></div>
       </div>
@@ -355,7 +386,7 @@
       const q = ($('dn-q').value || '').trim();
       if (!q) { avviso('Scrivi la questione.', 'warn'); return; }
       const riga = { questione: q, dettaglio: ($('dn-d').value || '').trim() || null, riguarda: ($('dn-r').value || '').trim() || null,
-        decisore: $('dn-dec').value, entro_il: $('dn-e').value || null, link: ($('dn-l').value || '').trim() || null,
+        decisore: $('dn-dec').value, priorita: $('dn-p').value, entro_il: $('dn-e').value || null, link: ($('dn-l').value || '').trim() || null,
         riservata: !!($('dn-ris') && $('dn-ris').checked) };
       const { error } = await window.sb.from('s_decisioni').insert(riga);
       if (error) throw new Error(error.message);

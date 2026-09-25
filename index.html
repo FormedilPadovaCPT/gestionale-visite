@@ -470,6 +470,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="scadenze">⏰ Scadenze</button>
     <button data-view="incarichi" id="nav-incarichi">📋 Incarichi<span id="nav-inc-badge" style="display:none;background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px">0</span></button>
     <button data-view="statistiche" id="nav-statistiche">📊 Statistiche</button>
+    <button data-view="appuntamenti" id="nav-appuntamenti" style="display:none">📅 Prossimi appuntamenti</button>
     <button data-view="direzione" id="nav-direzione" style="display:none">🏛️ Direzione<span id="nav-dir-badge" style="display:none">0</span></button>
     <button id="nav-assev" style="display:none;background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600" onclick="window.open('https://webapp-asseverazione.vercel.app/dashboard','_blank')">✅ Asseverazione</button>
     <button data-view="admin" id="nav-admin" style="display:none">🔐 Coordinatore</button>
@@ -1091,6 +1092,14 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       </div>
       <div id="inc-list"></div>
       <div id="inc-vuoto" style="display:none;text-align:center;color:#aaa;padding:26px;font-size:13px" class="card">Nessun incarico con questi filtri.</div>
+    </section>
+
+    <!-- PROSSIMI APPUNTAMENTI (25/09/2026): calendario d'ufficio (Google Calendar cptpd),
+         alimentato dalla segreteria — visibile a Direzione e Consiglio (viewer-mode) -->
+    <section id="view-appuntamenti" class="hidden">
+      <h2>📅 Prossimi appuntamenti</h2>
+      <p style="font-size:12.5px;color:#555;margin:0 0 12px">Il calendario d'ufficio, alimentato dalla segreteria: date di attività, commissioni e altri impegni utili.</p>
+      <div id="app-cal-embed" style="background:#fff;border-radius:10px;overflow:hidden;border:1px solid #eee;max-width:800px"></div>
     </section>
 
     <!-- DIREZIONE (25/09/2026): la pagina del Direttore (e della Presidenza) — direzione.js -->
@@ -2437,20 +2446,22 @@ async function onLogin(user){
     S.direttore=false;S.presidenza=false
     try{const[_d,_p]=await Promise.all([sb.rpc('is_direttore'),sb.rpc('is_presidenza')]);S.direttore=!!_d.data;S.presidenza=!!_p.data}catch(_e){}
     $('lbl-user').textContent=(_roleRow.nome||user.email)+' — sola lettura'
-    // dal 25/09/2026 il menu resta: due schede (Mappa e Statistiche) piu' la pagina
-    // Direzione per il Direttore e la Presidenza. Prima il menu spariva del tutto e
-    // con lui le Statistiche, uscite dalla Dashboard il 23/09.
+    // dal 25/09/2026 il menu resta: Mappa, Statistiche e Prossimi appuntamenti per
+    // tutti, piu' la pagina Direzione per il Direttore e la Presidenza. Prima il
+    // menu spariva del tutto e con lui le Statistiche, uscite dalla Dashboard il 23/09.
+    // Stesso giorno, corretto: si apre sempre su Mappa (prima Direttore e Presidenza
+    // atterravano dritti su Direzione, che resta comunque la terza scheda per loro).
     const _nv=document.querySelector('nav')
     if(_nv){_nv.classList.remove('hidden')
       _nv.querySelectorAll('button').forEach(b=>{const v=b.dataset.view
-        b.style.display=(v==='dashboard'||v==='statistiche'||(v==='direzione'&&(S.direttore||S.presidenza)))?'':'none'})
+        b.style.display=(v==='dashboard'||v==='statistiche'||v==='appuntamenti'||(v==='direzione'&&(S.direttore||S.presidenza)))?'':'none'})
       const _bd=_nv.querySelector('button[data-view="dashboard"]');if(_bd)_bd.textContent='🗺️ Mappa'
       const _bdir=_nv.querySelector('button[data-view="direzione"]');if(_bdir&&S.presidenza&&!S.direttore)_bdir.firstChild.textContent='🏛️ Presidenza'
     }
     document.body.classList.add('viewer-mode')
     await loadVoci().catch(()=>{})
     showScr('app')
-    navTo(S.direttore||S.presidenza?'direzione':'dashboard')
+    navTo('dashboard')
     S.appReady=true
     return
   }
@@ -2523,7 +2534,7 @@ function showScr(n){
 }
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','direzione','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','appuntamenti','direzione','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
   if(view==='form'&&typeof incCaricaTendina==='function')incCaricaTendina().catch(e=>console.warn('incCaricaTendina:',e))
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
@@ -2536,6 +2547,7 @@ function navTo(view){
   if(view==='scadenze')loadScadenze().catch(e=>{console.error('loadScadenze:',e);toast('Errore scadenze: '+e.message,'err')})
   if(view==='incarichi'&&typeof loadIncarichi==='function')loadIncarichi().catch(e=>console.warn('loadIncarichi:',e))
   if(view==='statistiche')loadStat().catch(e=>{console.error('loadStat:',e);toast('Errore caricamento statistiche: '+e.message,'err')})
+  if(view==='appuntamenti'){const h=$('app-cal-embed');if(h&&!h.dataset.loaded){h.dataset.loaded='1';h.innerHTML='<iframe src="https://calendar.google.com/calendar/embed?src=c_cf9b7b4f739cc42753f6207d36431da4dc7521c948e2e0135aa96f85e6ce5080%40group.calendar.google.com&ctz=Europe%2FRome" style="border:0;width:100%;height:600px;display:block" frameborder="0" scrolling="no"></iframe>'}}
   if(view==='direzione'&&window.direzione)window.direzione.carica().catch(e=>{console.error('direzione:',e);toast('Errore caricamento Direzione: '+e.message,'err')})
   if(view==='admin'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
   if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e));if(window.direzione)window.direzione.obiettivi().catch(e=>console.warn('obiettivi:',e))}

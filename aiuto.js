@@ -33,6 +33,8 @@ window.AIUTO_TESTI = {
   'v:statistiche': 'Contatori, grafici e tabelle delle visite (per esercizio, tecnico, IPC, comuni, imprese ricorrenti). Si calcolano quando apri la scheda.',
   'v:direzione': 'La pagina della Direzione: autorizzazioni dei servizi CPT in attesa del visto, conferme richieste sui cantieri critici e le questioni aperte da coordinatore e segreteria, con i giorni di attesa. Si risponde da qui.',
   'nav-direzione': 'La pagina della Direzione: autorizzazioni dei servizi CPT in attesa del visto, conferme richieste sui cantieri critici e le questioni aperte da coordinatore e segreteria, con i giorni di attesa. Si risponde da qui.',
+  'v:appuntamenti': 'Il calendario d\'ufficio, alimentato dalla segreteria: date di attività, commissioni e altri impegni utili.',
+  'nav-appuntamenti': 'Il calendario d\'ufficio, alimentato dalla segreteria: date di attività, commissioni e altri impegni utili.',
   'card-k-ceivmin': 'Visite fatte nell\'esercizio scelto (tutti i tecnici) contro il minimo della regola CEIV: 100 visite ogni 50.000 euro di contributi Cassa Edile. Il minimo lo imposta la segreteria nella sua Zona.',
   'v:form': 'Apre un verbale nuovo. Dal telefono ti propone i cantieri vicino a te; il numero del verbale nasce dal giorno di apertura e non si assegna due volte.',
   'v:lista': 'L\'elenco dei tuoi verbali, bozze comprese. Da ogni riga apri la scheda, il PDF, la mail all\'impresa o una visita di ritorno.',
