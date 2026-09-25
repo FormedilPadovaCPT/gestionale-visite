@@ -31,6 +31,8 @@ window.AIUTO_TESTI = {
   /* ── menu ── */
   'v:dashboard': 'Torna alla pagina iniziale: pulsanti rapidi, avvisi, il tuo obiettivo del mese e la mappa dei cantieri aperti con l\'IPC dell\'ultima visita.',
   'v:statistiche': 'Contatori, grafici e tabelle delle visite (per esercizio, tecnico, IPC, comuni, imprese ricorrenti). Si calcolano quando apri la scheda.',
+  'f-note-for-sn': 'Con la casella spuntata, quando mandi il verbale l\'impresa riceve nella stessa mail le prossime date dei corsi che mancano, con la quota vera (gratuita o scontata per le imprese iscritte alla Cassa Edile), e l\'ufficio corsi riceve da solo una segnalazione con i contatti dell\'impresa e la tua nota.',
+  'f-note-for-tipi': 'Quale formazione manca: spunta una o più voci. Servono a scegliere i corsi da proporre all\'impresa; la nota qui sotto va all\'ufficio corsi.',
   'v:direzione': 'La pagina della Direzione: autorizzazioni dei servizi CPT in attesa del visto, conferme richieste sui cantieri critici e le questioni aperte da coordinatore e segreteria, con i giorni di attesa. Si risponde da qui.',
   'nav-direzione': 'La pagina della Direzione: autorizzazioni dei servizi CPT in attesa del visto, conferme richieste sui cantieri critici e le questioni aperte da coordinatore e segreteria, con i giorni di attesa. Si risponde da qui.',
   'v:appuntamenti': 'Il calendario d\'ufficio, alimentato dalla segreteria: date di attività, commissioni e altri impegni utili.',
