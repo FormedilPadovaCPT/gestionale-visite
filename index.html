@@ -11902,7 +11902,7 @@ async function showRubricaDetail(tipo, id){
         ['Email 3',_c(r.impresa_email3,'impresa_email3')],
         ['Telefono (predef.)',_t(r.impresa_telefono,'impresa_telefono')],
         ['Telefono 2',_t(r.impresa_telefono2,'impresa_telefono2')],
-        ['PEC',r.pec],['Sito web',r.pagina_web],
+        ['PEC',r.pec?esc(r.pec):(ris.includes('pec')?'🔒 riservato (solo segreteria)':'')],['Sito web',r.pagina_web],
       ])
       html+=qdSec('Dati contrattuali / CCIA')
       html+=qdDl([
