@@ -76,19 +76,31 @@ jobs:
           # .nojekyll evita l'elaborazione Jekyll (serve i file così come sono)
           touch _site/.nojekyll
 
-      - name: Sintassi JavaScript (node --check sul modulo inline e su ogni script locale)
+      - name: Sintassi JavaScript (node --check sul modulo inline, sugli script inline classici e su ogni script locale)
         run: |
           set -e
           mkdir -p _chk
-          # il modulo inline di index.html va estratto per essere controllato
+          # il modulo inline e gli script inline classici di index.html vanno
+          # estratti per essere controllati (26/09/2026: prima si guardava solo
+          # il modulo, e un errore in uno script classico passava)
           python3 - <<'PY'
           import re
           s = open('index.html', encoding='utf-8').read()
           m = re.search(r'<script type="module">\n(.*?)\n</script>', s, re.S)
           assert m, 'modulo inline non trovato'
           open('_chk/inline.mjs', 'w', encoding='utf-8').write(m.group(1))
+          n = 0
+          for mm in re.finditer(r'<script([^>]*)>(.*?)</script>', s, re.S):
+              attr = mm.group(1)
+              if 'src=' in attr or 'type=' in attr and 'javascript' not in attr:
+                  continue   # esterni, il modulo (già estratto) e i blocchi non JS
+              n += 1
+              open('_chk/classico_%02d.js' % n, 'w', encoding='utf-8').write(mm.group(2))
+          assert n, 'nessuno script inline classico trovato'
+          print('script inline classici:', n)
           PY
           node --check _chk/inline.mjs
+          for f in _chk/classico_*.js; do node --check "$f"; done
           for f in _site/*.js; do
             cp "$f" "_chk/$(basename "$f" .js).mjs"
             node --check "_chk/$(basename "$f" .js).mjs" || node --check "$f"

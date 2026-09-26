@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Gestionale Visite – Formedil Padova · v2026-07-21f</title>
+<title>Gestionale Visite – Formedil Padova</title>
 <!-- App installabile (17/09/2026): manifest + icone. Il service worker (sw.js) serve
      SOLO alle notifiche e non mette niente in cache: il gestionale si carica dalla rete come prima. -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -2271,7 +2271,7 @@ window.onunhandledrejection = function(e) {
 <script src="app-data.js"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
-console.log("%c Gestionale v2026-07-21f caricato correttamente ✓", "color:green;font-weight:bold;font-size:14px")
+console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
 
 // ── Caricamento robusto di Supabase con fallback su più CDN ───────────────────
 // Risolve i blocchi di avvio causati da CDN irraggiungibili (firewall, proxy,
@@ -2519,7 +2519,14 @@ async function onLogin(user){
   // se nella stessa scheda era entrato prima un account di sola lettura, il menu torna quello del tecnico
   document.querySelectorAll('nav button[data-view]').forEach(b=>{if(['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche'].includes(b.dataset.view))b.style.display=''})
   {const _bd=document.querySelector('nav button[data-view="dashboard"]');if(_bd)_bd.textContent='🏠 Dashboard'}
-  let{data:tec}=await sb.from('tecnici').select('*').eq('email',user.email).maybeSingle()
+  let{data:tec,error:_tecErr}=await sb.from('tecnici').select('*').eq('email',user.email).maybeSingle()
+  /* lettura fallita (rete, server) ≠ scheda mancante: non si esce dall'account,
+     si dice che non si è riusciti a leggere e si lascia riprovare con Ricarica */
+  if(_tecErr){
+    __showStartupError('Non sono riuscito a leggere la scheda tecnico',
+      'Il collegamento al database non ha risposto ('+String(_tecErr.message||_tecErr).replace(/[<>&]/g,'')+'). Il tuo account non è stato disconnesso: premi Ricarica per riprovare.')
+    return
+  }
   if(!tec){
     /* Audit 05/09/2026: un account senza scheda tecnico e senza ruolo NON diventa
        piu' un tecnico da solo (prima si auto-inseriva in `tecnici`, e con la
@@ -2753,13 +2760,19 @@ async function loadFattureCoord(){
       .in('stato',['ricevuta','verificata','standby']).order('id',{ascending:false}).limit(40)
     if(error)throw error
     righe=data||[]
-  }catch(_e){box.style.display='none';return}
+  }catch(_e){
+    /* lettura fallita ≠ nessuna fattura da approvare: si dice, non si nasconde */
+    box.innerHTML=`<div class="card" style="border-left:4px solid #c0392b"><h3>&#128182; Fatture dei tecnici da approvare</h3><p style="font-size:12px;color:#c0392b;margin:4px 0">Non sono riuscito a leggere le fatture da approvare (${String(_e?.message||_e).replace(/&/g,'&amp;').replace(/</g,'&lt;')}): ricarica la pagina prima di concludere che non ce ne sono.</p></div>`
+    box.style.display='';return
+  }
   if(!righe.length){box.style.display='none';return}
   const nPrest={}
+  let errPrest=''
   try{
-    const{data:pp}=await sb.from('s_prestazioni').select('fattura_id,importo').in('fattura_id',righe.map(r=>r.id))
+    const{data:pp,error:ePP}=await sb.from('s_prestazioni').select('fattura_id,importo').in('fattura_id',righe.map(r=>r.id))
+    if(ePP)throw ePP
     ;(pp||[]).forEach(p=>{const k=nPrest[p.fattura_id]||(nPrest[p.fattura_id]={n:0,netto:0});k.n++;k.netto+=Number(p.importo||0)})
-  }catch(_e){}
+  }catch(_e){errPrest=_e?.message||String(_e)}
   const dIt=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):''
   const eur=n=>Number(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})
   const esc_=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
@@ -2770,7 +2783,7 @@ async function loadFattureCoord(){
     const k=nPrest[r.id]||{n:0,netto:0}
     return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid #f0e6dd">
       <strong style="font-size:12px">${esc_(r.tecnico_nome)}</strong>${badge(r.stato)}
-      <span style="font-size:12px;color:#444;flex:1;min-width:220px">fattura n&deg; <strong>${esc_(r.numero||'?')}</strong>${r.data_fattura?' del '+dIt(r.data_fattura):''} &middot; ricevuta ${dIt(r.data_ricevimento)} &middot; <strong>${eur(r.importo)} &euro;</strong> &middot; ${k.n} prestazioni (netto ${eur(k.netto)})${r.stato==='standby'&&r.standby_motivo?`<br><span style="color:#c0392b">Stand-by: ${esc_(r.standby_motivo)}</span>`:''}${r.note?`<br><span style="color:#888">${esc_(r.note)}</span>`:''}</span>
+      <span style="font-size:12px;color:#444;flex:1;min-width:220px">fattura n&deg; <strong>${esc_(r.numero||'?')}</strong>${r.data_fattura?' del '+dIt(r.data_fattura):''} &middot; ricevuta ${dIt(r.data_ricevimento)} &middot; <strong>${eur(r.importo)} &euro;</strong> &middot; ${errPrest?'<span style="color:#c0392b">prestazioni non lette</span>':`${k.n} prestazioni (netto ${eur(k.netto)})`}${r.stato==='standby'&&r.standby_motivo?`<br><span style="color:#c0392b">Stand-by: ${esc_(r.standby_motivo)}</span>`:''}${r.note?`<br><span style="color:#888">${esc_(r.note)}</span>`:''}</span>
       <button class="btn-primary btn-sm" onclick="fattDecidi(${r.id},'approvata')">&#9989; Approva</button>
       ${r.stato!=='standby'?`<button class="btn-outline btn-sm" onclick="fattDecidi(${r.id},'standby')">&#9208; Stand-by</button>`:''}
       <a href="https://formedilpadovacpt.github.io/segreteria/#fattura-${r.id}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:var(--orange,#e7500f);text-decoration:none">dettaglio &#8599;</a>
@@ -2779,6 +2792,7 @@ async function loadFattureCoord(){
   box.innerHTML=`<div class="card" style="border-left:4px solid var(--orange,#e7500f)">
     <h3>&#128182; Fatture dei tecnici da approvare <span style="color:#b35c00">&mdash; ${righe.length}</span></h3>
     <p style="font-size:12px;color:#666;margin:4px 0 6px">Si approva solo se tutte le attivita' del mese sono a posto; altrimenti stand-by con il motivo, e il mandato non parte finche' non si risolve col tecnico.</p>
+    ${errPrest?`<p style="font-size:12px;color:#c0392b;margin:4px 0 6px">Non sono riuscito a leggere le prestazioni collegate (${esc_(errPrest)}): il numero di prestazioni e il netto non sono disponibili, controllali nel dettaglio prima di approvare.</p>`:''}
     ${righe.map(riga).join('')}
   </div>`
   box.style.display=''
@@ -2836,11 +2850,12 @@ async function loadStageSr(){
   }catch(e){ errInc=e.message||String(e) }
   if(!errInc&&!inc.length)return
   _stageIncAperti=inc
-  let righe=[]
+  let righe=[], errRighe=''
   try{
-    const{data}=await sb.from('s_visite_stage').select('*').eq('tecnico_id',S.tecnico.tecnico_id).order('data',{ascending:false}).limit(8)
+    const{data,error}=await sb.from('s_visite_stage').select('*').eq('tecnico_id',S.tecnico.tecnico_id).order('data',{ascending:false}).limit(8)
+    if(error)throw error
     righe=data||[]
-  }catch(_e){}
+  }catch(_e){errRighe=_e?.message||String(_e)}
   const dIt=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):''
   const esc_=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
   const oggi=new Date().toISOString().slice(0,10)
@@ -2865,6 +2880,7 @@ async function loadStageSr(){
       <div class="field"><label>Relazione (cosa e' stato visto, esito)</label><textarea id="ssr-rel" rows="3" style="width:100%"></textarea></div>
       <button class="btn-primary btn-sm" style="margin-top:6px" onclick="stageSrSalva()">Salva la visita</button>
     </div>
+    ${errRighe?`<p style="font-size:12px;color:#c0392b;margin:10px 0 0">Non sono riuscito a leggere le visite stage gi&agrave; registrate (${esc_(errRighe)}): prima di registrarne una nuova ricarica la pagina, per non inserirla due volte.</p>`:''}
     ${righe.length?`<table style="width:100%;font-size:12px;margin-top:10px;border-collapse:collapse">
       <thead><tr style="text-align:left;color:#888"><th style="padding:4px 6px">Data</th><th style="padding:4px 6px">Azienda</th><th style="padding:4px 6px">Comune</th><th style="padding:4px 6px">Stagista</th><th style="padding:4px 6px">Relazione</th></tr></thead>
       <tbody>${righe.map(r=>`<tr style="border-top:1px solid #f0e6dd${r.stato==='annullata'?';opacity:.5;text-decoration:line-through':''}"><td style="padding:4px 6px;white-space:nowrap">${dIt(r.data)}</td><td style="padding:4px 6px">${esc_(r.azienda)}</td><td style="padding:4px 6px">${esc_([r.comune,r.provincia].filter(Boolean).join(' '))}</td><td style="padding:4px 6px">${esc_(r.stagista)}</td><td style="padding:4px 6px;color:#666">${esc_((r.relazione||'').slice(0,120))}</td></tr>`).join('')}</tbody></table>`:''}
@@ -5258,7 +5274,10 @@ async function deleteFoto(tipo){
 
 async function loadFotoExisting(vid){
   if(!vid)return
-  const {data}=await sb.from('visite_foto').select('*').eq('visita_id',vid)
+  const {data,error}=await sb.from('visite_foto').select('*').eq('visita_id',vid)
+  /* lettura fallita ≠ visita senza foto: gli slot vuoti farebbero credere che
+     le foto manchino, e il PDF uscirebbe senza */
+  if(error){toast('Non sono riuscito a leggere le foto già caricate per questa visita ('+error.message+'): gli spazi foto sembrano vuoti ma non lo sono. Ricarica prima di sostituirle o di generare il PDF.','err');return}
   if(!data?.length)return
   for(const r of data){
     S.foto[r.tipo]={url:r.drive_url, thumb:r.thumb_url, fileId:r.drive_file_id, nome:r.nome_file, sizeKb:r.dimensione_kb}
@@ -5404,7 +5423,8 @@ async function loadDash(){
 async function loadStat(){
   if($('fd-count'))$('fd-count').textContent='Caricamento dati…'
   // mappa tecnici
-  const{data:tecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome')
+  const{data:tecs,error:eTecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome')
+  if(eTecs)toast('Non sono riuscito a leggere l’elenco dei tecnici ('+eTecs.message+'): nelle statistiche compare il codice al posto del nome.','err')
   _dashTecMap={}
   ;(tecs||[]).forEach(t=>{_dashTecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()||t.tecnico_id})
   // fetch visite con cantiere + impresa principale (paginato).
@@ -5892,14 +5912,15 @@ async function loadScadenze(){
       const{data:vs,error:ev}=await sb.from('visite')
         .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,acc_cant,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_civico,cantiere_etichetta,comune_nome,lat,lng,geocode_status,cantiere_chiuso)')
         .eq('elimina',0).order('data_visita',{ascending:false}).order('nr_verbale',{ascending:false}).range(off,off+PAGE-1)
-      if(ev){console.error('loadScadenze visite',ev);break}
+      if(ev){console.error('loadScadenze visite',ev);toast('Non sono riuscito a leggere tutte le visite ('+ev.message+'): lo scadenzario è incompleto, ricarica prima di fidarti.','err');break}
       if(!vs||!vs.length)break
       visite=visite.concat(vs)
       if(vs.length<PAGE)break
     }
   }
 
-  const{data:tecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome')
+  const{data:tecs,error:eTecs}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome')
+  if(eTecs)toast('Non sono riuscito a leggere l’elenco dei tecnici ('+eTecs.message+'): nello scadenzario il tecnico resta senza nome.','err')
   const tecMap={}
   ;(tecs||[]).forEach(t=>{tecMap[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()})
 
@@ -6601,7 +6622,11 @@ window.fondiSelezionati=async function(){
     alert('Questi cantieri sono LOTTI DIVERSI ('+(cs||[]).filter(c=>String(c.lotto||'').trim()).map(c=>'lotto '+c.lotto).join(', ')+'): non sono doppioni e non si uniscono.\n\nOgni lotto ha le sue visite di ritorno. Se uno dei lotti e\u2019 scritto male, correggilo prima da Modifica cantiere.')
     return
   }
-  const{data:vs}=await sb.from('visite').select('cantiere_id').in('cantiere_id',ids).eq('elimina',0)
+  /* il conteggio decide quale cantiere proporre da mantenere: se non si legge,
+     l'unione non parte (con «0 visite» ovunque si terrebbe il cantiere sbagliato) */
+  let vs
+  try{vs=await sbTutte((da,a)=>sb.from('visite').select('visita_id,cantiere_id').in('cantiere_id',ids).eq('elimina',0).order('visita_id').range(da,a))}
+  catch(e){toast('Non sono riuscito a contare le visite dei cantieri ('+(e.message||e)+'): unione non avviata, riprova.','err');return}
   const nv={};(vs||[]).forEach(v=>nv[v.cantiere_id]=(nv[v.cantiere_id]||0)+1)
   const rows=(cs||[]).sort((a,b)=>(nv[b.cantiere_id]||0)-(nv[a.cantiere_id]||0)||String(a.created_at||'').localeCompare(String(b.created_at||'')))
   const ov=document.createElement('div');ov.className='modal-overlay'
@@ -7088,6 +7113,7 @@ $('mp-salva').onclick=async()=>{
 // ── duplicati (solo coordinatore) ──
 let _dedupData=null
 function _dedupGroupHtml(kid,rows,rapMap){
+  const rapNonLetti=rapMap===null   // lettura dei rapporti fallita: «?» e non «0»
   rapMap=rapMap||{}
   const th=l=>`<th style="padding:6px 8px;text-align:left;color:#888;font-weight:600;font-size:11px;white-space:nowrap;border-bottom:2px solid #eee">${l}</th>`
   const td=(v,extra)=>`<td style="padding:8px;vertical-align:top;font-size:12px;line-height:1.5;${extra||''}">${v}</td>`
@@ -7108,7 +7134,7 @@ function _dedupGroupHtml(kid,rows,rapMap){
           ${td([r.cf?`<span style="font-family:monospace;font-size:11px">${esc(r.cf)}</span>`:`<span style="color:#bbb">senza CF</span>`,nasc?esc(nasc):null].filter(Boolean).join('<br>'))}
           ${td(contatti)}
           ${td([r.qualifica?esc(r.qualifica):null,ruoli?`<span style="color:#888;font-size:11px">${ruoli}</span>`:null].filter(Boolean).join('<br>')||'<span style="color:#bbb">–</span>')}
-          ${td(nrap?`<b style="color:var(--orange)">${nrap}</b>`:'<span style="color:#bbb">0</span>','text-align:center')}
+          ${td(rapNonLetti?'<span style="color:#c0392b" title="Rapporti non letti">?</span>':nrap?`<b style="color:var(--orange)">${nrap}</b>`:'<span style="color:#bbb">0</span>','text-align:center')}
         </tr>`
       }).join('')}
       </tbody>
@@ -7131,17 +7157,21 @@ async function apriDedupPersone(){
     _pf+=1000
   }
   // Conta i rapporti di lavoro per scheda (aiuta a scegliere la principale)
-  const _rapMap={}
+  let _rapMap={}
   try{
     let _rp=[],_rf=0
     for(;;){
-      const{data:rr}=await sb.from('persone_imprese').select('persona_id').range(_rf,_rf+999)
+      const{data:rr,error:eRr}=await sb.from('persone_imprese').select('persona_id').order('id').range(_rf,_rf+999)
+      if(eRr)throw eRr
       _rp=_rp.concat(rr||[])
       if(!rr||rr.length<1000)break
       _rf+=1000
     }
     _rp.forEach(r=>{_rapMap[r.persona_id]=(_rapMap[r.persona_id]||0)+1})
-  }catch(_e){}
+  }catch(_e){
+    _rapMap=null   // la colonna «Rapporti» mostra «?», non «0»
+    toast('Non sono riuscito a leggere i rapporti di lavoro ('+(_e?.message||_e)+'): la colonna «Rapporti» non è affidabile, non usarla per scegliere la scheda principale.','err',7000)
+  }
   const groups={}
   ;(data||[]).forEach(r=>{
     const a=(r.nome||'').trim().toLowerCase(),b=(r.cognome||'').trim().toLowerCase()
@@ -7152,10 +7182,13 @@ async function apriDedupPersone(){
   let dupli=Object.entries(groups).filter(([,v])=>v.length>1)
   // Nasconde i gruppi già confermati come "non duplicati" (finché l'insieme di schede non cambia)
   try{
-    const{data:excl}=await sb.from('dedup_esclusioni').select('persona_ids')
+    const{data:excl,error:eEx}=await sb.from('dedup_esclusioni').select('persona_ids')
+    if(eEx)throw eEx
     const exSets=(excl||[]).map(e=>new Set(e.persona_ids||[]))
     dupli=dupli.filter(([,rows])=>!exSets.some(s=>rows.every(r=>s.has(r.persona_id))))
-  }catch(_e){}
+  }catch(_e){
+    toast('Non sono riuscito a leggere i gruppi già segnati «non sono duplicati» ('+(_e?.message||_e)+'): tra i gruppi proposti ci possono essere anche persone diverse già verificate.','err',7000)
+  }
   _dedupData={};window._dedupKeys={}
   const box=$('dedup-list')
   if(!dupli.length){
@@ -7535,10 +7568,12 @@ async function rubUnisciSel(){
   const{data,error}=await sb.from('persone').select('*').in('persona_id',ids)
   if(error||!(data||[]).length){toast('Errore caricamento schede: '+(error?.message||''),'err');return}
   const rapMap={}
-  try{
-    const{data:rr}=await sb.from('persone_imprese').select('persona_id').in('persona_id',ids)
+  {
+    /* i rapporti aiutano a scegliere la scheda principale: se non si leggono ci si ferma */
+    const{data:rr,error:eRr}=await sb.from('persone_imprese').select('persona_id').in('persona_id',ids)
+    if(eRr){toast('Non sono riuscito a leggere i rapporti di lavoro delle schede ('+eRr.message+'): unione non avviata, riprova.','err');return}
     ;(rr||[]).forEach(r=>{rapMap[r.persona_id]=(rapMap[r.persona_id]||0)+1})
-  }catch(_e){}
+  }
   _dedupData={sel0:data}
   window._dedupFromSel=true
   $('dedup-list').innerHTML=_dedupGroupHtml('sel0',data,rapMap)
@@ -7549,10 +7584,13 @@ window.rubUnisciSel=rubUnisciSel
 async function eliminaPersona(pid){
   if(!window.__isCoord){toast('Funzione riservata alla segreteria','err');return}
   let extra=''
-  try{
-    const{count}=await sb.from('persone_imprese').select('id',{count:'exact',head:true}).eq('persona_id',pid)
+  {
+    /* se i rapporti non si leggono non si elimina: l'avviso «ha N rapporti» mancherebbe
+       e la scheda sembrerebbe libera */
+    const{count,error:eCnt}=await sb.from('persone_imprese').select('id',{count:'exact',head:true}).eq('persona_id',pid)
+    if(eCnt){toast('Non sono riuscito a leggere i rapporti di lavoro della scheda ('+eCnt.message+'): eliminazione non eseguita, riprova.','err');return}
     if(count)extra=`\n\nAttenzione: la scheda ha ${count} rapport${count===1?'o':'i'} di lavoro collegat${count===1?'o':'i'}, che resteranno in archivio.`
-  }catch(_e){}
+  }
   if(!confirm('Eliminare questo contatto dalla rubrica?\n\nLa scheda va nel cestino (elimina=1), non viene cancellata definitivamente.'+extra))return
   const{error}=await sb.from('persone').update({elimina:1,updated_at:new Date().toISOString(),updated_by:S.user?.email||null}).eq('persona_id',pid)
   if(error){toast('Errore: '+error.message,'err');return}
@@ -7895,9 +7933,17 @@ function _setEvModalRett(isRett,infoTxt){
   }
 }
 async function checkRettifica(vid){
-  const{data:invii}=await sb.from('verbali').select('id,tipo,inviato_at,dest,email_dest,oggetto,snapshot')
+  const{data:invii,error:eInv}=await sb.from('verbali').select('id,tipo,inviato_at,dest,email_dest,oggetto,snapshot')
     .eq('visita_id',vid).eq('inviato_email',true)
     .order('inviato_at',{ascending:false}).limit(1)
+  /* lettura fallita ≠ mai inviato: senza saperlo non si propone la rettifica
+     e non si lascia partire un invio che sembrerebbe il primo (vedi btn-ev-invia) */
+  if(eInv){
+    window._evInviiNonLetti=vid
+    toast('Non sono riuscito a leggere gli invii precedenti di questo verbale ('+eInv.message+'): non so se è già stato trasmesso. Ricarica e riapri la visita prima di inviarlo.','err',9000)
+    return
+  }
+  if(window._evInviiNonLetti===vid)window._evInviiNonLetti=null
   const last=invii&&invii[0]
   if(!last)return
   const modifiche=diffSnapRettifica(last.snapshot,buildSnap(vid))
@@ -8134,6 +8180,7 @@ $('btn-ev-invia').onclick=async()=>{
   if(!emails.length){toast('Nessun destinatario','warn');return}
   const vid=S.savedId||S.fd?.visita_id||window._evContext?.vid
   if(!vid){toast('Salva prima la visita','warn');return}
+  if(window._evInviiNonLetti===vid&&!window._evRettifica){toast('Non sono riuscito a verificare se questo verbale è già stato inviato: invio fermato. Ricarica e riapri la visita, così si capisce se è un primo invio o una rettifica.','err',9000);return}
 
   const btn=$('btn-ev-invia')
   const status=$('email-verbale-status')
@@ -8226,9 +8273,12 @@ $('btn-ev-invia').onclick=async()=>{
 
     // 5. Registra l'invio nel log verbali (serve a rilevare le future rettifiche)
     try{
-      const{data:snapRow}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).maybeSingle()
+      const{data:snapRow,error:eSnap}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).maybeSingle()
+      /* la mail è partita: l'invio si registra comunque, ma senza la copia del verbale
+         la prossima rettifica non potrà dire che cosa è cambiato — lo si dice ora */
+      if(eSnap)toast('Invio registrato senza la copia del verbale trasmesso (lettura non riuscita: '+eSnap.message+'): una futura rettifica non potrà elencare le modifiche.','warn',9000)
       const _ret=window._evRettifica||null
-      await sb.from('verbali').insert({
+      const{error:eLog}=await sb.from('verbali').insert({
         visita_id:vid,
         nr_verbale:window._evContext?.nr_verbale||vGet('f-verbale')||'',
         inviato_email:true,
@@ -8242,7 +8292,8 @@ $('btn-ev-invia').onclick=async()=>{
         snapshot:snapRow?.snapshot||null,
         inviato_da:session?.user?.email||null
       })
-    }catch(logErr){console.warn('Log invio verbale non salvato:',logErr)}
+      if(eLog)throw eLog
+    }catch(logErr){console.warn('Log invio verbale non salvato:',logErr);toast('Il verbale è stato inviato, ma l\u2019invio NON è stato registrato ('+(logErr?.message||logErr)+'): avvisa la segreteria, altrimenti una rettifica sembrerà un primo invio.','err',10000)}
     window._evRettifica=null
     _setEvModalRett(false)
     setTimeout(()=>hide('modal-email-verbale'), 2000)
@@ -8265,7 +8316,10 @@ async function riapriBozza(vid){
   try{
     let snap=null
     // 1) Prova prima lo snapshot salvato in visite_snapshot
-    const{data:snapRow}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).maybeSingle()
+    const{data:snapRow,error:eSnap}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).maybeSingle()
+    /* lettura fallita ≠ bozza senza copia salvata: ricostruirla in silenzio dai dati
+       attuali perderebbe ciò che c'è solo nella copia */
+    if(eSnap){toast('Non sono riuscito a leggere la bozza salvata ('+eSnap.message+'): non la ricostruisco dai dati attuali. Riprova tra poco.','err',8000);return}
     if(snapRow?.snapshot){
       snap=snapRow.snapshot
     }else{
@@ -8359,17 +8413,20 @@ async function genPDF(vid, output='save'){
     // Rettifica: dicitura sul PDF se è in corso un reinvio rettificato
     // oppure se l'ultimo invio registrato è una rettifica
     let _rettBanner=null
-    try{
+    {
       if(window._evRettifica){
         _rettBanner='Sostituisce integralmente il verbale trasmesso il '+(window._evRettifica.dataPrimoInvio||'')
       }else{
-        const{data:_ri}=await sb.from('verbali').select('tipo,inviato_at').eq('visita_id',vid).eq('inviato_email',true).order('inviato_at',{ascending:false}).limit(2)
+        const{data:_ri,error:_eRi}=await sb.from('verbali').select('tipo,inviato_at').eq('visita_id',vid).eq('inviato_email',true).order('inviato_at',{ascending:false}).limit(2)
+        /* se gli invii non si leggono il PDF non esce: senza la dicitura «Sostituisce
+           integralmente…» una rettifica sembrerebbe il verbale originale */
+        if(_eRi)throw new Error('non sono riuscito a leggere gli invii precedenti del verbale ('+_eRi.message+'), quindi non so se va la dicitura di rettifica. Riprova tra poco')
         if(_ri&&_ri[0]?.tipo==='rettifica'){
           const _fmtR=iso=>{const d=new Date(iso);return isNaN(d)?'':`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`}
           _rettBanner=_ri[1]?('Sostituisce integralmente il verbale trasmesso il '+_fmtR(_ri[1].inviato_at)):('Rettifica trasmessa il '+_fmtR(_ri[0].inviato_at))
         }
       }
-    }catch(_rb){console.warn('banner rettifica:',_rb)}
+    }
 
     // Secondo tecnico
     let tec2=null
@@ -8438,7 +8495,6 @@ async function genPDF(vid, output='save'){
                 const b64=await fetchImageBase64(meta.thumb)
                 if(b64){
                   imgMap[tipo]='data:image/jpeg;base64,'+b64
-                  console.log('foto thumb OK:',tipo)
                   continue
                 }
               }catch(e2){console.warn('foto thumb errore:',tipo,e2.message)}
@@ -8462,7 +8518,6 @@ async function genPDF(vid, output='save'){
                   const dlData=await dlRes.json()
                   if(dlData.ok&&dlData.base64){
                     imgMap[tipo]='data:image/jpeg;base64,'+dlData.base64
-                    console.log('foto Edge Function OK:',tipo)
                   } else {
                     console.warn('foto Edge Function ERRORE:',tipo,dlData.error||dlRes.status)
                   }
@@ -8493,20 +8548,25 @@ async function genPDF(vid, output='save'){
     }
 
     // FIRMA – immagini firma da Supabase Storage (usa cache sessione _firmaCache)
+    if(_firmaCacheErr)await loadFirmeCache()   // al primo giro non si erano lette: si riprova
+    const _firmeNonLette=[]
     const _getFirmaB64=async(email)=>{
       if(!email)return null
+      if(_firmaCacheErr){_firmeNonLette.push(email);return null}
       const fUrl=_firmaCache[email]
       if(!fUrl)return null
       try{
         const sUrl=await getFirmaSignedUrl(fUrl)
-        if(!sUrl)return null
-        return await fetchImageBase64(sUrl)
-      }catch(e){return null}
+        const b=sUrl?await fetchImageBase64(sUrl):null
+        if(!b)_firmeNonLette.push(email)   // la firma c'è ma non è arrivata
+        return b
+      }catch(e){_firmeNonLette.push(email);return null}
     }
     for(const email of [pd.tecEmail,...(pd.tec2Nome?[pd.tec2Email]:[])]){
       const fb64=await _getFirmaB64(email)
       img.firme.push(fb64?'data:image/'+(fb64.startsWith('/9j')?'jpeg':'png')+';base64,'+fb64:null)
     }
+    if(_firmeNonLette.length)toast('Non sono riuscito a leggere la firma di '+_firmeNonLette.join(', ')+': il PDF esce SENZA firma. Riprova tra poco se deve essere firmato.','warn',9000)
 
     // ── CAMPAGNA INFORMATIVA (coda verbale) ──
     try{
@@ -8588,10 +8648,18 @@ async function genPDF(vid, output='save'){
 
 // Cache locale firma_url per sessione: { email -> firma_url }
 const _firmaCache={}
+let _firmaCacheErr=null   // lettura fallita: il PDF lo dice invece di uscire senza firma in silenzio
 
 // Carica firma_url di tutti i tecnici dal DB e popola la cache
 async function loadFirmeCache(){
-  const{data}=await sb.from('tecnici').select('email,firma_url').not('firma_url','is',null)
+  const{data,error}=await sb.from('tecnici').select('email,firma_url').not('firma_url','is',null)
+  if(error){
+    const primaVolta=!_firmaCacheErr
+    _firmaCacheErr=error.message||'lettura non riuscita'
+    if(primaVolta)toast('Non sono riuscito a leggere le firme dei tecnici ('+_firmaCacheErr+'): finché non si leggono i verbali PDF escono senza firma.','warn',8000)
+    return
+  }
+  _firmaCacheErr=null
   if(data)data.forEach(r=>{if(r.email&&r.firma_url)_firmaCache[r.email]=r.firma_url})
 }
 
@@ -8631,7 +8699,9 @@ async function openModalFirme(){
   show('modal-firme')
 
   // Ricarica firma_url dal DB per tutti i tecnici
-  const{data:tecRows}=await sb.from('tecnici').select('email,tecnico_nome,tecnico_cognome,firma_url')
+  const{data:tecRows,error:eTec}=await sb.from('tecnici').select('email,tecnico_nome,tecnico_cognome,firma_url')
+  /* lettura fallita ≠ «Nessuna firma caricata» per tutti */
+  if(eTec){list.innerHTML='<div style="text-align:center;color:#c0392b;font-size:12px;padding:12px">Non sono riuscito a leggere le firme ('+esc(eTec.message)+'). Chiudi e riapri tra poco.</div>';return}
   const tecMap={}
   if(tecRows)tecRows.forEach(r=>{tecMap[r.email]={...r}})
 
@@ -8707,14 +8777,16 @@ async function openModalFirme(){
 }
 
 window.deleteFirmaDB=async(email)=>{
-  const{data:row}=await sb.from('tecnici').select('firma_url').eq('email',email).maybeSingle()
+  const{data:row,error:eRow}=await sb.from('tecnici').select('firma_url').eq('email',email).maybeSingle()
+  if(eRow){toast('Non sono riuscito a leggere la firma da eliminare ('+eRow.message+'): non ho eliminato niente, riprova.','err');return}
   if(row?.firma_url){
     // Elimina file da Storage
     const marker='/object/public/firme-tecnici/'
     const storagePath=row.firma_url.includes(marker)?row.firma_url.split(marker)[1]:null
     if(storagePath)await sb.storage.from('firme-tecnici').remove([storagePath])
   }
-  await sb.from('tecnici').update({firma_url:null}).eq('email',email)
+  const{error:eUpd}=await sb.from('tecnici').update({firma_url:null}).eq('email',email)
+  if(eUpd){toast('Firma non eliminata: '+eUpd.message,'err');return}
   delete _firmaCache[email]
   toast('Firma eliminata','ok')
   openModalFirme()
@@ -8998,7 +9070,10 @@ async function sgrCercaDupCnce(){
   const dupli=Object.entries(grp).filter(([,v])=>v.length>1)
   if(!dupli.length){box.innerHTML='<div style="color:#95C22F;font-size:13px">✔ Nessun duplicato CNCE tra i cantieri attivi.</div>';return}
   const ids=dupli.flatMap(([,v])=>v.map(c=>c.cantiere_id))
-  const{data:vs}=await sb.from('visite').select('cantiere_id').in('cantiere_id',ids).eq('elimina',0)
+  /* il conteggio decide quale cantiere proporre da mantenere: se non si legge ci si ferma */
+  let vs
+  try{vs=await sbTutte((da,a)=>sb.from('visite').select('visita_id,cantiere_id').in('cantiere_id',ids).eq('elimina',0).order('visita_id').range(da,a))}
+  catch(e){box.innerHTML='<div style="color:#ff8a80;font-size:13px">Non sono riuscito a contare le visite dei cantieri duplicati ('+esc(e.message||String(e))+'): nessuna fusione proposta, riprova.</div>';return}
   const nv={};(vs||[]).forEach(v=>nv[v.cantiere_id]=(nv[v.cantiere_id]||0)+1)
   window.__dupCnceGroups={}
   box.innerHTML='<div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:8px">'+dupli.length+' gruppo/i di duplicati trovati.</div>'+dupli.map(([k,rows],gi)=>{
@@ -9818,7 +9893,6 @@ function osImportoClass(code){
 function oxIt(n,d){return (n==null||isNaN(n))?'':Number(n).toFixed(d==null?1:d).replace('.',',')}
 function oxPct(n){return oxIt(n,1)}
 function oxN(n){return n?String(n):''}
-function oxPad2(n){return String(Math.max(0,Math.round(n||0))).padStart(2,'0')}
 
 // ── palette brand Formedil ──
 
@@ -10931,7 +11005,12 @@ async function admEditCommittente(id){
   const _idf=$('ec-id');if(_idf){_idf.readOnly=true;_idf.style.background='#f4f4f4';_idf.style.color='#888';_idf.style.cursor='not-allowed'}
   const _mh=document.querySelector('#modal-edit-comm h3');if(_mh)_mh.textContent='👤 Scheda committente'
   let k=(_commRows||[]).find(x=>x.committente_id===id)
-  if(!k){try{const{data}=await sb.from('committenti').select('*').eq('committente_id',id).single();k=data||{}}catch(_){k={}}}
+  if(!k){
+    /* scheda non letta: la maschera vuota, salvata, cancellerebbe i dati del committente */
+    const{data,error}=await sb.from('committenti').select('*').eq('committente_id',id).single()
+    if(error){toast('Non sono riuscito a leggere la scheda del committente ('+error.message+'): riprova.','err');return}
+    k=data||{}
+  }
   vSet('ec-id',k.committente_id||id)
   vSet('ec-nome',k.committente_nome||'')
   vSet('ec-cfpiva',k.cf_piva||'')
@@ -10946,7 +11025,8 @@ async function admEditCommittente(id){
   const vbox=$('ec-visite-list'),vinfo=$('ec-visite-info')
   if(vbox)vbox.innerHTML='<div style="color:#aaa;font-size:12px">Caricamento visite…</div>'
   try{
-    const{data:cant}=await sb.from('cantieri').select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,comune_nome,cantiere_cnce').eq('cantiere_committente_id',id).order('comune_nome').limit(500)
+    const{data:cant,error:eCant}=await sb.from('cantieri').select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,comune_nome,cantiere_cnce').eq('cantiere_committente_id',id).order('comune_nome').limit(500)
+    if(eCant)throw eCant   // lettura fallita ≠ «Nessun cantiere collegato»
     const clist=cant||[]
     if(box){
       if(!clist.length)box.innerHTML='<div style="color:#aaa;font-size:12px">Nessun cantiere collegato</div>'
@@ -10955,13 +11035,25 @@ async function admEditCommittente(id){
     const cmap={};clist.forEach(function(c){cmap[c.cantiere_id]=c.cantiere_etichetta||c.cantiere_indirizzo||c.cantiere_id})
     const cids=clist.map(function(c){return c.cantiere_id})
     let vis=[]
-    if(cids.length){const{data:vv}=await sb.from('visite').select('visita_id,nr_verbale,data_visita,cantiere_id,ipc').in('cantiere_id',cids).eq('elimina',0).order('data_visita',{ascending:false}).limit(500);vis=vv||[]}
+    if(cids.length){
+      const{data:vv,error:eVv}=await sb.from('visite').select('visita_id,nr_verbale,data_visita,cantiere_id,ipc').in('cantiere_id',cids).eq('elimina',0).order('data_visita',{ascending:false}).limit(500)
+      if(eVv){   // lettura fallita ≠ «Nessuna visita collegata»
+        if(vinfo)vinfo.textContent=''
+        if(vbox)vbox.innerHTML='<div style="color:#c00;font-size:12px">Non sono riuscito a leggere le visite: '+esc(eVv.message||'')+'</div>'
+        return
+      }
+      vis=vv||[]
+    }
     if(vinfo)vinfo.textContent=vis.length?('· '+vis.length+' visite'):'· nessuna'
     if(vbox){
       if(!vis.length)vbox.innerHTML='<div style="color:#aaa;font-size:12px">Nessuna visita collegata</div>'
       else vbox.innerHTML=vis.map(function(v){var d=v.data_visita?new Date(v.data_visita).toLocaleDateString('it-IT'):'';return '<div style="padding:4px 0;border-bottom:1px solid #eee;font-size:12px"><b>'+esc(v.nr_verbale||v.visita_id)+'</b> <span style="color:#888">'+d+' · '+esc(cmap[v.cantiere_id]||'')+(v.ipc?(' · IPC '+esc(v.ipc)):'')+'</span></div>'}).join('')
     }
-  }catch(e){if(box)box.innerHTML='<div style="color:#c00;font-size:12px">Errore: '+esc(e.message||'')+'</div>'}
+  }catch(e){
+    if(box)box.innerHTML='<div style="color:#c00;font-size:12px">Non sono riuscito a leggere i cantieri: '+esc(e.message||'')+'</div>'
+    if(vinfo)vinfo.textContent=''
+    if(vbox)vbox.innerHTML='<div style="color:#c00;font-size:12px">Visite non lette (i cantieri non si sono letti).</div>'
+  }
 }
 function admNuovoCommittente(){
   _editCommId=null
@@ -12286,7 +12378,8 @@ async function showRubricaDetail(tipo, id){
       if(r.note?.trim()) html+=qdSec('Note')+`<div class="qd-note">${esc(r.note)}</div>`
       // Verbali in cui la persona compare (CSP, CSE, RL, presente) e per quali imprese (14/09/2026)
       try{
-        const{data:vb}=await sb.rpc('persona_verbali',{p_persona_id:id})
+        const{data:vb,error:eVb}=await sb.rpc('persona_verbali',{p_persona_id:id})
+        if(eVb)throw eVb
         if(vb&&vb.length){
           const _imp=[]
           vb.forEach(x=>{const k=x.impresa_nome||x.impresa_id||'–';const y=_imp.find(z=>z.k===k);if(y)y.n++;else _imp.push({k,n:1})})
@@ -12312,7 +12405,10 @@ async function showRubricaDetail(tipo, id){
           html+='</tbody></table>'
           html+='<div style="font-size:11px;color:#999;margin-top:4px">Abbinati per nome e cognome: due omonimi qui si confondono.</div>'
         }
-      }catch(_ve){/* elenco non disponibile: la scheda resta com'era */}
+      }catch(_ve){
+        /* lettura fallita ≠ persona mai comparsa nei verbali: lo si scrive nella scheda */
+        html+=qdSec('Nei verbali di sopralluogo')+'<div style="font-size:12px;color:#c0392b">Non sono riuscito a leggere i verbali in cui compare ('+esc(_ve?.message||String(_ve))+').</div>'
+      }
       // Rapporti di lavoro: visibili solo a chi è autorizzato lato asseverazione
       // (per gli altri utenti la query torna semplicemente vuota per RLS)
       try{
@@ -12366,7 +12462,8 @@ async function _loadSnapForVerbale(verbale){
   const{data:vRow,error}=await sb.from('visite').select('visita_id').eq('nr_verbale',nr).maybeSingle()
   if(error||!vRow)throw new Error('Verbale non trovato: '+nr)
   const vid=vRow.visita_id
-  const{data:snapRow}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).maybeSingle()
+  const{data:snapRow,error:eSnap}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).maybeSingle()
+  if(eSnap)throw new Error('non sono riuscito a leggere la copia salvata del verbale ('+eSnap.message+'): non la ricostruisco dai dati attuali, riprova')
   if(snapRow?.snapshot)return snapRow.snapshot
   const{data:v}=await sb.from('visite').select('*,tecnici!visite_tecnico_id_fkey(*),cantieri(*)').eq('visita_id',vid).single()
   if(!v)throw new Error('Dati non trovati')
@@ -13061,17 +13158,6 @@ async function loadIncarichi(){
   if(error){ console.warn('incarichi:',error); return }
   _incCache=data||[]
   if(!_incCache.length && !gest){ incAggiornaBanner(); incAggiornaNavBadge(); renderIncarichi(); return }
-  // mappe tecnico_id ↔ email, per condividere il filtro con le scadenze
-  try{
-    const{data:tt}=await sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome,email')
-    const idMail={}, idNomi={}
-    ;(tt||[]).forEach(t=>{
-      if(t.email) idMail[t.tecnico_id]=String(t.email).toLowerCase()
-      idNomi[t.tecnico_id]=((t.tecnico_cognome||'')+' '+(t.tecnico_nome||'')).trim()||t.email||t.tecnico_id
-    })
-    window._incIdMail=idMail; window._incTecNomi=idNomi
-    window._incTecIds=[]
-  }catch(e){ console.warn('mappe tecnici incarichi:',e) }
   incPopolaFiltri()
   incAggiornaNavBadge()
   renderIncarichi()
@@ -13702,12 +13788,12 @@ document.addEventListener('input',function(ev){
 <script src="stage-relazione.js"></script>
 <!-- accesso negato al cantiere: il tecnico segnala, la segreteria gestisce -->
 <script src="diniego-accesso.js?v=4"></script>
-<script src="cantieri-critici-coord.js?v=2"></script>
+<script src="cantieri-critici-coord.js?v=3"></script>
 <script src="controllo-verbale.js?v=1"></script>
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
-<script src="riepilogo-verbali.js?v=1"></script>
+<script src="riepilogo-verbali.js?v=2"></script>
 <script src="scheda-impresa.js?v=1"></script>
-<script src="notifiche.js?v=3"></script>
+<script src="notifiche.js?v=4"></script>
 <script src="aiuto.js?v=9"></script>
 <script src="mail-respinte-tec.js?v=1"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
@@ -13717,12 +13803,12 @@ document.addEventListener('input',function(ev){
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
-<script src="direzione.js?v=3"></script>
+<script src="direzione.js?v=4"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
 <script src="verbale-pdf.js?v=2"></script>
 <!-- mappa sul telefono: cantieri vicino a te (Nuova visita) e rientri sulla mappa (Scadenze) -->
-<script src="mappa.js?v=1"></script>
+<script src="mappa.js?v=2"></script>
 </body>
 </html>

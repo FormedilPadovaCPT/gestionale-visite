@@ -292,7 +292,6 @@
 
     const puoRispondere = (dec) => (dec === 'direttore' && R.direttore) || (dec === 'presidenza' && R.presidenza) || (dec === 'commissione' && (R.coord || R.segr));
     const gestisce = R.coord || R.segr;
-    const eta = (gg) => `<span style="display:inline-block;min-width:74px;text-align:center;border-radius:6px;padding:2px 8px;font-size:11.5px;font-weight:700;background:${gg == null ? '#f0f0f3' : gg >= 30 ? '#fdeaea' : gg >= 10 ? '#fff3e0' : '#eef7e6'};color:${gg == null ? '#666' : gg >= 30 ? '#c0392b' : gg >= 10 ? '#b35c00' : '#2d7a06'}" title="giorni di attesa">${gg == null ? '—' : gg + ' g'}</span>`;
     const chiCorto = (c) => String(c || '—').replace(/\s*\(dal vault\)/, '').replace(/^Segreteria Area Sicurezza$/, 'Segreteria');
     const decBadge = (d) => `<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:#888">${esc(DECISORI[d] || d)}</span>`;
 
@@ -457,8 +456,14 @@
       avviso('Ora la vedono Direttore e coordinatore.', 'ok'); await decisioniBox(host, modo); dopoCambio();
     }));
     host.querySelectorAll('[data-dal]').forEach((inp) => inp.addEventListener('change', async () => {
-      const { error } = await sb.from('s_decisioni').update({ aperta_il: inp.value || null }).eq('id', Number(inp.dataset.dal));
-      if (error) avviso('Data non salvata: ' + error.message, 'err'); else avviso('Data aggiornata.', 'ok');
+      /* il campo vuoto (cancellato, o a metà mentre si scrive la data) non si
+         salva: aperta_il è obbligatoria, e il 26/09 il null è stato rifiutato
+         cinque volte col messaggio inglese del database */
+      if (!inp.value) { inp.value = inp.defaultValue; return; }
+      const { error } = await sb.from('s_decisioni').update({ aperta_il: inp.value }).eq('id', Number(inp.dataset.dal));
+      if (error) { inp.value = inp.defaultValue; avviso('Data non salvata: ' + error.message, 'err'); return; }
+      inp.defaultValue = inp.value;
+      avviso('Data aggiornata.', 'ok');
     }));
     host.querySelectorAll('[data-modifica]').forEach((b) => b.addEventListener('click', (ev) => con(ev.currentTarget, async () => {
       const riga = b.closest('[data-prop]'); const attuale = riga ? riga.querySelector('[data-testo]').textContent : '';

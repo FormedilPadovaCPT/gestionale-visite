@@ -267,6 +267,5 @@
     document.head.appendChild(st);
   })();
 
-  window.loadCriticiCoord = carica;
   window.aggiornaZonaCoord = aggiorna;
 })();

@@ -174,10 +174,14 @@
     var vq = await sb.from('visite').select('cantiere_id,nr_verbale,data_visita,ipc,acc_cant')
       .in('cantiere_id', ids).eq('elimina', 0).order('data_visita', { ascending: false }).order('nr_verbale', { ascending: false }).limit(200)
     var ultime = {}
+    /* lettura fallita ≠ «nessuna visita registrata»: il cantiere sembrerebbe mai visitato */
+    var visNonLette = !!vq.error
+    if (vq.error) console.warn('mappa vicini: visite non lette', vq.error)
     ;(vq.data || []).forEach(function (v) { if (!ultime[v.cantiere_id]) ultime[v.cantiere_id] = v })
     var oggi = new Date().toISOString().slice(0, 10)
     chiudiMappaVicini()
     esito.innerHTML = '<p class="mc-sotto" style="margin-top:10px">Posizione trovata' + (acc ? ' (precisione ' + fmtKm(acc / 1000) + ')' : '') + '. I più vicini:</p>' +
+      (visNonLette ? '<p class="mc-sotto" style="color:#c0392b">Non sono riuscito a leggere le visite di questi cantieri: le ultime visite non sono indicate, non vuol dire che non ce ne siano.</p>' : '') +
       '<div class="mc-map" data-mc="mappa"></div>' +
       righe.map(function (c, i) {
         var u = ultime[c.cantiere_id]
@@ -186,7 +190,7 @@
         var fatto = u && String(u.data_visita).slice(0, 10) === oggi
         var info = u ? (fatto ? 'già visitato oggi, verbale ' + nrBreve(u.nr_verbale)
           : (u.acc_cant ? u.acc_cant + '° accesso · ' : '') + 'ultimo verbale ' + nrBreve(u.nr_verbale) + ' del ' + dataIt(u.data_visita) + (u.ipc ? ' · IPC ' + u.ipc : ''))
-          : 'nessuna visita registrata'
+          : (visNonLette ? 'visite non lette' : 'nessuna visita registrata')
         return '<div class="mc-vic' + (fatto ? ' mc-oggi' : '') + '"><i><span>' + (i + 1) + '</span></i>' +
           '<b>' + h(titolo) + '</b>' +
           '<button type="button" class="btn-primary btn-sm" data-usa="' + h(c.cantiere_id) + '">Inizia qui</button>' +

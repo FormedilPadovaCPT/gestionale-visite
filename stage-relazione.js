@@ -69,8 +69,11 @@
     corrente = inc;
 
     /* se la relazione era gia' stata compilata si riapre quella */
-    const { data: gia } = await sb.from('s_visite_stage').select('*')
+    const { data: gia, error: eGia } = await sb.from('s_visite_stage').select('*')
       .eq('incarico_id', incaricoId).order('id', { ascending: false }).limit(1);
+    /* lettura fallita ≠ relazione mai scritta: aprire la maschera vuota porterebbe
+       a salvarne una seconda (doppione) al posto di rivedere quella esistente */
+    if (eGia) { toast('Non sono riuscito a leggere la relazione già salvata per questo incarico (' + eGia.message + '): riprova tra poco, per non crearne una seconda.', 'err'); return; }
     const v = (gia && gia[0]) || null;
 
     $('srel-info').innerHTML = '<strong>Incarico n. ' + inc.id + '</strong> — ' + esc_(inc.tipo_richiesta || '')
