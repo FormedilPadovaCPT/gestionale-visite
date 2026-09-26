@@ -13174,7 +13174,9 @@ function renderIncarichi(){
       +(r.referente?'<div style="color:#666;margin-top:3px">👤 '+esc(r.referente)+(r.cell_referente?' · <a href="tel:'+esc(r.cell_referente)+'" style="color:#e7500f;text-decoration:none">'+esc(r.cell_referente)+'</a>':'')+'</div>':'')
       +(r.note_comunicazione?'<div style="margin-top:5px;background:#fff8f3;border-left:3px solid #e7500f;padding:6px 9px;border-radius:0 5px 5px 0;white-space:pre-wrap;font-size:12px">'+esc(r.note_comunicazione)+'</div>':'')
       +(rif&&!chiuso?'<div style="margin-top:5px;background:#fdeaea;border-left:3px solid #c0392b;padding:6px 9px;border-radius:0 5px 5px 0;font-size:12px;color:#8e2b20"><strong>Non disponibile</strong>'+(r.rifiuto_motivo?': '+esc(r.rifiuto_motivo):'')+(r.rifiutato_il?' <span style="color:#b07a72">('+new Date(r.rifiutato_il).toLocaleDateString('it-IT')+')</span>':'')+'</div>':'')
-      +(r.testo_richiesta?'<details style="margin-top:5px"><summary style="font-size:12px;color:#888;cursor:pointer">Testo della richiesta</summary><div style="white-space:pre-wrap;font-size:12px;color:#555;margin-top:4px">'+esc(r.testo_richiesta)+'</div></details>':'')
+      /* il testo della richiesta si vede subito, senza un altro clic (26/09/2026,
+         chiesto dall'utente): prima stava chiuso sotto «Testo della richiesta» */
+      +(r.testo_richiesta?'<div style="margin-top:6px"><div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.04em">Testo della richiesta</div><div style="white-space:pre-wrap;font-size:12.5px;color:#444;margin-top:2px;background:#fafbfc;border-left:3px solid #e2e5e9;padding:6px 9px;border-radius:0 5px 5px 0">'+esc(r.testo_richiesta)+'</div></div>':'')
       +barra+fine
       +'</div>'
     return '<div style="border:1px solid '+(eseguito?'#cde3a0':'#e6e6e6')+';border-left:4px solid '+(eseguito?'#95C22F':col)+';border-radius:6px;padding:10px 13px;margin-bottom:8px;'+(chiuso?'opacity:.55;':'')+'background:'+(eseguito?'#fbfef5':'#fff')+'">'+head+body+'</div>'
