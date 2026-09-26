@@ -1091,6 +1091,25 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 
     <!-- INCARICHI ASSEGNATI -->
     <section id="view-incarichi" class="hidden">
+      <style>
+      /* 26/09/2026, proposta A scelta dall'utente: sul PC gli incarichi sono una
+         tabella, un clic sulla riga apre sotto la scheda di sempre coi pulsanti.
+         Sul telefono restano le schede. */
+      .inc-tab{width:100%;border-collapse:collapse;font-size:13px}
+      .inc-tab th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#777;font-weight:600;padding:9px 10px;border-bottom:1px solid #e6e8eb;background:#fafbfc;white-space:nowrap}
+      .inc-tab td{padding:7px 10px;border-bottom:1px solid #f0f1f3;vertical-align:middle}
+      .inc-tab tr.inc-r{cursor:pointer}.inc-tab tr.inc-r:hover td{background:#fff7f2}.inc-tab tr.inc-r.on td{background:#fff3ec}
+      .inc-tab tr.inc-r.chiuso td{opacity:.55}
+      .inc-tab .inc-n{display:inline-block;color:#fff;font-weight:800;font-size:12.5px;border-radius:5px;padding:1px 7px}
+      .inc-tab .inc-tipo{font-weight:600;font-size:12.5px;max-width:230px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .inc-tab .inc-imp{font-weight:600;color:#222;max-width:330px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .inc-tab .inc-com,.inc-tab .inc-tec{max-width:210px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#555}
+      .inc-tab .num{font-variant-numeric:tabular-nums;white-space:nowrap}.inc-tab .dx{text-align:right}
+      .inc-tab .vecchio{color:#b35c00;font-weight:600}.inc-tab .freccia{color:#999;width:14px}
+      .inc-tab tr.inc-exp>td{background:#fffaf6;padding:8px 12px 12px}
+      .inc-tab tr.inc-exp>td>div{margin-bottom:0!important}
+      @media (min-width:1100px){#view-incarichi{max-width:1400px;margin-left:auto;margin-right:auto}}
+      </style>
       <div class="card" style="margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
           <h3 style="margin:0;color:#e7500f;flex:1 1 auto">&#128203; Incarichi assegnati</h3>
@@ -13076,12 +13095,15 @@ function renderIncarichi(){
   const eseg=_incCache.filter(r=>r.stato==='eseguito'&&passaTec(r)).length
   const chiusi=_incCache.filter(r=>r.stato==='chiuso'&&passaTec(r)).length
   const rp=$('inc-riepilogo')
-  if(rp) rp.textContent=rows.length+' visualizzati · '+aperti+' da evadere · '+eseg+' con visita registrata · '+chiusi+' chiusi'
+  const _oggiInc=new Date()
+  const nonVisti=_incCache.filter(r=>r.stato==='aperto'&&passaTec(r)&&!r.presa_visione_il&&!r.accettato_il).length
+  const vecchi=_incCache.filter(r=>r.stato==='aperto'&&passaTec(r)&&r.data_richiesta&&(_oggiInc-new Date(r.data_richiesta+'T12:00:00'))>183*86400000).length
+  if(rp) rp.textContent=rows.length+' visualizzati · '+aperti+' da evadere'+(nonVisti?' ('+nonVisti+' non ancora visti)':'')+(vecchi?' · '+vecchi+' aperti da più di sei mesi':'')+' · '+eseg+' con visita registrata · '+chiusi+' chiusi'
   const vuoto=$('inc-vuoto'); if(vuoto) vuoto.style.display=rows.length?'none':''
   incAggiornaBanner()
   incAggiornaNavBadge()
   if(!rows.length){ box.innerHTML=''; return }
-  box.innerHTML=rows.map(r=>{
+  const cardHtml=r=>{
     const col=INC_COL[r.tipo_richiesta]||'#565c66'
     const chiuso=r.stato==='chiuso'
     const eseguito=r.stato==='eseguito'
@@ -13156,9 +13178,58 @@ function renderIncarichi(){
       +barra+fine
       +'</div>'
     return '<div style="border:1px solid '+(eseguito?'#cde3a0':'#e6e6e6')+';border-left:4px solid '+(eseguito?'#95C22F':col)+';border-radius:6px;padding:10px 13px;margin-bottom:8px;'+(chiuso?'opacity:.55;':'')+'background:'+(eseguito?'#fbfef5':'#fff')+'">'+head+body+'</div>'
-  }).join('')
+  }
+  if(!(window.matchMedia&&window.matchMedia('(min-width:1100px)').matches)){ box.innerHTML=rows.map(cardHtml).join(''); return }
+  box.innerHTML=incTabellaHtml(rows,cardHtml,gest)
+  if(!box._incTab){
+    box._incTab=1
+    box.addEventListener('click',e=>{
+      const tr=e.target.closest('tr[data-inc-r]'); if(!tr) return
+      const id=Number(tr.dataset.incR)
+      if(_incAperti.has(id)) _incAperti.delete(id); else _incAperti.add(id)
+      renderIncarichi()
+    })
+  }
 }
 window.renderIncarichi=renderIncarichi
+
+/* La tabella degli incarichi sul PC (26/09/2026, proposta A scelta dall'utente).
+   Una riga per incarico; il clic apre sotto la scheda di sempre, con tutti i
+   pulsanti, cosi' la logica resta una sola. Le righe aperte restano aperte
+   quando l'elenco si ridisegna. */
+const _incAperti=new Set()
+function incTabellaHtml(rows,cardHtml,gest){
+  const oggi=new Date()
+  const giorni=d=>d?Math.floor((oggi-new Date(d+'T12:00:00'))/86400000):null
+  const stato=r=>r.stato==='chiuso'?'<span style="color:#27ae60">✓ completato</span>'
+    :r.stato==='eseguito'?'<span style="color:#7aa527">✓ visita registrata</span>'
+    :r.rifiutato_il?'<span style="color:#c0392b;font-weight:600">✋ rifiutato</span>'
+    :r.accettato_il?'<span style="color:#2d7a06">✓ accettato</span>'
+    :r.presa_visione_il?'<span style="color:#27ae60">visto</span>'
+    :'<span style="color:#aaa">non ancora visto</span>'
+  const nCol=gest?10:9
+  let h='<div class="card" style="padding:0;overflow:hidden"><table class="inc-tab"><thead><tr><th>N°</th><th>Tipo</th><th>Impresa</th><th>Comune</th>'+(gest?'<th>Tecnico</th>':'')+'<th>Richiesto il</th><th class="dx">Da</th><th class="dx">Visite</th><th>Stato</th><th></th></tr></thead><tbody>'
+  rows.forEach(r=>{
+    const col=INC_COL[r.tipo_richiesta]||'#565c66'
+    const g=giorni(r.data_richiesta)
+    const prev=r.visite_previste||1, fatte=r.visite_fatte||0
+    const aperto=_incAperti.has(r.id)
+    h+='<tr class="inc-r'+(aperto?' on':'')+(r.stato==='chiuso'?' chiuso':'')+'" data-inc-r="'+r.id+'" data-aiuto="Un clic apre sotto la scheda dell\'incarico con i pulsanti; un altro la chiude.">'
+      +'<td><span class="inc-n" style="background:'+col+'">'+r.id+'</span></td>'
+      +'<td class="inc-tipo" style="color:'+col+'" title="'+esc(r.tipo_richiesta||'')+'">'+esc(r.tipo_richiesta||'Incarico')+'</td>'
+      +'<td class="inc-imp" title="'+esc(r.impresa||'')+'">'+esc(r.impresa||r.cantiere||'—')+'</td>'
+      +'<td class="inc-com" title="'+esc(r.comune||'')+'">'+esc(r.comune||'—')+'</td>'
+      +(gest?'<td class="inc-tec">'+esc(r.tecnico_nome||'—')+'</td>':'')
+      +'<td class="num">'+(r.data_richiesta?r.data_richiesta.split('-').reverse().join('/'):'')+'</td>'
+      +'<td class="num dx'+(g>183&&r.stato==='aperto'?' vecchio':'')+'">'+(g!=null?g+' g':'—')+'</td>'
+      +'<td class="num dx">'+(prev>1?fatte+' / '+prev:'—')+'</td>'
+      +'<td>'+stato(r)+'</td><td class="freccia">'+(aperto?'▴':'▾')+'</td></tr>'
+    if(aperto) h+='<tr class="inc-exp"><td colspan="'+nCol+'">'+cardHtml(r)+'</td></tr>'
+  })
+  return h+'</tbody></table></div>'
+}
+// passando da finestra stretta a larga (e viceversa) si ridisegna
+if(window.matchMedia){ const _mqInc=window.matchMedia('(min-width:1100px)'); (_mqInc.addEventListener?_mqInc.addEventListener('change',()=>renderIncarichi()):_mqInc.addListener(()=>renderIncarichi())) }
 
 // tendine della pagina Incarichi (ricostruite a ogni caricamento)
 function incPopolaFiltri(){

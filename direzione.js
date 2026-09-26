@@ -59,6 +59,11 @@
   /* ── chi sono: lo dice il database, non un elenco di indirizzi ── */
   let _ruoli = null;
   const _aperteQ = new Set();   // le questioni aperte col tocco (26/09/2026): restano aperte quando l'elenco si ridisegna
+  /* 26/09/2026, proposta A scelta dall'utente («tabella»): sul PC il registro è una
+     tabella con le colonne; si ordina cliccando le intestazioni e si filtra coi
+     contatori. Sul telefono resta l'elenco che si apre. */
+  let _ordQ = 'prio';            // prio (alta prima, poi attesa) | n | t | e | g
+  let _filtroQ = 'tutte';        // tutte | alta | scadute
   async function ruoli() {
     /* la memoria vale per UN utente: se sullo stesso telefono entra un altro
        account (26/09/2026: il Direttore vedeva «Ritira» e la priorità della
@@ -268,11 +273,25 @@
     const decise = righe.filter((r) => r.stato === 'decisa');
     const incontri = righe.filter((r) => r.stato === 'incontro');
     aperte.forEach((r) => lista.push({ k: 'man', gg: giorni(r.aperta_il), r, testo: r.questione, chi: r.aperta_da_nome || r.aperta_da, decisore: r.decisore, link: r.link, dal: r.aperta_il }));
-    lista.sort((a, b) => (b.gg || 0) - (a.gg || 0));
+    const altaDi = (x) => (x.r && x.r.priorita === 'alta' ? 0 : 1);
+    const entroDi = (x) => (x.r && x.r.entro_il) || '9999-12-31';
+    const ORD = {
+      prio: (a, b) => altaDi(a) - altaDi(b) || (b.gg || 0) - (a.gg || 0),
+      n: (a, b) => ((a.r && a.r.id) || 0) - ((b.r && b.r.id) || 0),
+      t: (a, b) => String(a.testo || '').localeCompare(String(b.testo || ''), 'it'),
+      e: (a, b) => entroDi(a).localeCompare(entroDi(b)) || (b.gg || 0) - (a.gg || 0),
+      g: (a, b) => (b.gg || 0) - (a.gg || 0),
+    };
+    lista.sort(ORD[_ordQ] || ORD.prio);
+    const scadutaDi = (x) => !!(x.r && x.r.entro_il && x.r.entro_il < T);
+    const nAlta = lista.filter((x) => altaDi(x) === 0).length, nScad = lista.filter(scadutaDi).length;
+    if ((_filtroQ === 'alta' && !nAlta) || (_filtroQ === 'scadute' && !nScad)) _filtroQ = 'tutte';
+    const vista = lista.filter((x) => _filtroQ === 'alta' ? altaDi(x) === 0 : _filtroQ === 'scadute' ? scadutaDi(x) : true);
 
     const puoRispondere = (dec) => (dec === 'direttore' && R.direttore) || (dec === 'presidenza' && R.presidenza) || (dec === 'commissione' && (R.coord || R.segr));
     const gestisce = R.coord || R.segr;
     const eta = (gg) => `<span style="display:inline-block;min-width:74px;text-align:center;border-radius:6px;padding:2px 8px;font-size:11.5px;font-weight:700;background:${gg == null ? '#f0f0f3' : gg >= 30 ? '#fdeaea' : gg >= 10 ? '#fff3e0' : '#eef7e6'};color:${gg == null ? '#666' : gg >= 30 ? '#c0392b' : gg >= 10 ? '#b35c00' : '#2d7a06'}" title="giorni di attesa">${gg == null ? '—' : gg + ' g'}</span>`;
+    const chiCorto = (c) => String(c || '—').replace(/\s*\(dal vault\)/, '').replace(/^Segreteria Area Sicurezza$/, 'Segreteria');
     const decBadge = (d) => `<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:#888">${esc(DECISORI[d] || d)}</span>`;
 
     /* LA RIGA (26/09/2026, proposta B scelta dall'utente: «elenco che si apre»).
@@ -297,6 +316,7 @@
       const rinv = r && r.stato === 'rinviata' ? `<span style="color:#8e44ad">rinviata al ${dIt(r.rinviata_al)}</span>` : '';
       const meta = [alta ? '<span class="dq-chip dq-alta" title="priorità alta, impostata da ufficio o coordinatore">alta</span>' : '', x.k === 'auto' ? '<span class="dq-chip dq-auto" title="riga che il database ricava da sola dalle pratiche">automatica</span>' : '', scad, rinv, x.gg != null ? `${x.gg} g di attesa` : ''].filter(Boolean).join(' · ');
       const riservata = r && r.riservata ? ' <span title="riservata: la vedono Direttore e coordinatore" style="font-size:11px">🔒</span>' : '';
+      const cellaEntro = x.k === 'auto' ? '<span class="dq-chip dq-auto">automatica</span>' : rinv || scad || '<span style="color:#aaa">—</span>';
       /* il riassunto: il dettaglio, tolta la parte che ripete il titolo (le
          questioni importate dal second brain hanno il titolo in testa al dettaglio) */
       let riass = r && r.dettaglio ? String(r.dettaglio).trim() : '';
@@ -304,7 +324,7 @@
       if (riass && tit && riass.startsWith(tit)) riass = riass.slice(tit.length).replace(/^[\s—–-]+/, '');
       if (riass && tit && riass === tit) riass = '';
       return `<div class="dq-voce${alta ? ' dq-alta-b' : ''}${apertaQ ? ' dq-aperta' : ''}" data-apri-q="${id}" data-aiuto="Un tocco apre la questione: riassunto, chi l'ha aperta e i pulsanti. Un altro la chiude.">
-        <div class="dq-riga1"><div class="dq-titolo${apertaQ ? '' : ' dq-clamp'}">${esc(x.testo)}${riservata}</div><span class="dq-freccia">▾</span></div>
+        <div class="dq-riga1"><span class="dq-c dq-c-p" title="${alta ? 'priorità alta' : 'priorità normale'}"><span class="dq-pallino${alta ? ' on' : ''}"></span></span><span class="dq-c dq-c-n">${r ? r.id : ''}</span><div class="dq-titolo${apertaQ ? '' : ' dq-clamp'}">${esc(x.testo)}${riservata}</div><span class="dq-c dq-c-e">${cellaEntro}</span><span class="dq-c dq-c-g">${x.gg != null ? x.gg + ' g' : '—'}</span><span class="dq-c dq-c-chi">${esc(chiCorto(x.chi))}</span><span class="dq-freccia">▾</span></div>
         <div class="dq-meta">${meta}</div>
         <div class="dq-dett"${apertaQ ? '' : ' hidden'}>
           ${riass ? `<div class="dq-riass">${esc(riass)}</div>` : ''}
@@ -355,12 +375,16 @@
       <p style="font-size:12.5px;color:#555;margin:0 0 6px">${intro}</p>
       ${nuova}
       ${boxProposte}
-      ${lista.map(rigaHtml).join('') || '<p style="font-size:13px;color:#555;margin:6px 0 0">Nessuna questione aperta.</p>'}
+      ${lista.length ? `<div class="dq-filtri">${[['tutte', 'Tutte', lista.length], ['alta', 'Alta priorità', nAlta], ['scadute', 'Scadute', nScad]].filter((f) => f[0] === 'tutte' || f[2]).map(([v, t, n]) => `<button type="button" class="dq-filtro${_filtroQ === v ? ' on' : ''}" data-filtroq="${v}" data-aiuto="Mostra solo queste questioni; «Tutte» le rimette tutte.">${t} <b>${n}</b></button>`).join('')}</div>
+      <div class="dq-intest"><span data-ordq="prio" title="priorità alta in cima, poi per giorni di attesa">●</span><span data-ordq="n">N°</span><span data-ordq="t">Questione</span><span data-ordq="e">Entro il</span><span data-ordq="g">In attesa</span><span>Aperta da</span><span></span></div>` : ''}
+      ${vista.map(rigaHtml).join('') || '<p style="font-size:13px;color:#555;margin:6px 0 0">Nessuna questione aperta.</p>'}
       ${decise.length ? `<div style="font-size:12px;font-weight:600;color:#565c66;margin-top:12px">Decise, ${gestisce ? 'da prendere in carico' : 'in attesa che l\'ufficio le prenda in carico'} (${decise.length})</div>${decise.map(rigaDecisa).join('')}` : ''}
       ${incontri.length ? `<div style="font-size:12px;font-weight:600;color:#565c66;margin-top:12px">Incontro proposto (${incontri.length})</div>${incontri.map(rigaIncontro).join('')}` : ''}
       ${rinviate.length ? `<div style="font-size:12px;font-weight:600;color:#565c66;margin-top:12px">Rinviate (${rinviate.length})</div>${rinviate.map((r) => `<div style="font-size:12.5px;color:#666;padding:5px 0;border-top:1px solid #f0e6dd">⏳ <strong>al ${dIt(r.rinviata_al)}</strong> — ${esc(r.questione)}${r.decisione ? ` <span style="color:#888">(${esc(r.decisione)})</span>` : ''} · ${decBadge(r.decisore)}</div>`).join('')}` : ''}
     </div>`;
 
+    host.querySelectorAll('[data-ordq]').forEach((h) => { if (h.dataset.ordq === _ordQ) h.classList.add('on'); h.addEventListener('click', () => { _ordQ = h.dataset.ordq; decisioniBox(host, modo); }); });
+    host.querySelectorAll('[data-filtroq]').forEach((b) => b.addEventListener('click', () => { _filtroQ = b.dataset.filtroq; decisioniBox(host, modo); }));
     host.querySelectorAll('[data-crit-apri]').forEach((b) => b.addEventListener('click', () => apriCritico(Number(b.dataset.critApri))));
     host.querySelectorAll('[data-cron]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); cronologia(Number(a.dataset.cron)); }));
     /* il tocco sulla riga la apre o la chiude; i pulsanti e i link dentro non la chiudono */
@@ -672,6 +696,23 @@
       + '.dq-azioni{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}'
       + '.dq-menu{display:flex;flex-direction:column;gap:2px;margin-top:6px;padding:6px;border:1px solid #f0e6dd;border-radius:8px;background:#fff}'
       + '.dq-menu button{text-align:left;background:none;border:0;padding:7px 8px;font-size:13.5px;color:#222;border-radius:6px;cursor:pointer}.dq-menu button:hover{background:#fff3ec}'
+      + '.dq-c,.dq-intest{display:none}'
+      + '.dq-filtri{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 6px}'
+      + '.dq-filtro{border:1px solid #d6dade;background:#fff;border-radius:16px;padding:3px 11px;font-size:12.5px;color:#444;cursor:pointer}'
+      + '.dq-filtro b{margin-left:3px}.dq-filtro.on{background:#565c66;border-color:#565c66;color:#fff}'
+      + '.dq-pallino{display:inline-block;width:9px;height:9px;border-radius:50%;background:#dfe2e6}.dq-pallino.on{background:#c0392b}'
+      + '@media (min-width:1100px){'
+      + '.dq-intest,.dq-riga1{display:grid;grid-template-columns:14px 44px minmax(0,1fr) 170px 76px 150px 14px;gap:12px;align-items:center}'
+      + '.dq-intest{padding:7px 10px 7px 14px;border-top:1px solid #f0e6dd;background:#fafbfc;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#777;font-weight:600}'
+      + '.dq-intest span[data-ordq]{cursor:pointer;user-select:none}.dq-intest span[data-ordq]:hover,.dq-intest span.on{color:#e7500f}'
+      + '.dq-c{display:block;font-size:12.5px;color:#666;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+      + '.dq-c-n{color:#999}.dq-c-g{text-align:right}'
+      + '.dq-voce{padding:8px 10px}.dq-voce.dq-alta-b{border-left-color:#c0392b}'
+      + '.dq-voce:hover{background:#fff7f2}'
+      + '.dq-titolo{font-size:13.5px}.dq-clamp{-webkit-line-clamp:1}'
+      + '.dq-meta{display:none}.dq-freccia{margin-top:0}'
+      + '.dq-dett{margin:8px 0 4px 70px;max-width:980px}'
+      + '}'
       + '@media (prefers-reduced-motion:reduce){.dq-freccia{transition:none}}';
     document.head.appendChild(st);
   })();
