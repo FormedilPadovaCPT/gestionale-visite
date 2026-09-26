@@ -637,7 +637,77 @@
       num.textContent = (fatte != null ? fatte : '–') + ' / ' + min;
       num.style.color = p == null ? '#888' : p >= 100 ? '#2d7a06' : p >= 75 ? '#95C22F' : '#b35c00';
       pct.textContent = (p != null ? p + '% del minimo' : '') + (r.contributi_ceiv != null ? ' · ' + Number(r.contributi_ceiv).toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }) + ' di contributi' : '');
+      if (p != null && p >= 100) festaObiettivo(esercizio, fatte, min);
     } catch (e) { num.textContent = '–'; pct.textContent = 'non sono riuscito a leggere il minimo'; console.warn('kpi ceiv:', e); }
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     4-bis. LA FESTA DEL TRAGUARDO (26/09/2026, chiesto dall'utente al
+     raggiungimento dei 900 verbali dell'esercizio 2025/2026)
+     Quando le visite dell'esercizio IN CORSO arrivano al minimo, in cima
+     alla scheda Statistiche compare la scritta del traguardo e partono i
+     fuochi d'artificio: cinque scoppi nei colori dell'ente, pochi secondi,
+     senza bloccare la pagina. A ogni apertura dell'app fino alla fine
+     dell'esercizio (l'utente, stesso giorno: «mantieni effetto fino al 1
+     ottobre» — prima erano tre volte per dispositivo): dal 1/10 l'esercizio
+     in corso cambia e la festa si spegne da sola. Cambiare i filtri non la
+     riaccende. Chi ha chiesto al telefono meno animazioni vede solo la
+     scritta. Esercizio nuovo = obiettivo nuovo = festa nuova.
+     ════════════════════════════════════════════════════════════ */
+  const FESTA_COLORI = ['#e7500f', '#565c66', '#95C22F', '#f4a261', '#c9ccd1'];
+  const _festaFatta = {};
+  function festaObiettivo(esercizio, fatte, min) {
+    const ae = typeof window.annoEdile === 'function' ? window.annoEdile().label : null;
+    if (!ae || esercizio !== ae) return;
+    const view = $('view-statistiche'); if (!view) return;
+    let ban = $('festa-obiettivo');
+    if (!ban) {
+      ban = document.createElement('div');
+      ban.id = 'festa-obiettivo';
+      ban.style.cssText = 'display:flex;align-items:center;gap:12px;border:1px solid var(--orange,#e7500f);border-radius:12px;padding:12px 16px;margin:0 0 14px;background:#fff7f2';
+      const filtri = $('dash-filtri');
+      if (filtri && filtri.parentNode === view) view.insertBefore(ban, filtri); else view.prepend(ban);
+    }
+    ban.innerHTML = '<span style="font-size:26px" aria-hidden="true">🏆</span><div><div style="font-weight:700;font-size:16px;color:#333">Obiettivo raggiunto: ' + fatte + ' verbali su ' + min + '</div>'
+      + '<div style="font-size:13px;color:#666">Esercizio ' + esercizio + ' · Grazie a tutti i tecnici dell\'Area Sicurezza e Salute</div></div>';
+    if (_festaFatta[esercizio]) return;
+    _festaFatta[esercizio] = true;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    fuochi();
+  }
+  function fuochi() {
+    const cv = document.createElement('canvas');
+    cv.setAttribute('aria-hidden', 'true');
+    cv.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9999';
+    document.body.appendChild(cv);
+    const W = window.innerWidth, H = window.innerHeight, d = window.devicePixelRatio || 1;
+    cv.width = W * d; cv.height = H * d;
+    const cx = cv.getContext('2d'); cx.setTransform(d, 0, 0, d, 0, 0);
+    let P = [], tm = null, scoppi = 0;
+    function scoppio() {
+      const x = W * (0.15 + Math.random() * 0.7), y = H * (0.18 + Math.random() * 0.3);
+      for (let i = 0; i < 70; i++) {
+        const an = Math.random() * Math.PI * 2, v = 5 * (0.5 + Math.random() * 0.7);
+        P.push({ x, y, vx: Math.cos(an) * v, vy: Math.sin(an) * v, r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.3,
+          w: 5 + Math.random() * 5, h: 3 + Math.random() * 4, c: FESTA_COLORI[i % FESTA_COLORI.length], life: 0, max: 160 + Math.random() * 80 });
+      }
+    }
+    function passo() {
+      cx.clearRect(0, 0, W, H);
+      P = P.filter((p) => p.life < p.max && p.y < H + 20);
+      for (const p of P) {
+        p.life++; p.vx *= 0.985; p.vy = p.vy * 0.985 + 0.08; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        const s = Math.abs(Math.cos(p.life * 0.1));
+        cx.save(); cx.globalAlpha = Math.max(0, 1 - p.life / p.max); cx.translate(p.x, p.y); cx.rotate(p.r);
+        cx.fillStyle = p.c; cx.fillRect(-p.w / 2, -p.h * s / 2, p.w, p.h * s + 0.5); cx.restore();
+      }
+      if (!P.length && scoppi >= 5) { clearInterval(tm); cv.remove(); }
+    }
+    /* setInterval e non requestAnimationFrame: con la scheda in secondo piano
+       rAF si ferma e i pezzi resterebbero sospesi a metà (provato il 26/09) */
+    tm = setInterval(passo, 16);
+    const t = setInterval(() => { scoppio(); if (++scoppi >= 5) clearInterval(t); }, 300);
+    scoppio(); scoppi = 1;
   }
 
   /* nella Zona Segreteria: i contributi per esercizio */
