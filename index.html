@@ -5298,7 +5298,7 @@ function buildRiepilogo(){
   const calcRit=calcRientroFormedil(vGet('f-data'),accCant,ipc)
   let ritornoTxt
   if(vGet('f-data-ritorno')){
-    ritornoTxt=fmtDate(vGet('f-data-ritorno'))
+    ritornoTxt=esc(fmtDate(vGet('f-data-ritorno')))
     if(calcRit.date)ritornoTxt+=' <span style="font-size:11px;color:#888">(proposta: '+fmtDate(calcRit.date.toISOString().slice(0,10))+')</span>'
   }else if(calcRit.date){
     const dStr=calcRit.date.toISOString().slice(0,10)
@@ -5316,8 +5316,8 @@ function buildRiepilogo(){
     ['Tecnico',vGet('f-tec-display')],
     ['N° imprese',String(computeImpTotals().nr_imp)],
     ['N° lavoratori',String(computeImpTotals().nr_lavoratori)],
-    ['Visita di ritorno',ritornoTxt,true],
-  ].map(([k,v,html])=>`<div class="rp-item"><div class="rp-k">${k}</div><div class="rp-v">${html?v:esc(v||'-')}</div></div>`).join('')
+  ].map(([k,v])=>`<div class="rp-item"><div class="rp-k">${k}</div><div class="rp-v">${esc(v||'-')}</div></div>`).join('')
+    +`<div class="rp-item"><div class="rp-k">Visita di ritorno</div><div class="rp-v">${ritornoTxt}</div></div>`
 
   let zoneHtml=''
   for(let z=1;z<=10;z++){
