@@ -1107,6 +1107,27 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       .inc-voce .m .vecchio{color:#b35c00;font-weight:600}
       .inc-destra{position:sticky;top:10px}
       .inc-destra>div{margin-bottom:0!important;padding:16px 20px!important}
+      /* 26/09/2026, poco dopo: per la SEGRETERIA (chi vede gli incarichi di tutti)
+         l'utente ha scelto la proposta C, una colonna per tecnico; il clic su un
+         biglietto apre la scheda di sempre in una finestra. Il tecnico, che vede
+         solo i suoi, resta con elenco e scheda (B). */
+      .inc-board{display:grid;gap:12px;align-items:start;overflow-x:auto;padding-bottom:4px}
+      .inc-col{background:#eceff2;border-radius:10px;padding:10px;min-width:0}
+      .inc-col-t{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:#444;margin:2px 4px 2px}
+      .inc-col-t span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .inc-col-t b{background:#fff;border-radius:9px;padding:0 8px;color:#222;font-variant-numeric:tabular-nums}
+      .inc-col-s{font-size:11.5px;color:#888;margin:0 4px 8px}
+      .inc-bc{background:#fff;border-radius:8px;padding:8px 10px;margin-bottom:8px;box-shadow:0 1px 2px rgba(0,0,0,.06);cursor:pointer;border-left:3px solid transparent}
+      .inc-bc:hover{border-left-color:#e7500f}.inc-bc.on{border-left-color:#e7500f;background:#fff7f2}
+      .inc-bc.vecchio{opacity:.62}.inc-bc.chiuso{opacity:.45}
+      .inc-bc .t{font-size:13px;font-weight:600;color:#222;line-height:1.3}
+      .inc-bc .t .inc-n,.inc-voce .t .inc-n{display:inline-block;color:#fff;font-weight:800;font-size:11.5px;border-radius:5px;padding:0 6px;margin-right:6px}
+      .inc-bc .m{font-size:11.5px;color:#888;margin-top:3px}
+      .inc-bc .m .vecchio{color:#b35c00;font-weight:600}
+      .inc-ovl{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow:auto}
+      .inc-ovl-box{background:#fff;border-radius:10px;max-width:840px;width:100%;position:relative;padding:14px 16px 16px;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+      .inc-ovl-box>div{margin-bottom:0!important;margin-top:22px}
+      .inc-ovl-x{position:absolute;top:6px;right:10px;background:none;border:0;font-size:22px;color:#888;cursor:pointer}
       @media (min-width:1100px){#view-incarichi{max-width:1400px;margin-left:auto;margin-right:auto}}
       </style>
       <div class="card" style="margin-bottom:14px">
@@ -13179,6 +13200,19 @@ function renderIncarichi(){
     return '<div style="border:1px solid '+(eseguito?'#cde3a0':'#e6e6e6')+';border-left:4px solid '+(eseguito?'#95C22F':col)+';border-radius:6px;padding:10px 13px;margin-bottom:8px;'+(chiuso?'opacity:.55;':'')+'background:'+(eseguito?'#fbfef5':'#fff')+'">'+head+body+'</div>'
   }
   if(!(window.matchMedia&&window.matchMedia('(min-width:1100px)').matches)){ box.innerHTML=rows.map(cardHtml).join(''); return }
+  window._incCardHtml=cardHtml
+  if(gest){
+    box.innerHTML=incColonneHtml(rows)
+    if(!box._incCol){
+      box._incCol=1
+      box.addEventListener('click',e=>{
+        const v=e.target.closest('[data-inc-apri]'); if(!v) return
+        incApriScheda(Number(v.dataset.incApri))
+      })
+    }
+    if(_incOvlId!=null&&$('inc-ovl')) incApriScheda(_incOvlId)
+    return
+  }
   if(!rows.some(r=>r.id===_incSel)) _incSel=rows[0].id
   box.innerHTML=incDivisoHtml(rows,cardHtml,gest)
   if(!box._incSplit){
@@ -13195,7 +13229,50 @@ window.renderIncarichi=renderIncarichi
 /* Gli incarichi sul PC (26/09/2026, proposta B scelta dall'utente): a sinistra
    l'elenco stretto, a destra la scheda di sempre dell'incarico scelto, con tutti
    i pulsanti, cosi' la logica resta una sola. */
-let _incSel=null
+let _incSel=null, _incOvlId=null
+/* Le colonne per tecnico (proposta C, 26/09/2026). Si raggruppa per EMAIL, non
+   per nome: lo stesso tecnico compariva scritto in due modi («De Marco Arch.
+   Nicola» e «Nicola De Marco») e sarebbe diventato due colonne. Come intestazione
+   il nome scritto piu' spesso. Colonne ordinate per numero di incarichi. */
+function incColonneHtml(rows){
+  const oggi=new Date()
+  const giorni=d=>d?Math.floor((oggi-new Date(d+'T12:00:00'))/86400000):null
+  const stato=r=>r.stato==='chiuso'?'completato':r.stato==='eseguito'?'visita registrata':r.rifiutato_il?'✋ rifiutato':r.accettato_il?'✓ accettato':r.presa_visione_il?'visto':'non ancora visto'
+  const gruppi=new Map()
+  rows.forEach(r=>{ const k=String(r.tecnico_email||r.tecnico_nome||'—').toLowerCase(); if(!gruppi.has(k)) gruppi.set(k,[]); gruppi.get(k).push(r) })
+  const nomeDi=g=>{ const c={}; g.forEach(r=>{ const n=r.tecnico_nome||r.tecnico_email||'Senza tecnico'; c[n]=(c[n]||0)+1 }); return Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0] }
+  const col=[...gruppi.values()].sort((a,b)=>b.length-a.length)
+  return '<div class="inc-board" style="grid-template-columns:repeat('+col.length+',minmax(230px,1fr))">'+col.map(g=>{
+    const nv=g.filter(r=>r.stato==='aperto'&&!r.presa_visione_il&&!r.accettato_il).length
+    return '<div class="inc-col"><div class="inc-col-t"><span title="'+esc(nomeDi(g))+'">'+esc(nomeDi(g))+'</span><b>'+g.length+'</b></div>'
+      +'<div class="inc-col-s">'+(nv?nv+' non ancora visti':'tutti visti')+'</div>'
+      +g.map(r=>{
+        const colr=INC_COL[r.tipo_richiesta]||'#565c66'
+        const gg=giorni(r.data_richiesta), vecchio=gg>183&&r.stato==='aperto'
+        const prev=r.visite_previste||1, fatte=r.visite_fatte||0
+        return '<div class="inc-bc'+(vecchio?' vecchio':'')+(r.stato==='chiuso'?' chiuso':'')+(r.id===_incOvlId?' on':'')+'" data-inc-apri="'+r.id+'" data-aiuto="Un clic apre la scheda dell\'incarico, con i pulsanti.">'
+          +'<div class="t"><span class="inc-n" style="background:'+colr+'">'+r.id+'</span>'+esc(r.impresa||r.cantiere||r.comune||'—')+'</div>'
+          +'<div class="m">'+esc(r.tipo_richiesta||'Incarico')+(r.comune?' · '+esc(r.comune):'')+'</div>'
+          +'<div class="m"><span class="'+(vecchio?'vecchio':'')+'">'+(gg!=null?gg+' g':'')+'</span>'+(prev>1?' · '+fatte+'/'+prev+' visite':'')+' · '+stato(r)+'</div></div>'
+      }).join('')+'</div>'
+  }).join('')+'</div>'
+}
+/* la scheda di sempre, in una finestra sopra le colonne; si aggiorna quando
+   l'elenco si ridisegna (dopo un pulsante), si chiude con ✕, Esc o un clic fuori */
+function incApriScheda(id){
+  const r=(_incCache||[]).find(x=>x.id===id)
+  let o=$('inc-ovl')
+  if(!r||typeof window._incCardHtml!=='function'){ if(o) o.remove(); _incOvlId=null; return }
+  if(!o){
+    o=document.createElement('div'); o.id='inc-ovl'; o.className='inc-ovl'
+    o.addEventListener('click',e=>{ if(e.target===o||e.target.closest('[data-inc-chiudi]')){ o.remove(); _incOvlId=null; renderIncarichi() } })
+    document.body.appendChild(o)
+  }
+  _incOvlId=id
+  o.innerHTML='<div class="inc-ovl-box" role="dialog" aria-label="Incarico '+id+'"><button type="button" class="inc-ovl-x" data-inc-chiudi aria-label="Chiudi">✕</button>'+window._incCardHtml(r)+'</div>'
+  document.querySelectorAll('.inc-bc').forEach(b=>b.classList.toggle('on',Number(b.dataset.incApri)===id))
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&$('inc-ovl')){ $('inc-ovl').remove(); _incOvlId=null; renderIncarichi() } })
 function incDivisoHtml(rows,cardHtml,gest){
   const oggi=new Date()
   const giorni=d=>d?Math.floor((oggi-new Date(d+'T12:00:00'))/86400000):null
@@ -13381,7 +13458,7 @@ window.incAnnullaRifiuto=incAnnullaRifiuto
    precedente aveva dichiarato, altrimenti il nuovo eredita il rifiuto. */
 async function incRiassegna(id){
   if(!window.__isSegreteria){toast('Riservato alla segreteria','err');return}
-  const{data:tec}=await sb.from('tecnici').select('tecnico_nome,tecnico_cognome,email').eq('attivo',true).not('email','is',null).order('tecnico_cognome')
+  const{data:tec}=await sb.from('tecnici').select('tecnico_nome,tecnico_cognome,titolo,email').eq('attivo',true).not('email','is',null).order('tecnico_cognome')
   const lista=(tec||[]).filter(t=>t.email)
   if(!lista.length){toast('Nessun tecnico attivo con email','warn');return}
   const scelta=prompt('A chi riassegno l\'incarico #'+id+'?\n\n'+lista.map((t,i)=>(i+1)+') '+[t.tecnico_nome,t.tecnico_cognome].filter(Boolean).join(' ')).join('\n')+'\n\nScrivi il numero:')
@@ -13390,11 +13467,13 @@ async function incRiassegna(id){
   if(!t){toast('Numero non valido','warn');return}
   // la traccia: senza, fra un mese nessuno sa perche' l'incarico ha cambiato mano
   const{data:_prima}=await sb.from('incarichi').select('tecnico_nome,note_comunicazione,rifiuto_motivo').eq('id',id).maybeSingle()
-  const _chi=[t.tecnico_nome,t.tecnico_cognome].filter(Boolean).join(' ')
+  /* il nome nella forma degli incarichi, «Cognome Titolo Nome» (26/09/2026: la forma
+     «Nome Cognome» faceva sembrare due tecnici diversi la stessa persona) */
+  const _chi=[t.tecnico_cognome,t.titolo,t.tecnico_nome].filter(Boolean).join(' ')
   const _riga='['+new Date().toLocaleDateString('it-IT')+'] Riassegnato dal gestionale: da '+((_prima&&_prima.tecnico_nome)||'?')+' a '+_chi+((_prima&&_prima.rifiuto_motivo)?' (il precedente non era disponibile: '+_prima.rifiuto_motivo+')':'')+'. Nessuna mail inviata da qui.'
   const{error}=await sb.from('incarichi').update({
     note_comunicazione:[(_prima&&_prima.note_comunicazione)||'',_riga].filter(Boolean).join('\n'),
-    tecnico_email:t.email,tecnico_nome:[t.tecnico_nome,t.tecnico_cognome].filter(Boolean).join(' '),
+    tecnico_email:t.email,tecnico_nome:_chi,
     rifiutato_il:null,rifiutato_da:null,rifiuto_motivo:null,
     accettato_il:null,accettato_da:null,presa_visione_il:null,presa_visione_da:null
   }).eq('id',id)
