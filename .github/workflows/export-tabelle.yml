@@ -19,6 +19,9 @@ on:
     - cron: '30 3 * * 0'   # ogni domenica alle 03:30 UTC (05:30 italiane)
   workflow_dispatch:        # avvio manuale dal tab Actions
 
+permissions:
+  contents: read
+
 jobs:
   export:
     runs-on: ubuntu-latest

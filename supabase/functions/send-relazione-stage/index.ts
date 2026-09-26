@@ -47,7 +47,7 @@ const esc = (s: unknown) => String(s ?? '')
 async function risolviCartella(token: string, percorso: string): Promise<string | null> {
   let padre: string | null = null
   for (const nome of percorso.split('/').map((s) => s.trim()).filter(Boolean)) {
-    const q = `name='${nome.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    const q = `name='${nome.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
       + (padre ? ` and '${padre}' in parents` : '')
     const u = 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q)
       + '&fields=files(id,name)&pageSize=5&supportsAllDrives=true&includeItemsFromAllDrives=true'
@@ -254,7 +254,7 @@ serve(async (req) => {
       destinatari: dest, cc, archiviata: !!driveId, cartella: percorso,
     }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
   } catch (e) {
-    return new Response(JSON.stringify({ ok: false, error: String((e as Error).message || e) }), {
+    return new Response(JSON.stringify({ ok: false, error: (e instanceof Error && e.message) || 'errore interno' }), {
       status: 400, headers: { ...CORS, 'Content-Type': 'application/json' },
     })
   }

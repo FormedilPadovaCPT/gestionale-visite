@@ -23,7 +23,7 @@ def sintassi_script(s: str, base: pathlib.Path) -> list:
         # Dire «OK» senza aver controllato sarebbe il guasto che questo punto vuole evitare.
         return ["Node non trovato: la sintassi degli script NON e' stata controllata."]
     problemi = []
-    blocchi = re.findall(r"<script\b([^>]*)>(.*?)</script>", s, flags=re.S | re.I)
+    blocchi = re.findall(r"<script\b([^>]*)>(.*?)</script\b[^>]*>", s, flags=re.S | re.I)
     with tempfile.TemporaryDirectory() as d:
         n = 0
         for attr, corpo in blocchi:

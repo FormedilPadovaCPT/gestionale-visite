@@ -184,6 +184,6 @@ serve(async (req)=>{
     return new Response(JSON.stringify({ ok:true, manuale, giorni, bcc:COORD, inviate:esiti.filter(e=>e.ok).length, da_riassegnare:riepilogoOrfani, esiti }, null, 2),{headers:{'Content-Type':'application/json',...CORS}})
   }catch(e){
     console.error('promemoria-ricontrolli:', e)
-    return new Response(JSON.stringify({error:String(e.message||e)}),{status:400,headers:{'Content-Type':'application/json',...CORS}})
+    return new Response(JSON.stringify({error:(e instanceof Error&&e.message)||'errore interno'}),{status:400,headers:{'Content-Type':'application/json',...CORS}})
   }
 })

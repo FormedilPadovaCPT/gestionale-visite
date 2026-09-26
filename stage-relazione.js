@@ -30,7 +30,7 @@
 
 (function () {
   const $ = (id) => document.getElementById(id);
-  const esc_ = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const esc_ = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   const dIt = (s) => (s ? String(s).slice(0, 10).split('-').reverse().join('/') : '');
 
   let corrente = null;      // l'incarico da cui si e' partiti

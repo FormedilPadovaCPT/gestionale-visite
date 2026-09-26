@@ -60,7 +60,7 @@
   async function libero(codice, cantiereId) {
     for (let n = 1; n < 50; n++) {
       const prova = n === 1 ? codice : `${codice}-${n}`;
-      const { data, error } = await window.sb.from('cantieri').select('cantiere_id').ilike('nodo_id', prova.replace(/[%_]/g, '\\$&'))
+      const { data, error } = await window.sb.from('cantieri').select('cantiere_id').ilike('nodo_id', prova.replace(/[\\%_]/g, '\\$&'))
         .neq('cantiere_id', cantiereId || '').limit(1);
       if (error) throw error;
       if (!data || !data.length) return prova;

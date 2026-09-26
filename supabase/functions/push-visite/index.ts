@@ -44,7 +44,7 @@ const CORS = {
 }
 const json = (o: unknown, status = 200) =>
   new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json', ...CORS } })
-const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e))
+const errMsg = (e: unknown) => (e instanceof Error ? e.message : 'errore interno')
 
 const MAX_CORPO = 4096
 const MAX_TELEFONI = 6   // per persona: telefono, tablet, un paio di computer

@@ -164,7 +164,7 @@ type Proposta = {
   date: { inizio: string; fine: string | null; sede: string | null }[]
 }
 const PREFISSO_OGGETTO = 'FORMEDIL Padova -AREA SICUREZZA E SALUTE-'
-const esc = (s: unknown) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')   // usata anche dalle funzioni della formazione, fuori da serve()
+const esc = (s: unknown) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')   // usata anche dalle funzioni della formazione, fuori da serve()
 const dataVisitaIso = (s?: string | null) => { const m = String(s || '').match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/); return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : (/^\d{4}-\d{2}-\d{2}/.test(String(s || '')) ? String(s).slice(0, 10) : null) }
 const eur = (n: number | null | undefined) => n == null ? '' : Number(n).toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
 const dIt = (iso?: string | null) => iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : ''
@@ -292,7 +292,7 @@ serve(async (req) => {
 
     // ── Modalità rettifica ──
     const isRett = !!(rettifica && (rettifica.dataPrimoInvio || (rettifica.modifiche||[]).length || rettifica.note))
-    const esc = (s: unknown) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    const esc = (s: unknown) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')
 
     const subjectFinal = subject || `${isRett ? 'RETTIFICA verbale - ' : ''}Cantiere di ${cantIndirizzo||cantiere||''} ${nrVerbale||''}`.trim()
 

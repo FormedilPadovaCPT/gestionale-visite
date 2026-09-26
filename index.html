@@ -14,12 +14,12 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Visite">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" integrity="sha512-2/YdOMV+YNpanLCF5MdQwaoFRVbTmrJ4u4EpqS/USXAQNUDgI5uwYi6J98WVtJKcfe1AbgerygzDFToxAlOGEQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <!-- mappa sul telefono: cantieri vicino a te e rientri sulla mappa (mappa.js) -->
 <link rel="stylesheet" href="mappa.css?v=1"/>
 <style>
@@ -3844,7 +3844,7 @@ $('btn-mc-comm-save').onclick=async()=>{
 // ── COMMITTENTE INFO CARD ──
 function renderCommCard(c){
   const card=$('comm-info-card'); if(!card)return
-  const row=(label,val)=>val?`<div><b style="color:#565c66;min-width:120px;display:inline-block">${label}</b> ${val}</div>`:''
+  const row=(label,val)=>val?`<div><b style="color:#565c66;min-width:120px;display:inline-block">${label}</b> ${esc(val)}</div>`:''
   const tipo=c.committente_tipo==1?'🏛 Pubblico':c.committente_tipo==2?'🏠 Privato':''
   const sogg=c.tipo_sogg==='PG'?'Persona giuridica':'Persona fisica'
   card.innerHTML=`
@@ -5316,8 +5316,8 @@ function buildRiepilogo(){
     ['Tecnico',vGet('f-tec-display')],
     ['N° imprese',String(computeImpTotals().nr_imp)],
     ['N° lavoratori',String(computeImpTotals().nr_lavoratori)],
-    ['Visita di ritorno',ritornoTxt],
-  ].map(([k,v])=>`<div class="rp-item"><div class="rp-k">${k}</div><div class="rp-v">${v||'-'}</div></div>`).join('')
+    ['Visita di ritorno',ritornoTxt,true],
+  ].map(([k,v,html])=>`<div class="rp-item"><div class="rp-k">${k}</div><div class="rp-v">${html?v:esc(v||'-')}</div></div>`).join('')
 
   let zoneHtml=''
   for(let z=1;z<=10;z++){
@@ -6755,7 +6755,7 @@ function _cmEnsure(){
   return true
 }
 
-function _cmEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function _cmEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 
 function _cmPopupSegn(s){
   const dt=s.created_at?new Date(s.created_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'–'
@@ -6764,7 +6764,7 @@ function _cmPopupSegn(s){
   let ph=''
   if(_img){
     const _fb=(s.thumb_url&&s.thumb_url!==_img)?_cmEsc(s.thumb_url):''
-    ph='<a href="'+_cmEsc(s.drive_url||_img)+'" target="_blank"><img src="'+_cmEsc(_img)+'" referrerpolicy="no-referrer"'+(_fb?' onerror="this.onerror=null;this.src=\''+_fb+'\'"':'')+' style="max-width:200px;max-height:150px;border-radius:6px;display:block;margin:4px 0"></a>'
+    ph='<a href="'+_cmEsc(s.drive_url||_img)+'" target="_blank"><img src="'+_cmEsc(_img)+'" referrerpolicy="no-referrer"'+(_fb?' data-fb="'+_fb+'" onerror="this.onerror=null;this.src=this.dataset.fb"':'')+' style="max-width:200px;max-height:150px;border-radius:6px;display:block;margin:4px 0"></a>'
   }else if(s.drive_url)ph='<a href="'+_cmEsc(s.drive_url)+'" target="_blank">📷 Apri foto su Drive</a><br>'
   const _nav='<a href="https://www.google.com/maps/dir/?api=1&destination='+s.lat+','+s.lng+'&travelmode=driving" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;margin:6px 0 2px;padding:7px 12px;background:var(--orange,#e7500f);color:#fff;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600">🧭 Naviga fin qui</a><br>'
   let btns=''
@@ -10878,7 +10878,7 @@ async function admSaveEditImpresa() {
   admLoadImprese()
 }
 
-function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') }
 
 $('btn-ei-cancel').onclick = () => hide('modal-edit-imp')
 $('btn-ei-save').onclick = admSaveEditImpresa
@@ -12020,7 +12020,7 @@ async function showCantiereDetail(cantId){
           const _sgImg=sg.drive_file_id?('https://drive.google.com/thumbnail?id='+esc(sg.drive_file_id)+'&sz=w600'):(sg.thumb_url||'')
           if(_sgImg){
             const _sgFb=(sg.thumb_url&&sg.thumb_url!==_sgImg)?esc(sg.thumb_url):''
-            html+='<a href="'+esc(sg.drive_url||_sgImg)+'" target="_blank"><img src="'+esc(_sgImg)+'" referrerpolicy="no-referrer"'+(_sgFb?' onerror="this.onerror=null;this.src=\''+_sgFb+'\'"':'')+' style="width:100%;border-radius:8px;display:block;margin-bottom:4px"></a>'
+            html+='<a href="'+esc(sg.drive_url||_sgImg)+'" target="_blank"><img src="'+esc(_sgImg)+'" referrerpolicy="no-referrer"'+(_sgFb?' data-fb="'+_sgFb+'" onerror="this.onerror=null;this.src=this.dataset.fb"':'')+' style="width:100%;border-radius:8px;display:block;margin-bottom:4px"></a>'
           }else if(sg.drive_url)html+='<a href="'+esc(sg.drive_url)+'" target="_blank">📷 Foto su Drive</a><br>'
           html+='📍 '+dt+(sg.tecnico_nome?'<br>'+esc(sg.tecnico_nome):'')+(sg.note?'<br><i>'+esc(sg.note)+'</i>':'')
           html+='</div>'
@@ -13785,7 +13785,7 @@ document.addEventListener('input',function(ev){
 
 </script>
 <!-- relazione di visita allo stagista: apre dalla pagina Incarichi -->
-<script src="stage-relazione.js"></script>
+<script src="stage-relazione.js?v=2"></script>
 <!-- accesso negato al cantiere: il tecnico segnala, la segreteria gestisce -->
 <script src="diniego-accesso.js?v=4"></script>
 <script src="cantieri-critici-coord.js?v=3"></script>
@@ -13799,7 +13799,7 @@ document.addEventListener('input',function(ev){
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
-<script src="codice-univoco.js?v=2"></script>
+<script src="codice-univoco.js?v=3"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->

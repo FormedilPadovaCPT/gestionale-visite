@@ -37,7 +37,7 @@ async function drive(token: string, url: string, init: RequestInit = {}) {
 
 /* cartella per nome dentro `padre`, creata se manca */
 async function cartella(token: string, nome: string, padre: string): Promise<string> {
-  const q = `name='${nome.replace(/'/g, "\\'")}' and '${padre}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+  const q = `name='${nome.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}' and '${padre}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
   const r = await drive(token, 'https://www.googleapis.com/drive/v3/files?fields=files(id)&q=' + encodeURIComponent(q))
   const j = await r.json()
   if (j.files?.length) return j.files[0].id
@@ -155,6 +155,6 @@ Deno.serve(async (req) => {
     return risposta({ ok: false, error: 'azione sconosciuta' }, 400)
   } catch (e) {
     console.error('foto-appunti:', e)
-    return risposta({ ok: false, error: (e as Error).message || String(e) }, 500)
+    return risposta({ ok: false, error: (e instanceof Error && e.message) || 'errore interno' }, 500)
   }
 })
