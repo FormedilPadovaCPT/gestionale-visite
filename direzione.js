@@ -90,6 +90,35 @@
   }
   function chiudi() { const f = $('dir-finestra'); if (f) f.remove(); }
 
+  /* PERCHÉ esce dal registro (26/09/2026). Il second brain legge ritiro_tipo per
+     sapere che cosa fare della task: «risolta» la chiude, «non da mostrare» e
+     «doppione» la lasciano aperta. Prima c'era solo un motivo libero, e «già
+     risolto» e «non opportuna» finivano nello stesso campo. */
+  function chiediRitiro(titolo, predefinito) {
+    return new Promise((fine) => {
+      let esito = null;
+      const opz = [
+        ['risolta', 'Già risolta o già decisa', 'la task nel second brain si chiude'],
+        ['non_mostrare', 'Non è materia per il Direttore', 'la task resta aperta, solo non la vede lui'],
+        ['doppione', 'Doppione di un\'altra questione', 'la task resta legata all\'altra'],
+      ];
+      const f = finestra(titolo, `<div style="font-size:13px;color:#555;margin-bottom:8px">Perché esce dal registro? Serve al second brain per sapere che cosa fare della task.</div>
+        ${opz.map(([v, t, s]) => `<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;text-transform:none;letter-spacing:0;font-size:13.5px;font-weight:600;color:#333;cursor:pointer"><input type="radio" name="dir-rit" value="${v}"${v === predefinito ? ' checked' : ''} style="width:18px;height:18px;margin:1px 0 0;accent-color:#e7500f"><span>${t}<br><span style="font-weight:400;color:#777;font-size:12px">${s}</span></span></label>`).join('')}
+        <textarea id="dir-rit-motivo" rows="2" placeholder="Due parole su come è andata (facoltativo)" style="width:100%;margin-top:6px;font-size:13px"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button type="button" class="btn-outline btn-sm" data-chiudi>Annulla</button><button type="button" class="btn-primary btn-sm" id="dir-rit-ok">Togli dal registro</button></div>`);
+      const oss = new MutationObserver(() => { if (!document.body.contains(f)) { oss.disconnect(); fine(esito); } });
+      oss.observe(document.body, { childList: true });
+      f.querySelector('#dir-rit-ok').addEventListener('click', () => {
+        const scelto = f.querySelector('input[name="dir-rit"]:checked');
+        if (!scelto) { avviso('Scegli perché esce dal registro.', 'err'); return; }
+        const motivo = f.querySelector('#dir-rit-motivo').value.trim();
+        const etichetta = opz.find((o) => o[0] === scelto.value)[1].toLowerCase();
+        esito = { ritiro_tipo: scelto.value, ritirata_motivo: motivo || etichetta };
+        chiudi();
+      });
+    });
+  }
+
   function con(btn, fn) {
     return (async () => {
       const t = btn ? btn.textContent : '';
@@ -314,7 +343,7 @@
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button type="button" class="btn-outline btn-sm" data-modifica="${r.id}" data-aiuto="Riscrive il testo della questione prima di renderla visibile: la task del second brain resta com'è.">✏️</button>
-          <button type="button" class="btn-outline btn-sm" data-scarta="${r.id}" data-aiuto="Scarta la proposta scrivendo perché (non opportuna, superata, doppia): non entra nel registro e non viene riproposta.">✕ Scarta</button></div></div>`;
+          <button type="button" class="btn-outline btn-sm" data-scarta="${r.id}" data-aiuto="Scarta la proposta scegliendo perché: se è già risolta il second brain chiude la task; se non è materia per il Direttore o è un doppione, la task resta aperta. Non viene riproposta.">✕ Scarta</button></div></div>`;
     const boxProposte = proposte.length ? `<details open style="margin:8px 0 12px;padding:8px 12px;border:1px solid #d6e0ea;border-radius:8px;background:#f5f8fb">
         <summary style="cursor:pointer;font-size:13px;font-weight:600;color:#345">📥 Proposte da spuntare — ${proposte.length} task del second brain che aspettano il Direttore <span style="font-weight:400;color:#678">(le vedi solo tu: spunta quelle da rendere visibili, scarta le altre)</span></summary>
         ${proposte.map(rigaProposta).join('')}</details>` : (R.segr && modo === 'coord' ? '<p style="font-size:12px;color:#888;margin:4px 0 10px">📥 Nessuna proposta da spuntare: le task del second brain che aspettano il Direttore arrivano qui tre volte al giorno.</p>' : '');
@@ -351,7 +380,7 @@
       slot.innerHTML = `<div class="dq-menu">
         <button type="button" data-m="prio" data-aiuto="Cambia il grado di priorità: la «alta» mette la barra rossa e l'etichetta. Lo imposta l'ufficio o il coordinatore, mai chi decide.">${r.priorita === 'alta' ? '⬇️ Priorità: da alta a normale' : '⬆️ Priorità: da normale ad alta'}</button>
         <button type="button" data-m="titolo" data-aiuto="Riscrive il titolo della questione, in una riga. Il riassunto sotto resta com'è.">✏️ Modifica il titolo</button>
-        <button type="button" data-m="ritira" data-aiuto="Toglie la questione dal registro scrivendo perché (superata, risolta altrove). Non si cancella: resta in cronologia come ritirata.">🗑 Ritira dal registro</button></div>`;
+        <button type="button" data-m="ritira" data-aiuto="Toglie la questione dal registro scegliendo perché: «già risolta» chiude anche la task nel second brain, le altre la lasciano aperta. Resta in cronologia come ritirata.">🗑 Ritira dal registro</button></div>`;
       slot.querySelector('[data-m="prio"]').addEventListener('click', (ev) => con(ev.currentTarget, async () => {
         const { error } = await sb.from('s_decisioni').update({ priorita: r.priorita === 'alta' ? 'normale' : 'alta' }).eq('id', id);
         if (error) throw new Error(error.message);
@@ -365,17 +394,17 @@
         avviso('Titolo aggiornato.', 'ok'); await decisioniBox(host, modo);
       }));
       slot.querySelector('[data-m="ritira"]').addEventListener('click', (ev) => con(ev.currentTarget, async () => {
-        const motivo = prompt('Perché la ritiri? (resta in cronologia)');
-        if (motivo == null) return;
-        const { error } = await sb.from('s_decisioni').update({ stato: 'ritirata', ritirata_motivo: motivo.trim() || null }).eq('id', id);
+        const rit = await chiediRitiro('Togli dal registro la questione n° ' + id, 'risolta');
+        if (!rit) return;
+        const { error } = await sb.from('s_decisioni').update({ stato: 'ritirata', ...rit }).eq('id', id);
         if (error) throw new Error(error.message);
         avviso('Questione ritirata.', 'ok'); await decisioniBox(host, modo); dopoCambio();
       }));
     }));
     host.querySelectorAll('[data-ritira]').forEach((b) => b.addEventListener('click', (ev) => con(ev.currentTarget, async () => {
-      const motivo = prompt('Perché la ritiri? (resta in cronologia)');
-      if (motivo == null) return;
-      const { error } = await sb.from('s_decisioni').update({ stato: 'ritirata', ritirata_motivo: motivo.trim() || null }).eq('id', Number(b.dataset.ritira));
+      const rit = await chiediRitiro('Togli dal registro la questione n° ' + b.dataset.ritira, 'risolta');
+      if (!rit) return;
+      const { error } = await sb.from('s_decisioni').update({ stato: 'ritirata', ...rit }).eq('id', Number(b.dataset.ritira));
       if (error) throw new Error(error.message);
       avviso('Questione ritirata.', 'ok'); await decisioniBox(host, modo); dopoCambio();
     })));
@@ -414,9 +443,9 @@
       await decisioniBox(host, modo);
     })));
     host.querySelectorAll('[data-scarta]').forEach((b) => b.addEventListener('click', (ev) => con(ev.currentTarget, async () => {
-      const motivo = prompt('Perché la scarti? (non opportuna, superata, doppia…)');
-      if (motivo == null) return;
-      const { error } = await sb.from('s_decisioni').update({ stato: 'ritirata', ritirata_motivo: motivo.trim() || 'scartata dalla segreteria' }).eq('id', Number(b.dataset.scarta));
+      const rit = await chiediRitiro('Scarta la proposta', null);
+      if (!rit) return;
+      const { error } = await sb.from('s_decisioni').update({ stato: 'ritirata', ...rit }).eq('id', Number(b.dataset.scarta));
       if (error) throw new Error(error.message);
       avviso('Proposta scartata.', 'ok'); await decisioniBox(host, modo);
     })));
