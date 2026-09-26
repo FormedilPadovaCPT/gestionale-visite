@@ -1,0 +1,243 @@
+name: Prova di ripristino del backup
+
+# Un backup che non si è mai riaperto è una speranza, non una garanzia.
+# Questo workflow prende l'ULTIMO backup cifrato dalla cartella Drive
+# "Backup_Gestionale" (la copia che useremmo davvero in un'emergenza), lo
+# decifra con la stessa passphrase, lo ricarica in un Postgres vuoto con
+# l'immagine ufficiale di Supabase (stessa versione 17.6, stesse estensioni,
+# stessi ruoli anon/authenticated/service_role) e poi CONTA le righe di ogni
+# tabella confrontandole con il database vivo.
+#
+# Esito: verde se ogni tabella degli schemi public, planning, cpt_admin e
+# archivio è tornata con almeno il 90% delle righe di oggi (il backup è delle
+# 04:00, il confronto è di adesso: qualche riga in più nel vivo è normale).
+# Lo schema auth è solo informativo: nell'immagine esiste già e le sue
+# tabelle possono avere colonne diverse da quelle del progetto ospitato.
+#
+# Il risultato viene scritto anche nella tabella public.s_backup_prove del
+# database vivo (creata da qui se manca, leggibile da segreteria e
+# coordinatore): così l'ufficio vede quando è stata fatta l'ultima prova e
+# come è andata, senza aprire GitHub.
+#
+# Secret usati (gli stessi del backup): SUPABASE_DB_URL, BACKUP_PASSPHRASE,
+# GOOGLE_SERVICE_ACCOUNT_JSON. Nessun dato in chiaro lascia il runner: il
+# database ripristinato vive nel container e muore con il job.
+
+on:
+  schedule:
+    - cron: '30 3 1 * *'    # il 1° di ogni mese alle 03:30 UTC, dopo il backup delle 02:00
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/restore-test.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ripristino:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      db:
+        image: supabase/postgres:17.6.1.177
+        env:
+          POSTGRES_PASSWORD: prova-ripristino
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      TARGET_URL: postgresql://postgres:prova-ripristino@localhost:5432/postgres
+    steps:
+      - name: Installa client PostgreSQL 17
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Scarica l'ultimo backup da Drive (Backup_Gestionale)
+        env:
+          GSA_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GSA_JSON:-}" ]; then
+            echo "Secret GOOGLE_SERVICE_ACCOUNT_JSON assente: senza Drive la prova non ha senso."; exit 1
+          fi
+          pip -q install google-auth requests
+          python3 - <<'PY'
+          import os, json, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          info = json.loads(os.environ['GSA_JSON'].lstrip('﻿\r\n\t ').strip())
+          creds = service_account.Credentials.from_service_account_info(
+              info, scopes=['https://www.googleapis.com/auth/drive'],
+              subject='cptpd@did.formedilpadova.it')
+          creds.refresh(Request())
+          H = {'Authorization': f'Bearer {creds.token}'}
+          q = "name = 'Backup_Gestionale' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+          r = requests.get('https://www.googleapis.com/drive/v3/files', params={'q': q, 'fields': 'files(id)'}, headers=H).json()
+          if not r.get('files'):
+              raise SystemExit('Cartella Backup_Gestionale non trovata su Drive')
+          fid = r['files'][0]['id']
+          q2 = f"'{fid}' in parents and name contains 'backup_' and trashed = false"
+          files = requests.get('https://www.googleapis.com/drive/v3/files',
+                               params={'q': q2, 'fields': 'files(id,name,size,modifiedTime)', 'pageSize': 200},
+                               headers=H).json().get('files', [])
+          if not files:
+              raise SystemExit('Nessun backup_* nella cartella Backup_Gestionale')
+          ult = sorted(files, key=lambda f: f['name'])[-1]
+          print('Ultimo backup su Drive:', ult['name'], ult.get('size'), 'byte, modificato', ult.get('modifiedTime'))
+          with requests.get(f"https://www.googleapis.com/drive/v3/files/{ult['id']}?alt=media", headers=H, stream=True) as d:
+              d.raise_for_status()
+              with open(ult['name'], 'wb') as f:
+                  for chunk in d.iter_content(1 << 20):
+                      f.write(chunk)
+          with open(os.environ['GITHUB_ENV'], 'a') as e:
+              e.write(f"BACKUP_NOME={ult['name']}\n")
+          PY
+          ls -l backup_*.sql.gz.gpg
+
+      - name: Decifra e scompatta
+        env:
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          [ -n "${PASS:-}" ] || { echo "Secret BACKUP_PASSPHRASE assente."; exit 1; }
+          gpg --batch --yes --passphrase "$PASS" -d "$BACKUP_NOME" | gunzip > backup.sql
+          ls -l backup.sql
+          echo "Righe COPY nel dump: $(grep -c '^COPY ' backup.sql)"
+
+      - name: Prepara il Postgres vuoto (estensioni che il dump dà per scontate)
+        run: |
+          set -euo pipefail
+          psql "$TARGET_URL" -v ON_ERROR_STOP=1 -c "select version();" \
+            -c "create extension if not exists pg_trgm with schema public;" \
+            -c "create extension if not exists btree_gist with schema public;" \
+            -c "create extension if not exists pg_net;" \
+            -c "create extension if not exists pgcrypto with schema extensions;" \
+            -c "create extension if not exists \"uuid-ossp\" with schema extensions;" \
+            -c "create extension if not exists http with schema extensions;"
+
+      - name: Ripristina il dump nel container
+        run: |
+          set -uo pipefail
+          inizio=$(date +%s)
+          psql "$TARGET_URL" -q -v ON_ERROR_STOP=0 -f backup.sql > restore.out 2> restore.err
+          echo "DURATA_RESTORE=$(( $(date +%s) - inizio ))" >> "$GITHUB_ENV"
+          echo "Errori durante il ripristino: $(grep -c '^psql:.*ERROR' restore.err || true)"
+          echo "ERRORI_RESTORE=$(grep -c '^psql:.*ERROR' restore.err || true)" >> "$GITHUB_ENV"
+          echo "--- primi 40 errori distinti (senza numero di riga) ---"
+          grep '^psql:.*ERROR' restore.err | sed -E 's/^psql:backup\.sql:[0-9]+: //' | sort | uniq -c | sort -rn | head -40 | tee errori_distinti.txt
+
+      - name: Conta le righe, nel ripristinato e nel vivo
+        env:
+          SOURCE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          cat > conta.sql <<'SQL'
+          select n.nspname||'.'||c.relname as t,
+                 (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I.%I', n.nspname, c.relname), false, true, '')))[1]::text::bigint as n
+          from pg_class c join pg_namespace n on n.oid = c.relnamespace
+          where c.relkind = 'r' and n.nspname in ('public','planning','cpt_admin','archivio','auth')
+          order by 1;
+          SQL
+          psql "$TARGET_URL" -At -F $'\t' -f conta.sql > conta_ripristinato.tsv
+          psql "$SOURCE_URL" -At -F $'\t' -f conta.sql > conta_vivo.tsv
+          echo "Tabelle nel ripristinato: $(wc -l < conta_ripristinato.tsv) — nel vivo: $(wc -l < conta_vivo.tsv)"
+
+      - name: Confronta e scrivi il verdetto
+        id: verdetto
+        env:
+          SOURCE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, json, subprocess
+          def leggi(p):
+              d = {}
+              for r in open(p, encoding='utf-8'):
+                  r = r.rstrip('\n')
+                  if not r: continue
+                  t, n = r.split('\t'); d[t] = int(n)
+              return d
+          vivo, rip = leggi('conta_vivo.tsv'), leggi('conta_ripristinato.tsv')
+          ko, warn, ok = [], [], []
+          for t, nv in sorted(vivo.items()):
+              info = t.startswith('auth.')
+              nr = rip.get(t)
+              if nr is None:
+                  (warn if info else ko).append((t, nv, None, 'assente nel ripristinato'))
+              elif nv >= 10 and nr < nv * 0.9:
+                  (warn if info else ko).append((t, nv, nr, 'meno del 90% delle righe'))
+              elif nr > nv * 1.1 and nv >= 10:
+                  warn.append((t, nv, nr, 'più righe del vivo?'))
+              else:
+                  ok.append((t, nv, nr, ''))
+          esito = 'riuscita' if not ko else 'FALLITA'
+          errori = int(os.environ.get('ERRORI_RESTORE', '0') or 0)
+          durata = int(os.environ.get('DURATA_RESTORE', '0') or 0)
+          try:
+              distinti = open('errori_distinti.txt', encoding='utf-8', errors='replace').read().strip()
+          except FileNotFoundError:
+              distinti = ''
+          righe_vivo = sum(v for t, v in vivo.items() if not t.startswith('auth.'))
+          righe_rip = sum(v for t, v in rip.items() if not t.startswith('auth.'))
+          # riepilogo per GitHub
+          s = [f"# Prova di ripristino — **{esito}**", "",
+               f"Backup: `{os.environ.get('BACKUP_NOME','?')}` · ripristino in {durata}s con {errori} errori psql · "
+               f"tabelle: {len(ok)} ok, {len(warn)} avvisi, {len(ko)} fallite · righe (senza auth): vivo {righe_vivo:,} / ripristinato {righe_rip:,}", ""]
+          if ko:
+              s += ["## Tabelle fallite (public/planning/cpt_admin/archivio)", "", "| tabella | vivo | ripristinato | perché |", "|---|---:|---:|---|"]
+              s += [f"| `{t}` | {nv} | {'—' if nr is None else nr} | {p} |" for t, nv, nr, p in ko]
+              s.append("")
+          if warn:
+              s += ["## Avvisi (auth è informativo)", "", "| tabella | vivo | ripristinato | perché |", "|---|---:|---:|---|"]
+              s += [f"| `{t}` | {nv} | {'—' if nr is None else nr} | {p} |" for t, nv, nr, p in warn]
+              s.append("")
+          if distinti:
+              s += ["## Errori psql più frequenti", "", "```", distinti, "```", ""]
+          open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8').write('\n'.join(s))
+          print('\n'.join(s))
+          # verdetto nel database vivo, così l'ufficio lo vede nell'app
+          dettaglio = {'ko': ko, 'avvisi': warn, 'errori_distinti': distinti[:4000],
+                       'tabelle_ok': len(ok), 'righe_vivo': righe_vivo, 'righe_ripristinato': righe_rip,
+                       'immagine': 'supabase/postgres:17.6.1.177', 'run': os.environ.get('GITHUB_RUN_ID')}
+          sql = """
+          create table if not exists public.s_backup_prove (
+            id bigint generated always as identity primary key,
+            eseguita_il timestamptz not null default now(),
+            backup_nome text not null,
+            esito text not null,
+            tabelle_ok int, tabelle_avvisi int, tabelle_ko int,
+            errori_restore int, durata_s int,
+            dettaglio jsonb
+          );
+          comment on table public.s_backup_prove is 'Prove di ripristino del backup notturno (workflow restore-test.yml del gestionale). Una riga per prova; scrive solo il workflow via connessione diretta.';
+          alter table public.s_backup_prove enable row level security;
+          do $$ begin
+            if not exists (select 1 from pg_policies where schemaname='public' and tablename='s_backup_prove' and policyname='s_backup_prove_sel') then
+              create policy s_backup_prove_sel on public.s_backup_prove for select to authenticated
+                using ((select public.is_segreteria()) or (select public.is_coordinatore()));
+            end if;
+          end $$;
+          revoke all on public.s_backup_prove from anon;
+          insert into public.s_backup_prove (backup_nome, esito, tabelle_ok, tabelle_avvisi, tabelle_ko, errori_restore, durata_s, dettaglio)
+          values (:'nome', :'esito', :ok, :warn, :ko, :err, :dur, :'det'::jsonb);
+          """
+          open('verdetto.sql', 'w', encoding='utf-8').write(sql)
+          subprocess.run(['psql', os.environ['SOURCE_URL'], '-v', 'ON_ERROR_STOP=1', '-q',
+                          '-v', f"nome={os.environ.get('BACKUP_NOME','?')}", '-v', f'esito={esito}',
+                          '-v', f'ok={len(ok)}', '-v', f'warn={len(warn)}', '-v', f'ko={len(ko)}',
+                          '-v', f'err={errori}', '-v', f'dur={durata}',
+                          '-v', 'det=' + json.dumps(dettaglio, ensure_ascii=False),
+                          '-f', 'verdetto.sql'], check=True)
+          print('Verdetto scritto in public.s_backup_prove')
+          if ko:
+              raise SystemExit(f'Prova FALLITA: {len(ko)} tabelle non tornate')
+          PY
