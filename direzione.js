@@ -670,8 +670,11 @@
   async function obiettivi() {
     const host = $('sgr-obiettivi'); if (!host) return;
     const ae = typeof window.annoEdile === 'function' ? window.annoEdile().label : null;
-    const [a1, a2] = ae ? ae.split('-').map(Number) : [null, null];
-    const eserc = ae ? [`${a1 - 1}-${a2 - 1}`, ae, `${a1 + 1}-${a2 + 1}`] : [];
+    /* l'esercizio si scrive «2025/2026» (annoEdile): prima si spezzava sul trattino
+       e le righe accanto uscivano «NaN-NaN» (26/09/2026). Accanto a quello in corso
+       il precedente e il successivo, nella stessa forma. */
+    const [a1, a2] = ae ? ae.split(/[\/-]/).map(Number) : [NaN, NaN];
+    const eserc = ae && isFinite(a1) && isFinite(a2) ? [`${a1 - 1}/${a2 - 1}`, ae, `${a1 + 1}/${a2 + 1}`] : ae ? [ae] : [];
     let dati = {};
     try { dati = await obiettiviLeggi(); } catch (e) {
       host.innerHTML = `<div class="adm-section"><div class="adm-section-title">🎯 Obiettivo visite dell'esercizio (regola CEIV)</div><p style="font-size:12px;color:#f88">Non sono riuscito a leggere gli obiettivi: ${esc(e.message)}</p></div>`;
