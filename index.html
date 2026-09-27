@@ -3219,7 +3219,8 @@ async function initForm(snap=null){
   // numero PROVVISORIO: quello vero si fissa al primo salvataggio, sulla data della visita
   // (S.nrAuto = il numero l'ha proposto l'app, non viene da un verbale gia' esistente)
   S.nrAuto=!(snap&&(snap.visita_id||snap._tieniNumero))
-  const nr=await nextVerbale(today())
+  let nr=''
+  try{nr=await nextVerbale(today())}catch(_e){console.warn('numero verbale:',_e);toast('Numero del verbale non ricevuto dal server: lo prendo al primo salvataggio','err')}
   vSet('f-verbale',nr)
   S.fd.nr_verbale=nr
   bloccaNrVerbale()
@@ -3279,12 +3280,13 @@ function prefissoVerbale(dataISO){
   const start=m>=10?y:y-1
   return 'CPT/'+String(start%100).padStart(2,'0')+'_'+String((start+1)%100).padStart(2,'0')+'/'
 }
+/* il numero lo dà il server (27/09/2026): legge le visite di tutti anche quando
+   il tecnico vede solo le sue (prossimo_numero_verbale, stessa regola di prima) */
 async function nextVerbale(dataISO){
-  const pref=prefissoVerbale(dataISO)
-  const{data}=await sb.from('visite').select('nr_verbale').like('nr_verbale',pref+'%').order('nr_verbale',{ascending:false}).limit(1)
-  if(!data?.length)return pref+'0001'
-  const last=parseInt(data[0].nr_verbale.split('/')[2])||0
-  return pref+String(last+1).padStart(4,'0')
+  const d=/^\d{4}-\d{2}-\d{2}$/.test(dataISO||'')?dataISO:today()
+  const{data,error}=await sb.rpc('prossimo_numero_verbale',{p_data:d})
+  if(error||!data)throw error||new Error('numero verbale non ricevuto dal server')
+  return data
 }
 
 function buildLavChecks(){
@@ -6006,6 +6008,17 @@ async function loadScadenze(){
     if(!v.cantiere_id)return
     if(!ultimePerCantiere[v.cantiere_id])ultimePerCantiere[v.cantiere_id]=v
   })
+  // Pratiche passate a un altro tecnico (27/09/2026: comune o quartiere spostato
+  // dalla segreteria, oppure assegnata a mano). Il verbale resta di chi l'ha fatto:
+  // cambia solo chi deve tornare in cantiere, finché la visita resta l'ultima.
+  {
+    const{data:pt,error:ept}=await sb.from('v_pendenze_titolari').select('visita_id,a_tecnico_id')
+    if(ept)toast('Non sono riuscito a leggere le pratiche passate ad altri tecnici ('+ept.message+'): lo scadenzario le mostra ancora a chi ha fatto il verbale.','err')
+    const tit={};(pt||[]).forEach(r=>{tit[r.visita_id]=r.a_tecnico_id})
+    Object.values(ultimePerCantiere).forEach(v=>{
+      if(tit[v.visita_id]&&tit[v.visita_id]!==v.tecnico_id){v.tecnico_verbale=v.tecnico_id;v.tecnico_id=tit[v.visita_id]}
+    })
+  }
 
   const dueWeeksAgo=new Date(oggi);dueWeeksAgo.setDate(dueWeeksAgo.getDate()-14)
   const sixtyDaysLater=new Date(oggi);sixtyDaysLater.setDate(sixtyDaysLater.getDate()+60)
@@ -6059,7 +6072,7 @@ async function loadScadenze(){
   function scadRow(v,isUrgente){
     const cant=v.cantieri?.cantiere_etichetta||v.cantieri?.cantiere_indirizzo||'–'
     const ipc=v.ipc||'NR'
-    const tec=tecMap[v.tecnico_id]||'–'
+    const tec=(tecMap[v.tecnico_id]||'–')+(v.tecnico_verbale?` <span style="font-size:10px;color:#888" title="La pratica è passata a questo tecnico; il verbale resta di chi l'ha fatto">(verbale di ${tecMap[v.tecnico_verbale]||'–'})</span>`:'')
     const diff=Math.abs(v.diffDays)
     const diffLbl=isUrgente
       ?`<span style="color:#e74c3c;font-weight:700">${diff===0?'oggi':diff+' gg fa'}</span>`
