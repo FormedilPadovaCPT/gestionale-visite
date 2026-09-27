@@ -467,7 +467,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 <div id="screen-pwd" class="hidden">
   <div class="login-card">
     <h1>Cambia la password</h1>
-    <p>Per sicurezza la segreteria ha chiesto a tutti i tecnici di scegliere una password nuova. Serve una volta sola: poi l'app si apre come sempre.</p>
+    <p>Per sicurezza la segreteria ha chiesto a tutti di scegliere una password nuova. Serve una volta sola: poi l'app si apre come sempre.</p>
     <div class="login-err" id="pwd-err"></div>
     <div class="field"><label>Nuova password</label><input type="password" id="pwd-nuova" autocomplete="new-password"></div>
     <div class="field"><label>Ripeti la nuova password</label><input type="password" id="pwd-ripeti" autocomplete="new-password"></div>
@@ -2498,6 +2498,8 @@ async function onLogin(user){
   try{const _r=await sb.from('app_ruoli').select('ruolo,stato,nome,carica').eq('email',user.email).maybeSingle();_roleRow=_r.data}catch(_e){}
   S.viewer=!!(_roleRow&&_roleRow.ruolo==='viewer'&&_roleRow.stato==='attivo')
   if(S.viewer){
+    // cambio password obbligatorio anche per Direzione e Consiglio (27/09/2026)
+    if(!(await obbligaCambioPassword()))return
     S.tecnico=null
     S.viewerNome=_roleRow.nome||null
     S.carica=_roleRow.carica||null
