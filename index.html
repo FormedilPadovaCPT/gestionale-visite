@@ -87,7 +87,7 @@ label{display:block;font-weight:600;margin-bottom:4px;color:var(--grey);font-siz
 .load-logo small{display:block;font-size:13px;font-weight:400;opacity:.8;margin-top:4px}
 .load-status{display:block;font-size:11px;font-weight:400;opacity:.7;margin-top:10px;min-height:14px}
 /* LOGIN */
-#screen-login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--orange) 0%,#b83d0a 100%);padding:20px}
+#screen-login,#screen-pwd{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--orange) 0%,#b83d0a 100%);padding:20px}
 .login-card{background:#fff;border-radius:16px;padding:36px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
 .login-card h1{font-size:19px;color:var(--orange);margin-bottom:3px}
 .login-card p{color:var(--grey);font-size:12px;margin-bottom:24px}
@@ -459,6 +459,21 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <button class="btn-primary" id="btn-richiedi-invia">Invia richiesta</button>
       <div id="ra-msg" style="font-size:12px;margin-top:8px"></div>
     </div>
+  </div>
+</div>
+
+<!-- CAMBIO PASSWORD OBBLIGATORIO (27/09/2026): compare dopo l'accesso a chi ha una
+     riga aperta in app_cambio_password; finche' non cambia la password l'app non si apre -->
+<div id="screen-pwd" class="hidden">
+  <div class="login-card">
+    <h1>Cambia la password</h1>
+    <p>Per sicurezza la segreteria ha chiesto a tutti i tecnici di scegliere una password nuova. Serve una volta sola: poi l'app si apre come sempre.</p>
+    <div class="login-err" id="pwd-err"></div>
+    <div class="field"><label>Nuova password</label><input type="password" id="pwd-nuova" autocomplete="new-password"></div>
+    <div class="field"><label>Ripeti la nuova password</label><input type="password" id="pwd-ripeti" autocomplete="new-password"></div>
+    <p style="margin:0 0 12px;font-size:11px">Almeno 10 caratteri, con lettere e numeri, diversa da quella di prima. Non mandarla per mail a nessuno.</p>
+    <button class="btn-primary" id="btn-pwd-salva">Salva la nuova password</button>
+    <div style="margin-top:12px;text-align:center"><a href="#" id="link-pwd-esci" style="font-size:12px;color:var(--grey)">Esci</a></div>
   </div>
 </div>
 
@@ -2456,7 +2471,10 @@ async function initAuth(){
     if(session)await onLogin(session.user)
     else showScr('login')
     sb.auth.onAuthStateChange((event,s)=>{
-      if(!s){S.appReady=false;showScr('login');return}
+      if(!s){S.appReady=false;S.cambioPwd=false;showScr('login');return}
+      // durante il cambio password obbligatorio USER_UPDATED e TOKEN_REFRESHED non devono
+      // far ripartire onLogin: ci pensa obbligaCambioPassword a proseguire (27/09/2026)
+      if(S.cambioPwd){S.user=s.user;return}
       // Se l'app è già inizializzata, aggiorna solo l'utente senza reinizializzare (evita reset al cambio scheda)
       if(S.appReady&&(event==='TOKEN_REFRESHED'||event==='USER_UPDATED'||event==='SIGNED_IN')){S.user=s.user;return}
       onLogin(s.user)
@@ -2537,6 +2555,8 @@ async function onLogin(user){
     if(el){el.textContent=`L'account ${user.email} non e' abilitato al gestionale: chiedi alla segreteria di creare la scheda tecnico.`;el.style.display='block'}
     return
   }
+  // cambio password obbligatorio, se la segreteria l'ha chiesto (27/09/2026)
+  if(!(await obbligaCambioPassword()))return
   S.tecnico=tec
   $('lbl-user').textContent=tec?`${tec.tecnico_nome} ${tec.tecnico_cognome}`:user.email
   // Mostra tab Coordinatore solo per l'account admin
@@ -2566,6 +2586,60 @@ $('btn-login').onclick=async()=>{
   if(error){const e=$('login-err');e.textContent=error.message;e.style.display='block'}
 }
 $('l-pwd').onkeydown=e=>{if(e.key==='Enter')$('btn-login').click()}
+
+// ── CAMBIO PASSWORD OBBLIGATORIO (27/09/2026) ──
+// Chiesto dall'utente dopo le password circolate in chiaro via mail: a chi ha una riga
+// aperta in app_cambio_password l'app, subito dopo l'accesso, chiede una password nuova
+// e non si apre finche' non l'ha cambiata. Restituisce true se si puo' proseguire.
+// Se la LETTURA fallisce si prosegue (non si chiude fuori un tecnico in cantiere per un
+// problema di rete), lo si dice in console, e la richiesta resta aperta per il prossimo accesso.
+async function obbligaCambioPassword(){
+  let deve=false
+  try{
+    const{data,error}=await sb.rpc('deve_cambiare_password')
+    if(error)throw error
+    deve=data===true
+  }catch(e){console.warn('Non sono riuscito a leggere se serve il cambio password:',e);return true}
+  if(!deve)return true
+  S.cambioPwd=true
+  const err=$('pwd-err');err.style.display='none';vSet('pwd-nuova','');vSet('pwd-ripeti','')
+  showScr('pwd')
+  return await new Promise(resolve=>{
+    const errore=t=>{err.textContent=t;err.style.display='block'}
+    const btn=$('btn-pwd-salva')
+    $('link-pwd-esci').onclick=async e=>{e.preventDefault();S.cambioPwd=false;resolve(false);await sb.auth.signOut()}
+    $('pwd-ripeti').onkeydown=e=>{if(e.key==='Enter')btn.click()}
+    btn.onclick=async()=>{
+      const p1=vGet('pwd-nuova')||'',p2=vGet('pwd-ripeti')||''
+      if(p1.length<10)return errore('La password deve avere almeno 10 caratteri.')
+      if(!/[A-Za-z]/.test(p1)||!/[0-9]/.test(p1))return errore('La password deve contenere lettere e numeri.')
+      if(p1!==p2)return errore('Le due password non coincidono.')
+      btn.disabled=true;btn.textContent='Salvataggio…';err.style.display='none'
+      try{
+        const{error}=await sb.auth.updateUser({password:p1})
+        if(error){
+          const c=error.code||'',m=error.message||''
+          if(c==='same_password'||/different from the old/i.test(m))return errore('La nuova password deve essere diversa da quella di prima.')
+          if(c==='weak_password'||/weak|at least/i.test(m))return errore('Password troppo debole: allungala o aggiungi numeri e simboli.')
+          if(c==='reauthentication_needed'||/reauthenticat/i.test(m)){
+            errore('Per sicurezza devi rientrare con la password attuale: ti riporto all’accesso, poi ti verrà richiesto di nuovo il cambio.')
+            setTimeout(async()=>{S.cambioPwd=false;resolve(false);await sb.auth.signOut()},3500)
+            return
+          }
+          return errore('Password non cambiata: '+m)
+        }
+        // la password e' cambiata: si chiude la richiesta. Se questa scrittura fallisce la
+        // password resta comunque cambiata; al prossimo accesso verra' chiesto di nuovo.
+        const r=await sb.rpc('password_cambiata')
+        if(r.error)console.warn('Password cambiata, ma non sono riuscito a registrarlo:',r.error)
+        S.cambioPwd=false
+        if(typeof toast==='function')setTimeout(()=>toast('Password cambiata. Da ora entri con quella nuova.'),600)
+        resolve(true)
+      }catch(e){errore('Password non cambiata: '+(e.message||e))}
+      finally{btn.disabled=false;btn.textContent='Salva la nuova password'}
+    }
+  })
+}
 $('btn-logout').onclick=()=>sb.auth.signOut()
 $('link-richiedi')?.addEventListener('click',e=>{e.preventDefault();$('box-richiedi')?.classList.toggle('hidden')})
 $('btn-richiedi-invia')?.addEventListener('click',async()=>{
@@ -2586,7 +2660,7 @@ $('btn-richiedi-invia')?.addEventListener('click',async()=>{
 // ── SCREEN / NAV ──
 function showScr(n){
   if(window.__safetyTimer){clearTimeout(window.__safetyTimer);window.__safetyTimer=null}
-  ;['loading','login','app'].forEach(s=>$(('screen-'+s))?.classList.toggle('hidden',s!==n))
+  ;['loading','login','pwd','app'].forEach(s=>$(('screen-'+s))?.classList.toggle('hidden',s!==n))
 }
 function navTo(view){
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))

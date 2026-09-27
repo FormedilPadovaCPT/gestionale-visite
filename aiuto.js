@@ -28,6 +28,9 @@
    ============================================================ */
 
 window.AIUTO_TESTI = {
+  /* ── cambio password obbligatorio (27/09/2026) ── */
+  'btn-pwd-salva': 'Sostituisce subito la tua password con quella nuova e apre l\'app. Da ora entri solo con la nuova: la vecchia non vale più, e la richiesta della segreteria si chiude.',
+  'link-pwd-esci': 'Esci senza cambiare la password: torni alla schermata di accesso, e al prossimo ingresso il cambio ti verrà chiesto di nuovo.',
   /* ── menu ── */
   'v:dashboard': 'Torna alla pagina iniziale: pulsanti rapidi, avvisi, il tuo obiettivo del mese e la mappa dei cantieri aperti con l\'IPC dell\'ultima visita.',
   'v:statistiche': 'Contatori, grafici e tabelle delle visite (per esercizio, tecnico, IPC, comuni, imprese ricorrenti). Si calcolano quando apri la scheda.',
