@@ -653,6 +653,13 @@
      in corso cambia e la festa si spegne da sola. Cambiare i filtri non la
      riaccende. Chi ha chiesto al telefono meno animazioni vede solo la
      scritta. Esercizio nuovo = obiettivo nuovo = festa nuova.
+     Il sonoro (27/09/2026, chiesto dall'utente): a ogni scoppio un botto e
+     uno scoppiettio, generati dal browser (Web Audio, nessun file da
+     scaricare), a volume basso. Il suono dura quanto i fuochi e si spegne da
+     solo con l'ultimo scoppio: nessun tasto (l'utente, stesso giorno). Il
+     browser suona solo dopo che nella pagina si è già toccato qualcosa: se
+     le Statistiche sono la prima cosa che si vede, i fuochi partono muti, e
+     non è un guasto.
      ════════════════════════════════════════════════════════════ */
   const FESTA_COLORI = ['#e7500f', '#565c66', '#95C22F', '#f4a261', '#c9ccd1'];
   const _festaFatta = {};
@@ -675,6 +682,31 @@
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     fuochi();
   }
+  /* sonoro dei fuochi: acceso di norma, la scelta resta nel browser */
+  /* sonoro dei fuochi: un contesto audio per spettacolo, chiuso quando finisce */
+  function audioFesta() {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+    let ac; try { ac = new AC(); } catch (_) { return null; }
+    if (ac.state === 'suspended') ac.resume().catch(() => {});
+    return ac;
+  }
+  /* rumore bianco che si spegne: filtrato basso è il botto, alto lo scoppiettio */
+  function rumore(ac, quando, durata, taglio, volume) {
+    const n = Math.max(1, Math.floor(ac.sampleRate * durata));
+    const buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = taglio;
+    const g = ac.createGain(); g.gain.value = volume;
+    src.connect(f); f.connect(g); g.connect(ac.destination);
+    src.start(quando);
+  }
+  function suonoScoppio(ac) {
+    if (!ac || ac.state === 'closed') return;   // se il browser lo tiene bloccato, gli scoppi restano in coda muti e si chiude tutto alla fine
+    const t0 = ac.currentTime + 0.02;
+    rumore(ac, t0, 0.9, 900 + Math.random() * 600, 0.35);
+    for (let i = 0; i < 9; i++) rumore(ac, t0 + 0.25 + Math.random() * 0.6, 0.04, 5000, 0.06 + Math.random() * 0.05);
+  }
   function fuochi() {
     const cv = document.createElement('canvas');
     cv.setAttribute('aria-hidden', 'true');
@@ -684,7 +716,9 @@
     cv.width = W * d; cv.height = H * d;
     const cx = cv.getContext('2d'); cx.setTransform(d, 0, 0, d, 0, 0);
     let P = [], tm = null, scoppi = 0;
+    const ac = audioFesta();
     function scoppio() {
+      suonoScoppio(ac);
       const x = W * (0.15 + Math.random() * 0.7), y = H * (0.18 + Math.random() * 0.3);
       for (let i = 0; i < 70; i++) {
         const an = Math.random() * Math.PI * 2, v = 5 * (0.5 + Math.random() * 0.7);
@@ -701,7 +735,7 @@
         cx.save(); cx.globalAlpha = Math.max(0, 1 - p.life / p.max); cx.translate(p.x, p.y); cx.rotate(p.r);
         cx.fillStyle = p.c; cx.fillRect(-p.w / 2, -p.h * s / 2, p.w, p.h * s + 0.5); cx.restore();
       }
-      if (!P.length && scoppi >= 5) { clearInterval(tm); cv.remove(); }
+      if (!P.length && scoppi >= 5) { clearInterval(tm); cv.remove(); if (ac) ac.close().catch(() => {}); }
     }
     /* setInterval e non requestAnimationFrame: con la scheda in secondo piano
        rAF si ferma e i pezzi resterebbero sospesi a metà (provato il 26/09) */
