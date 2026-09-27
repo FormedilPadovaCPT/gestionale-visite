@@ -4014,7 +4014,7 @@ window.salvaCommittente=salvaCommittente
 // ── AUTOCOMPLETE COMMITTENTE ──
 setupAC('mc-comm-search','mc-comm-list', async q=>{
   let qb=sb.from('committenti').select('committente_id,committente_nome,cf_piva,piva,tipo_sogg').eq('elimina',0).order('committente_nome').limit(20)
-  if(q)qb=qb.or(`committente_nome.ilike.*${q}*,cf_piva.ilike.*${q}*,piva.ilike.*${q}*`)
+  if(q)qb=_perParole(qb,q,['committente_nome','cf_piva','piva'])
   const{data}=await qb
   return(data||[]).map(c=>({id:c.committente_id,label:c.committente_nome,extra:c}))
 }, it=>{
@@ -4032,7 +4032,7 @@ setupAC('mc-comm-search','mc-comm-list', async q=>{
 })()
 setupAC('f-comm-search','comm-list', async q=>{
   let qb=sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,email,telefono,piva,tipo_sogg').eq('elimina',0).order('committente_nome').limit(20)
-  if(q)qb=qb.or(`committente_nome.ilike.%${q}%,cf_piva.ilike.%${q}%,piva.ilike.%${q}%`)
+  if(q)qb=_perParole(qb,q,['committente_nome','cf_piva','piva'])
   const{data}=await qb
   return(data||[]).map(c=>({id:c.committente_id,label:c.committente_nome,extra:c}))
 },item=>{
@@ -7312,6 +7312,19 @@ async function dedupMerge(kid){
   else apriDedupPersone()
 }
 
+// ── ricerca di un nominativo (27/09/2026) ──
+// Ogni parola scritta deve stare in uno dei campi indicati, in qualunque ordine: «Luca Cesari»,
+// «Cesari Luca», «ces luc» trovano la stessa persona. Stessa regola di perNominativo nella segreteria.
+function _paroleRicerca(testo){
+  return [...new Set(String(testo||'').split(/\s+/).map(p=>p.replace(/[,()*%\\.:"']/g,'').trim()).filter(p=>p.length>=2))].slice(0,4)
+}
+function _perParole(qb,testo,campi){
+  const parole=_paroleRicerca(testo)
+  if(!parole.length)return qb.in(campi[0],[])
+  parole.forEach(p=>{qb=qb.or(campi.map(c=>`${c}.ilike.*${p}*`).join(','))})
+  return qb
+}
+
 // ── autocomplete persone nel form visita ──
 function attachPersonAC(cfg){
   const list=document.createElement('div')
@@ -7340,12 +7353,32 @@ function attachPersonAC(cfg){
     if(cfg.qual&&r.qualifica){const s=$(cfg.qual);if(s&&[...s.options].some(o=>o.value===r.qualifica||o.text===r.qualifica))s.value=r.qualifica}
     hideL()
   }
+  // Si cerca con TUTTE le parole scritte in Nome e Cognome insieme, e ogni parola puo' stare nel nome
+  // o nel cognome: «Luca» nel Nome e «Ros» nel Cognome trovano Luca Rossi da qualunque casella si scriva,
+  // e anche «Rossi Luca» scritto tutto in una casella. Prima si cercava il solo testo della casella in uso
+  // e le prime 8 in ordine di cognome: cercando per nome la persona restava spesso fuori (27/09/2026).
+  let _seq=0
   const onInput=async ev=>{
     const q=ev.target.value.trim()
     if(q.length<2){hideL();return}
-    let data=null
-    try{const r=await sb.from('persone').select('*').eq('elimina',0).or(`nome.ilike.*${q}*,cognome.ilike.*${q}*`).order('cognome',{ascending:true,nullsFirst:false}).limit(8);data=r.data}catch(_e){}
-    items=data||[]
+    const testo=[cfg.nome,cfg.cog].map(id=>($(id)?.value||'')).join(' ')
+    if(!_paroleRicerca(testo).length){hideL();return}
+    const mio=++_seq
+    let data=null,errore=null
+    try{
+      const qb=_perParole(sb.from('persone').select('*').eq('elimina',0),testo,['nome','cognome'])
+      const r=await qb.order('cognome',{ascending:true,nullsFirst:false}).order('nome',{ascending:true,nullsFirst:false}).limit(60)
+      data=r.data;errore=r.error
+    }catch(_e){errore=_e}
+    if(mio!==_seq)return   // e' gia' partita una ricerca piu' recente: questa risposta e' vecchia
+    if(errore){list.innerHTML=`<div style="padding:7px 10px;color:#c0392b">Non sono riuscito a leggere l'anagrafica (${esc(errore.message||String(errore))})</div>`;showAt(ev.target);items=[];return}
+    // Ordine: ciascuna casella conta soprattutto per il suo campo. «Rossi» nel Cognome e «Ma» nel Nome
+    // mettono in cima Rossi Mario e Rossi Marco (nome che COMINCIA per «ma»), poi chi ha «ma» altrove
+    // (Rossi Tommaso), poi le schede con nome e cognome invertiti. Chiesto dall'utente il 27/09/2026.
+    const _pN=_paroleRicerca($(cfg.nome)?.value),_pC=_paroleRicerca($(cfg.cog)?.value)
+    const _quanto=(val,w)=>{const v=String(val||'').toLowerCase(),x=w.toLowerCase();return v===x?4:v.startsWith(x)?3:v.includes(' '+x)?2:v.includes(x)?1:0}   // uguale > comincia per > parola interna > contiene
+    const _punti=r=>_pN.reduce((s,w)=>s+_quanto(r.nome,w)*2+_quanto(r.cognome,w),0)+_pC.reduce((s,w)=>s+_quanto(r.cognome,w)*2+_quanto(r.nome,w),0)
+    items=(data||[]).map((r,i)=>({r,i,p:_punti(r)})).sort((a,b)=>b.p-a.p||a.i-b.i).slice(0,20).map(x=>x.r)
     if(!items.length){hideL();return}
     list.innerHTML=items.map((r,i)=>`<div data-i="${i}" style="padding:7px 10px;cursor:pointer;border-bottom:1px solid #f2f2f2" onmouseenter="this.style.background='#fff3ee'" onmouseleave="this.style.background=''">${esc([r.titolo,r.nome,r.cognome].filter(Boolean).join(' '))}${r.qualifica?' <span style="color:#999;font-size:11px">('+esc(r.qualifica)+')</span>':''}${r.telefono||r.email?'<br><span style="color:#999;font-size:11px">'+esc([r.telefono,r.email].filter(Boolean).join(' · '))+'</span>':''}</div>`).join('')
     ;[...list.children].forEach(d=>d.onmousedown=e=>{e.preventDefault();pick(items[+d.dataset.i])})
