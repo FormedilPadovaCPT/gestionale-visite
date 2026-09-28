@@ -471,6 +471,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <div class="login-err" id="pwd-err"></div>
     <div class="field"><label>Nuova password</label><input type="password" id="pwd-nuova" autocomplete="new-password"></div>
     <div class="field"><label>Ripeti la nuova password</label><input type="password" id="pwd-ripeti" autocomplete="new-password"></div>
+    <label style="display:flex;align-items:center;gap:6px;margin:0 0 10px;font-size:12px;cursor:pointer"><input type="checkbox" id="pwd-mostra" style="width:auto;margin:0;padding:0"> Mostra le password che sto scrivendo</label>
     <p style="margin:0 0 12px;font-size:11px">Almeno 10 caratteri, con lettere e numeri, diversa da quella di prima. Non mandarla per mail a nessuno.</p>
     <button class="btn-primary" id="btn-pwd-salva">Salva la nuova password</button>
     <div style="margin-top:12px;text-align:center"><a href="#" id="link-pwd-esci" style="font-size:12px;color:var(--grey)">Esci</a></div>
@@ -2605,6 +2606,10 @@ async function obbligaCambioPassword(){
   if(!deve)return true
   S.cambioPwd=true
   const err=$('pwd-err');err.style.display='none';vSet('pwd-nuova','');vSet('pwd-ripeti','')
+  // «Mostra le password» (28/09/2026): parte sempre spento, e scopre tutti e due i campi
+  const mostra=$('pwd-mostra')
+  const scopri=()=>{for(const id of['pwd-nuova','pwd-ripeti'])$(id).type=mostra.checked?'text':'password'}
+  mostra.checked=false;scopri();mostra.onchange=scopri
   showScr('pwd')
   return await new Promise(resolve=>{
     const errore=t=>{err.textContent=t;err.style.display='block'}
@@ -2635,6 +2640,7 @@ async function obbligaCambioPassword(){
         const r=await sb.rpc('password_cambiata')
         if(r.error)console.warn('Password cambiata, ma non sono riuscito a registrarlo:',r.error)
         S.cambioPwd=false
+        mostra.checked=false;scopri();vSet('pwd-nuova','');vSet('pwd-ripeti','')
         if(typeof toast==='function')setTimeout(()=>toast('Password cambiata. Da ora entri con quella nuova.'),600)
         resolve(true)
       }catch(e){errore('Password non cambiata: '+(e.message||e))}
