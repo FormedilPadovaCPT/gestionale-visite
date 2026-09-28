@@ -449,6 +449,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <div class="login-err" id="login-err"></div>
     <div class="field"><label>Email</label><input type="email" id="l-email" autocomplete="email"></div>
     <div class="field"><label>Password</label><input type="password" id="l-pwd" autocomplete="current-password"></div>
+    <label style="display:flex;align-items:center;gap:6px;margin:-4px 0 12px;font-size:12px;cursor:pointer"><input type="checkbox" id="l-mostra" style="width:auto;margin:0;padding:0"> Mostra la password che sto scrivendo</label>
     <button class="btn-primary" id="btn-login">Accedi</button>
     <div style="margin-top:16px;text-align:center;border-top:1px solid #eee;padding-top:12px">
       <a href="#" id="link-richiedi" style="font-size:12px;color:var(--orange);text-decoration:underline">Sei un consigliere? Richiedi l'accesso alla dashboard</a>
@@ -2586,8 +2587,11 @@ async function onLogin(user){
 }
 $('btn-login').onclick=async()=>{
   const{error}=await sb.auth.signInWithPassword({email:vGet('l-email'),password:vGet('l-pwd')})
-  if(error){const e=$('login-err');e.textContent=error.message;e.style.display='block'}
+  if(error){const e=$('login-err');e.textContent=error.message;e.style.display='block';return}
+  $('l-mostra').checked=false;$('l-pwd').type='password'   // entrati: la password torna coperta
 }
+// «Mostra la password» anche all'accesso (28/09/2026): si vede prima di dare l'ok
+$('l-mostra').onchange=e=>{$('l-pwd').type=e.target.checked?'text':'password'}
 $('l-pwd').onkeydown=e=>{if(e.key==='Enter')$('btn-login').click()}
 
 // ── CAMBIO PASSWORD OBBLIGATORIO (27/09/2026) ──
