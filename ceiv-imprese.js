@@ -38,6 +38,36 @@
     if (!c && !st) return '';
     return [c, st].filter(Boolean).join(' – ');
   }
+  // Colore dello stato in Cassa (29/09/2026, chiesto dall'utente): attiva verde, sospesa giallo, non iscritta grigio.
+  // «Cessata» e stato vuoto restano senza colore: non sono «non iscritta» e non vanno confusi con quella.
+  function statoCassa(imp) {
+    const s = _s(imp.stato_cassa).toLowerCase();
+    if (/non\s*iscritt/.test(s)) return 'non_iscritta';
+    if (/attiv/.test(s)) return 'attiva';
+    if (/sospes/.test(s)) return 'sospesa';
+    return '';
+  }
+  const COLORI_CASSA = {
+    attiva: { fondo: [205, 238, 212], testo: [25, 105, 45], xlsx: 'CDEED4', nome: 'attiva' },
+    sospesa: { fondo: [255, 233, 140], testo: [115, 85, 0], xlsx: 'FFE98C', nome: 'sospesa' },
+    non_iscritta: { fondo: [222, 222, 222], testo: [85, 85, 85], xlsx: 'DEDEDE', nome: 'non iscritta' },
+  };
+
+  // Il calendario del browser accetta anche l'anno 0206: il 29/09/2026 «Dal 01/01/0206» ha estratto tutto
+  // lo storico senza dire niente. Una data fuori misura ferma l'estrazione; la data vuota resta «tutto».
+  function controllaPeriodo(dal, al, oggi) {
+    const anno = (d) => { const m = /^(\d+)-\d\d-\d\d$/.exec(_s(d)); return m ? Number(m[1]) : NaN; };
+    const max = anno(oggi) + 1;
+    const campi = [['Dal', dal], ['Al', al]];
+    for (let i = 0; i < campi.length; i++) {
+      const nome = campi[i][0], d = _s(campi[i][1]);
+      if (!d) continue;
+      const a = anno(d);
+      if (!(a >= 2000 && a <= max)) return `La data «${nome}» è ${fmtData(d)}: l'anno non è plausibile, correggilo (dal 2000 al ${max}).`;
+    }
+    if (_s(dal) && _s(al) && _s(dal) > _s(al)) return `La data «Dal» (${fmtData(dal)}) viene dopo la data «Al» (${fmtData(al)}).`;
+    return '';
+  }
 
   // visite: righe di `visite` con cantieri, tecnici e impresa principale; presentiPerVisita: { visita_id: [righe] }
   function normalizza(visite, presentiPerVisita) {
@@ -48,13 +78,13 @@
       let imprese = pres.map((p) => {
         const imp = p.imprese || {};
         const k = codici(imp, p.impresa_id);
-        return { nome: _s(imp.impresa_nome), piva: k.piva, cf: k.cf, ruolo: ruoloDi(p), autonomo: eAutonomo(p), cassa: cassaDi(imp), codCeiv: codCeivDi(imp), lav: _n(p.nr_lav) };
+        return { nome: _s(imp.impresa_nome), piva: k.piva, cf: k.cf, ruolo: ruoloDi(p), autonomo: eAutonomo(p), cassa: cassaDi(imp), stato: statoCassa(imp), codCeiv: codCeivDi(imp), lav: _n(p.nr_lav) };
       });
       let soloPrincipale = false;
       if (!imprese.length && v.imprese && (v.imprese.impresa_nome || v.imprese.piva)) {
         // nessuna riga delle imprese presenti: resta l'impresa principale del verbale, senza lavoratori suoi
         const k = codici(v.imprese, v.impresa_id);
-        imprese = [{ nome: _s(v.imprese.impresa_nome), piva: k.piva, cf: k.cf, ruolo: '', autonomo: false, cassa: cassaDi(v.imprese), codCeiv: codCeivDi(v.imprese), lav: null }];
+        imprese = [{ nome: _s(v.imprese.impresa_nome), piva: k.piva, cf: k.cf, ruolo: '', autonomo: false, cassa: cassaDi(v.imprese), stato: statoCassa(v.imprese), codCeiv: codCeivDi(v.imprese), lav: null }];
         soloPrincipale = true;
       }
       const lavTot = _n(v.nr_lavoratori);
@@ -92,17 +122,23 @@
   const LARGHEZZE = [18, 8, 30, 18, 12, 16, 20, 36, 14, 18, 22, 9, 14, 20, 12, 10, 10, 12, 60, 50];
 
   // Una riga per impresa: i dati del cantiere e del sopralluogo si ripetono, così si filtra e si incrocia.
-  function righeExcel(dati) {
-    const aoa = [INTESTAZIONE.slice()];
+  function _righe(dati) {
+    const out = [];
     ordina(dati).forEach((r) => {
       const testa = [r.cnce, r.lotto, r.indirizzo, r.comune, fmtData(r.data), r.verbale, r.tecnico];
       const coda = [r.nImprese, r.nAutonomi, r.lavTot === null ? '' : r.lavTot, r.altre, r.note.join('; ')];
-      const lista = r.imprese.length ? r.imprese : [{ nome: '', piva: '', cf: '', ruolo: '', autonomo: false, cassa: '', codCeiv: '', lav: null }];
+      const lista = r.imprese.length ? r.imprese : [{ nome: '', piva: '', cf: '', ruolo: '', autonomo: false, cassa: '', stato: '', codCeiv: '', lav: null }];
       lista.forEach((x) => {
-        aoa.push(testa.concat([x.nome, x.piva, x.cf, x.ruolo, x.autonomo ? 'Sì' : 'No', x.codCeiv || '', x.cassa, x.lav === null ? '' : x.lav], coda));
+        out.push({ riga: testa.concat([x.nome, x.piva, x.cf, x.ruolo, x.autonomo ? 'Sì' : 'No', x.codCeiv || '', x.cassa, x.lav === null ? '' : x.lav], coda), stato: x.stato || '' });
       });
     });
-    return aoa;
+    return out;
+  }
+  const righeExcel = (dati) => [INTESTAZIONE.slice()].concat(_righe(dati).map((o) => o.riga));
+  // Celle da colorare nell'Excel: { r, c, colore } con r contata dall'intestazione (riga 0).
+  function coloriExcel(dati) {
+    const c = INTESTAZIONE.indexOf('Cassa Edile');
+    return _righe(dati).map((o, i) => (o.stato ? { r: i + 1, c, colore: COLORI_CASSA[o.stato].xlsx } : null)).filter(Boolean);
   }
 
   function conta(dati) {
@@ -131,7 +167,20 @@
       doc.setFontSize(7); doc.setTextColor(150, 150, 150); doc.setFont('helvetica', 'normal');
       doc.text('Formedil Padova – Estrazione per C.E.I.V.: imprese presenti per cantiere', 105, 292, { align: 'center' });
       doc.text(String(pagina), 204, 292, { align: 'right' });
-      y = 30;
+      // legenda dei colori della Cassa Edile
+      let lx = PW - M;
+      ['non_iscritta', 'sospesa', 'attiva'].forEach((k) => {
+        const col = COLORI_CASSA[k];
+        doc.setFontSize(6.5); doc.setFont('helvetica', 'normal');
+        const w = doc.getTextWidth(col.nome) + 4;
+        lx -= w;
+        doc.setFillColor(col.fondo[0], col.fondo[1], col.fondo[2]); doc.rect(lx, 25.6, w, 3.6, 'F');
+        doc.setTextColor(col.testo[0], col.testo[1], col.testo[2]); doc.text(col.nome, lx + 2, 28.2);
+        lx -= 1.5;
+      });
+      doc.setFontSize(6.5); doc.setTextColor(110, 110, 110);
+      doc.text('Cassa Edile:', lx - 1, 28.2, { align: 'right' });
+      y = 32;
     };
     const nuova = () => { doc.addPage(); testata(); };
     const spezza = (txt, size, bold, maxW) => {
@@ -157,6 +206,7 @@
           cod: spezza([x.piva, x.cf && x.cf !== x.piva ? x.cf : ''].filter(Boolean).join(' / '), 7.5, false, LC[1]),
           ruolo: spezza(x.ruolo, 7.5, false, LC[2]),
           cassa: spezza([x.codCeiv ? 'Cod. ' + x.codCeiv : '', x.cassa].filter(Boolean).join(' – '), 7.5, false, LC[3]),
+          colore: COLORI_CASSA[x.stato] || null,
           lav: x.lav === null ? '–' : String(x.lav),
         }));
         const hRiga = (c) => Math.max(c.nome.length, c.cod.length, c.ruolo.length, c.cassa.length) * 3.6 + 1.6;
@@ -186,7 +236,13 @@
           doc.setFontSize(7.5);
           c.cod.forEach((l, i) => doc.text(l, X[1], y + 3.4 + i * 3.6));
           c.ruolo.forEach((l, i) => doc.text(l, X[2], y + 3.4 + i * 3.6));
+          if (c.colore) {
+            doc.setFillColor(c.colore.fondo[0], c.colore.fondo[1], c.colore.fondo[2]);
+            doc.rect(X[3] - 1.5, y + 0.4, LC[3] + 3, h - 0.8, 'F');
+            doc.setTextColor(c.colore.testo[0], c.colore.testo[1], c.colore.testo[2]);
+          }
           c.cassa.forEach((l, i) => doc.text(l, X[3], y + 3.4 + i * 3.6));
+          doc.setTextColor(30, 30, 30);
           doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.text(c.lav, X[4], y + 3.4, { align: 'right' });
           doc.setDrawColor(225, 225, 225); doc.setLineWidth(0.15); doc.line(M, y + h, PW - M, y + h);
           y += h;
@@ -210,7 +266,7 @@
     return doc;
   }
 
-  const api = { normalizza, righeExcel, disegnaPdf, conta, fmtData, ruoloDi, eAutonomo, codici, INTESTAZIONE, LARGHEZZE };
+  const api = { normalizza, righeExcel, coloriExcel, disegnaPdf, conta, fmtData, ruoloDi, eAutonomo, codici, statoCassa, controllaPeriodo, COLORI_CASSA, INTESTAZIONE, LARGHEZZE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.CeivImprese = api;
 })(typeof window !== 'undefined' ? window : globalThis);

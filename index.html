@@ -12947,8 +12947,11 @@ document.getElementById('btn-adm-excel-exp')?.addEventListener('click',admEsport
 function _ceivStatus(msg, err){ const el=$('ceiv-status'); if(el){ el.textContent=msg||''; el.style.color=err?'#e74c3c':'rgba(255,255,255,.6)'; } }
 function _ceivPeriodo(){
   const dal=($('ceiv-dal')?.value)||'', al=($('ceiv-al')?.value)||'';
-  return { dal: dal||'1900-01-01', al: al||today(), etichetta: (dal?fmtDate(dal):'inizio') + ' – ' + (al?fmtDate(al):fmtDate(today())) };
+  return { dal: dal||'1900-01-01', al: al||today(), errore: window.CeivImprese.controllaPeriodo(dal, al, today()),
+    etichetta: (dal?fmtDate(dal):'inizio') + ' – ' + (al?fmtDate(al):fmtDate(today())) };
 }
+// una data fuori misura (anno 0206) ferma l'estrazione invece di estrarre tutto lo storico
+function _ceivPeriodoOk(p, stato){ if(!p.errore) return true; stato(p.errore, true); toast('Controlla le date','warn'); return false; }
 async function _ceivFetch(dal, al){
   const vis = await sbTutte((da,a)=>sb.from('visite')
     .select('visita_id,nr_verbale,data_visita,ipc,acc_cant,nr_imp,nr_ind,nr_lavoratori,impresa_id,comm_rag_soc,comm_piva,comm_cf,comm_nome,comm_cog,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri!inner(cantiere_cnce,cantiere_indirizzo,cantiere_civico,comune_nome),imprese!visite_impresa_id_fkey(impresa_nome,piva,impresa_email_ref)')
@@ -12988,7 +12991,7 @@ function _ceivBuildDoc(data, p){
 }
 async function ceivEsportaExcel(){
   if(!window.__isCoord){ toast('Funzione riservata alla segreteria','err'); return; }
-  const p=_ceivPeriodo(); _ceivStatus('⏳ Estrazione dati…');
+  const p=_ceivPeriodo(); if(!_ceivPeriodoOk(p,_ceivStatus)) return; _ceivStatus('⏳ Estrazione dati…');
   try{
     const data = await _ceivFetch(p.dal, p.al);
     if(!data.length){ _ceivStatus('Nessuna visita su cantieri con codice CNCE nel periodo.', true); toast('Nessuna visita trovata','warn'); return; }
@@ -12999,7 +13002,7 @@ async function ceivEsportaExcel(){
 }
 async function ceivEsportaPdf(){
   if(!window.__isCoord){ toast('Funzione riservata alla segreteria','err'); return; }
-  const p=_ceivPeriodo(); _ceivStatus('⏳ Estrazione dati…');
+  const p=_ceivPeriodo(); if(!_ceivPeriodoOk(p,_ceivStatus)) return; _ceivStatus('⏳ Estrazione dati…');
   try{
     const data = await _ceivFetch(p.dal, p.al);
     if(!data.length){ _ceivStatus('Nessuna visita su cantieri con codice CNCE nel periodo.', true); toast('Nessuna visita trovata','warn'); return; }
@@ -13013,7 +13016,7 @@ async function ceivInviaMail(){
   const to=($('ceiv-mail-to')?.value||'').trim();
   const cc=($('ceiv-mail-cc')?.value||'').trim();
   if(!to){ _ceivStatus('Inserisci l’email del destinatario CEIV.', true); toast('Manca l’email CEIV','warn'); return; }
-  const p=_ceivPeriodo(); _ceivStatus('⏳ Estrazione dati…');
+  const p=_ceivPeriodo(); if(!_ceivPeriodoOk(p,_ceivStatus)) return; _ceivStatus('⏳ Estrazione dati…');
   try{
     const data = await _ceivFetch(p.dal, p.al);
     if(!data.length){ _ceivStatus('Nessuna visita su cantieri con codice CNCE nel periodo.', true); toast('Nessuna visita trovata','warn'); return; }
@@ -13047,7 +13050,7 @@ window.ceivInviaMail=ceivInviaMail;
 function _ceiviStatus(msg, err){ const el=$('ceivi-status'); if(el){ el.textContent=msg||''; el.style.color=err?'#e74c3c':'rgba(255,255,255,.6)'; } }
 function _ceiviPeriodo(){
   const dal=($('ceivi-dal')?.value)||'', al=($('ceivi-al')?.value)||'';
-  return { dal: dal||'1900-01-01', al: al||today(), tutto: !dal,
+  return { dal: dal||'1900-01-01', al: al||today(), tutto: !dal, errore: window.CeivImprese.controllaPeriodo(dal, al, today()),
     dalFmt: dal?fmtDate(dal):'inizio', alFmt: fmtDate(al||today()),
     etichetta: (dal?fmtDate(dal):'inizio') + ' – ' + fmtDate(al||today()) };
 }
@@ -13073,12 +13076,35 @@ function _ceiviFname(ext){
   const p=_ceiviPeriodo();
   return `CEIV_Imprese_per_cantiere_${p.tutto?'tutto':p.dal}_${p.al}.${ext}`;
 }
-function _ceiviWb(data){
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(window.CeivImprese.righeExcel(data));
+// La libreria Excel dell'app non scrive i colori: per lo stato in Cassa (verde attiva, giallo sospesa,
+// grigio non iscritta) si carica, solo qui, la sua variante con gli stili, senza toccare quella dell'app.
+let _xlsxStile=null;
+function _caricaXlsxStile(){
+  if(_xlsxStile) return _xlsxStile;
+  _xlsxStile=new Promise((ok,ko)=>{
+    const orig=window.XLSX, s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+    s.integrity='sha384-OUW9euuUyxyHcAhTqbhI+Iyb8LMssXt/cpz0yXhs9UWG2/R/uaWdakx/4cfww7Vb';
+    s.crossOrigin='anonymous';
+    s.onload=()=>{ const X=window.XLSX; window.XLSX=orig; (X&&X!==orig)?ok(X):ko(new Error('libreria dei colori non caricata')); };
+    s.onerror=()=>{ window.XLSX=orig; ko(new Error('libreria dei colori non raggiungibile')); };
+    document.head.appendChild(s);
+  }).catch(e=>{ _xlsxStile=null; throw e; });
+  return _xlsxStile;
+}
+// → { X, wb, colori }: X è la libreria con cui va SCRITTO il file (solo quella con gli stili scrive i colori)
+async function _ceiviWb(data){
+  let X=XLSX, colori=true;
+  try{ X=await _caricaXlsxStile(); }catch(e){ console.warn('Excel CEIV senza colori:',e); X=XLSX; colori=false; }
+  const wb = X.utils.book_new();
+  const ws = X.utils.aoa_to_sheet(window.CeivImprese.righeExcel(data));
   ws['!cols'] = window.CeivImprese.LARGHEZZE.map(w=>({wch:w}));
-  XLSX.utils.book_append_sheet(wb, ws, 'ImpresePerCantiere');
-  return wb;
+  if(colori) window.CeivImprese.coloriExcel(data).forEach(k=>{
+    const cella = ws[X.utils.encode_cell({ r:k.r, c:k.c })];
+    if(cella) cella.s = { fill:{ patternType:'solid', fgColor:{ rgb:k.colore } } };
+  });
+  X.utils.book_append_sheet(wb, ws, 'ImpresePerCantiere');
+  return { X, wb, colori };
 }
 function _ceiviDoc(data, p){
   const { jsPDF } = window.jspdf;
@@ -13092,7 +13118,7 @@ function _ceiviEsito(data){
 }
 async function _ceiviDati(){
   if(!window.__isCoord){ toast('Funzione riservata alla segreteria','err'); return null; }
-  const p=_ceiviPeriodo(); _ceiviStatus('⏳ Estrazione dati…');
+  const p=_ceiviPeriodo(); if(!_ceivPeriodoOk(p,_ceiviStatus)) return null; _ceiviStatus('⏳ Estrazione dati…');
   const data = await _ceiviFetch(p.dal, p.al);
   if(!data.length){ _ceiviStatus('Nessuna visita su cantieri con codice CNCE nel periodo.', true); toast('Nessuna visita trovata','warn'); return null; }
   return { p, data };
@@ -13100,8 +13126,9 @@ async function _ceiviDati(){
 async function ceivImpExcel(){
   try{
     const r = await _ceiviDati(); if(!r) return;
-    XLSX.writeFile(_ceiviWb(r.data), _ceiviFname('xlsx'));
-    _ceiviStatus('✓ Excel generato: '+_ceiviEsito(r.data)+'.'); toast('Excel imprese scaricato ✓','ok');
+    const x = await _ceiviWb(r.data);
+    x.X.writeFile(x.wb, _ceiviFname('xlsx'));
+    _ceiviStatus('✓ Excel generato: '+_ceiviEsito(r.data)+'.'+(x.colori?'':' ⚠️ Senza i colori della Cassa Edile: la libreria che li scrive non si è caricata.')); toast('Excel imprese scaricato ✓','ok');
   }catch(e){ console.error('ceivImpExcel',e); _ceiviStatus('Non sono riuscito a leggere i dati: '+(e.message||e), true); toast('Errore: '+(e.message||e),'err'); }
 }
 async function ceivImpPdf(){
@@ -13122,7 +13149,8 @@ async function ceivImpInvia(){
       '\n\nLa mail parte SUBITO e non si richiama. Hai gia’ guardato i due file?\n\nOK = invia, Annulla = non inviare')){
       _ceiviStatus('Invio annullato: non e’ partito niente.'); return; }
     _ceiviStatus('⏳ Generazione allegati…');
-    const xlsxB64 = XLSX.write(_ceiviWb(r.data), { type:'base64', bookType:'xlsx' });
+    const x = await _ceiviWb(r.data);
+    const xlsxB64 = x.X.write(x.wb, { type:'base64', bookType:'xlsx' });
     const pdfB64 = _ceiviDoc(r.data, r.p).output('datauristring').split(',')[1];
     _ceiviStatus('⏳ Invio email a CEIV…');
     const { data:res, error } = await sb.functions.invoke('send-ceiv', { body:{
@@ -14028,7 +14056,7 @@ document.addEventListener('input',function(ev){
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
 <script src="riepilogo-verbali.js?v=2"></script>
 <script src="scheda-impresa.js?v=1"></script>
-<script src="ceiv-imprese.js?v=3"></script>
+<script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=4"></script>
 <script src="aiuto.js?v=9"></script>
 <script src="mail-respinte-tec.js?v=1"></script>

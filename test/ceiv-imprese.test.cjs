@@ -113,4 +113,28 @@ const tanti = []
 for (let i = 0; i < 60; i++) tanti.push(Object.assign({}, visite[0], { visita_id: 'V1', nr_verbale: 'CPT/25_26/' + (1000 + i), cantieri: Object.assign({}, visite[0].cantieri, { cantiere_cnce: 'CNCE' + (1000 + i) }) }))
 assert.ok(C.disegnaPdf(finto(), C.normalizza(tanti, presenti), 'inizio', '30/09/2026').pagine > 5, 'con molti sopralluoghi servono più pagine')
 
+// Stato in Cassa per il colore: attiva, sospesa, non iscritta; cessata e vuoto senza colore
+assert.strictEqual(C.statoCassa({ cassa_edile: 'C.E.I.V.', stato_cassa: 'Attiva' }), 'attiva')
+assert.strictEqual(C.statoCassa({ cassa_edile: 'C.E.I.V.', stato_cassa: 'Sospesa' }), 'sospesa')
+assert.strictEqual(C.statoCassa({ cassa_edile: 'C.E.I.V.', stato_cassa: 'Non iscritta' }), 'non_iscritta', '«non iscritta» non deve diventare altro')
+assert.strictEqual(C.statoCassa({ stato_cassa: 'Cessata' }), '')
+assert.strictEqual(C.statoCassa({}), '')
+// nell'Excel si colora la sola cella «Cassa Edile» delle righe con uno stato: qui Beta Impianti (attiva)
+const col = C.coloriExcel(dati)
+assert.strictEqual(col.length, 1)
+assert.strictEqual(aoa[col[0].r][H('Impresa o lavoratore autonomo')], 'Beta Impianti snc')
+assert.strictEqual(col[0].c, H('Cassa Edile'))
+assert.strictEqual(col[0].colore, C.COLORI_CASSA.attiva.xlsx)
+// nel PDF c'è la legenda dei tre colori
+assert.ok(['attiva', 'sospesa', 'non iscritta'].every((n) => doc.testi.includes(n)), 'manca la legenda dei colori')
+
+// Periodo: il caso del 29/09/2026 («Dal» con l'anno 0206) deve fermare l'estrazione
+const oggi = '2026-09-29'
+assert.ok(C.controllaPeriodo('0206-01-01', '2026-09-29', oggi).includes('01/01/0206'), 'anno 0206 accettato')
+assert.ok(C.controllaPeriodo('2026-01-01', '20266-09-29', oggi), 'anno a cinque cifre accettato')
+assert.ok(C.controllaPeriodo('2026-09-01', '2026-06-30', oggi).includes('dopo'), '«Dal» dopo «Al» accettato')
+assert.strictEqual(C.controllaPeriodo('2026-05-27', '2026-09-29', oggi), '')
+assert.strictEqual(C.controllaPeriodo('', '', oggi), '', 'date vuote = tutto lo storico, voluto')
+assert.strictEqual(C.controllaPeriodo('', '2026-09-29', oggi), '')
+
 console.log('ceiv-imprese: tutte le prove passate')
