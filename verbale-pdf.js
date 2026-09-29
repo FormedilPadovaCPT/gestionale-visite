@@ -25,7 +25,7 @@
   // ── tabelle di decodifica ──
   // ZONE_LBL e TIPO_IMP_OPT vengono da app-data.js quando c'è (browser); le copie servono alle prove in Node
   const ZONE = typeof ZONE_LBL !== 'undefined' ? ZONE_LBL : { 1: 'Impianti di cantiere', 2: 'Protezione luoghi di lavoro', 3: 'Apparecchi di sollevamento', 4: 'Attrezzature, scale, utensili', 5: 'Macchine di cantiere', 6: 'Opere provvisionali', 7: 'DPI', 8: 'Documentazione', 9: 'Soggetti', 10: 'Formazione' }
-  const RUOLI_IMP = typeof TIPO_IMP_OPT !== 'undefined' ? TIPO_IMP_OPT : { 1: 'Affidataria', 2: 'Affidataria ed esecutrice', 3: 'Esecutrice' }
+  const RUOLI_IMP = typeof TIPO_IMP_OPT !== 'undefined' ? TIPO_IMP_OPT : { 1: 'Affidataria', 2: 'Affidataria ed esecutrice', 3: 'Esecutrice', 4: 'Subappaltatrice', 5: 'Lavoratore autonomo / ditta individuale', 6: 'Fornitrice' }
   const TIPO_ACC = { 1: 'Su segnalazione', 2: 'Su richiesta', 3: 'Per protocolli di intesa', 4: 'Indicata da RLS/RLST', 5: 'Programmata', 6: 'Cantiere qualità', 7: 'Indicata dal CPT' }
   const TIP_INT = { 1: 'Costruzione', 2: 'Ristrutturazione', 3: 'Demolizione', 4: 'Ampliamento', 5: 'Altro' }
   const TIP_OPE = { 1: 'Industriale', 2: 'Civile', 3: 'Commerciale', 5: 'Stradale', 8: 'Scolastica', 16: 'Altro' }

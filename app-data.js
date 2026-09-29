@@ -73,7 +73,33 @@ const COMUNI_PD=[...new Set([...Object.keys(ISTAT_PD),...COMUNI_EXTRA])].sort((a
 // --- Batch 2: codelist / etichette / palette ---
 const ZONE_LBL={1:'Impianti di cantiere',2:'Protezione luoghi di lavoro',3:'Apparecchi di sollevamento',4:'Attrezzature, scale, utensili',5:'Macchine di cantiere',6:'Opere provvisionali',7:'DPI',8:'Documentazione',9:'Soggetti',10:'Formazione'}
 const _QPD_NOMI={1:'Q1 Centro',2:'Q2 Nord',3:'Q3 Est',4:'Q4 Sud-Est',5:'Q5 Sud-Ovest',6:'Q6 Ovest'}
-const TIPO_IMP_OPT={1:'Affidataria',2:'Affidataria ed esecutrice',3:'Esecutrice'}
+// 29/09/2026: aggiunte 4-6. I codici 1-3 sono quelli dell'Osservatorio; 4-6 servono alla Cassa Edile
+// (chi lavora in cantiere in subappalto o da autonomo) e nell'Osservatorio confluiscono in «esecutrice».
+const TIPO_IMP_OPT={1:'Affidataria',2:'Affidataria ed esecutrice',3:'Esecutrice',4:'Subappaltatrice',5:'Lavoratore autonomo / ditta individuale',6:'Fornitrice'}
+// Il ruolo scritto per esteso in visite_imprese_presenti.ruolo: stesse parole dei verbali importati dal modulo.
+const TIPO_IMP_RUOLO={1:'affidataria',2:'affidataria ed esecutrice',3:'esecutrice',4:'subappaltatrice',5:'lavoratore autonomo',6:'fornitrice'}
+const TIPO_IMP_AUTONOMO=5
+// Dalla riga del database al codice della tendina. Vince il ruolo scritto: nei verbali importati
+// tipo_imp è compilato solo per l'impresa principale e a volte non combacia col ruolo.
+function tipoImpDaRiga(r){
+  const t=String((r&&r.ruolo)||'').trim().toLowerCase()
+  const k=Object.keys(TIPO_IMP_RUOLO).find(x=>TIPO_IMP_RUOLO[x]===t)
+  return k?+k:((r&&+r.tipo_imp)||'')
+}
+// Una riga di visite_imprese_presenti (con l'impresa collegata) nella forma che usa il modulo del verbale.
+// Porta con sé tutto quello che il salvataggio riscrive: senza, riaprire e salvare un verbale perdeva
+// ruolo, capocantiere, badge e note dell'impresa.
+function impDaRigaDb(im,i){
+  const a=im.imprese||{}
+  return{
+    impresa_id:im.impresa_id||'',impresa_nome:a.impresa_nome||'',
+    piva:a.piva||'',cf_imp:a.impresa_cf||'',ind_imp:a.ind_imp||a.indirizzo||'',com_imp:a.com_imp||a.comune||'',
+    att:im.att||'',capo_nome:im.capo_nome||'',capo_cog:im.capo_cog||'',nom_prec:im.nom_prec||'',
+    nr_lav:+im.nr_lav||0,nr_lav_str:+im.nr_lav_str||0,
+    badge:im.badge||'',pat:im.pat||'',note_fasilav:im.note_fasilav||'',
+    tipo_imp:tipoImpDaRiga(im),ruolo:im.ruolo||'',is_principale:i===0
+  }
+}
 const CERTIF_OPT={1:'Asseverata',2:'Certificata OHSAS 18001',3:'UNI EN ISO 45001',4:'Sistema Qualità UNI EN ISO 9001',5:'Certificazione ambientale ISO 14001'}
 const CEIV_OPT=['C.E.I.V.','EDILCASSA VENETO','CASSA EDILE BELLUNO','CASSA EDILE VENEZIA','CASSA EDILE VICENZA','ALTRO']
 const IMP_LBL={1:'fino a 250.000 €',2:'250.001 – 500.000 €',3:'500.001 – 1.000.000 €',4:'1.000.001 – 1.500.000 €',5:'1.500.001 – 2.500.000 €',6:'2.500.001 – 3.500.000 €',7:'3.500.001 – 5.000.000 €',8:'5.000.001 – 10.000.000 €',9:'10.000.001 – 15.000.000 €',10:'oltre 15.000.000 €',11:'non disponibile'}

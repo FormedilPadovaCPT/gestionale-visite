@@ -1404,6 +1404,20 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div id="ceiv-status" style="font-size:12px;color:rgba(255,255,255,.6);margin-top:8px"></div>
         </div>
 
+        <!-- ── ESTRAZIONE CEIV: imprese presenti per cantiere (29/09/2026) ── -->
+        <div class="adm-section">
+          <div class="adm-section-title">👷 Estrazione CEIV – imprese e lavoratori presenti per cantiere</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:10px">Per ogni sopralluogo su un cantiere con codice “CNCE”: le imprese e i lavoratori autonomi trovati, con partita IVA o codice fiscale, i lavoratori di ciascuno e il totale del sopralluogo. <strong>Excel</strong>: una riga per impresa. <strong>PDF</strong>: una scheda per sopralluogo. L’invio usa l’indirizzo «Email CEIV» scritto qui sopra. Lasciando vuote le date estrae tutto lo storico.</p>
+          <div class="adm-date-row">
+            <div class="field" style="min-width:150px"><label>Dal</label><input type="date" id="ceivi-dal"></div>
+            <div class="field" style="min-width:150px"><label>Al</label><input type="date" id="ceivi-al"></div>
+            <button class="btn-primary" style="background:#27ae60;border-color:#1e8449" onclick="ceivImpExcel()">📊 Excel imprese</button>
+            <button class="btn-primary" style="background:#e7500f;border-color:#c43f0a" onclick="ceivImpPdf()">📄 PDF imprese</button>
+            <button class="btn-primary" style="background:#565c66;border-color:#565c66" onclick="ceivImpInvia()">✉️ Invia imprese a CEIV</button>
+          </div>
+          <div id="ceivi-status" style="font-size:12px;color:rgba(255,255,255,.6);margin-top:8px"></div>
+        </div>
+
         <!-- Report PDF -->
         <div class="adm-section">
           <div class="adm-section-title">📄 Report statistico</div>
@@ -2285,7 +2299,7 @@ window.onunhandledrejection = function(e) {
 };
 </script>
 
-<script src="app-data.js"></script>
+<script src="app-data.js?v=2"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -3519,8 +3533,11 @@ $('btn-add-imp').onclick=()=>{
 // Totali lavoratori/imprese calcolati dalle imprese inserite
 function computeImpTotals(){
   const list=(S.imprese||[]).filter(im=>im.impresa_id)
+  // autonomi e ditte individuali si contano a parte (nr_ind), come nel modulo: 1.9 imprese, 1.10 ditte individuali
+  const aut=list.filter(im=>+im.tipo_imp===TIPO_IMP_AUTONOMO).length
   return{
-    nr_imp:list.length||0,
+    nr_imp:(list.length-aut)||0,
+    nr_ind:aut,
     nr_lavoratori:list.reduce((s,im)=>s+(+im.nr_lav||0),0),
     nr_lavoratori_stranieri:list.reduce((s,im)=>s+(+im.nr_lav_str||0),0)
   }
@@ -4577,7 +4594,7 @@ async function saveVisita(stato){
       comm_piva:vGet('f-comm-piva')||null,
       comm_rag_soc:vGet('f-comm-rag-soc')||null,
       nr_imp:computeImpTotals().nr_imp||null,
-      nr_ind:null,
+      nr_ind:computeImpTotals().nr_ind,
       coord:cGet('f-coord'),
       costi:vGet('f-costi')||null,
       stato_lav:vGet('f-stato-lav')||null,
@@ -4672,7 +4689,8 @@ async function saveVisita(stato){
       att:im.att||null,nom_prec:[im.capo_nome||'',im.capo_cog||''].map(s=>s.trim()).filter(Boolean).join(' ')||im.nom_prec||null,badge:im.badge||null,
       pat:im.pat||null,note_fasilav:im.note_fasilav||null,
       nr_lav:+im.nr_lav||0,nr_lav_str:+im.nr_lav_str||0,
-      tipo_imp:+im.tipo_imp||null,is_principale:i===0,ordine:i
+      tipo_imp:+im.tipo_imp||null,ruolo:TIPO_IMP_RUOLO[+im.tipo_imp]||im.ruolo||null,
+      is_principale:i===0,ordine:i
     }))
     if(impRows.length)await sb.from('visite_imprese_presenti').insert(impRows)
 
@@ -4776,7 +4794,7 @@ function buildSnap(vid=null){
     cse_tel:vGet('f-cse-tel')||null,
     // Tab 1 – Dati cantiere al momento della visita
     nr_imp:computeImpTotals().nr_imp||0,
-    nr_ind:0,
+    nr_ind:computeImpTotals().nr_ind,
     nr_lavoratori:computeImpTotals().nr_lavoratori,
     nr_lavoratori_stranieri:computeImpTotals().nr_lavoratori_stranieri,
     importo:vGet('f-importo')||null,
@@ -7896,7 +7914,7 @@ async function inviEmailVerbaleFromList(vid){
   toast('Caricamento dati visita…')
   const{data:v,error}=await sb.from('visite').select(`
     visita_id,nr_verbale,data_visita,tecnico2_id,tecnico_id,
-    note_for_sn,note_for_m,note_for_tipi,ppre_titolo,ppre_nome,ppre_cog,ppre_qualifica,ppre_tel,
+    note_for_sn,note_for_m,note_for_tipi,ppre_titolo,ppre_nome,ppre_cog,qual_ppre,tel_ppre,
     comm_nome,comm_cog,comm_rag_soc,comm_tipo_sogg,comm_email,
     resp_lav,rl_email,
     csp,csp_email,
@@ -7905,14 +7923,14 @@ async function inviEmailVerbaleFromList(vid){
     tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome)
   `).eq('visita_id',vid).single()
   if(error||!v){toast('Visita non trovata','err');return}
-  const{data:impRows}=await sb.from('visite_imprese_presenti').select('impresa_id,is_principale,imprese(impresa_nome,impresa_email_ref,impresa_telefono,partita_iva,cassa_edile,stato_cassa)').eq('visita_id',vid).order('ordine')
+  const{data:impRows}=await sb.from('visite_imprese_presenti').select('impresa_id,is_principale,imprese(impresa_nome,impresa_email_ref,impresa_telefono,piva,cassa_edile,stato_cassa)').eq('visita_id',vid).order('ordine')
   // formazione mancante (25/09/2026): il pacchetto per la mail all'impresa e la segnalazione all'ufficio corsi
   {const _pr=(impRows||[]).find(x=>x.is_principale)||(impRows||[])[0]||null,_pi=_pr&&_pr.imprese||{}
    await _tipiFormazione().catch(()=>{})
    window._evFormazione=_evFormazioneCalc({sn:v.note_for_sn===true,tipi:v.note_for_tipi||[],nota:v.note_for_m,
-     ceiv:_ceivDa(_pi.cassa_edile,_pi.stato_cassa),impresa:_pi.impresa_nome||null,piva:_pi.partita_iva||null,impresa_id:_pr&&_pr.impresa_id||null,
+     ceiv:_ceivDa(_pi.cassa_edile,_pi.stato_cassa),impresa:_pi.impresa_nome||null,piva:_pi.piva||null,impresa_id:_pr&&_pr.impresa_id||null,
      impresa_email:(_pi.impresa_email_ref||'').trim()||null,impresa_tel:_pi.impresa_telefono||null,
-     referente:[v.ppre_titolo,v.ppre_nome,v.ppre_cog].filter(Boolean).join(' ')+(v.ppre_qualifica?' ('+v.ppre_qualifica+')':'')||null,referente_tel:v.ppre_tel||null,tecnico_id:v.tecnico_id||null})}
+     referente:[v.ppre_titolo,v.ppre_nome,v.ppre_cog].filter(Boolean).join(' ')+(v.qual_ppre?' ('+v.qual_ppre+')':'')||null,referente_tel:v.tel_ppre||null,tecnico_id:v.tecnico_id||null})}
   // Secondo tecnico (se presente)
   let _eTec2=''
   if(v.tecnico2_id){
@@ -8123,12 +8141,12 @@ function apriEmailRettifica(p){
   //  dell'impresa aggiorna il pacchetto appena arriva, prima che il tecnico prema Invia)
   try{const _i0=(S.imprese&&S.imprese[0])||{}
     const _calc=_ir=>{window._evFormazione=_evFormazioneCalc({sn:cGet('f-note-for-sn'),tipi:_tipiSel()||[],nota:vGet('f-note-for-m'),
-      ceiv:_ceivDa(_ir.cassa_edile||_i0.ceiv,_ir.stato_cassa),impresa:_i0.impresa_nome||null,piva:_ir.partita_iva||_i0.piva||null,impresa_id:_i0.impresa_id||null,
+      ceiv:_ceivDa(_ir.cassa_edile||_i0.ceiv,_ir.stato_cassa),impresa:_i0.impresa_nome||null,piva:_ir.piva||_i0.piva||null,impresa_id:_i0.impresa_id||null,
       impresa_email:(_ir.impresa_email_ref||'').trim()||null,impresa_tel:_ir.impresa_telefono||null,
       referente:[vGet('f-ppre-titolo'),vGet('f-ppre-nome'),vGet('f-ppre-cog')].filter(Boolean).join(' ')+(vGet('f-qual-ppre')?' ('+vGet('f-qual-ppre')+')':'')||null,referente_tel:vGet('f-tel-ppre')||null,tecnico_id:S.tecnico?.tecnico_id||null});_evAnteprima&&_evAnteprima()}
     _calc({})
     _tipiFormazione().then(()=>_calc({})).catch(()=>{})
-    if(_i0.impresa_id)sb.from('imprese').select('impresa_email_ref,impresa_telefono,partita_iva,cassa_edile,stato_cassa').eq('impresa_id',_i0.impresa_id).maybeSingle().then(({data:_d})=>_calc(_d||{})).catch(()=>{})
+    if(_i0.impresa_id)sb.from('imprese').select('impresa_email_ref,impresa_telefono,piva,cassa_edile,stato_cassa').eq('impresa_id',_i0.impresa_id).maybeSingle().then(({data:_d})=>_calc(_d||{})).catch(()=>{})
   }catch(e){console.warn('formazione dal modulo:',e);window._evFormazione=null}
   const _fTec1=vGet('f-tec-display')||''
   const _fTec2=vGet('f-tec2-display')||''
@@ -8233,12 +8251,12 @@ function inviEmailVerbale(){
   //  dell'impresa aggiorna il pacchetto appena arriva, prima che il tecnico prema Invia)
   try{const _i0=(S.imprese&&S.imprese[0])||{}
     const _calc=_ir=>{window._evFormazione=_evFormazioneCalc({sn:cGet('f-note-for-sn'),tipi:_tipiSel()||[],nota:vGet('f-note-for-m'),
-      ceiv:_ceivDa(_ir.cassa_edile||_i0.ceiv,_ir.stato_cassa),impresa:_i0.impresa_nome||null,piva:_ir.partita_iva||_i0.piva||null,impresa_id:_i0.impresa_id||null,
+      ceiv:_ceivDa(_ir.cassa_edile||_i0.ceiv,_ir.stato_cassa),impresa:_i0.impresa_nome||null,piva:_ir.piva||_i0.piva||null,impresa_id:_i0.impresa_id||null,
       impresa_email:(_ir.impresa_email_ref||'').trim()||null,impresa_tel:_ir.impresa_telefono||null,
       referente:[vGet('f-ppre-titolo'),vGet('f-ppre-nome'),vGet('f-ppre-cog')].filter(Boolean).join(' ')+(vGet('f-qual-ppre')?' ('+vGet('f-qual-ppre')+')':'')||null,referente_tel:vGet('f-tel-ppre')||null,tecnico_id:S.tecnico?.tecnico_id||null});_evAnteprima&&_evAnteprima()}
     _calc({})
     _tipiFormazione().then(()=>_calc({})).catch(()=>{})
-    if(_i0.impresa_id)sb.from('imprese').select('impresa_email_ref,impresa_telefono,partita_iva,cassa_edile,stato_cassa').eq('impresa_id',_i0.impresa_id).maybeSingle().then(({data:_d})=>_calc(_d||{})).catch(()=>{})
+    if(_i0.impresa_id)sb.from('imprese').select('impresa_email_ref,impresa_telefono,piva,cassa_edile,stato_cassa').eq('impresa_id',_i0.impresa_id).maybeSingle().then(({data:_d})=>_calc(_d||{})).catch(()=>{})
   }catch(e){console.warn('formazione dal modulo:',e);window._evFormazione=null}
   const _fTec1=vGet('f-tec-display')||''
   const _fTec2=vGet('f-tec2-display')||''
@@ -8466,11 +8484,7 @@ async function riapriBozza(vid){
         if(r.valore)checklist[r.codice]=r.valore
         if(r.nota)note_checklist[r.codice]=r.nota
       })
-      const imprese=(impRows||[]).map((im,i)=>({
-        impresa_id:im.impresa_id||'',impresa_nome:im.imprese?.impresa_nome||'',
-        piva:im.imprese?.piva||'',cf_imp:im.imprese?.impresa_cf||'',
-        att:im.att||'',nr_lav:+im.nr_lav||0,nr_lav_str:+im.nr_lav_str||0,is_principale:i===0
-      }))
+      const imprese=(impRows||[]).map(impDaRigaDb)
       const cant=v.cantieri||{}
       snap={
         visita_id:vid,
@@ -11762,11 +11776,7 @@ async function rebuildSnapFromDB(vid){
   const{data:impRows}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva)').eq('visita_id',vid).order('ordine')
   const checklist={},note_checklist={}
   ;(chkRows||[]).forEach(r=>{ if(r.valore)checklist[r.codice]=r.valore; if(r.nota)note_checklist[r.codice]=r.nota })
-  const imprese=(impRows||[]).map((im,i)=>({
-    impresa_id:im.impresa_id||'',impresa_nome:im.imprese?.impresa_nome||'',
-    piva:im.imprese?.piva||'',cf_imp:im.imprese?.impresa_cf||'',
-    att:im.att||'',nr_lav:+im.nr_lav||0,nr_lav_str:+im.nr_lav_str||0,is_principale:i===0
-  }))
+  const imprese=(impRows||[]).map(impDaRigaDb)
   const cant=v.cantieri||{}
   return{
     visita_id:vid,
@@ -12601,7 +12611,7 @@ async function _loadSnapForVerbale(verbale){
   if(!v)throw new Error('Dati non trovati')
   const{data:chkRows}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
   const{data:lavRows}=await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid)
-  const{data:impRows}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva,ind_imp,com_imp)').eq('visita_id',vid).order('ordine')
+  const{data:impRows}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva,indirizzo,comune)').eq('visita_id',vid).order('ordine')
   const checklist={},note_checklist={}
   ;(chkRows||[]).forEach(r=>{checklist[r.codice]=r.valore||'NA';if(r.nota)note_checklist[r.codice]=r.nota})
   const cant=v.cantieri||{}
@@ -12624,14 +12634,7 @@ async function _loadSnapForVerbale(verbale){
     ..._figSnap('cse',v.cse_titolo,v.cse_nome,v.cse_cog,v.cse),cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
     nr_imp:v.nr_imp||0,nr_ind:v.nr_ind||0,nr_lavoratori:v.nr_lavoratori||0,nr_lavoratori_stranieri:v.nr_lavoratori_stranieri||0,
     importo:v.importo||null,costi:v.costi||null,stato_lav:v.stato_lav||null,
-    imprese:(impRows||[]).map((im,i)=>({
-      impresa_id:im.impresa_id||'',impresa_nome:im.imprese?.impresa_nome||'',
-      piva:im.imprese?.piva||'',cf_imp:im.imprese?.impresa_cf||'',
-      ind_imp:im.imprese?.ind_imp||'',com_imp:im.imprese?.com_imp||'',
-      att:im.att||'',capo_nome:im.capo_nome||'',capo_cog:im.capo_cog||'',
-      nr_lav:+im.nr_lav||0,nr_lav_str:+im.nr_lav_str||0,
-      badge:im.badge||'',tipo_imp:im.tipo_imp||'',is_principale:i===0
-    })),
+    imprese:(impRows||[]).map(impDaRigaDb),
     checklist,note_checklist,
     lavorazioni:(lavRows||[]).map(l=>({genere:l.genere,fase:l.fase,lavorazione:l.lavorazione})),
     oss_tec:v.oss_tec||null,oss_int:v.oss_tec_int||null,
@@ -13037,6 +13040,106 @@ async function ceivInviaMail(){
 window.ceivEsportaExcel=ceivEsportaExcel;
 window.ceivEsportaPdf=ceivEsportaPdf;
 window.ceivInviaMail=ceivInviaMail;
+
+// ═══════════════════════════════════════════════════════════════
+//  ESTRAZIONE CEIV – imprese presenti per cantiere (usa window.CeivImprese, ceiv-imprese.js)
+// ═══════════════════════════════════════════════════════════════
+function _ceiviStatus(msg, err){ const el=$('ceivi-status'); if(el){ el.textContent=msg||''; el.style.color=err?'#e74c3c':'rgba(255,255,255,.6)'; } }
+function _ceiviPeriodo(){
+  const dal=($('ceivi-dal')?.value)||'', al=($('ceivi-al')?.value)||'';
+  return { dal: dal||'1900-01-01', al: al||today(), tutto: !dal,
+    dalFmt: dal?fmtDate(dal):'inizio', alFmt: fmtDate(al||today()),
+    etichetta: (dal?fmtDate(dal):'inizio') + ' – ' + fmtDate(al||today()) };
+}
+async function _ceiviFetch(dal, al){
+  const vis = await sbTutte((da,a)=>sb.from('visite')
+    .select('visita_id,nr_verbale,data_visita,stato,nr_imp,nr_ind,nr_lavoratori,impresa_id,comm_rag_soc,comm_nome,comm_cog,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri!inner(cantiere_cnce,lotto,cantiere_indirizzo,cantiere_civico,comune_nome),imprese!visite_impresa_id_fkey(impresa_nome,piva,impresa_cf,cassa_edile,stato_cassa)')
+    .gte('data_visita', dal).lte('data_visita', al).eq('elimina', 0)
+    .ilike('cantieri.cantiere_cnce', 'cnce%')
+    .order('data_visita', { ascending:false }).order('visita_id').range(da,a));
+  const rows = vis||[];
+  const byVis = {};
+  const ids = rows.map(r=>r.visita_id);
+  for(let i=0;i<ids.length;i+=100){
+    const { data:bb, error:e2 } = await sb.from('visite_imprese_presenti')
+      .select('visita_id,impresa_id,ordine,is_principale,ruolo,tipo_imp,nr_lav,imprese!visite_imprese_presenti_impresa_id_fkey(impresa_nome,piva,impresa_cf,cassa_edile,stato_cassa)')
+      .in('visita_id', ids.slice(i,i+100));
+    if(e2) throw e2;   // senza le imprese l'estrazione sarebbe falsa: meglio fermarsi che uscire a metà
+    (bb||[]).forEach(r=>{ (byVis[r.visita_id]=byVis[r.visita_id]||[]).push(r); });
+  }
+  return window.CeivImprese.normalizza(rows, byVis);
+}
+function _ceiviFname(ext){
+  const p=_ceiviPeriodo();
+  return `CEIV_Imprese_per_cantiere_${p.tutto?'tutto':p.dal}_${p.al}.${ext}`;
+}
+function _ceiviWb(data){
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(window.CeivImprese.righeExcel(data));
+  ws['!cols'] = window.CeivImprese.LARGHEZZE.map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws, 'ImpresePerCantiere');
+  return wb;
+}
+function _ceiviDoc(data, p){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  return window.CeivImprese.disegnaPdf(doc, data, p.dalFmt, p.alFmt);
+}
+function _ceiviEsito(data){
+  const c = window.CeivImprese.conta(data);
+  return `${c.sopralluoghi} sopralluoghi su ${c.cantieri} cantieri, ${c.righe} righe di imprese`+
+    (c.daGuardare?` — ${c.daGuardare} sopralluoghi con una nota da guardare (colonna «Note»)`:'');
+}
+async function _ceiviDati(){
+  if(!window.__isCoord){ toast('Funzione riservata alla segreteria','err'); return null; }
+  const p=_ceiviPeriodo(); _ceiviStatus('⏳ Estrazione dati…');
+  const data = await _ceiviFetch(p.dal, p.al);
+  if(!data.length){ _ceiviStatus('Nessuna visita su cantieri con codice CNCE nel periodo.', true); toast('Nessuna visita trovata','warn'); return null; }
+  return { p, data };
+}
+async function ceivImpExcel(){
+  try{
+    const r = await _ceiviDati(); if(!r) return;
+    XLSX.writeFile(_ceiviWb(r.data), _ceiviFname('xlsx'));
+    _ceiviStatus('✓ Excel generato: '+_ceiviEsito(r.data)+'.'); toast('Excel imprese scaricato ✓','ok');
+  }catch(e){ console.error('ceivImpExcel',e); _ceiviStatus('Non sono riuscito a leggere i dati: '+(e.message||e), true); toast('Errore: '+(e.message||e),'err'); }
+}
+async function ceivImpPdf(){
+  try{
+    const r = await _ceiviDati(); if(!r) return;
+    _ceiviDoc(r.data, r.p).save(_ceiviFname('pdf'));
+    _ceiviStatus('✓ PDF generato: '+_ceiviEsito(r.data)+'.'); toast('PDF imprese scaricato ✓','ok');
+  }catch(e){ console.error('ceivImpPdf',e); _ceiviStatus('Non sono riuscito a leggere i dati: '+(e.message||e), true); toast('Errore: '+(e.message||e),'err'); }
+}
+async function ceivImpInvia(){
+  const to=($('ceiv-mail-to')?.value||'').trim();
+  const cc=($('ceiv-mail-cc')?.value||'').trim();
+  if(!to){ _ceiviStatus('Scrivi l’indirizzo nel campo «Email CEIV» dell’estrazione qui sopra.', true); toast('Manca l’email CEIV','warn'); return; }
+  try{
+    const r = await _ceiviDati(); if(!r) return;
+    if(!confirm('Invio a CEIV – imprese presenti per cantiere\n\nA: '+to+(cc?'\nIn copia: '+cc:'')+'\nPeriodo: '+r.p.etichetta+'\n'+_ceiviEsito(r.data)+
+      '\nAllegati: '+_ceiviFname('xlsx')+' e '+_ceiviFname('pdf')+
+      '\n\nLa mail parte SUBITO e non si richiama. Hai gia’ guardato i due file?\n\nOK = invia, Annulla = non inviare')){
+      _ceiviStatus('Invio annullato: non e’ partito niente.'); return; }
+    _ceiviStatus('⏳ Generazione allegati…');
+    const xlsxB64 = XLSX.write(_ceiviWb(r.data), { type:'base64', bookType:'xlsx' });
+    const pdfB64 = _ceiviDoc(r.data, r.p).output('datauristring').split(',')[1];
+    _ceiviStatus('⏳ Invio email a CEIV…');
+    const { data:res, error } = await sb.functions.invoke('send-ceiv', { body:{
+      to:[to], cc: cc?[cc]:[], periodo: r.p.etichetta, nRighe: r.data.length,
+      attachments:[
+        { name:_ceiviFname('xlsx'), b64:xlsxB64, mime:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+        { name:_ceiviFname('pdf'),  b64:pdfB64,  mime:'application/pdf' },
+      ] } });
+    if(error) throw error;
+    if(res && res.error) throw new Error(res.error);
+    _ceiviStatus(`✓ Email inviata a ${to}: `+_ceiviEsito(r.data)+'.');
+    toast('Email CEIV inviata ✓','ok');
+  }catch(e){ console.error('ceivImpInvia',e); _ceiviStatus('Invio non riuscito: '+(e.message||e), true); toast('Errore invio: '+(e.message||e),'err'); }
+}
+window.ceivImpExcel=ceivImpExcel;
+window.ceivImpPdf=ceivImpPdf;
+window.ceivImpInvia=ceivImpInvia;
 
 
 
@@ -13925,6 +14028,7 @@ document.addEventListener('input',function(ev){
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
 <script src="riepilogo-verbali.js?v=2"></script>
 <script src="scheda-impresa.js?v=1"></script>
+<script src="ceiv-imprese.js?v=1"></script>
 <script src="notifiche.js?v=4"></script>
 <script src="aiuto.js?v=9"></script>
 <script src="mail-respinte-tec.js?v=1"></script>
