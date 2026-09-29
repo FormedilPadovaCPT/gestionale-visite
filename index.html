@@ -13053,7 +13053,7 @@ function _ceiviPeriodo(){
 }
 async function _ceiviFetch(dal, al){
   const vis = await sbTutte((da,a)=>sb.from('visite')
-    .select('visita_id,nr_verbale,data_visita,stato,nr_imp,nr_ind,nr_lavoratori,impresa_id,comm_rag_soc,comm_nome,comm_cog,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri!inner(cantiere_cnce,lotto,cantiere_indirizzo,cantiere_civico,comune_nome),imprese!visite_impresa_id_fkey(impresa_nome,piva,impresa_cf,cassa_edile,stato_cassa)')
+    .select('visita_id,nr_verbale,data_visita,stato,nr_imp,nr_ind,nr_lavoratori,altre_imp_text,impresa_id,comm_rag_soc,comm_nome,comm_cog,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri!inner(cantiere_cnce,lotto,cantiere_indirizzo,cantiere_civico,comune_nome),imprese!visite_impresa_id_fkey(impresa_nome,piva,impresa_cf,cassa_edile,stato_cassa)')
     .gte('data_visita', dal).lte('data_visita', al).eq('elimina', 0)
     .ilike('cantieri.cantiere_cnce', 'cnce%')
     .order('data_visita', { ascending:false }).order('visita_id').range(da,a));
@@ -14028,7 +14028,7 @@ document.addEventListener('input',function(ev){
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
 <script src="riepilogo-verbali.js?v=2"></script>
 <script src="scheda-impresa.js?v=1"></script>
-<script src="ceiv-imprese.js?v=1"></script>
+<script src="ceiv-imprese.js?v=2"></script>
 <script src="notifiche.js?v=4"></script>
 <script src="aiuto.js?v=9"></script>
 <script src="mail-respinte-tec.js?v=1"></script>

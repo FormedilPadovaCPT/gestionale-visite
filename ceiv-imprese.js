@@ -66,7 +66,10 @@
       if (imprese.some((x) => x.lav === null) && !soloPrincipale) note.push('Lavoratori non indicati per una o più imprese');
       if (somma !== null && lavTot !== null && somma !== lavTot) note.push(`Somma per impresa ${somma}, totale dichiarato ${lavTot}`);
       if (nrInd !== null && nrInd > nAut) note.push(`${nrInd - nAut} ${nrInd - nAut === 1 ? 'autonomo dichiarato' : 'autonomi dichiarati'} senza nominativo`);
+      const altre = _s(v.altre_imp_text).replace(/\s+/g, ' ');
+      if (altre) note.push('Altre imprese o autonomi segnalati dal tecnico a testo libero');
       return {
+        altre,
         visitaId: v.visita_id, cnce: _s(c.cantiere_cnce), lotto: _s(c.lotto),
         indirizzo: [c.cantiere_indirizzo, c.cantiere_civico].map(_s).filter(Boolean).join(' '), comune: _s(c.comune_nome),
         data: _s(v.data_visita), verbale: _s(v.nr_verbale),
@@ -83,15 +86,15 @@
 
   const INTESTAZIONE = ['Codice CNCE', 'Lotto', 'Indirizzo cantiere', 'Comune', 'Data sopralluogo', 'N. verbale', 'Tecnico',
     'Impresa o lavoratore autonomo', 'Partita IVA', 'Codice fiscale', 'Ruolo in cantiere', 'Autonomo', 'Cassa Edile',
-    'Lavoratori dell\'impresa presenti', 'Imprese nel cantiere', 'Autonomi nel cantiere', 'Lavoratori totali del sopralluogo', 'Note'];
-  const LARGHEZZE = [18, 8, 30, 18, 12, 16, 20, 36, 14, 18, 22, 9, 20, 12, 10, 10, 12, 50];
+    'Lavoratori dell\'impresa presenti', 'Imprese nel cantiere', 'Autonomi nel cantiere', 'Lavoratori totali del sopralluogo', 'Altre imprese o autonomi segnalati (testo del tecnico)', 'Note'];
+  const LARGHEZZE = [18, 8, 30, 18, 12, 16, 20, 36, 14, 18, 22, 9, 20, 12, 10, 10, 12, 60, 50];
 
   // Una riga per impresa: i dati del cantiere e del sopralluogo si ripetono, così si filtra e si incrocia.
   function righeExcel(dati) {
     const aoa = [INTESTAZIONE.slice()];
     ordina(dati).forEach((r) => {
       const testa = [r.cnce, r.lotto, r.indirizzo, r.comune, fmtData(r.data), r.verbale, r.tecnico];
-      const coda = [r.nImprese, r.nAutonomi, r.lavTot === null ? '' : r.lavTot, r.note.join('; ')];
+      const coda = [r.nImprese, r.nAutonomi, r.lavTot === null ? '' : r.lavTot, r.altre, r.note.join('; ')];
       const lista = r.imprese.length ? r.imprese : [{ nome: '', piva: '', cf: '', ruolo: '', autonomo: false, cassa: '', lav: null }];
       lista.forEach((x) => {
         aoa.push(testa.concat([x.nome, x.piva, x.cf, x.ruolo, x.autonomo ? 'Sì' : 'No', x.cassa, x.lav === null ? '' : x.lav], coda));
@@ -155,7 +158,8 @@
           lav: x.lav === null ? '–' : String(x.lav),
         }));
         const hRiga = (c) => Math.max(c.nome.length, c.cod.length, c.ruolo.length, c.cassa.length) * 3.6 + 1.6;
-        const noteL = r.note.length ? spezza('Nota: ' + r.note.join('; '), 7, false, W - 5) : [];
+        const noteL = (r.note.length ? spezza('Nota: ' + r.note.join('; '), 7, false, W - 5) : [])
+          .concat(r.altre ? spezza('Segnalate dal tecnico: ' + r.altre, 7, false, W - 5) : []);
         const alt = 6 + 5 + corpo.reduce((s, c) => s + hRiga(c), 0) + 6.5 + (noteL.length ? noteL.length * 3.2 + 1.5 : 0) + 3;
         if (y + alt > BOT) nuova();
         // riga del sopralluogo

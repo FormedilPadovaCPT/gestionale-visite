@@ -65,6 +65,12 @@ assert.strictEqual(v3.imprese.length, 1)
 assert.ok(v3.note.some((n) => n.startsWith('Elenco delle imprese presenti non compilato')))
 
 // somma diversa dal totale: si segnala, non si corregge
+// il testo libero del tecnico sulle altre imprese esce per intero e viene segnalato
+const conAltre = C.normalizza([Object.assign({}, visite[0], { altre_imp_text: 'DEA SRL - P.IVA 04953250265 -\n 2 presenti' })], presenti)[0]
+assert.strictEqual(conAltre.altre, 'DEA SRL - P.IVA 04953250265 - 2 presenti')
+assert.ok(conAltre.note.some((n) => n.startsWith('Altre imprese o autonomi segnalati')))
+assert.ok(C.righeExcel([conAltre])[1].includes('DEA SRL - P.IVA 04953250265 - 2 presenti'))
+
 const storto = C.normalizza([Object.assign({}, visite[0], { nr_lavoratori: 12 })], presenti)[0]
 assert.ok(storto.note.includes('Somma per impresa 9, totale dichiarato 12'))
 assert.strictEqual(storto.lavTot, 12)
