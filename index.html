@@ -13053,7 +13053,7 @@ function _ceiviPeriodo(){
 }
 async function _ceiviFetch(dal, al){
   const vis = await sbTutte((da,a)=>sb.from('visite')
-    .select('visita_id,nr_verbale,data_visita,stato,nr_imp,nr_ind,nr_lavoratori,altre_imp_text,impresa_id,comm_rag_soc,comm_nome,comm_cog,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri!inner(cantiere_cnce,lotto,cantiere_indirizzo,cantiere_civico,comune_nome),imprese!visite_impresa_id_fkey(impresa_nome,piva,impresa_cf,cassa_edile,stato_cassa)')
+    .select('visita_id,nr_verbale,data_visita,stato,nr_imp,nr_ind,nr_lavoratori,altre_imp_text,impresa_id,comm_rag_soc,comm_nome,comm_cog,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri!inner(cantiere_cnce,lotto,cantiere_indirizzo,cantiere_civico,comune_nome),imprese!visite_impresa_id_fkey(impresa_nome,piva,impresa_cf,cassa_edile,stato_cassa,cod_ceiv)')
     .gte('data_visita', dal).lte('data_visita', al).eq('elimina', 0)
     .ilike('cantieri.cantiere_cnce', 'cnce%')
     .order('data_visita', { ascending:false }).order('visita_id').range(da,a));
@@ -13062,7 +13062,7 @@ async function _ceiviFetch(dal, al){
   const ids = rows.map(r=>r.visita_id);
   for(let i=0;i<ids.length;i+=100){
     const { data:bb, error:e2 } = await sb.from('visite_imprese_presenti')
-      .select('visita_id,impresa_id,ordine,is_principale,ruolo,tipo_imp,nr_lav,imprese!visite_imprese_presenti_impresa_id_fkey(impresa_nome,piva,impresa_cf,cassa_edile,stato_cassa)')
+      .select('visita_id,impresa_id,ordine,is_principale,ruolo,tipo_imp,nr_lav,imprese!visite_imprese_presenti_impresa_id_fkey(impresa_nome,piva,impresa_cf,cassa_edile,stato_cassa,cod_ceiv)')
       .in('visita_id', ids.slice(i,i+100));
     if(e2) throw e2;   // senza le imprese l'estrazione sarebbe falsa: meglio fermarsi che uscire a metà
     (bb||[]).forEach(r=>{ (byVis[r.visita_id]=byVis[r.visita_id]||[]).push(r); });
@@ -14028,7 +14028,7 @@ document.addEventListener('input',function(ev){
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
 <script src="riepilogo-verbali.js?v=2"></script>
 <script src="scheda-impresa.js?v=1"></script>
-<script src="ceiv-imprese.js?v=2"></script>
+<script src="ceiv-imprese.js?v=3"></script>
 <script src="notifiche.js?v=4"></script>
 <script src="aiuto.js?v=9"></script>
 <script src="mail-respinte-tec.js?v=1"></script>

@@ -23,7 +23,7 @@ const visite = [
 const presenti = {
   V1: [
     { visita_id: 'V1', impresa_id: 'RSSMRA70A01G224X', ordine: 3, is_principale: false, ruolo: 'lavoratore autonomo', tipo_imp: 3, nr_lav: 1, imprese: { impresa_nome: 'Rossi Mario', impresa_cf: 'RSSMRA70A01G224X' } },
-    { visita_id: 'V1', impresa_id: '02345670282', ordine: 2, is_principale: false, ruolo: 'subappaltatrice', tipo_imp: null, nr_lav: 3, imprese: { impresa_nome: 'Beta Impianti snc', piva: '02345670282', cassa_edile: 'C.E.I.V.', stato_cassa: 'Attiva' } },
+    { visita_id: 'V1', impresa_id: '02345670282', ordine: 2, is_principale: false, ruolo: 'subappaltatrice', tipo_imp: null, nr_lav: 3, imprese: { impresa_nome: 'Beta Impianti snc', piva: '02345670282', cassa_edile: 'C.E.I.V.', stato_cassa: 'Attiva', cod_ceiv: '012345' } },
     { visita_id: 'V1', impresa_id: '01234560281', ordine: 1, is_principale: true, ruolo: null, tipo_imp: 1, nr_lav: 4, imprese: { impresa_nome: 'Edil Alfa srl', piva: '01234560281' } },
     { visita_id: 'V1', impresa_id: 'BNCLCU80B02G224Y', ordine: 4, is_principale: false, ruolo: null, tipo_imp: 5, nr_lav: 1, imprese: { impresa_nome: 'Bianchi Luca' } },
   ],
@@ -46,6 +46,8 @@ assert.strictEqual(v1.imprese[1].autonomo, false)
 // il codice fiscale dell'autonomo si ricava dalla chiave quando l'anagrafica non l'ha
 assert.strictEqual(v1.imprese[3].cf, 'BNCLCU80B02G224Y')
 assert.strictEqual(v1.imprese[3].piva, '')
+assert.strictEqual(v1.imprese[1].codCeiv, '012345')
+assert.strictEqual(v1.imprese[0].codCeiv, '', 'chi non è iscritto non ha codice')
 assert.strictEqual(v1.imprese[1].cassa, 'C.E.I.V. – Attiva')
 // conteggi: imprese e autonomi separati, totale quello dichiarato, nessuna nota se la somma torna
 assert.strictEqual(v1.nImprese, 2); assert.strictEqual(v1.nAutonomi, 2)

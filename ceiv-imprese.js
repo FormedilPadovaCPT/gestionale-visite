@@ -31,6 +31,8 @@
     if (!cf && /^[A-Z0-9]{16}$/.test(id) && /[A-Z]/.test(id)) cf = id;
     return { piva, cf };
   }
+  // Il codice con cui la Cassa conosce l'impresa: lo ha solo chi è (o è stata) iscritta alla C.E.I.V.
+  const codCeivDi = (imp) => _s(imp.cod_ceiv);
   function cassaDi(imp) {
     const c = _s(imp.cassa_edile), st = _s(imp.stato_cassa);
     if (!c && !st) return '';
@@ -46,13 +48,13 @@
       let imprese = pres.map((p) => {
         const imp = p.imprese || {};
         const k = codici(imp, p.impresa_id);
-        return { nome: _s(imp.impresa_nome), piva: k.piva, cf: k.cf, ruolo: ruoloDi(p), autonomo: eAutonomo(p), cassa: cassaDi(imp), lav: _n(p.nr_lav) };
+        return { nome: _s(imp.impresa_nome), piva: k.piva, cf: k.cf, ruolo: ruoloDi(p), autonomo: eAutonomo(p), cassa: cassaDi(imp), codCeiv: codCeivDi(imp), lav: _n(p.nr_lav) };
       });
       let soloPrincipale = false;
       if (!imprese.length && v.imprese && (v.imprese.impresa_nome || v.imprese.piva)) {
         // nessuna riga delle imprese presenti: resta l'impresa principale del verbale, senza lavoratori suoi
         const k = codici(v.imprese, v.impresa_id);
-        imprese = [{ nome: _s(v.imprese.impresa_nome), piva: k.piva, cf: k.cf, ruolo: '', autonomo: false, cassa: cassaDi(v.imprese), lav: null }];
+        imprese = [{ nome: _s(v.imprese.impresa_nome), piva: k.piva, cf: k.cf, ruolo: '', autonomo: false, cassa: cassaDi(v.imprese), codCeiv: codCeivDi(v.imprese), lav: null }];
         soloPrincipale = true;
       }
       const lavTot = _n(v.nr_lavoratori);
@@ -85,9 +87,9 @@
     a.cnce.localeCompare(b.cnce) || a.lotto.localeCompare(b.lotto) || b.data.localeCompare(a.data) || a.verbale.localeCompare(b.verbale));
 
   const INTESTAZIONE = ['Codice CNCE', 'Lotto', 'Indirizzo cantiere', 'Comune', 'Data sopralluogo', 'N. verbale', 'Tecnico',
-    'Impresa o lavoratore autonomo', 'Partita IVA', 'Codice fiscale', 'Ruolo in cantiere', 'Autonomo', 'Cassa Edile',
+    'Impresa o lavoratore autonomo', 'Partita IVA', 'Codice fiscale', 'Ruolo in cantiere', 'Autonomo', 'Codice CEIV impresa', 'Cassa Edile',
     'Lavoratori dell\'impresa presenti', 'Imprese nel cantiere', 'Autonomi nel cantiere', 'Lavoratori totali del sopralluogo', 'Altre imprese o autonomi segnalati (testo del tecnico)', 'Note'];
-  const LARGHEZZE = [18, 8, 30, 18, 12, 16, 20, 36, 14, 18, 22, 9, 20, 12, 10, 10, 12, 60, 50];
+  const LARGHEZZE = [18, 8, 30, 18, 12, 16, 20, 36, 14, 18, 22, 9, 14, 20, 12, 10, 10, 12, 60, 50];
 
   // Una riga per impresa: i dati del cantiere e del sopralluogo si ripetono, così si filtra e si incrocia.
   function righeExcel(dati) {
@@ -95,9 +97,9 @@
     ordina(dati).forEach((r) => {
       const testa = [r.cnce, r.lotto, r.indirizzo, r.comune, fmtData(r.data), r.verbale, r.tecnico];
       const coda = [r.nImprese, r.nAutonomi, r.lavTot === null ? '' : r.lavTot, r.altre, r.note.join('; ')];
-      const lista = r.imprese.length ? r.imprese : [{ nome: '', piva: '', cf: '', ruolo: '', autonomo: false, cassa: '', lav: null }];
+      const lista = r.imprese.length ? r.imprese : [{ nome: '', piva: '', cf: '', ruolo: '', autonomo: false, cassa: '', codCeiv: '', lav: null }];
       lista.forEach((x) => {
-        aoa.push(testa.concat([x.nome, x.piva, x.cf, x.ruolo, x.autonomo ? 'Sì' : 'No', x.cassa, x.lav === null ? '' : x.lav], coda));
+        aoa.push(testa.concat([x.nome, x.piva, x.cf, x.ruolo, x.autonomo ? 'Sì' : 'No', x.codCeiv || '', x.cassa, x.lav === null ? '' : x.lav], coda));
       });
     });
     return aoa;
@@ -154,7 +156,7 @@
           nome: spezza(x.nome + (x.autonomo ? '  (autonomo)' : ''), 8, false, LC[0]),
           cod: spezza([x.piva, x.cf && x.cf !== x.piva ? x.cf : ''].filter(Boolean).join(' / '), 7.5, false, LC[1]),
           ruolo: spezza(x.ruolo, 7.5, false, LC[2]),
-          cassa: spezza(x.cassa, 7.5, false, LC[3]),
+          cassa: spezza([x.codCeiv ? 'Cod. ' + x.codCeiv : '', x.cassa].filter(Boolean).join(' – '), 7.5, false, LC[3]),
           lav: x.lav === null ? '–' : String(x.lav),
         }));
         const hRiga = (c) => Math.max(c.nome.length, c.cod.length, c.ruolo.length, c.cassa.length) * 3.6 + 1.6;
@@ -174,7 +176,7 @@
         // intestazione della tabella
         doc.setFillColor(240, 240, 240); doc.rect(M, y, W, 5, 'F');
         doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(90, 90, 90);
-        ['Impresa o lavoratore autonomo', 'P.IVA / codice fiscale', 'Ruolo', 'Cassa Edile'].forEach((t, i) => doc.text(t, X[i], y + 3.4));
+        ['Impresa o lavoratore autonomo', 'P.IVA / codice fiscale', 'Ruolo', 'Cassa Edile e codice'].forEach((t, i) => doc.text(t, X[i], y + 3.4));
         doc.text('Lavoratori', X[4], y + 3.4, { align: 'right' });
         y += 5;
         corpo.forEach((c) => {
