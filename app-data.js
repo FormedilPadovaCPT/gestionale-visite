@@ -103,9 +103,15 @@ function impDaRigaDb(im,i){
 const CERTIF_OPT={1:'Asseverata',2:'Certificata OHSAS 18001',3:'UNI EN ISO 45001',4:'Sistema Qualità UNI EN ISO 9001',5:'Certificazione ambientale ISO 14001'}
 const CEIV_OPT=['C.E.I.V.','EDILCASSA VENETO','CASSA EDILE BELLUNO','CASSA EDILE VENEZIA','CASSA EDILE VICENZA','ALTRO']
 const IMP_LBL={1:'fino a 250.000 €',2:'250.001 – 500.000 €',3:'500.001 – 1.000.000 €',4:'1.000.001 – 1.500.000 €',5:'1.500.001 – 2.500.000 €',6:'2.500.001 – 3.500.000 €',7:'3.500.001 – 5.000.000 €',8:'5.000.001 – 10.000.000 €',9:'10.000.001 – 15.000.000 €',10:'oltre 15.000.000 €',11:'non disponibile'}
-const TIP_INT_LABELS={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',5:'Altro',6:'Ripristino',7:'Restauro',8:'Manutenzione'}
-const TIP_OPE_LABELS={1:'Industriale',2:'Civile',3:'Commerciale',4:'Agricola',5:'Stradale',6:'Idraulica',7:'Gallerie',8:'Scolastica',9:'Ospedaliera',10:'Sportiva',11:'Ricettiva',12:'Residenziale',13:'Pubbl. utilità',14:'Bonifiche',15:'Impianti',16:'Altro',17:'Infrastrutture'}
-const DURATA_LABELS={1:'Fino a 1 mese',2:'Da 1 a 3 mesi',3:'Da 3 a 12 mesi',4:'Da 12 a 24 mesi',5:'Da 24 a 36 mesi',6:'Da 36 a 48 mesi',7:'Oltre 48 mesi',8:'Non presente'}
+/* Tipo intervento, tipo opera e durata: CODIFICA NAZIONALE dell'Osservatorio FORMEDIL Italia (ex CNCPT),
+   manuale Cresme tabelle 1, 2 e 4 e scheda nazionale del rapporto di sopralluogo (rev. 04). Dal 30/09/2026:
+   prima il gestionale aveva una scala sua (durata a 8 fasce da «fino a 1 mese», opera con 4 = Agricola,
+   9 = Ospedaliera, 10 = Sportiva) e all'Osservatorio arrivavano codici con un altro significato.
+   Il database rifiuta codici fuori da queste tabelle. 5 = «Altro» intervento è una voce del modulo
+   che la tabella nazionale non ha. Test: test/codifica-nazionale.test.cjs */
+const TIP_INT_LABELS={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',5:'Altro'}
+const TIP_OPE_LABELS={1:'Industriale',2:'Civile',3:'Commerciale',4:'Ospedaliera',5:'Stradale',6:'Rurale',7:'Funeraria',8:'Scolastica',9:'Ferroviaria',10:'Marittima',11:'Fluviale',12:'Sportiva',13:'Carceraria',14:'Campi eolici',15:'Fotovoltaica',16:'Altro'}
+const DURATA_LABELS={1:'Fino a 3 mesi',2:'Da 3 a 12 mesi',3:'Da 12 a 24 mesi',4:'Da 24 a 36 mesi',5:'Da 36 a 48 mesi',6:'Oltre 48 mesi',7:'Non disponibile'}
 const TIPO_ACC_LABELS={1:'Su segnalazione',2:'Su richiesta',3:'Protocolli di intesa',4:'RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT',8:'Adesione servizio visite in serie',9:'Visita STAGE/ASL',10:'Per attività di Asseverazione',11:'Attestazione / consulenza e monitoraggio'}
 const RPT_PALETTE=['#e7500f','#565c66','#95C22F','#f2a276','#8c939d','#c6de8c','#a83a0a','#3d434c','#6f8f1f','#c9ccd1']
 // IPC: Alto rosso, Medio arancione, Basso giallo, Nessun Rilievo verde

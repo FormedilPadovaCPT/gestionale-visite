@@ -257,11 +257,11 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
         let ti=+c.cantiere_tip_int||0
         if(![1,2,3,4,6,7,8].includes(ti)){miss.push('tipo intervento');ti=8}
         let to=+c.cantiere_tip_ope||0
-        if(to<1||to>17){miss.push('tipo opera');to=16}
+        if(to<1||to>16){miss.push('tipo opera');to=16}   // codifica nazionale 1-16 (30/09/2026)
         let im=+c.cantiere_importo||0
         if(im<1||im>14){miss.push('importo');im=11}
         let du=+c.cantiere_durata||0
-        if(du<1||du>8){miss.push('durata');du=8}
+        if(du<1||du>7){miss.push('durata');du=7}   // codifica nazionale 1-7: 7 = non disponibile (30/09/2026)
         let ind=String(c.cantiere_indirizzo||'').trim();if(ind.length<2){ind=(c.comune_nome||'ND');miss.push('indirizzo')}
         let civ=String(c.cantiere_civico||'').trim()||'SN'
         if(miss.length)W.cantIncompleti.push((c.cantiere_etichetta||ind)+' ('+miss.join(', ')+')')
