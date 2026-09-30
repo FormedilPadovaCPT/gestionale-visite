@@ -2306,7 +2306,7 @@ window.onunhandledrejection = function(e) {
 };
 </script>
 
-<script src="app-data.js?v=2"></script>
+<script src="app-data.js?v=3"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -12731,7 +12731,7 @@ async function admEsportaExcel(){
     const snap=await _loadSnapForVerbale(verbale)
     const voci=await _getChkVoci()
     const wb=XLSX.utils.book_new()
-    const TACC={'1':'Su segnalazione','2':'Su richiesta','3':'Protocolli intesa','4':'RLS/RLST','5':'Programmata','6':'Cantiere qualita','7':'Dal CPT'}
+    const TACC={'1':'Su segnalazione','2':'Su richiesta','3':'Protocolli intesa','4':'RLS/RLST','5':'Programmata','6':'Cantiere qualita','7':'Dal CPT','8':'Visite in serie','9':'Stage ASL','10':'Asseverazione'}
     const ILBL={'1':'fino a 250k','2':'250k-500k','3':'500k-1M','4':'1-1,5M','5':'1,5-2,5M','6':'2,5-3,5M','7':'3,5-5M','8':'5-10M','11':'N/D'}
     const ws1Data=[['Campo','Valore'],
       ['N. Verbale',snap.nr_verbale_origine||''],
@@ -13248,7 +13248,7 @@ function _parseXlsxSnap(wb){
     snap.data_visita=m['Data visita']||null
     snap.ora_visita=m['Ora inizio']||null
     snap.ora_fine=m['Ora fine']||null
-    const ta={'Su segnalazione':'1','Su richiesta':'2','Protocolli intesa':'3','RLS/RLST':'4','Programmata':'5','Cantiere qualita':'6','Dal CPT':'7'}
+    const ta={'Su segnalazione':'1','Su richiesta':'2','Protocolli intesa':'3','RLS/RLST':'4','Programmata':'5','Cantiere qualita':'6','Dal CPT':'7','Visite in serie':'8','Stage ASL':'9','Asseverazione':'10'}
     snap.tipo_accesso=ta[m['Tipo accesso']]||null
     snap.rlst_sn=m['RLST presente']==='Si'?'1':'0'
     snap.stage_vis=m['Stagista presente']==='Si'?'1':'0'
@@ -14136,7 +14136,7 @@ document.addEventListener('input',function(ev){
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
-<script src="verbale-pdf.js?v=2"></script>
+<script src="verbale-pdf.js?v=3"></script>
 <!-- mappa sul telefono: cantieri vicino a te (Nuova visita) e rientri sulla mappa (Scadenze) -->
 <script src="mappa.js?v=2"></script>
 </body>
