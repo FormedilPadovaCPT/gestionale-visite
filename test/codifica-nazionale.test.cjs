@@ -37,4 +37,9 @@ const oss = fs.readFileSync(path.join(__dirname, '..', 'osservatorio.js'), 'utf8
 assert.ok(/to<1\|\|to>16/.test(oss), 'esportazione: tipo opera 1-16');
 assert.ok(/du<1\|\|du>7/.test(oss), 'esportazione: durata 1-7');
 
+/* tipo di visita: la conversione verso la tabella nazionale 1-7 è la stessa del campo visite.tipo_accesso_naz */
+const mappa = Function('return ' + oss.match(/const TIPO_MAP=(\{[^}]*\})/)[1])();
+assert.deepStrictEqual(mappa, { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 2, 9: 3, 10: 2, 11: 2, 12: 3 }, 'conversione del tipo di visita');
+assert.ok(/tipo_accesso_naz/.test(oss), "l'esportazione legge il campo nazionale");
+
 console.log('codifica-nazionale: ok');

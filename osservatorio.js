@@ -146,7 +146,7 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
       const visite=[]
       for(let vfrom=0;;vfrom+=1000){
         const{data:vs,error:ev}=await sb.from('visite')
-          .select('visita_id,nr_verbale,cantiere_id,impresa_id,tecnico_id,tecnico2_id,tipo_accesso,data_visita,ora_visita,ora_fine,nr_imp,nr_lavoratori,nr_ind,resp_lav,csp,cse,coord,note_lav,comm_email,rl_nome,rl_cog,csp_nome,csp_cog,cse_nome,cse_cog')
+          .select('visita_id,nr_verbale,cantiere_id,impresa_id,tecnico_id,tecnico2_id,tipo_accesso,tipo_accesso_naz,data_visita,ora_visita,ora_fine,nr_imp,nr_lavoratori,nr_ind,resp_lav,csp,cse,coord,note_lav,comm_email,rl_nome,rl_cog,csp_nome,csp_cog,cse_nome,cse_cog')
           .eq('elimina',0).eq('stato','definitivo').gte('data_visita',dal).lte('data_visita',al)
           .order('data_visita').order('visita_id').range(vfrom,vfrom+999)
         if(ev)throw new Error(ev.message)
@@ -201,7 +201,10 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
         }
       })
       // ── XML VISITE ──
-      const TIPO_MAP={1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:5,9:5,10:7,11:5}  // 11 (30/09/2026): attestazione/consulenza, come prima della correzione
+      // Il tipo di visita per l'Osservatorio lo calcola il database (visite.tipo_accesso_naz, 30/09/2026, deciso
+      // dall'utente): serie, asseverazione e attestazione/consulenza → 2 «Su richiesta»; stage e progetti SPISAL →
+      // 3 «Per protocolli di intesa». Questa tabella è la stessa conversione, di riserva se il campo mancasse.
+      const TIPO_MAP={1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:2,9:3,10:2,11:2,12:3}
       const RUOLO_MAP={'affidataria':1,'affidataria ed esecutrice':2,'esecutrice':3,'subappaltatrice':3,'lavoratore autonomo':3}
       let xv='<?xml version="1.0" encoding="utf-8"?>\n<visite>\n'
       let nVis=0,nVal=0
@@ -211,7 +214,7 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
         if(!v.impresa_id){W.senzaImpresa.push(v.nr_verbale||v.visita_id);return}
         const ta=+v.tipo_accesso||0
         if(ta>7)W.tipoExtra++
-        const tipo=TIPO_MAP[ta]||5
+        const tipo=+v.tipo_accesso_naz||TIPO_MAP[ta]||5
         let ruolo=RUOLO_MAP[String(ruoloMap[v.visita_id]||'').toLowerCase()]
         if(!ruolo){ruolo=2;W.ruoloDefault++}
         xv+='<visita>'

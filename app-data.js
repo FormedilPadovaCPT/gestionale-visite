@@ -112,7 +112,7 @@ const IMP_LBL={1:'fino a 250.000 €',2:'250.001 – 500.000 €',3:'500.001 –
 const TIP_INT_LABELS={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',5:'Altro'}
 const TIP_OPE_LABELS={1:'Industriale',2:'Civile',3:'Commerciale',4:'Ospedaliera',5:'Stradale',6:'Rurale',7:'Funeraria',8:'Scolastica',9:'Ferroviaria',10:'Marittima',11:'Fluviale',12:'Sportiva',13:'Carceraria',14:'Campi eolici',15:'Fotovoltaica',16:'Altro'}
 const DURATA_LABELS={1:'Fino a 3 mesi',2:'Da 3 a 12 mesi',3:'Da 12 a 24 mesi',4:'Da 24 a 36 mesi',5:'Da 36 a 48 mesi',6:'Oltre 48 mesi',7:'Non disponibile'}
-const TIPO_ACC_LABELS={1:'Su segnalazione',2:'Su richiesta',3:'Protocolli di intesa',4:'RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT',8:'Adesione servizio visite in serie',9:'Visita STAGE/ASL',10:'Per attività di Asseverazione',11:'Attestazione / consulenza e monitoraggio'}
+const TIPO_ACC_LABELS={1:'Su segnalazione',2:'Su richiesta',3:'Protocolli di intesa',4:'RLS/RLST',5:'Programmata',6:'Cantiere qualità',7:'Indicata dal CPT',8:'Adesione servizio visite in serie',9:'Visita STAGE/ASL',10:'Per attività di Asseverazione',11:'Attestazione / consulenza e monitoraggio',12:'Progetto SPISAL'}
 const RPT_PALETTE=['#e7500f','#565c66','#95C22F','#f2a276','#8c939d','#c6de8c','#a83a0a','#3d434c','#6f8f1f','#c9ccd1']
 // IPC: Alto rosso, Medio arancione, Basso giallo, Nessun Rilievo verde
 const _DASH_C={alto:'#E02B20',medio:'#ED7D31',basso:'#FFC000',nr:'#95C22F',orange:'#e7500f',grey:'#565c66',green:'#95C22F'}

@@ -629,6 +629,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
                 <option value="9">Visita STAGE/ASL</option>
                 <option value="10">Per attività di Asseverazione</option>
                 <option value="11">Attestazione / consulenza e monitoraggio</option>
+                <option value="12">Progetto SPISAL</option>
               </select>
             </div>
             <div class="field" style="flex:0 0 150px">
@@ -2307,7 +2308,7 @@ window.onunhandledrejection = function(e) {
 };
 </script>
 
-<script src="app-data.js?v=6"></script>
+<script src="app-data.js?v=7"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -10124,7 +10125,8 @@ function oxCatOf(v,c,ruolo){
   const to=parseInt(c.cantiere_tip_ope,10)||0
   const tipope=(to===2)?1:([1,3,6,14,15].includes(to)?2:([5,9,10,11].includes(to)?3:(to===4?4:(to===8?5:(to>0?6:0)))))
   const ct=parseInt((v.comm_tipo!=null?v.comm_tipo:(c.committenti&&c.committenti.committente_tipo)),10)||0
-  const ta=parseInt(v.tipo_accesso,10)||0
+  // il report dell'Osservatorio usa il tipo di visita nazionale, come l'esportazione (30/09/2026)
+  const ta=parseInt(v.tipo_accesso_naz!=null?v.tipo_accesso_naz:v.tipo_accesso,10)||0
   return{
     importo:osImportoClass(c.cantiere_importo),
     tipint:[1,2,3,4,6,7,8].includes(ti)?ti:0,
@@ -10422,7 +10424,7 @@ async function admGeneraReportOsservatorio(){
     const visite=[]
     for(let from=0;;from+=1000){
       const{data:b,error:e1}=await sb.from('visite').select([
-        'visita_id','data_visita','cantiere_id','impresa_id','comm_tipo','tipo_accesso',
+        'visita_id','data_visita','cantiere_id','impresa_id','comm_tipo','tipo_accesso','tipo_accesso_naz',
         'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_importo,cantiere_committente_id,committenti(committente_tipo))'
       ].join(',')).gte('data_visita',dal).lte('data_visita',al).eq('elimina',0)
         .order('visita_id').range(from,from+999)
@@ -12741,7 +12743,7 @@ async function admEsportaExcel(){
     const snap=await _loadSnapForVerbale(verbale)
     const voci=await _getChkVoci()
     const wb=XLSX.utils.book_new()
-    const TACC={'1':'Su segnalazione','2':'Su richiesta','3':'Protocolli intesa','4':'RLS/RLST','5':'Programmata','6':'Cantiere qualita','7':'Dal CPT','8':'Visite in serie','9':'Stage ASL','10':'Asseverazione','11':'Attestazione consulenza'}
+    const TACC={'1':'Su segnalazione','2':'Su richiesta','3':'Protocolli intesa','4':'RLS/RLST','5':'Programmata','6':'Cantiere qualita','7':'Dal CPT','8':'Visite in serie','9':'Stage ASL','10':'Asseverazione','11':'Attestazione consulenza','12':'Progetto SPISAL'}
     const ILBL={'1':'fino a 250k','2':'250k-500k','3':'500k-1M','4':'1-1,5M','5':'1,5-2,5M','6':'2,5-3,5M','7':'3,5-5M','8':'5-10M','11':'N/D'}
     const ws1Data=[['Campo','Valore'],
       ['N. Verbale',snap.nr_verbale_origine||''],
@@ -13258,7 +13260,7 @@ function _parseXlsxSnap(wb){
     snap.data_visita=m['Data visita']||null
     snap.ora_visita=m['Ora inizio']||null
     snap.ora_fine=m['Ora fine']||null
-    const ta={'Su segnalazione':'1','Su richiesta':'2','Protocolli intesa':'3','RLS/RLST':'4','Programmata':'5','Cantiere qualita':'6','Dal CPT':'7','Visite in serie':'8','Stage ASL':'9','Asseverazione':'10','Attestazione consulenza':'11'}
+    const ta={'Su segnalazione':'1','Su richiesta':'2','Protocolli intesa':'3','RLS/RLST':'4','Programmata':'5','Cantiere qualita':'6','Dal CPT':'7','Visite in serie':'8','Stage ASL':'9','Asseverazione':'10','Attestazione consulenza':'11','Progetto SPISAL':'12'}
     snap.tipo_accesso=ta[m['Tipo accesso']]||null
     snap.rlst_sn=m['RLST presente']==='Si'?'1':'0'
     snap.stage_vis=m['Stagista presente']==='Si'?'1':'0'
@@ -14146,7 +14148,7 @@ document.addEventListener('input',function(ev){
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
-<script src="verbale-pdf.js?v=7"></script>
+<script src="verbale-pdf.js?v=8"></script>
 <!-- mappa sul telefono: cantieri vicino a te (Nuova visita) e rientri sulla mappa (Scadenze) -->
 <script src="mappa.js?v=2"></script>
 </body>

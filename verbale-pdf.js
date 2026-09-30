@@ -27,7 +27,7 @@
   const ZONE = typeof ZONE_LBL !== 'undefined' ? ZONE_LBL : { 1: 'Impianti di cantiere', 2: 'Protezione luoghi di lavoro', 3: 'Apparecchi di sollevamento', 4: 'Attrezzature, scale, utensili', 5: 'Macchine di cantiere', 6: 'Opere provvisionali', 7: 'DPI', 8: 'Documentazione', 9: 'Soggetti', 10: 'Formazione' }
   const RUOLI_IMP = typeof TIPO_IMP_OPT !== 'undefined' ? TIPO_IMP_OPT : { 1: 'Affidataria', 2: 'Affidataria ed esecutrice', 3: 'Esecutrice', 4: 'Subappaltatrice', 5: 'Lavoratore autonomo / ditta individuale', 6: 'Fornitrice' }
   // 8, 9 e 10 aggiunti il 30/09/2026: mancavano, e il verbale di una visita in serie stampava «–»
-  const TIPO_ACC = { 1: 'Su segnalazione', 2: 'Su richiesta', 3: 'Per protocolli di intesa', 4: 'Indicata da RLS/RLST', 5: 'Programmata', 6: 'Cantiere qualità', 7: 'Indicata dal CPT', 8: 'Adesione servizio visite in serie', 9: 'Visita stage / ASL', 10: 'Per attività di asseverazione', 11: 'Attestazione / consulenza e monitoraggio' }
+  const TIPO_ACC = { 1: 'Su segnalazione', 2: 'Su richiesta', 3: 'Per protocolli di intesa', 4: 'Indicata da RLS/RLST', 5: 'Programmata', 6: 'Cantiere qualità', 7: 'Indicata dal CPT', 8: 'Adesione servizio visite in serie', 9: 'Visita stage / ASL', 10: 'Per attività di asseverazione', 11: 'Attestazione / consulenza e monitoraggio', 12: 'Progetto SPISAL' }
   // Il verbale va all'impresa, e all'impresa non si dice che c'è stata una segnalazione (30/09/2026):
   // la visita «su segnalazione» sul foglio esce «Indicata dal CPT». Il tipo vero resta nel database,
   // negli elenchi, nelle statistiche e nel riepilogo per la fattura: è un dato dell'ufficio.
