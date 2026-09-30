@@ -119,10 +119,12 @@ const OS_MESI=['ott','nov','dic','gen','feb','mar','apr','mag','giu','lug','ago'
 const OS_MESI_FULL=['ottobre','novembre','dicembre','gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre']
 const OXBRAND=[231,80,15]
 const _MESI_IT=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre']
-const _TIP_INT={1:'Costruzione',2:'Ristrutturazione',3:'Demolizione',4:'Ampliamento',5:'Altro',6:'Ripristino',7:'Restauro',8:'Manutenzione'}
-const _TIP_OPE={1:'Industriale',2:'Civile',3:'Commerciale',4:'Agricola',5:'Stradale',8:'Scolastica',16:'Altro'}
-const _DURATA={1:'< 30 gg',2:'30–90 gg',3:'3–6 mesi',4:'6–12 mesi',5:'> 12 mesi'}
-const _IMPORTO={1:'≤ 250k',2:'250k–500k',3:'500k–1M',4:'1–1,5M',5:'1,5–2,5M',6:'2,5–3,5M',7:'3,5–5M',8:'5–10M',11:'N/D'}
+/* 30/09/2026: una tabella sola per codice. Le copie che stavano qui avevano la durata a cinque fasce di
+   Access (4 = «6–12 mesi» invece di «da 12 a 24 mesi») e il tipo opera fermo a sette voci. */
+const _TIP_INT=TIP_INT_LABELS
+const _TIP_OPE=TIP_OPE_LABELS
+const _DURATA=DURATA_LABELS
+const _IMPORTO={1:'≤ 250k',2:'250k–500k',3:'500k–1M',4:'1–1,5M',5:'1,5–2,5M',6:'2,5–3,5M',7:'3,5–5M',8:'5–10M',9:'10–15M',10:'> 15M',11:'N/D'}
 /* Una tabella sola (30/09/2026): la copia che stava qui si fermava al 7, e la scheda di una visita
    in serie (8), stage (9) o di asseverazione (10) mostrava il tipo di accesso vuoto — 642 visite. */
 const _TIPO_ACC=TIPO_ACC_LABELS
@@ -224,7 +226,7 @@ const CEIV_COLOR_MAP={
   'CASSA EDILE VENEZIA':'#2ecc71',
   'CASSA EDILE VICENZA':'#9b59b6',
   'ALTRO'             :'#f39c12',
-  'Non iscritto'      :'#565c66'
+  'Cassa edile non indicata':'#565c66'
 }
 
 const OXC={

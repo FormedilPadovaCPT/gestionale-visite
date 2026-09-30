@@ -2306,7 +2306,7 @@ window.onunhandledrejection = function(e) {
 };
 </script>
 
-<script src="app-data.js?v=3"></script>
+<script src="app-data.js?v=4"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -9516,12 +9516,15 @@ function rptStacked({rows,segColors,segLabels,title,w=600,h}){
   return canvas.toDataURL()
 }
 // Monthly vertical bar chart → dataURL
-function rptMonthly({data,year,w=580,h=155}){
+/* 30/09/2026: i mesi sono quelli del periodo scelto e nel suo ordine (l'esercizio va da ottobre a
+   settembre). Prima erano sempre Gen-Dic col titolo «Andamento mensile 2025», e ottobre 2025 stava
+   in fondo accanto a settembre 2026. */
+function rptMonthly({data,labels,titolo,w=580,h=155}){
   const{canvas,ctx}=_mkCanvas(w,h)
-  const months=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
+  const months=labels
   const maxV=Math.max(...data,1)
   const padL=30,padR=10,padB=24
-  const padT=_rptTitle(ctx,'Andamento mensile '+year,w)
+  const padT=_rptTitle(ctx,titolo,w)
   const plotH=h-padT-padB
   // griglia orizzontale su passi "puliti"
   const step=maxV>40?Math.ceil(maxV/4/10)*10:(maxV>8?Math.ceil(maxV/4/2)*2:2)
@@ -9534,7 +9537,7 @@ function rptMonthly({data,year,w=580,h=155}){
   }
   ctx.strokeStyle=RPT_AXIS
   ctx.beginPath();ctx.moveTo(padL,h-padB);ctx.lineTo(w-padR,h-padB);ctx.stroke()
-  const bw=(w-padL-padR)/12
+  const bw=(w-padL-padR)/Math.max(data.length,1)
   data.forEach((v,i)=>{
     const x=padL+i*bw+bw*0.18
     const barW=bw*0.64
@@ -9647,7 +9650,8 @@ async function admGeneraReport(){
       ;(vipBatch||[]).forEach(r=>{
         if(!r.impresa_id||ceivImpSet.has(r.impresa_id))return
         ceivImpSet.add(r.impresa_id)
-        const ce=(r.imprese?.cassa_edile||'').trim()||'Non iscritto'
+        /* un campo vuoto dice che il dato manca, non che l'impresa non è iscritta (30/09/2026) */
+        const ce=(r.imprese?.cassa_edile||'').trim()||'Cassa edile non indicata'
         ceivMap[ce]=(ceivMap[ce]||0)+1
       })
     }
@@ -9671,9 +9675,13 @@ async function admGeneraReport(){
     const tecList=Object.values(tecMap).sort((a,b)=>b.cnt-a.cnt).slice(0,8)
 
     // Mensile
-    const reportYear=dal.substring(0,4)
-    const monthly=Array(12).fill(0)
-    visite.forEach(v=>{if(v.data_visita){const m=parseInt(v.data_visita.split('-')[1])-1;if(m>=0&&m<12)monthly[m]++}})
+    // Mensile: per data della VISITA, mese per mese dal primo all'ultimo del periodo (al massimo 24)
+    const _MESE3=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
+    const mesiPeriodo=[]
+    {let yy=+dal.substring(0,4),mm=+dal.substring(5,7);const yf=+al.substring(0,4),mf=+al.substring(5,7)
+     while((yy<yf||(yy===yf&&mm<=mf))&&mesiPeriodo.length<24){mesiPeriodo.push({k:yy+'-'+String(mm).padStart(2,'0'),l:_MESE3[mm-1]+' '+String(yy).slice(2)});mm++;if(mm>12){mm=1;yy++}}}
+    const monthly=mesiPeriodo.map(({k})=>visite.filter(v=>(v.data_visita||'').startsWith(k)).length)
+    const titoloMensile='Andamento mensile '+(mesiPeriodo.length?mesiPeriodo[0].l+' – '+mesiPeriodo[mesiPeriodo.length-1].l:'')
 
     // Tipo accesso
     const accMap={}
@@ -9701,7 +9709,9 @@ async function admGeneraReport(){
       const im=v.cantieri?.cantiere_importo
       const kImp=im||11
       importoMap[kImp]=(importoMap[kImp]||0)+1
-      const ct=v.cantieri?.committenti?.committente_tipo||v.comm_tipo
+      /* 30/09/2026: prima quello scritto nella visita, poi quello del cantiere — l'anagrafica del
+         committente legato al cantiere dava 35 pubblici per privati e 10 al contrario */
+      const ct=v.comm_tipo||v.cantieri?.committenti?.committente_tipo
       commMap[ct===1?'Pubblico':(ct===2?'Privato':'Non indicato')]++
       const ta=+(v.tipo_accesso||0)
       tipVisMap[[1,3,4,7].includes(ta)?'Segnalazione o indicata da enti':([2,5,6].includes(ta)?'Concordata con l\u2019impresa':'Altro / non indicato')]++
@@ -9713,7 +9723,10 @@ async function admGeneraReport(){
 
     // Comuni (top 12)
     const comMap={}
-    visite.forEach(v=>{const c=v.cantieri?.comune_nome;if(c)comMap[c]=(comMap[c]||0)+1})
+    /* 30/09/2026: «PADOVA» e «Padova» contavano come due comuni (251 + 17), e i quartieri di
+       Padova («PADOVA - Q1 (Centro storico)») come comuni a sé */
+    const _comuneRpt=c=>String(c||'').trim().toUpperCase().replace(/\s*-\s*Q\d.*$/,'')
+    visite.forEach(v=>{const c=_comuneRpt(v.cantieri?.comune_nome);if(c)comMap[c]=(comMap[c]||0)+1})
     const comTop=Object.entries(comMap).sort((a,b)=>b[1]-a[1]).slice(0,12)
 
     // Qualifica persona presente
@@ -9784,7 +9797,7 @@ async function admGeneraReport(){
     y+=kh+4
 
     // Andamento mensile (tutta larghezza)
-    const monthImg=rptMonthly({data:monthly,year:reportYear,w:640,h:170})
+    const monthImg=rptMonthly({data:monthly,labels:mesiPeriodo.map(x=>x.l),titolo:titoloMensile,w:640,h:170})
     chartCard(monthImg,M,y,CW,52);y+=56
 
     // IPC donut + Tipo accesso donut  (mezza + mezza)
@@ -9872,8 +9885,8 @@ async function admGeneraReport(){
     // Iscrizione Cassa Edile / CEIV (tutta larghezza, legenda a due colonne)
     if(Object.keys(ceivMap).length){
       const ceivEntries=Object.entries(ceivMap).sort((a,b)=>{
-        if(a[0]==='Non iscritto')return 1
-        if(b[0]==='Non iscritto')return -1
+        if(a[0]==='Cassa edile non indicata')return 1
+        if(b[0]==='Cassa edile non indicata')return -1
         return b[1]-a[1]
       })
       const ceivImg=rptDonut({
@@ -14136,7 +14149,7 @@ document.addEventListener('input',function(ev){
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
-<script src="verbale-pdf.js?v=4"></script>
+<script src="verbale-pdf.js?v=5"></script>
 <!-- mappa sul telefono: cantieri vicino a te (Nuova visita) e rientri sulla mappa (Scadenze) -->
 <script src="mappa.js?v=2"></script>
 </body>
