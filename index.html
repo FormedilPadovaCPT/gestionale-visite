@@ -79,6 +79,12 @@ label{display:block;font-weight:600;margin-bottom:4px;color:var(--grey);font-siz
 .badge-oss{background:#fff8cc;color:#8a6d00}
 .badge-bozza{background:#eef;color:#555}
 .badge-definitivo{background:#e8f8ee;color:var(--ok)}
+/* stato dell'invio del verbale nell'elenco Visite (30/09/2026) */
+.inv-ok{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#e8f8ee;color:var(--ok);border:1px solid #9fd8b4;font-size:12px;font-weight:700;vertical-align:middle;cursor:default}
+.inv-data{font-size:11px;color:#666;margin-left:5px;white-space:nowrap}
+.inv-da{display:inline-flex;align-items:center;gap:4px;background:#fdecea;color:#c0392b;border:1px solid #f1b0a8;border-radius:12px;padding:2px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;line-height:1.5}
+.inv-da:hover{background:#f9d7d2}
+.inv-da.on{background:#c0392b;color:#fff;border-color:#c0392b}
 .sect-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--grey);background:var(--light);padding:5px 10px;border-radius:var(--radius);margin-bottom:10px;margin-top:4px}
 /* LOADING */
 #screen-loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--orange);z-index:9999}
@@ -989,10 +995,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <select id="q-ipc"><option value="">Tutti IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun Rilievo</option></select>
           <select id="q-stato"><option value="">Tutti stati</option><option value="bozza">Bozza</option><option value="definitivo">Definitivo</option></select>
           <select id="q-tec"><option value="">Tutti i tecnici</option></select><select id="q-eserc" title="Esercizio (anno edile ott–set)"></select>
-          <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button><label id="q-elim-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer"><input type="checkbox" id="q-elim"> Mostra eliminate</label>
+          <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button><label id="q-elim-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer"><input type="checkbox" id="q-elim"> Mostra eliminate</label><button type="button" id="q-dainviare" class="inv-da" style="display:none"></button>
         </div>
         <div class="tbl-wrap">
-          <table><thead><tr><th id="th-nr" style="cursor:pointer;user-select:none" title="Ordina per numero verbale">Verbale <span class="sort-ind" id="si-nr"></span></th><th id="th-data" style="cursor:pointer;user-select:none" title="Ordina per data visita">Data <span class="sort-ind" id="si-data"></span></th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th style="font-size:11px;white-space:nowrap">NC+ / NC&minus; / OSS / VER</th><th>Stato</th><th></th></tr></thead>
+          <table><thead><tr><th id="th-nr" style="cursor:pointer;user-select:none" title="Ordina per numero verbale">Verbale <span class="sort-ind" id="si-nr"></span></th><th id="th-data" style="cursor:pointer;user-select:none" title="Ordina per data visita">Data <span class="sort-ind" id="si-data"></span></th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th style="font-size:11px;white-space:nowrap">NC+ / NC&minus; / OSS / VER</th><th>Stato</th><th title="Il verbale è stato mandato all'impresa?">Invio</th><th></th></tr></thead>
           <tbody id="tbody-lista"></tbody></table>
         </div>
         <div id="lista-empty" class="hidden" style="text-align:center;padding:24px;color:#aaa">Nessuna visita trovata</div>
@@ -6258,7 +6264,7 @@ async function loadLista(){
     for(let y=_cur;y>=2023;y--)_oh+='<option value="'+y+'">'+y+'-'+(y+1)+'</option>'
     _qy.innerHTML=_oh;_qy.value=String(_cur);_qy.onchange=loadLista
   }
-  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,ipc,stato,elimina,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
+  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,created_at,ipc,stato,elimina,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
   if(!_showElim)qb=qb.eq('elimina',0)
   if(fi)qb=qb.eq('ipc',fi)
   if(fs)qb=qb.eq('stato',fs)
@@ -6283,8 +6289,13 @@ async function loadLista(){
   })
   _listaSortInd()
   if(q){const ql=q.toLowerCase();vs=vs.filter(v=>v.nr_verbale?.toLowerCase().includes(ql)||v.cantieri?.cantiere_indirizzo?.toLowerCase().includes(ql)||v.cantieri?.cantiere_etichetta?.toLowerCase().includes(ql)||v.imprese?.impresa_nome?.toLowerCase().includes(ql))}
+  /* lettura fallita ≠ «nessun invio»: senza saperlo la colonna dice «?» e il filtro non conta */
+  _invLetti=true
   try{await _caricaInvii(vs.map(v=>v.visita_id))}
-  catch(e){console.warn('stato invii:',e);_invMap={};toast('Non sono riuscito a leggere quali verbali sono stati inviati','warn')}
+  catch(e){console.warn('stato invii:',e);_invMap={};_invLetti=false;toast('Non sono riuscito a leggere quali verbali sono stati inviati','warn')}
+  const _nDaInv=vs.filter(_daInviare).length
+  if(_soloDaInviare&&_invLetti)vs=vs.filter(_daInviare)
+  _invChip(_nDaInv)
   const tbody=$('tbody-lista')
   if(!vs.length){tbody.innerHTML='';show('lista-empty')}
   else{hide('lista-empty');tbody.innerHTML=vs.map(v=>vtRow(v)).join('');bindRowActions()}
@@ -6362,7 +6373,8 @@ function vtRow(v){
     <td>${cant}</td><td>${v.imprese?.impresa_nome||'-'}</td>
     <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
     ${_lcCell(v)}
-    <td><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span>${_invCell(v)}</td>
+    <td><span class="badge badge-${v.stato||'bozza'}">${v.stato||'bozza'}</span></td>
+    <td style="white-space:nowrap">${_invCell(v)}</td>
     <td><div class="tbl-actions">${actions}</div></td>
   </tr>`
 }
@@ -7652,8 +7664,8 @@ function _evAggiungi(){
   i.value='';_evRenderList();i.focus()
 }
 window._evTogli=function(idx){const l=window._evEmails||[];if(l[idx]&&l[idx].extra){l.splice(idx,1);_evRenderList()}}
-/* stato dell'invio nell'elenco Visite (23/09/2026) */
-let _invMap={}
+/* stato dell'invio nell'elenco Visite (23/09/2026); colonna «Invio» e filtro «Da inviare» dal 30/09/2026 */
+let _invMap={},_invLetti=true,_soloDaInviare=false
 async function _caricaInvii(ids){
   const m={}
   for(let i=0;i<ids.length;i+=200){
@@ -7664,12 +7676,36 @@ async function _caricaInvii(ids){
   _invMap=m
 }
 const _FINE_MODULO_GOOGLE='2026-09-30'   // fino a qui i verbali partivano col modulo Google
-function _invCell(v){
+const _APP_DAL=new Date('2026-10-01T00:00:00+02:00')   // da qui i verbali nascono e partono dal gestionale
+/* «già inviato con la vecchia applicazione»: tutto ciò che era già caricato al passaggio (deciso dall'utente
+   il 30/09/2026) e ciò che arriva dopo dal modulo Google (visita_id V2526-…): conta quando la visita è stata
+   caricata, non la data del sopralluogo — una visita del 30/09 scritta nell'app il 2/10 è da inviare. */
+function _invVecchiaApp(v){
+  if(/^V\d{4}-/.test(String(v.visita_id||'')))return true
+  if(v.created_at)return new Date(v.created_at)<_APP_DAL
+  return String(v.data_visita||'')<=_FINE_MODULO_GOOGLE
+}
+function _invStato(v){   // '' bozza o eliminata · 'app' · 'vecchia' · 'da' · '?' lettura non riuscita
   if(+v.elimina===1||(v.stato||'bozza')==='bozza')return ''
-  const at=_invMap[v.visita_id]
-  if(at){const d=new Date(at);return `<div style="font-size:10px;color:#2e7d32;margin-top:3px;white-space:nowrap" title="Inviato dal gestionale il ${d.toLocaleString('it-IT')}">📧 inviato il ${d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'})}</div>`}
-  if(String(v.data_visita||'')<=_FINE_MODULO_GOOGLE)return `<div style="font-size:10px;color:#2e7d32;margin-top:3px;white-space:nowrap" title="Visita fino al 30/09/2026: il verbale è partito col modulo Google">📧 inviato</div>`
-  return `<div style="font-size:10px;color:#c0392b;margin-top:3px;white-space:nowrap;font-weight:600" title="Verbale definitivo non ancora inviato all'impresa: usa il pulsante 📧">✉️ da inviare</div>`
+  if(_invMap[v.visita_id])return 'app'
+  if(_invVecchiaApp(v))return 'vecchia'
+  return _invLetti?'da':'?'
+}
+const _daInviare=v=>_invStato(v)==='da'
+function _invCell(v){
+  const st=_invStato(v)
+  if(st==='')return '<span style="color:#bbb" title="Bozza: non c\'è ancora niente da inviare">\u2013</span>'
+  if(st==='app'){const d=new Date(_invMap[v.visita_id]);return `<span class="inv-ok" title="Inviato dal gestionale il ${d.toLocaleString('it-IT')}">\u2713</span><span class="inv-data">${d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'})}</span>`}
+  if(st==='vecchia')return '<span class="inv-ok" title="Verbale caricato prima del 1/10/2026: è partito con il modulo Google">\u2713</span>'
+  if(st==='?')return '<span style="color:#999;font-weight:700" title="Non sono riuscito a leggere se questo verbale è stato inviato: ricarica l\'elenco">?</span>'
+  return `<button type="button" class="inv-da" data-act="email" data-id="${v.visita_id}" title="Verbale definitivo non ancora inviato all'impresa: premi per preparare l'invio">✉️ Da inviare</button>`
+}
+function _invChip(n){
+  const b=$('q-dainviare');if(!b)return
+  if(!b.dataset.b){b.dataset.b='1';b.onclick=()=>{_soloDaInviare=!_soloDaInviare;loadLista()}}
+  b.style.display=(n>0||_soloDaInviare)?'inline-flex':'none'
+  b.classList.toggle('on',_soloDaInviare)
+  b.textContent=_soloDaInviare?`✉️ Solo da inviare: ${n} \u2715`:`✉️ Da inviare: ${n}`
 }
 async function _evArricchisciAlt(emails){
   try{
@@ -14058,7 +14094,7 @@ document.addEventListener('input',function(ev){
 <script src="scheda-impresa.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=4"></script>
-<script src="aiuto.js?v=9"></script>
+<script src="aiuto.js?v=10"></script>
 <script src="mail-respinte-tec.js?v=1"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>

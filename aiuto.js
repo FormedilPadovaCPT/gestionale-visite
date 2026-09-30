@@ -95,6 +95,9 @@ window.AIUTO_TESTI = {
 
   /* ── visite e cantieri ── */
   'btn-cerca': 'Cerca fra i tuoi verbali per impresa, cantiere, comune o numero.',
+  /* ── stato dell'invio nell'elenco Visite (30/09/2026) ── */
+  'q-dainviare': 'Lascia nell\'elenco solo i verbali definitivi che non risultano ancora mandati all\'impresa. Premilo di nuovo per rivedere tutte le visite.',
+  't:da inviare': 'Questo verbale è definitivo ma non è ancora partito. Apre la finestra di invio con i destinatari: la mail parte solo quando premi «Invia», e qui compare la spunta verde con la data.',
   'btn-nuovo-cant-lista': 'Crea un cantiere nuovo senza aprire un verbale.',
   'btn-cerca-cant': 'Cerca un cantiere per indirizzo, comune, impresa o codice.',
   'btn-tutti-cant': 'Toglie i filtri e mostra l\'elenco completo.',
