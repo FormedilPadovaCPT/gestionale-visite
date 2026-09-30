@@ -20,8 +20,9 @@ assert.strictEqual(tipoSulVerbale(2), 'Su richiesta');
 assert.strictEqual(tipoSulVerbale(5), 'Programmata');
 assert.strictEqual(tipoSulVerbale(8), 'Adesione servizio visite in serie');
 assert.strictEqual(tipoSulVerbale(null), '–');
+assert.strictEqual(tipoSulVerbale(11), 'Attestazione / consulenza e monitoraggio');
 
 /* in nessun caso la parola «segnalazione» finisce sul foglio */
-for (let t = 1; t <= 10; t++) assert.ok(!/segnalazion/i.test(tipoSulVerbale(t)), `tipo ${t}`);
+for (let t = 1; t <= 11; t++) assert.ok(!/segnalazion/i.test(tipoSulVerbale(t)), `tipo ${t}`);
 
 console.log('verbale-tipo-accesso: ok');

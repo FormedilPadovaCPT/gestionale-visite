@@ -201,7 +201,7 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
         }
       })
       // ── XML VISITE ──
-      const TIPO_MAP={1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:5,9:5,10:7}
+      const TIPO_MAP={1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:5,9:5,10:7,11:5}  // 11 (30/09/2026): attestazione/consulenza, come prima della correzione
       const RUOLO_MAP={'affidataria':1,'affidataria ed esecutrice':2,'esecutrice':3,'subappaltatrice':3,'lavoratore autonomo':3}
       let xv='<?xml version="1.0" encoding="utf-8"?>\n<visite>\n'
       let nVis=0,nVal=0

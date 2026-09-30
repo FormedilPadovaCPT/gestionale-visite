@@ -34,4 +34,13 @@ for (const [k, v] of Object.entries(TIP_INT)) assert.ok(uguali(campo({ cantiere_
 /* il caso che ha fatto scoprire il difetto */
 assert.strictEqual(campo({ cantiere_durata: 4 }, 'Durata cantiere'), 'da 12 a 24 mesi');
 
+/* conta quello che risultava nella visita (30/09/2026); il cantiere solo se la visita non lo dice */
+const campoVisita = (v, cant, etichetta) => {
+  const d = VerbalePDF.prepara({ v: Object.assign({ visita_id: 'x', cantieri: cant }, v), imps: [], chk: [], lavs: [], voci: [], tec2: null, rettBanner: null });
+  for (const riga of d.cantiere) for (let i = 0; i < riga.length; i += 2) if (riga[i] === etichetta) return riga[i + 1];
+};
+assert.strictEqual(campoVisita({ vis_durata: 5 }, { cantiere_durata: 3 }, 'Durata cantiere'), 'da 24 a 36 mesi');
+assert.strictEqual(campoVisita({ vis_durata: null }, { cantiere_durata: 3 }, 'Durata cantiere'), 'da 3 a 12 mesi');
+assert.strictEqual(campoVisita({ vis_tip_int: 2 }, { cantiere_tip_int: 1 }, 'Tipo intervento'), 'Ristrutturazione');
+
 console.log('verbale-codici-cantiere: ok');

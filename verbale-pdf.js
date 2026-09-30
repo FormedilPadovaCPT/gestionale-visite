@@ -27,7 +27,7 @@
   const ZONE = typeof ZONE_LBL !== 'undefined' ? ZONE_LBL : { 1: 'Impianti di cantiere', 2: 'Protezione luoghi di lavoro', 3: 'Apparecchi di sollevamento', 4: 'Attrezzature, scale, utensili', 5: 'Macchine di cantiere', 6: 'Opere provvisionali', 7: 'DPI', 8: 'Documentazione', 9: 'Soggetti', 10: 'Formazione' }
   const RUOLI_IMP = typeof TIPO_IMP_OPT !== 'undefined' ? TIPO_IMP_OPT : { 1: 'Affidataria', 2: 'Affidataria ed esecutrice', 3: 'Esecutrice', 4: 'Subappaltatrice', 5: 'Lavoratore autonomo / ditta individuale', 6: 'Fornitrice' }
   // 8, 9 e 10 aggiunti il 30/09/2026: mancavano, e il verbale di una visita in serie stampava «–»
-  const TIPO_ACC = { 1: 'Su segnalazione', 2: 'Su richiesta', 3: 'Per protocolli di intesa', 4: 'Indicata da RLS/RLST', 5: 'Programmata', 6: 'Cantiere qualità', 7: 'Indicata dal CPT', 8: 'Adesione servizio visite in serie', 9: 'Visita stage / ASL', 10: 'Per attività di asseverazione' }
+  const TIPO_ACC = { 1: 'Su segnalazione', 2: 'Su richiesta', 3: 'Per protocolli di intesa', 4: 'Indicata da RLS/RLST', 5: 'Programmata', 6: 'Cantiere qualità', 7: 'Indicata dal CPT', 8: 'Adesione servizio visite in serie', 9: 'Visita stage / ASL', 10: 'Per attività di asseverazione', 11: 'Attestazione / consulenza e monitoraggio' }
   // Il verbale va all'impresa, e all'impresa non si dice che c'è stata una segnalazione (30/09/2026):
   // la visita «su segnalazione» sul foglio esce «Indicata dal CPT». Il tipo vero resta nel database,
   // negli elenchi, nelle statistiche e nel riepilogo per la fattura: è un dato dell'ufficio.
@@ -118,8 +118,9 @@
     const cantiere = [
       ['Indirizzo', cant.cantiere_indirizzo || '–', 'N° civico', cant.cantiere_civico || '–'],
       ['Comune', cant.comune_nome || '–', 'CAP', cant.cantiere_cap || '–'],
-      ['Tipo intervento', TIP_INT[cant.cantiere_tip_int] || '–', 'Tipo opera', TIP_OPE[cant.cantiere_tip_ope] || '–'],
-      ['Importo lavori (€)', IMP_LBL[cant.cantiere_importo] || '–', 'Durata cantiere', DUR_LBL[cant.cantiere_durata] || '–'],
+      // quello che risultava in questa visita (30/09/2026), altrimenti quello del cantiere
+      ['Tipo intervento', TIP_INT[v.vis_tip_int ?? cant.cantiere_tip_int] || '–', 'Tipo opera', TIP_OPE[v.vis_tip_ope ?? cant.cantiere_tip_ope] || '–'],
+      ['Importo lavori (€)', IMP_LBL[v.vis_importo ?? cant.cantiere_importo] || '–', 'Durata cantiere', DUR_LBL[v.vis_durata ?? cant.cantiere_durata] || '–'],
       ['Codice CNCE', cant.cantiere_cnce || '–', 'Codice univoco', cant.nodo_id || '–'],
       ['N° imprese in cantiere', String(imps.filter((im) => im.impresa_id).length || v.nr_imp || 1), 'Totale lavoratori', String(imps.reduce((s, im) => s + (+im.nr_lav || 0), 0) || v.nr_lavoratori || 0)]
     ]

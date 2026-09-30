@@ -628,6 +628,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
                 <option value="8">Adesione servizio visite in serie</option>
                 <option value="9">Visita STAGE/ASL</option>
                 <option value="10">Per attività di Asseverazione</option>
+                <option value="11">Attestazione / consulenza e monitoraggio</option>
               </select>
             </div>
             <div class="field" style="flex:0 0 150px">
@@ -2306,7 +2307,7 @@ window.onunhandledrejection = function(e) {
 };
 </script>
 
-<script src="app-data.js?v=4"></script>
+<script src="app-data.js?v=5"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -9604,6 +9605,7 @@ async function admGeneraReport(){
         'visita_id','data_visita','ipc','tipo_accesso','rlst_sn',
         'nom_ppre','qual_ppre','cantiere_id','tecnico_id','tecnico2_id',
         'nr_lavoratori','nr_imp','nr_ind','comm_tipo','comm_tipo_sogg',
+        'vis_tip_int','vis_tip_ope','vis_durata','vis_importo',
         'tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome)',
         'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_durata,cantiere_importo,comune_nome,committenti(committente_tipo))'
       ].join(','))
@@ -9687,17 +9689,17 @@ async function admGeneraReport(){
     const accMap={}
     visite.forEach(v=>{const k=+(v.tipo_accesso||0);if(k)accMap[k]=(accMap[k]||0)+1})
 
-    // Tipo intervento / opera / durata (da cantieri join)
+    // Tipo intervento / opera / durata: quello dichiarato nella visita (30/09/2026, deciso dall'utente),
+    // e solo se la visita non lo dice quello del cantiere, che conserva un valore solo
     const tipIntMap={},tipOpeMap={},durataMap={}
     visite.forEach(v=>{
-      const ti=v.cantieri?.cantiere_tip_int;if(ti)tipIntMap[ti]=(tipIntMap[ti]||0)+1
-      const to=v.cantieri?.cantiere_tip_ope;if(to)tipOpeMap[to]=(tipOpeMap[to]||0)+1
-      const du=v.cantieri?.cantiere_durata;if(du)durataMap[du]=(durataMap[du]||0)+1
+      const ti=v.vis_tip_int??v.cantieri?.cantiere_tip_int;if(ti)tipIntMap[ti]=(tipIntMap[ti]||0)+1
+      const to=v.vis_tip_ope??v.cantieri?.cantiere_tip_ope;if(to)tipOpeMap[to]=(tipOpeMap[to]||0)+1
+      const du=v.vis_durata??v.cantieri?.cantiere_durata;if(du)durataMap[du]=(durataMap[du]||0)+1
     })
 
     // Importo lavori / lavoratori / imprese / ditte individuali / tipo visita / committente
     const importoMap={},commMap={'Pubblico':0,'Privato':0,'Non indicato':0}
-    const tipVisMap={'Segnalazione o indicata da enti':0,'Concordata con l\u2019impresa':0,'Altro / non indicato':0}
     const clsLav=[[1,1,'1'],[2,3,'2-3'],[4,5,'4-5'],[6,10,'6-10'],[11,20,'11-20'],[21,9999,'oltre 20']]
     const clsImp=[[1,1,'1'],[2,2,'2'],[3,3,'3'],[4,5,'4-5'],[6,9999,'6 o piu\u2019']]
     const clsInd=[[0,0,'nessuna'],[1,1,'1'],[2,2,'2'],[3,3,'3'],[4,9999,'4 o piu\u2019']]
@@ -9706,15 +9708,13 @@ async function admGeneraReport(){
     let lavTot=0,lavN=0
     const putCls=(m,cls,v)=>{const c=cls.find(([a,b])=>v>=a&&v<=b);if(c)m[c[2]]++}
     visite.forEach(v=>{
-      const im=v.cantieri?.cantiere_importo
+      const im=v.vis_importo??v.cantieri?.cantiere_importo
       const kImp=im||11
       importoMap[kImp]=(importoMap[kImp]||0)+1
       /* 30/09/2026: prima quello scritto nella visita, poi quello del cantiere — l'anagrafica del
          committente legato al cantiere dava 35 pubblici per privati e 10 al contrario */
       const ct=v.comm_tipo||v.cantieri?.committenti?.committente_tipo
       commMap[ct===1?'Pubblico':(ct===2?'Privato':'Non indicato')]++
-      const ta=+(v.tipo_accesso||0)
-      tipVisMap[[1,3,4,7].includes(ta)?'Segnalazione o indicata da enti':([2,5,6].includes(ta)?'Concordata con l\u2019impresa':'Altro / non indicato')]++
       if(v.nr_lavoratori!=null&&v.nr_lavoratori!==''){const x=+v.nr_lavoratori;if(x>0){putCls(lavMap,clsLav,x);lavTot+=x;lavN++}}
       if(v.nr_imp!=null&&v.nr_imp!=='')putCls(impMap,clsImp,+v.nr_imp)
       if(v.nr_ind!=null&&v.nr_ind!=='')putCls(indMap,clsInd,+v.nr_ind)
@@ -9975,18 +9975,15 @@ async function admGeneraReport(){
     }
     y+=56
 
-    const tvKeys=Object.keys(tipVisMap).filter(k=>tipVisMap[k])
-    if(tvKeys.length){
-      const tvImg=rptDonut({data:tvKeys.map(k=>tipVisMap[k]),labels:tvKeys,
-        colors:['#e7500f','#95C22F','#565c66'],title:'Tipologia di visita',w:400,h:280,maxLbl:30})
-      chartCard(tvImg,M,y,half,66)
-    }
+    /* 30/09/2026: tolto il grafico «Tipologia di visita» che raggruppava i tipi di accesso (contava la
+       programmata come «concordata con l'impresa», e serie, stage e asseverazione come «altro»):
+       quello completo, voce per voce, è a pagina 1 */
     const ctKeys=Object.keys(commMap).filter(k=>commMap[k])
     if(ctKeys.length){
       const ctImg=rptDonut({data:ctKeys.map(k=>commMap[k]),labels:ctKeys,
         colors:ctKeys.map(k=>k==='Pubblico'?'#3498db':(k==='Privato'?'#e7500f':'#a9afb8')),
         title:'Tipologia di committente',w:400,h:280,maxLbl:30})
-      chartCard(ctImg,M+half+4,y,half,66)
+      chartCard(ctImg,M,y,half,66)
     }
 
     footer(3)
@@ -12744,7 +12741,7 @@ async function admEsportaExcel(){
     const snap=await _loadSnapForVerbale(verbale)
     const voci=await _getChkVoci()
     const wb=XLSX.utils.book_new()
-    const TACC={'1':'Su segnalazione','2':'Su richiesta','3':'Protocolli intesa','4':'RLS/RLST','5':'Programmata','6':'Cantiere qualita','7':'Dal CPT','8':'Visite in serie','9':'Stage ASL','10':'Asseverazione'}
+    const TACC={'1':'Su segnalazione','2':'Su richiesta','3':'Protocolli intesa','4':'RLS/RLST','5':'Programmata','6':'Cantiere qualita','7':'Dal CPT','8':'Visite in serie','9':'Stage ASL','10':'Asseverazione','11':'Attestazione consulenza'}
     const ILBL={'1':'fino a 250k','2':'250k-500k','3':'500k-1M','4':'1-1,5M','5':'1,5-2,5M','6':'2,5-3,5M','7':'3,5-5M','8':'5-10M','11':'N/D'}
     const ws1Data=[['Campo','Valore'],
       ['N. Verbale',snap.nr_verbale_origine||''],
@@ -13261,7 +13258,7 @@ function _parseXlsxSnap(wb){
     snap.data_visita=m['Data visita']||null
     snap.ora_visita=m['Ora inizio']||null
     snap.ora_fine=m['Ora fine']||null
-    const ta={'Su segnalazione':'1','Su richiesta':'2','Protocolli intesa':'3','RLS/RLST':'4','Programmata':'5','Cantiere qualita':'6','Dal CPT':'7','Visite in serie':'8','Stage ASL':'9','Asseverazione':'10'}
+    const ta={'Su segnalazione':'1','Su richiesta':'2','Protocolli intesa':'3','RLS/RLST':'4','Programmata':'5','Cantiere qualita':'6','Dal CPT':'7','Visite in serie':'8','Stage ASL':'9','Asseverazione':'10','Attestazione consulenza':'11'}
     snap.tipo_accesso=ta[m['Tipo accesso']]||null
     snap.rlst_sn=m['RLST presente']==='Si'?'1':'0'
     snap.stage_vis=m['Stagista presente']==='Si'?'1':'0'
@@ -14149,7 +14146,7 @@ document.addEventListener('input',function(ev){
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
-<script src="verbale-pdf.js?v=5"></script>
+<script src="verbale-pdf.js?v=6"></script>
 <!-- mappa sul telefono: cantieri vicino a te (Nuova visita) e rientri sulla mappa (Scadenze) -->
 <script src="mappa.js?v=2"></script>
 </body>
