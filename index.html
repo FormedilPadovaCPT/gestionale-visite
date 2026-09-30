@@ -1039,6 +1039,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
         <div id="cant-list-filters" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px"></div>
         <div id="cant-list-count" style="font-size:12px;color:#888;margin-bottom:8px"></div>
+        <div id="cant-list-nascosti" style="display:none;background:#fff8e1;border:1px solid #f0d78a;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:13px;line-height:1.9"></div>
         <div id="giro-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#fff4ee;border:1px solid var(--orange,#e7500f);border-radius:8px;padding:8px 12px;margin-bottom:10px">
           <span id="giro-count" style="font-size:13px;font-weight:600"></span>
           <button class="btn-primary btn-sm" onclick="_giroVai()">🧭 Giro a tappe sul navigatore</button>
@@ -6481,6 +6482,18 @@ async function loadCantieri(q=''){
     if(!data||data.length<1000)break
     _fromC+=1000
   }
+  /* cantieri chiusi che combaciano con la ricerca ma non sono nell'elenco (30/09/2026): si contano,
+     così «Nessun cantiere trovato» non nasconde un cantiere che esiste. null = conteggio non riuscito */
+  window._cantRicerca=qStr
+  window._cantChiusiNascosti=0
+  if(qStr&&!_incChiusi){
+    try{
+      const{count,error:eCh}=await sb.from('cantieri').select('cantiere_id',{count:'exact',head:true}).eq('elimina',0).eq('cantiere_chiuso',true)
+        .or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*`)
+      if(eCh)throw eCh
+      window._cantChiusiNascosti=count||0
+    }catch(e){console.warn('cantieri chiusi nascosti:',e);window._cantChiusiNascosti=null}
+  }
   // provincia di Padova (23/09/2026): codice ISTAT 028…, altrimenti CAP 35…, altrimenti nome del comune
   if(!window.__comuniPD){
     try{
@@ -6634,6 +6647,21 @@ function _clBuildFilters(rows){
   lf.querySelector('input').onchange=e=>{_clState.fuori=e.target.checked;_clBuildFilters(_clRows||[]);_clRender()}
   fdiv.appendChild(lf)
 }
+/* Che cosa la ricerca ha trovato ma l'elenco non mostra: cantieri chiusi (si leggono solo con «Includi chiusi»)
+   e cantieri tolti dai filtri (zona, comuni, tipo…). Un pulsante per ciascuno li fa vedere. */
+function _clNascosti(all){
+  const box=$('cant-list-nascosti');if(!box)return
+  const q=window._cantRicerca||'',parti=[]
+  const nCh=window._cantChiusiNascosti
+  if(q&&nCh>0)parti.push('🔒 '+(nCh===1?'C\'è <strong>1 cantiere chiuso</strong> che corrisponde':'Ci sono <strong>'+nCh+' cantieri chiusi</strong> che corrispondono')+' a «'+esc(q)+'» <button type="button" class="btn-outline btn-sm" id="btn-cant-mostra-chiusi">Mostra anche i chiusi</button>')
+  else if(q&&nCh===null)parti.push('Non sono riuscito a controllare se fra i cantieri chiusi ce n\'è qualcuno che corrisponde: spunta «Includi chiusi 🔒» per vederli.')
+  const nFil=(_clRows||[]).filter(r=>!r._segn).length-all.filter(r=>!r._segn).length
+  if(q&&nFil>0)parti.push((nFil===1?'<strong>1 cantiere</strong> corrisponde alla ricerca ma è nascosto':'<strong>'+nFil+' cantieri</strong> corrispondono alla ricerca ma sono nascosti')+' dai filtri qui sopra (zona, comuni, tipo…) <button type="button" class="btn-outline btn-sm" id="btn-cant-togli-filtri">Togli i filtri</button>')
+  box.innerHTML=parti.map(t=>'<div>'+t+'</div>').join('')
+  box.style.display=parti.length?'block':'none'
+  const b1=$('btn-cant-mostra-chiusi');if(b1)b1.onclick=()=>{const c=$('chk-cant-chiusi');if(c){c.checked=true;window._cantShowAll=false;loadCantieri()}}
+  const b2=$('btn-cant-togli-filtri');if(b2)b2.onclick=()=>{Object.assign(_clState,{area:'provincia',ope:'',imp:'',sca:'',orig:'',vis:'',fuori:true});_clState.comSel.clear();window._cantShowAll=false;_clBuildFilters(_clRows||[]);_clRender()}
+}
 function _clRender(){
   const tbody=$('tbody-cantieri'),empty=$('cantieri-empty')
   if(!tbody)return
@@ -6642,6 +6670,7 @@ function _clRender(){
   const _shown=window._cantShowAll?all.length:Math.min(300,all.length)
   const info=$('cant-list-count')
   if(info)info.textContent=all.length?(all.length+' cantieri'+(all.length>_shown?' — mostrati i primi '+_shown:'')):''
+  _clNascosti(all)
   if(!all.length){tbody.innerHTML='';empty.classList.remove('hidden');return}
   empty.classList.add('hidden')
   tbody.innerHTML=all.slice(0,_shown).map(c=>{
@@ -14094,7 +14123,7 @@ document.addEventListener('input',function(ev){
 <script src="scheda-impresa.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=4"></script>
-<script src="aiuto.js?v=10"></script>
+<script src="aiuto.js?v=11"></script>
 <script src="mail-respinte-tec.js?v=1"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>

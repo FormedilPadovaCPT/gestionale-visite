@@ -95,6 +95,9 @@ window.AIUTO_TESTI = {
 
   /* ── visite e cantieri ── */
   'btn-cerca': 'Cerca fra i tuoi verbali per impresa, cantiere, comune o numero.',
+  /* ── ricerca fra i cantieri: quello che c'è ma non si vede (30/09/2026) ── */
+  't:mostra anche i chiusi': 'La ricerca ha trovato cantieri chiusi, che di norma l\'elenco non mostra. Spunta «Includi chiusi 🔒» e rifà la ricerca: li riconosci dal lucchetto. Non riapre nessun cantiere.',
+  't:togli i filtri': 'Alcuni cantieri trovati sono nascosti dai filtri (la tua zona, i comuni, il tipo di opera…). Li azzera e passa a tutta la provincia, comprese le sedi fuori provincia; la ricerca resta.',
   /* ── stato dell'invio nell'elenco Visite (30/09/2026) ── */
   'q-dainviare': 'Lascia nell\'elenco solo i verbali definitivi che non risultano ancora mandati all\'impresa. Premilo di nuovo per rivedere tutte le visite.',
   't:da inviare': 'Questo verbale è definitivo ma non è ancora partito. Apre la finestra di invio con i destinatari: la mail parte solo quando premi «Invia», e qui compare la spunta verde con la data.',
