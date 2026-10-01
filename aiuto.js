@@ -165,7 +165,7 @@ window.AIUTO_TESTI = {
   't:excel imprese': 'Scarica l\'Excel per la Cassa Edile: una riga per ogni impresa o autonomo trovato in cantiere, con P.IVA o codice fiscale e lavoratori.',
   't:pdf imprese': 'Scarica il PDF per la Cassa Edile: una scheda per sopralluogo con le imprese presenti e il totale dei lavoratori.',
   't:invia imprese a ceiv': 'Genera i due file delle imprese presenti e li spedisce subito all\'indirizzo «Email CEIV». Chiede conferma; la mail non si richiama: prima guarda i file.',
-  't:genera report pdf': 'Genera il report delle statistiche in PDF, quello che va alla Commissione.',
+  't:genera report pdf': 'Genera il report delle statistiche in PDF, quello che va alla Commissione. Cinque pagine: l\'ultima ha l\'IPC di ogni macroarea della checklist.',
   'p:report osservatorio': 'Genera il report per l\'Osservatorio nazionale, nel formato richiesto da FORMEDIL.',
   'btn-adm-load-xlsx': 'Apre nel modulo la visita letta dal file Excel, per controllarla prima di salvarla.',
   'oss-genera': 'Genera il file XML delle visite del periodo per il caricamento nell\'Osservatorio nazionale.',
