@@ -9630,6 +9630,38 @@ function rptAggregateMacro(chkAll, prefToZone){
   return res
 }
 
+/* 01/10/2026 — IPC per macro area, come i grafici «Macroaree di valutazione» del foglio Google
+   (chiesto dall'utente). Per ogni visita e per ogni area si contano i rilievi di QUELL'AREA e si
+   applica la scala dell'IPC generale: almeno una NC+ o piu' di 3 NC- = alto; da 1 a 3 NC- o piu'
+   di 6 osservazioni = medio; da 1 a 6 osservazioni = basso; solo voci conformi = nessun rilievo.
+   Un'area senza voci valutate (tutte «non applicabile») non entra nel grafico: null.
+   Verificato sul 2025-26: coincide col foglio su tutte e dieci le aree. */
+function rptIpcLivello(d){
+  if(d.ncp>=1||d.ncm>3)return 'ALTO'
+  if(d.ncm>=1||d.oss>6)return 'MEDIO'
+  if(d.oss>=1)return 'BASSO'
+  if(d.ver>=1)return 'NR'
+  return null
+}
+// chkAll: righe {visita_id,codice,valore}; ritorna {zona:{ALTO,MEDIO,BASSO,NR}} in numero di VISITE
+function rptIpcMacro(chkAll,prefToZone){
+  const perVis={}
+  ;(chkAll||[]).forEach(({visita_id,codice,valore})=>{
+    if(!visita_id||!codice||codice.length<3)return
+    const zona=prefToZone[codice.substring(0,3).toUpperCase()]
+    if(!zona)return
+    const k=valore==='NC+'?'ncp':valore==='NC-'?'ncm':valore==='OSS'?'oss':valore==='VER'?'ver':null
+    if(!k)return
+    const key=visita_id+'|'+zona
+    if(!perVis[key])perVis[key]={zona,ncp:0,ncm:0,oss:0,ver:0}
+    perVis[key][k]++
+  })
+  const res={}
+  for(let z=1;z<=10;z++)res[z]={ALTO:0,MEDIO:0,BASSO:0,NR:0}
+  Object.values(perVis).forEach(d=>{const l=rptIpcLivello(d);if(l&&res[d.zona])res[d.zona][l]++})
+  return res
+}
+
 // jsPDF page header (banda arancione sottile + titolo a sinistra)
 function rptPageHeader(doc,title,dalFmt,alFmt){
   doc.setFillColor(231,80,15);doc.rect(0,0,210,6,'F')
@@ -9685,7 +9717,7 @@ async function admGeneraReport(){
     for(let i=0;i<visitaIds.length;i+=100){
       for(let from=0;;from+=1000){
         const{data:batch,error:eChk}=await sb.from('visite_checklist')
-          .select('codice,valore').in('visita_id',visitaIds.slice(i,i+100)).neq('valore','NA')
+          .select('visita_id,codice,valore').in('visita_id',visitaIds.slice(i,i+100)).neq('valore','NA')
           .order('id').range(from,from+999)
         /* 01/10/2026: un lotto non letto dava un totale piu' basso senza dirlo. Sono numeri che
            diventano ufficiali: se una lettura fallisce il report non esce */
@@ -9779,6 +9811,7 @@ async function admGeneraReport(){
 
     // Macro aree (lookup dinamico: prime 3 lettere codice → zona 1-10)
     const macroData=rptAggregateMacro(chkAll,prefToZone)
+    const ipcMacro=rptIpcMacro(chkAll,prefToZone)
 
     // Formatter date
     const fmtD=d=>{if(!d)return'–';const[y,mm,dd]=d.split('-');return`${dd}/${mm}/${y}`}
@@ -10104,6 +10137,48 @@ async function admGeneraReport(){
     doc.text('VER = voce verificata conforme · OSS = osservazione · NC- = non conformità lieve · NC+ = non conformità rilevante. Voci "NA" escluse.',M,doc.lastAutoTable.finalY+4.5)
 
     footer(4)
+
+    // ════ PAGINA 5 – IPC per macro area: una torta per area, come nel foglio Google ════
+    doc.addPage()
+    rptPageHeader(doc,'INDICE DI PERICOLOSIT\u00c0 PER MACRO AREA',dalFmt,alFmt)
+    y=28
+    // criteri di giudizio, gli stessi dell'IPC generale applicati ai rilievi della singola area
+    const crit=[
+      {l:'NESSUN RILIEVO',t:'solo voci conformi',c:[122,165,39]},
+      {l:'BASSO',t:'da 1 a 6 osservazioni',c:[217,164,0]},
+      {l:'MEDIO',t:'pi\u00f9 di 6 osservazioni e/o da 1 a 3 NC-',c:[237,125,49]},
+      {l:'ALTO',t:'pi\u00f9 di 3 NC- e/o almeno una NC+',c:[224,43,32]}
+    ]
+    const cGap=3,cw=(CW-cGap*(crit.length-1))/crit.length
+    crit.forEach((k,i)=>{
+      const kx=M+i*(cw+cGap)
+      card(kx,y,cw,12.5)
+      doc.setFillColor(...k.c);doc.rect(kx,y+1.8,1.3,8.9,'F')
+      doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(...k.c)
+      doc.text(k.l,kx+4,y+5)
+      doc.setFontSize(6.6);doc.setFont('helvetica','normal');doc.setTextColor(86,92,102)
+      doc.text(k.t,kx+4,y+9.6,{maxWidth:cw-6})
+    })
+    y+=15.5
+    doc.setFontSize(7.5);doc.setFont('helvetica','italic');doc.setTextColor(150,155,162)
+    doc.text('Ogni grafico conta le visite in cui l\u2019area \u00e8 stata valutata (almeno una voce diversa da \u00abnon applicabile\u00bb): il loro numero \u00e8 al centro.',M,y)
+    y+=3
+    {
+      const ipcH=45,ipcGap=2.8
+      for(let z=1;z<=10;z++){
+        const d=ipcMacro[z]||{ALTO:0,MEDIO:0,BASSO:0,NR:0}
+        const img=rptDonut({
+          data:[d.ALTO,d.MEDIO,d.BASSO,d.NR],
+          labels:['Alto','Medio','Basso','Nessun Rilievo'],
+          colors:['#E02B20','#ED7D31','#FFC000','#95C22F'],
+          title:String(z).padStart(2,'0')+'  '+(ZONE_LBL[z]||('Zona '+z)),w:430,h:200
+        })
+        const col=(z-1)%2,row=Math.floor((z-1)/2)
+        chartCard(img,M+col*(half+4),y+row*(ipcH+ipcGap),half,ipcH)
+      }
+    }
+
+    footer(5)
 
     // ── Salva ──
     const fname=`Report_Visite_${dal}_${al}.pdf`
