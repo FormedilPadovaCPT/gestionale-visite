@@ -85,7 +85,23 @@ assert.ok(/id="sgr-vecchio"/.test(html), 'manca la casella «vecchio parametro»
 
 // ── 5. verbale: l'importo scelto va nella scheda del cantiere, prima di salvare la visita ──
 const save = estrai(html, 'async function saveVisita(stato){', 'function buildSnap(', 'index.html')
+// nei cantieri con codice CNCE la scheda porta il dato della Cassa Edile: si sovrascrive solo con la conferma del tecnico
+const azCtx = {}
+vm.createContext(azCtx)
+vm.runInContext(estrai(html, 'function importoVerbaleAzione(scelto,cant){', '// Propone la fascia', 'index.html') + '\nthis.az=importoVerbaleAzione', azCtx)
+const az = azCtx.az
+assert.strictEqual(az(2, { cantiere_importo: 1, cantiere_cnce: 'CNCE-PD-123' }), 'chiedi', 'cantiere della Cassa Edile: prima di cambiare l’importo si chiede')
+assert.strictEqual(az(1, { cantiere_importo: 1, cantiere_cnce: 'CNCE-PD-123' }), 'niente')
+assert.strictEqual(az(2, { cantiere_importo: null, cantiere_cnce: 'CNCE-PD-123' }), 'scrivi', 'scheda senza importo: si scrive')
+assert.strictEqual(az(2, { cantiere_importo: 11, cantiere_cnce: 'CNCE-PD-123' }), 'scrivi', '«non disponibile» non e’ un dato della Cassa da difendere')
+assert.strictEqual(az(11, { cantiere_importo: 3, cantiere_cnce: 'CNCE-PD-123' }), 'chiedi')
+assert.strictEqual(az(2, { cantiere_importo: 1, cantiere_cnce: null }), 'scrivi', 'cantiere non della Cassa Edile: vale l’ultimo dichiarato')
+assert.strictEqual(az(2, { cantiere_importo: 1, cantiere_cnce: '  ' }), 'scrivi')
+assert.strictEqual(az(null, { cantiere_importo: 1, cantiere_cnce: 'X' }), 'niente')
+assert.strictEqual(az(2, null), 'niente')
 const iImp = save.indexOf("update({cantiere_importo:impSel})")
+assert.ok(/importoVerbaleAzione\(impSel,cImp\)/.test(save) && /if\(azione==='chiedi'\)/.test(save) && /confirm\(/.test(save), 'salvataggio: non chiede conferma sui cantieri della Cassa Edile')
+assert.ok(/if\(azione==='tieni'\)vSet\('f-importo',String\(cImp\.cantiere_importo\)\)/.test(save), 'salvataggio: se il tecnico non conferma la tendina deve tornare al valore della scheda')
 const iVis = save.indexOf("// 1) Esiste già una riga con questo visita_id?")
 assert.ok(iImp > 0 && iVis > iImp, 'l’importo scelto nel verbale non aggiorna la scheda del cantiere prima del salvataggio')
 assert.ok(/if\(eUpImp\)toast\(/.test(save) && /if\(eCantUp\)toast\(/.test(save), 'salvataggio: gli aggiornamenti del cantiere non guardano error')

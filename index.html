@@ -3810,6 +3810,19 @@ function _autoDurataCantiere(){
   const f=_fasciaDurata($('mc-data-inizio')?.value,$('mc-data-ult')?.value)
   if(f){du.value=f;du.style.background='#eef9f0';du.title='Proposto da data inizio/ultimazione. Modificabile.'}
 }
+/* Che cosa fare dell'importo scelto nel verbale rispetto alla scheda del cantiere (01/10/2026).
+   'niente' = non scelto, o uguale alla scheda
+   'scrivi' = la scheda non ha un importo (vuoto o «non disponibile»), oppure il cantiere non viene dalla Cassa Edile
+   'chiedi' = il cantiere ha il codice CNCE e la scheda ha gia' un importo: e' il dato comunicato alla Cassa
+              Edile, il piu' attendibile (chiesto dall'utente): si sovrascrive solo se il tecnico conferma */
+function importoVerbaleAzione(scelto,cant){
+  const s=+scelto||null
+  if(!s||!cant)return 'niente'
+  const c=+cant.cantiere_importo||null
+  if(s===c)return 'niente'
+  if(c&&c!==11&&String(cant.cantiere_cnce||'').trim())return 'chiedi'
+  return 'scrivi'
+}
 // Propone la fascia 'Importo lavori' dal dato del cantiere, se presente e non gia scelta
 function proponiImportoCantiere(imp){
   const el=$('f-importo');if(!el)return
@@ -3818,7 +3831,7 @@ function proponiImportoCantiere(imp){
   if(!el.querySelector('option[value="'+imp+'"]'))return
   el.value=String(imp)
   el.style.background='#eef9f0'
-  el.title='Proposto dalla scheda del cantiere. Se lo cambi, al salvataggio si aggiorna la scheda del cantiere.'
+  el.title='Proposto dalla scheda del cantiere. Se lo cambi, al salvataggio si aggiorna la scheda del cantiere; per i cantieri della Cassa Edile (codice CNCE) ti viene chiesta conferma.'
 }
 async function proponiCommittenteCantiere(cantId){
   try{
@@ -4641,14 +4654,25 @@ async function saveVisita(stato){
        La tendina del verbale lo propone dalla scheda del cantiere; se il tecnico lo cambia si aggiorna la
        scheda. Prima la scelta non veniva salvata da nessuna parte. Si fa PRIMA di salvare la visita: il
        database copia nella visita i dati che il cantiere ha in quel momento (tg_visite_dati_cantiere).
-       Se non riesce il verbale si salva lo stesso, e lo si dice. */
+       Se non riesce il verbale si salva lo stesso, e lo si dice.
+       Nei cantieri con codice CNCE l'importo della scheda e' quello comunicato alla Cassa Edile: prima di
+       sovrascriverlo si chiede al tecnico se e' sicuro; se dice di no resta quello della scheda. */
     const impSel=+vGet('f-importo')||null
     if(cant_id&&impSel){
-      const{data:cImp,error:eImp}=await sb.from('cantieri').select('cantiere_importo').eq('cantiere_id',cant_id).maybeSingle()
+      const{data:cImp,error:eImp}=await sb.from('cantieri').select('cantiere_importo,cantiere_cnce').eq('cantiere_id',cant_id).maybeSingle()
       if(eImp)toast('Non sono riuscito a leggere la scheda del cantiere ('+eImp.message+'): l\u2019importo scelto non e\u2019 stato salvato.','warn')
-      else if(cImp&&(+cImp.cantiere_importo||null)!==impSel){
-        const{error:eUpImp}=await sb.from('cantieri').update({cantiere_importo:impSel}).eq('cantiere_id',cant_id)
-        if(eUpImp)toast('Importo non aggiornato nella scheda del cantiere: '+eUpImp.message,'warn')
+      else{
+        let azione=importoVerbaleAzione(impSel,cImp)
+        if(azione==='chiedi'){
+          const lblS=IMP_LBL[cImp.cantiere_importo]||cImp.cantiere_importo,lblV=IMP_LBL[impSel]||impSel
+          azione=confirm('IMPORTO LAVORI\n\nLa scheda di questo cantiere viene dalla Cassa Edile (codice CNCE '+cImp.cantiere_cnce+') e riporta: '+lblS+'.\nNel verbale hai scelto: '+lblV+'.\n\nSei sicuro che l\u2019importo sia diverso da quello comunicato alla Cassa Edile?\n\nOK = s\u00ec, aggiorno la scheda del cantiere con «'+lblV+'»\nAnnulla = no, resta «'+lblS+'»')?'scrivi':'tieni'
+          if(azione==='tieni')vSet('f-importo',String(cImp.cantiere_importo))
+        }
+        if(azione==='scrivi'){
+          const{error:eUpImp}=await sb.from('cantieri').update({cantiere_importo:impSel}).eq('cantiere_id',cant_id)
+          if(eUpImp)toast('Importo non aggiornato nella scheda del cantiere: '+eUpImp.message,'warn')
+          else toast('Importo aggiornato nella scheda del cantiere','ok')
+        }
       }
     }
 
