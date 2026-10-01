@@ -3540,8 +3540,8 @@ $('btn-add-imp').onclick=()=>{
 }
 
 // Totali lavoratori/imprese calcolati dalle imprese inserite
-function computeImpTotals(){
-  const list=(S.imprese||[]).filter(im=>im.impresa_id)
+function computeImpTotals(righe){
+  const list=(righe||S.imprese||[]).filter(im=>im.impresa_id)
   // autonomi e ditte individuali si contano a parte (nr_ind), come nel modulo: 1.9 imprese, 1.10 ditte individuali
   const aut=list.filter(im=>+im.tipo_imp===TIPO_IMP_AUTONOMO).length
   return{
@@ -3708,8 +3708,24 @@ async function autoAccCant(cantId){
   if(!cantId)return
   try{
     const curId=S.savedId||S.fd.visita_id||null
+    /* 01/10/2026 — due difetti che a luglio hanno cambiato il numero di accesso di 15 verbali già
+       chiusi: il conto prendeva TUTTE le visite del cantiere, anche quelle successive a questa (un
+       primo accesso di dicembre, risalvato a luglio, diventava il quarto), e riscriveva il numero
+       dichiarato dal tecnico. Un verbale definitivo tiene il suo numero; negli altri casi si
+       contano solo le visite fino alla data di questa. */
+    if(curId){
+      const{data:gia,error:eGia}=await sb.from('visite').select('stato,acc_cant').eq('visita_id',curId).maybeSingle()
+      if(eGia)return
+      if(gia&&gia.stato==='definitivo'&&gia.acc_cant){
+        const el0=$('f-acc-cant')
+        if(el0)el0.title='Numero di accesso dichiarato nel verbale: resta '+gia.acc_cant+' anche cambiando cantiere.'
+        return
+      }
+    }
+    const dataV=vGet('f-data')
     let qb=sb.from('visite').select('visita_id',{count:'exact',head:true}).eq('cantiere_id',cantId).eq('elimina',0)
     if(curId)qb=qb.neq('visita_id',curId)
+    if(dataV)qb=qb.lte('data_visita',dataV)
     const{count,error}=await qb
     if(error)return
     const n=(count||0)+1
@@ -4620,8 +4636,25 @@ async function saveVisita(stato){
     }
 
     // 1) Esiste già una riga con questo visita_id?
-    const{data:byId}=await sb.from('visite').select('visita_id').eq('visita_id',vid).maybeSingle()
+    const{data:byId,error:eById}=await sb.from('visite').select('visita_id,stato').eq('visita_id',vid).maybeSingle()
+    if(eById)throw eById
     if(byId){
+      /* 01/10/2026 — Risalvare un verbale già definitivo non riscrive quello che nessuno ha toccato.
+         A luglio, riassegnando i cantieri, 48 verbali importati dal modulo sono stati risalvati: uno
+         è tornato in bozza, e in otto il numero di imprese dichiarato dal tecnico è diventato il
+         conto delle imprese elencate (il modulo ne elencava al massimo cinque). Le statistiche non
+         coincidevano più col modulo. Quindi: un definitivo resta definitivo, e i totali di imprese
+         e lavoratori si ricalcolano solo se l'elenco delle imprese è stato cambiato davvero. */
+      if(byId.stato==='definitivo'){
+        if(stato==='bozza'){stato='definitivo';vistaRow.stato='definitivo'}
+        const{data:_impDb,error:_eImpDb}=await sb.from('visite_imprese_presenti').select('impresa_id,tipo_imp,nr_lav,nr_lav_str').eq('visita_id',vid)
+        if(_eImpDb)throw _eImpDb
+        const _tDb=computeImpTotals(_impDb||[]),_tOra=computeImpTotals()
+        if(['nr_imp','nr_ind','nr_lavoratori','nr_lavoratori_stranieri'].every(k=>_tDb[k]===_tOra[k])){
+          delete vistaRow.nr_imp;delete vistaRow.nr_ind
+          delete vistaRow.nr_lavoratori;delete vistaRow.nr_lavoratori_stranieri
+        }
+      }
       // Aggiorna la riga esistente
       const{error}=await sb.from('visite').update(vistaRow).eq('visita_id',vid)
       if(error)throw error
