@@ -293,7 +293,8 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
         if(im.impresa_email_ref)xi+=_xel('impresaEmailRef',im.impresa_email_ref,128)
         const rawCcia=String(im.tipo_iscrizione_ccia||'').trim()
         const ccia=/^[1-5]$/.test(rawCcia)?+rawCcia:CCIA_MAP[rawCcia.toLowerCase()]
-        if(ccia)xi+=_xel('tipoIscrizioneCcia',ccia)
+        // lo schema dell'Osservatorio ammette solo 1, 2, 3: un 4 o un 5 farebbe scartare il file (il campo e' facoltativo)
+        if(ccia&&ccia<=3)xi+=_xel('tipoIscrizioneCcia',ccia)
         const rawCcnl=String(im.contratto_ccnl||'').trim()
         const ccnl=/^([1-9]|1[0-3])$/.test(rawCcnl)?+rawCcnl:CCNL_MAP[rawCcnl.toLowerCase()]
         if(ccnl){xi+=_xel('contrattoCcnl',ccnl);if(im.contratto_ccnl_altro)xi+=_xel('contrattoCcnlAltro',im.contratto_ccnl_altro,128)}
@@ -304,7 +305,8 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
       let xm='<?xml version="1.0" encoding="utf-8"?>\n<committenti>\n'
       comms.forEach(co=>{
         let nome=String(co.committente_nome||'').trim();if(nome.length<2)nome=(nome+' – ND').trim()
-        const tipo=[1,2,3].includes(+co.committente_tipo)?+co.committente_tipo:1
+        // tabella 6 del manuale: 1 Pubblico, 2 Privato, 3 Non disponibile. Senza tipo va 3: prima andava 1 «Pubblico»
+        const tipo=[1,2,3].includes(+co.committente_tipo)?+co.committente_tipo:3
         xm+='<committente>'+_xel('elimina',0)+_xel('committenteId',co.committente_id,50)+_xel('committenteNome',nome,256)+_xel('committenteTipo',tipo)+'</committente>\n'
       })
       xm+='</committenti>'

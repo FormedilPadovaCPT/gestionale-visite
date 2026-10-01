@@ -1439,6 +1439,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div style="margin:8px 0 4px"><label style="font-size:11px;color:rgba(255,255,255,.6)">Anno edile (ott→set): </label><select onchange="osSetAnnoEdile(this.value)" style="padding:4px 8px;border-radius:6px;background:#1d2433;color:#fff;border:1px solid rgba(255,255,255,.2)"><option value="">— intervallo libero —</option><option value="2023">2023-2024</option><option value="2024">2024-2025</option><option value="2025">2025-2026</option><option value="2026">2026-2027</option><option value="2027">2027-2028</option><option value="2028">2028-2029</option></select></div>
           <button class="btn-primary" onclick="admGeneraReportOsservatorio()" style="background:#e7500f;border-color:#c43f0a;margin-top:8px">📑 Report Osservatorio (1:1, 19 pagine)</button>
           <p style="font-size:11px;color:rgba(255,255,255,.4);margin-top:6px">Replica fedele del "REPORT ATTIVITA'" dell'Osservatorio: quadro di sintesi + schede per importo, tipo intervento/opera/committente/visita e ruolo impresa.</p>
+          <p style="font-size:11px;color:rgba(255,255,255,.55);margin-top:10px">Importo, tipo di intervento, tipo di opera, durata e committente sono quelli della <strong>scheda del cantiere</strong>, un valore per cantiere, come nel file che va all'Osservatorio nazionale.</p>
+          <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:rgba(255,255,255,.75);margin-top:6px;cursor:pointer" data-aiuto="Con la spunta i due report escono come fino al 1° ottobre 2026: importo, intervento, opera, durata e committente presi da quello che il tecnico ha dichiarato in ogni visita. I numeri di quelle voci sono diversi dal report corrente; il PDF lo scrive su ogni pagina e nel nome del file."><input type="checkbox" id="sgr-vecchio" style="margin-top:2px"> <span>Stampa col <strong>vecchio parametro</strong> (il dichiarato in ogni visita). Dà numeri diversi su importo, intervento, opera, durata e committente: il PDF lo scrive su ogni pagina.</span></label>
         </div>
 
         <!-- ── EXCEL EXPORT / IMPORT ── -->
@@ -2308,7 +2310,7 @@ window.onunhandledrejection = function(e) {
 };
 </script>
 
-<script src="app-data.js?v=8"></script>
+<script src="app-data.js?v=9"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -3816,7 +3818,7 @@ function proponiImportoCantiere(imp){
   if(!el.querySelector('option[value="'+imp+'"]'))return
   el.value=String(imp)
   el.style.background='#eef9f0'
-  el.title='Proposto automaticamente dal dato del cantiere. Modificabile se necessario.'
+  el.title='Proposto dalla scheda del cantiere. Se lo cambi, al salvataggio si aggiorna la scheda del cantiere.'
 }
 async function proponiCommittenteCantiere(cantId){
   try{
@@ -4635,6 +4637,21 @@ async function saveVisita(stato){
       stato
     }
 
+    /* 01/10/2026 — L'importo dei lavori e' un dato del CANTIERE (un valore solo, come nell'Osservatorio).
+       La tendina del verbale lo propone dalla scheda del cantiere; se il tecnico lo cambia si aggiorna la
+       scheda. Prima la scelta non veniva salvata da nessuna parte. Si fa PRIMA di salvare la visita: il
+       database copia nella visita i dati che il cantiere ha in quel momento (tg_visite_dati_cantiere).
+       Se non riesce il verbale si salva lo stesso, e lo si dice. */
+    const impSel=+vGet('f-importo')||null
+    if(cant_id&&impSel){
+      const{data:cImp,error:eImp}=await sb.from('cantieri').select('cantiere_importo').eq('cantiere_id',cant_id).maybeSingle()
+      if(eImp)toast('Non sono riuscito a leggere la scheda del cantiere ('+eImp.message+'): l\u2019importo scelto non e\u2019 stato salvato.','warn')
+      else if(cImp&&(+cImp.cantiere_importo||null)!==impSel){
+        const{error:eUpImp}=await sb.from('cantieri').update({cantiere_importo:impSel}).eq('cantiere_id',cant_id)
+        if(eUpImp)toast('Importo non aggiornato nella scheda del cantiere: '+eUpImp.message,'warn')
+      }
+    }
+
     // 1) Esiste già una riga con questo visita_id?
     const{data:byId,error:eById}=await sb.from('visite').select('visita_id,stato').eq('visita_id',vid).maybeSingle()
     if(eById)throw eById
@@ -4699,7 +4716,8 @@ async function saveVisita(stato){
       const cantUpdate={}
       const ci=vGet('f-comm-id');if(ci)cantUpdate.cantiere_committente_id=ci
       if(Object.keys(cantUpdate).length){
-        await sb.from('cantieri').update(cantUpdate).eq('cantiere_id',cant_id)
+        const{error:eCantUp}=await sb.from('cantieri').update(cantUpdate).eq('cantiere_id',cant_id)
+        if(eCantUp)toast('Committente non collegato alla scheda del cantiere: '+eCantUp.message,'warn')
       }
     }
 
@@ -5593,14 +5611,15 @@ async function loadStat(){
     const arr=r.visite_imprese_presenti||[]
     const p=arr.find(x=>x.is_principale)||arr[0]||null
     const c=r.cantieri||{}
+    const dc=datiCantiereStat(r,r.cantieri)
     return{
       vid:r.visita_id, data:r.data_visita,
       ipc:(['ALTO','MEDIO','BASSO'].indexOf(r.ipc)>=0?r.ipc:'NR'),
       rlst:!!r.rlst_sn, acc:+r.acc_cant||0, tec:r.tecnico_id, tipo:r.tipo_accesso, cid:r.cantiere_id||null,
       ncp:+r.ipc_nc_plus||0, ncm:+r.ipc_nc_minus||0, oss:+r.ipc_oss||0,
-      /* 01/10/2026: stessa regola del Report visite — vale quello dichiarato nella visita, il cantiere
-         solo se la visita non lo dice; prima questa pagina leggeva il cantiere e dava altri numeri */
-      comune:comuneStat(c.comune_nome)||null, tipint:(r.vis_tip_int??c.cantiere_tip_int)||null, tipope:(r.vis_tip_ope??c.cantiere_tip_ope)||null, importo:(r.vis_importo??c.cantiere_importo)||null,
+      /* 01/10/2026: intervento, opera e importo sono quelli della scheda del cantiere, come nel Report
+         visite, nel report Osservatorio e nel file per il nazionale (datiCantiereStat) */
+      comune:comuneStat(c.comune_nome)||null, tipint:dc.tipint, tipope:dc.tipope, importo:dc.importo,
       ruolo:(p&&tipoImpDaRiga(p))||null, ceiv:ceivStat(p&&p.imprese),
       impnome:(p&&p.imprese&&p.imprese.impresa_nome)||null, impid:(p&&p.impresa_id)||null,
       eserc:_esercizioDa(r.data_visita)
@@ -5898,6 +5917,44 @@ function ceivStat(imp){
 /* Comune per le statistiche: maiuscole unificate e quartiere di Padova tolto («PADOVA - Q1 (Centro
    storico)» e «Padova» sono PADOVA). */
 function comuneStat(c){return String(c||'').trim().toUpperCase().replace(/\s*-\s*Q\d.*$/,'')}
+/* 01/10/2026 (deciso dall'utente dopo il confronto col modello nazionale) — Importo, tipo di intervento,
+   tipo di opera, durata e committente sono dati del CANTIERE: un valore solo per cantiere, quello della
+   sua scheda, lo stesso che parte nel file per l'Osservatorio. Il manuale operativo dell'Osservatorio
+   (pag. 16 e 23) registra «alla data della visita» solo imprese presenti, lavoratori e autonomi.
+   Vale per la pagina Statistiche, il Report visite e il report Osservatorio: una regola sola.
+   Se la scheda del cantiere non ha il dato, il dato manca («non disponibile»), come manchera' al nazionale:
+   si completa la scheda, non si pesca dalla visita.
+   vecchio=true e' il parametro usato fino al 01/10/2026 (il dichiarato in ogni visita, il cantiere solo
+   come riserva): resta per ristampare i report com'erano, e da' numeri diversi su queste cinque voci.
+   v = riga di visite (vis_tip_int, vis_tip_ope, vis_importo, vis_durata, comm_tipo)
+   c = riga di cantieri (cantiere_tip_int, cantiere_tip_ope, cantiere_importo, cantiere_durata, committenti(committente_tipo)) */
+const NOTA_VECCHIO_PARAMETRO='Stampa col vecchio parametro (dichiarato in ogni visita): numeri diversi dal report corrente su importo, intervento, opera, durata e committente.'
+function datiCantiereStat(v,c,vecchio){
+  v=v||{}
+  const haCant=!!(c&&Object.keys(c).length)
+  c=c||{}
+  const ctC=(c.committenti&&c.committenti.committente_tipo)||null
+  if(vecchio||!haCant)return{
+    tipint:(v.vis_tip_int??c.cantiere_tip_int)||null,tipope:(v.vis_tip_ope??c.cantiere_tip_ope)||null,
+    importo:(v.vis_importo??c.cantiere_importo)||null,durata:(v.vis_durata??c.cantiere_durata)||null,
+    commtipo:v.comm_tipo||ctC||null
+  }
+  return{tipint:c.cantiere_tip_int||null,tipope:c.cantiere_tip_ope||null,importo:c.cantiere_importo||null,
+    durata:c.cantiere_durata||null,commtipo:ctC}
+}
+// Quante visite stanno su un cantiere la cui scheda non ha il dato: [{v:riga visita, c:riga cantiere}] → testo, o ''
+function datiCantiereMancanti(righe){
+  const n={committente:0,importo:0,'tipo di intervento':0,'tipo di opera':0,durata:0}
+  ;(righe||[]).forEach(({c})=>{
+    const d=datiCantiereStat(null,c&&Object.keys(c).length?c:{_:1})
+    if(!d.commtipo)n.committente++
+    if(!d.importo)n.importo++
+    if(!d.tipint)n['tipo di intervento']++
+    if(!d.tipope)n['tipo di opera']++
+    if(!d.durata)n.durata++
+  })
+  return Object.entries(n).filter(([,x])=>x>0).map(([k,x])=>k+' '+x).join(', ')
+}
 
 function _ceivDash(v){
   const s=String(v||'').trim()
@@ -9663,7 +9720,7 @@ function rptIpcMacro(chkAll,prefToZone){
 }
 
 // jsPDF page header (banda arancione sottile + titolo a sinistra)
-function rptPageHeader(doc,title,dalFmt,alFmt){
+function rptPageHeader(doc,title,dalFmt,alFmt,nota){
   doc.setFillColor(231,80,15);doc.rect(0,0,210,6,'F')
   doc.setTextColor(43,47,54);doc.setFontSize(14);doc.setFont('helvetica','bold')
   doc.text(title,12,16.5)
@@ -9672,6 +9729,7 @@ function rptPageHeader(doc,title,dalFmt,alFmt){
   doc.text('FORMEDIL PADOVA · Area Sicurezza e Salute',198,13,{align:'right'})
   doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(231,80,15)
   doc.text(`Periodo ${dalFmt} – ${alFmt}`,198,18,{align:'right'})
+  if(nota){doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.setTextColor(196,63,10);doc.text(nota,12,24)}
   doc.setFont('helvetica','normal');doc.setTextColor(40,40,40)
 }
 
@@ -9682,6 +9740,9 @@ async function admGeneraReport(){
   const dal=($('sgr-dal')?.value)||''
   const al=($('sgr-al')?.value)||''
   if(!dal||!al){toast('Seleziona entrambe le date prima di generare il report','err');return}
+  // stampa col vecchio parametro (dichiarato in ogni visita): vedi datiCantiereStat
+  const vecchio=!!($('sgr-vecchio')&&$('sgr-vecchio').checked)
+  const notaVecchio=vecchio?NOTA_VECCHIO_PARAMETRO:''
   toast('Elaborazione report in corso…','ok')
   try{
 
@@ -9765,13 +9826,15 @@ async function admGeneraReport(){
     const accMap={}
     visite.forEach(v=>{const k=+(v.tipo_accesso||0);if(k)accMap[k]=(accMap[k]||0)+1})
 
-    // Tipo intervento / opera / durata: quello dichiarato nella visita (30/09/2026, deciso dall'utente),
-    // e solo se la visita non lo dice quello del cantiere, che conserva un valore solo
+    // Tipo intervento / opera / durata / importo / committente: la scheda del cantiere, come nel file per
+    // l'Osservatorio (01/10/2026, deciso dall'utente); con la casella «vecchio parametro» il dichiarato in ogni visita
+    const dcDi=v=>datiCantiereStat(v,v.cantieri,vecchio)
     const tipIntMap={},tipOpeMap={},durataMap={}
     visite.forEach(v=>{
-      const ti=v.vis_tip_int??v.cantieri?.cantiere_tip_int;if(ti)tipIntMap[ti]=(tipIntMap[ti]||0)+1
-      const to=v.vis_tip_ope??v.cantieri?.cantiere_tip_ope;if(to)tipOpeMap[to]=(tipOpeMap[to]||0)+1
-      const du=v.vis_durata??v.cantieri?.cantiere_durata;if(du)durataMap[du]=(durataMap[du]||0)+1
+      const dc=dcDi(v)
+      const ti=dc.tipint;if(ti)tipIntMap[ti]=(tipIntMap[ti]||0)+1
+      const to=dc.tipope;if(to)tipOpeMap[to]=(tipOpeMap[to]||0)+1
+      const du=dc.durata;if(du)durataMap[du]=(durataMap[du]||0)+1
     })
 
     // Importo lavori / lavoratori / imprese / ditte individuali / tipo visita / committente
@@ -9784,12 +9847,12 @@ async function admGeneraReport(){
     let lavTot=0,lavN=0
     const putCls=(m,cls,v)=>{const c=cls.find(([a,b])=>v>=a&&v<=b);if(c)m[c[2]]++}
     visite.forEach(v=>{
-      const im=v.vis_importo??v.cantieri?.cantiere_importo
-      const kImp=im||11
+      const dc=dcDi(v)
+      const kImp=dc.importo||11
       importoMap[kImp]=(importoMap[kImp]||0)+1
-      /* 30/09/2026: prima quello scritto nella visita, poi quello del cantiere — l'anagrafica del
-         committente legato al cantiere dava 35 pubblici per privati e 10 al contrario */
-      const ct=v.comm_tipo||v.cantieri?.committenti?.committente_tipo
+      /* 01/10/2026: il committente e' quello collegato alla scheda del cantiere, come nel file per
+         l'Osservatorio. Dove l'anagrafica e' sbagliata o manca, si corregge l'anagrafica. */
+      const ct=dc.commtipo
       commMap[ct===1?'Pubblico':(ct===2?'Privato':'Non indicato')]++
       if(v.nr_lavoratori!=null&&v.nr_lavoratori!==''){const x=+v.nr_lavoratori;if(x>0){putCls(lavMap,clsLav,x);lavTot+=x;lavN++}}
       if(v.nr_imp!=null&&v.nr_imp!=='')putCls(impMap,clsImp,+v.nr_imp)
@@ -9840,7 +9903,7 @@ async function admGeneraReport(){
     }
 
     // ════ PAGINA 1 – KPI + Andamento + IPC + Tipo accesso + Tecnici ════
-    rptPageHeader(doc,'RAPPORTO VISITE IN CANTIERE',dalFmt,alFmt)
+    rptPageHeader(doc,'RAPPORTO VISITE IN CANTIERE',dalFmt,alFmt,notaVecchio)
     let y=28
 
     // KPI: card bianche con barra colorata a sinistra (la prima piena arancione)
@@ -9934,7 +9997,7 @@ async function admGeneraReport(){
 
     // ════ PAGINA 2 – Tipologie + Territorio ════
     doc.addPage()
-    rptPageHeader(doc,'TIPOLOGIE E DISTRIBUZIONE TERRITORIALE',dalFmt,alFmt)
+    rptPageHeader(doc,'TIPOLOGIE E DISTRIBUZIONE TERRITORIALE',dalFmt,alFmt,notaVecchio)
     y=28
 
     // Tipo intervento + Durata (mezza + mezza)
@@ -10011,7 +10074,7 @@ async function admGeneraReport(){
 
     // ════ PAGINA 3 – Caratteristiche dei cantieri visitati ════
     doc.addPage()
-    rptPageHeader(doc,'CARATTERISTICHE DEI CANTIERI E DELLE VISITE',dalFmt,alFmt)
+    rptPageHeader(doc,'CARATTERISTICHE DEI CANTIERI E DELLE VISITE',dalFmt,alFmt,notaVecchio)
     y=28
 
     const impKeys=Object.keys(importoMap).map(Number).sort((a,b)=>a-b)
@@ -10062,7 +10125,7 @@ async function admGeneraReport(){
 
     // ════ PAGINA 4 – Analisi macro aree ════
     doc.addPage()
-    rptPageHeader(doc,'ANALISI PER MACRO AREE DELLA CHECKLIST',dalFmt,alFmt)
+    rptPageHeader(doc,'ANALISI PER MACRO AREE DELLA CHECKLIST',dalFmt,alFmt,notaVecchio)
     y=28
 
     // Sintesi: verifiche totali, esiti conformi, rilievi
@@ -10140,7 +10203,7 @@ async function admGeneraReport(){
 
     // ════ PAGINA 5 – IPC per macro area: una torta per area, come nel foglio Google ════
     doc.addPage()
-    rptPageHeader(doc,'INDICE DI PERICOLOSIT\u00c0 PER MACRO AREA',dalFmt,alFmt)
+    rptPageHeader(doc,'INDICE DI PERICOLOSIT\u00c0 PER MACRO AREA',dalFmt,alFmt,notaVecchio)
     y=28
     // criteri di giudizio, gli stessi dell'IPC generale applicati ai rilievi della singola area
     const crit=[
@@ -10181,9 +10244,11 @@ async function admGeneraReport(){
     footer(5)
 
     // ── Salva ──
-    const fname=`Report_Visite_${dal}_${al}.pdf`
+    const fname=`Report_Visite_${dal}_${al}${vecchio?'_vecchio-parametro':''}.pdf`
     doc.save(fname)
     toast(`Report PDF generato: ${fname}`,'ok')
+    const manca=vecchio?'':datiCantiereMancanti(visite.map(v=>({c:v.cantieri})))
+    if(manca)toast('Schede dei cantieri incomplete (numero di visite): '+manca+'. Nel report sono «non disponibile», come risulteranno all\u2019Osservatorio.','warn',15000)
 
   }catch(e){
     console.error('admGeneraReport:',e)
@@ -10233,18 +10298,19 @@ function oxN(n){return n?String(n):''}
 
 // ── definizione dimensioni di analisi (ordine identico all'originale) ──
 // mappatura categorie report ← codifiche Osservatorio
-function oxCatOf(v,c,ruolo){
-  /* 01/10/2026 (deciso dall'utente): anche questo report conta quello dichiarato nella visita, e il
-     cantiere solo se la visita non lo dice. Prima leggeva il cantiere e dava numeri diversi dal Report
-     visite e dal foglio del modulo. Il file che va al nazionale resta un valore per cantiere. */
-  const ti=parseInt(v.vis_tip_int??c.cantiere_tip_int,10)||0
-  const to=parseInt(v.vis_tip_ope??c.cantiere_tip_ope,10)||0
+function oxCatOf(v,c,ruolo,vecchio){
+  /* 01/10/2026 (deciso dall'utente): importo, intervento, opera e committente sono quelli della scheda
+     del cantiere, come nel modello nazionale e nel file che va all'Osservatorio (datiCantiereStat).
+     vecchio=true: il dichiarato in ogni visita, per ristampare il report com'era. */
+  const dc=datiCantiereStat(v,v.cantieri,vecchio)
+  const ti=parseInt(dc.tipint,10)||0
+  const to=parseInt(dc.tipope,10)||0
   const tipope=(to===2)?1:([1,3,6,14,15].includes(to)?2:([5,9,10,11].includes(to)?3:(to===4?4:(to===8?5:(to>0?6:0)))))
-  const ct=parseInt((v.comm_tipo!=null?v.comm_tipo:(c.committenti&&c.committenti.committente_tipo)),10)||0
+  const ct=parseInt(dc.commtipo,10)||0
   // il report dell'Osservatorio usa il tipo di visita nazionale, come l'esportazione (30/09/2026)
   const ta=parseInt(v.tipo_accesso_naz!=null?v.tipo_accesso_naz:v.tipo_accesso,10)||0
   return{
-    importo:osImportoClass(v.vis_importo??c.cantiere_importo),
+    importo:osImportoClass(dc.importo),
     tipint:[1,2,3,4,6,7,8].includes(ti)?ti:0,
     tipope:tipope,
     commtipo:(ct===1||ct===2)?ct:0,
@@ -10543,11 +10609,14 @@ function oxHeader(doc,anno,titolo){
   doc.setFontSize(9)
   doc.text(anno,198,18.4,{align:'right'})
 }
+// testo scritto in fondo a ogni pagina quando il report e' stampato col vecchio parametro (vedi datiCantiereStat)
+let _oxNotaVecchio=''
 function oxFooter(doc,pg){
   doc.setFillColor(OXBRAND[0],OXBRAND[1],OXBRAND[2])
   doc.rect(10,282,190,4,'F')
   doc.setTextColor(130,130,130);doc.setFont('helvetica','normal');doc.setFontSize(7)
   doc.text('Pagina '+pg,105,291.5,{align:'center'})
+  if(_oxNotaVecchio){doc.setFontSize(6);doc.setFont('helvetica','bold');doc.setTextColor(196,63,10);doc.text(_oxNotaVecchio,105,294.6,{align:'center'});doc.setFont('helvetica','normal')}
 }
 function oxSec(doc,txt,y,sub){
   doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(86,92,102)
@@ -10582,6 +10651,9 @@ async function admGeneraReportOsservatorio(){
   const dal=($('sgr-dal')?.value)||''
   const al=($('sgr-al')?.value)||''
   if(!dal||!al){toast('Seleziona entrambe le date prima di generare il report','err');return}
+  // stampa col vecchio parametro (dichiarato in ogni visita): vedi datiCantiereStat
+  const vecchio=!!($('sgr-vecchio')&&$('sgr-vecchio').checked)
+  _oxNotaVecchio=vecchio?NOTA_VECCHIO_PARAMETRO:''
   toast('Elaborazione report Osservatorio in corso…','ok')
   try{
     // ── 1. visite + cantiere/committente ──
@@ -10590,7 +10662,7 @@ async function admGeneraReportOsservatorio(){
       const{data:b,error:e1}=await sb.from('visite').select([
         'visita_id','data_visita','cantiere_id','impresa_id','comm_tipo','tipo_accesso','tipo_accesso_naz',
         'vis_tip_int','vis_tip_ope','vis_importo',
-        'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_importo,cantiere_committente_id,committenti(committente_tipo))'
+        'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_importo,cantiere_durata,cantiere_committente_id,committenti(committente_tipo))'
       ].join(',')).gte('data_visita',dal).lte('data_visita',al).eq('elimina',0)
         .order('visita_id').range(from,from+999)
       if(e1)throw e1
@@ -10683,7 +10755,7 @@ async function admGeneraReportOsservatorio(){
         id:v.visita_id,data:v.data_visita,mese:m0==null?null:osMeseEdile(m0),
         cant:v.cantiere_id||v.visita_id,
         grp:(v.cantiere_id||v.visita_id)+'|'+(v.impresa_id||''),
-        cat:oxCatOf(v,c,ruoloByVis[v.visita_id]),
+        cat:oxCatOf(v,c,ruoloByVis[v.visita_id],vecchio),
         zone:z,sub:subByVis[v.visita_id]||{},cod:codByVis[v.visita_id]||{},
         ncp:ncp,ncm:ncm,oss:oss,ver:ver,
         esito:ncp>0?3:ncm>0?2:oss>0?1:0
@@ -10747,6 +10819,14 @@ async function admGeneraReportOsservatorio(){
     doc.text('Formedil Padova - Centro per la Formazione e la Sicurezza Edile di Padova',105,180,{align:'center'})
     doc.setFontSize(9);doc.setTextColor(140,140,140)
     doc.text('Emesso il '+new Date().toLocaleString('it-IT'),105,235,{align:'center'})
+    if(vecchio){
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,63,10)
+      doc.text('STAMPA COL VECCHIO PARAMETRO',105,150,{align:'center'})
+      doc.setFont('helvetica','normal');doc.setFontSize(8.5)
+      doc.text('Importo, tipo di intervento, tipo di opera e committente sono quelli dichiarati in ogni visita,',105,156,{align:'center'})
+      doc.text('non quelli della scheda del cantiere: i numeri di queste sezioni sono diversi dal report corrente',105,160.5,{align:'center'})
+      doc.text("e da quelli che l'Osservatorio nazionale ricava dai nostri dati.",105,165,{align:'center'})
+    }
     oxFooter(doc,pg)
 
     // ── PAGINA 2: QUADRO DI SINTESI - scheda 1 ──
@@ -11101,13 +11181,15 @@ async function admGeneraReportOsservatorio(){
       }
     }
 
-    const fname='Report_Osservatorio_'+dal+'_'+al+'.pdf'
+    const fname='Report_Osservatorio_'+dal+'_'+al+(vecchio?'_vecchio-parametro':'')+'.pdf'
     doc.save(fname)
     toast('Report Osservatorio generato ('+pg+' pagine): '+fname,'ok')
+    const manca=vecchio?'':datiCantiereMancanti(visite.map(v=>({c:v.cantieri})))
+    if(manca)toast('Schede dei cantieri incomplete (numero di visite): '+manca+'. Nel report sono «nd», come risulteranno all\u2019Osservatorio.','warn',15000)
   }catch(e){
     console.error('admGeneraReportOsservatorio:',e)
     toast('Errore generazione report: '+(e.message||e),'err')
-  }
+  }finally{_oxNotaVecchio=''}
 }
 window.admGeneraReportOsservatorio = admGeneraReportOsservatorio
 // imposta rapidamente le date dell'anno edile (ott→set)

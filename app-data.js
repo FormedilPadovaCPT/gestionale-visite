@@ -136,8 +136,12 @@ const _IMPORTO={1:'≤ 250k',2:'250k–500k',3:'500k–1M',4:'1–1,5M',5:'1,5�
 const _TIPO_ACC=TIPO_ACC_LABELS
 const _CCNL_LBL={'1':'Edilizia Industria','2':'Edilizia Artigianato','3':'Metalmeccanico Ind.','4':'Metalmeccanico Art.','5':'Installatori Impianti','6':'Legno','13':'Altro'}
 const _CCIA_LBL={'1':'Artigiana','2':'Industriale','3':'Cooperativa','4':'Commerciale','5':'Altro'}
-const _CCNL_FULL={1:'Edilizia industria',2:'Edilizia artigianato',3:'Lapidei industria',4:'Lapidei artigianato',5:'Altro/Non edile',6:'Non applicabile'}
-const _CCIA_FULL={1:'Iscritto',2:'Non iscritto',3:'Esonero'}
+/* 01/10/2026: la scheda dell'impresa aveva una tabella sua (3 = «Lapidei industria», 1 = «Iscritto»), diversa
+   dalle tendine con cui il dato si inserisce (3 = «Metalmeccanico Industria», 1 = «Artigiana»): lo stesso codice
+   si leggeva in due modi. Una tabella sola, quella delle tendine. Non sono tabelle nazionali: il manuale
+   dell'Osservatorio non le riporta (lo schema XSD ammette 1-3 per l'iscrizione e 1-13 per il contratto). */
+const _CCNL_FULL={1:'Edilizia Industria',2:'Edilizia Artigianato',3:'Metalmeccanico Industria',4:'Metalmeccanico Artigianato',5:'Installatori Impianti',6:'Legno',13:'Altro'}
+const _CCIA_FULL=_CCIA_LBL
 
 // --- Batch 3: blocchi dati multi-riga ---
 const LAV_DATA={

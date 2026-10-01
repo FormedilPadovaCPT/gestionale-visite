@@ -41,11 +41,13 @@ assert.strictEqual(comuneStat('PADOVA - Q5 SUD OVEST (Armistizio – Savonarola)
 assert.strictEqual(comuneStat(' Rubano '), 'RUBANO')
 assert.strictEqual(comuneStat(null), '')
 
-// ── 3. I tre punti leggono il dato dichiarato nella visita, il cantiere solo come riserva ──
+// ── 3. I tre punti leggono intervento, opera e importo con la stessa funzione ──
+// (dal pomeriggio del 01/10/2026 la regola sola e' la scheda del cantiere, come nel modello nazionale:
+//  il dettaglio e' in test/dati-del-cantiere.test.cjs; i dati dichiarati nella visita si scaricano ancora
+//  perche' servono alla stampa col vecchio parametro)
 const dash = estrai('// fetch visite con cantiere + impresa principale', '// Dataset leggero su TUTTO lo storico')
 assert.ok(/vis_tip_int,vis_tip_ope,vis_importo/.test(dash), 'pagina Statistiche: mancano i dati dichiarati nella visita')
-assert.ok(/tipint:\(r\.vis_tip_int\?\?c\.cantiere_tip_int\)/.test(dash), 'pagina Statistiche: tipo intervento dal cantiere')
-assert.ok(/importo:\(r\.vis_importo\?\?c\.cantiere_importo\)/.test(dash), 'pagina Statistiche: importo dal cantiere')
+assert.ok(/const dc=datiCantiereStat\(r,r\.cantieri\)/.test(dash), 'pagina Statistiche: non passa da datiCantiereStat')
 assert.ok(/comune:comuneStat\(/.test(dash), 'pagina Statistiche: comuni non unificati')
 assert.ok(/ceiv:ceivStat\(/.test(dash), 'pagina Statistiche: Cassa Edile non letta dalla lista')
 
@@ -59,10 +61,10 @@ assert.ok(/\[0,0,'nessuna'\],\[1,1,'1'\]/.test(rpt), 'Report visite: manca la cl
 assert.ok(/error:eChk/.test(rpt) && /if\(eChk\)throw/.test(rpt), 'Report visite: la lettura delle check-list non guarda error')
 assert.ok(/error:eVoci/.test(rpt) && /if\(eVoci\)throw/.test(rpt), 'Report visite: la lettura delle voci non guarda error')
 
-const oss = estrai('function oxCatOf(v,c,ruolo){', '// ══════════ GRAFICI CANVAS')
-assert.ok(/v\.vis_tip_int\?\?c\.cantiere_tip_int/.test(oss), 'Osservatorio: tipo intervento dal cantiere')
-assert.ok(/v\.vis_tip_ope\?\?c\.cantiere_tip_ope/.test(oss), 'Osservatorio: tipo opera dal cantiere')
-assert.ok(/osImportoClass\(v\.vis_importo\?\?c\.cantiere_importo\)/.test(oss), 'Osservatorio: importo dal cantiere')
+assert.ok(/datiCantiereStat\(v,v\.cantieri,vecchio\)/.test(rpt), 'Report visite: non passa da datiCantiereStat')
+const oss = estrai('function oxCatOf(v,c,ruolo,vecchio){', '// ══════════ GRAFICI CANVAS')
+assert.ok(/const dc=datiCantiereStat\(v,v\.cantieri,vecchio\)/.test(oss), 'Osservatorio: non passa da datiCantiereStat')
+assert.ok(/osImportoClass\(dc\.importo\)/.test(oss), 'Osservatorio: importo non dalla funzione comune')
 const ossSel = estrai('async function admGeneraReportOsservatorio(){', "].join(',')).gte('data_visita',dal)")
 assert.ok(/'vis_tip_int','vis_tip_ope','vis_importo'/.test(ossSel), 'Osservatorio: non scarica i dati dichiarati nella visita')
 
@@ -75,4 +77,4 @@ const acc = estrai('async function autoAccCant(cantId){', '// ── MODAL NUOVO
 assert.ok(/gia\.stato==='definitivo'&&gia\.acc_cant/.test(acc), 'numero di accesso: un definitivo viene ricalcolato')
 assert.ok(/\.lte\('data_visita',dataV\)/.test(acc), 'numero di accesso: conta anche le visite successive')
 
-console.log('ok — statistiche: una regola sola (C.E.I.V. dalla lista, dato della visita, comuni unificati) e maschera protetta')
+console.log('ok — statistiche: una regola sola (C.E.I.V. dalla lista, dati del cantiere dalla funzione comune, comuni unificati) e maschera protetta')
