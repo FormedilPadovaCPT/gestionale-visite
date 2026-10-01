@@ -253,10 +253,10 @@ const OXD=[
   {key:'importo',title:'IMPORTO LAVORI CANTIERE',sub:'(classi di importo in migliaia di euro)',schede:3,
    cats:[1,2,3,4,5],lbl:{1:'Fino a 250',2:'da 251 a 500',3:'da 501 a 1.500',4:'da 1.501 a 5.000',5:'oltre 5.000'},
    blk:{1:'fino a 250.000',2:'da 250.001 a 500.000',3:'da 500.001 a 1.500.000',4:'da 1.500.001 a 5.000.000',5:'oltre 5.000.000'}},
-  {key:'tipint',title:'TIPO INTERVENTO',sub:'',schede:3,
+  {key:'tipint',title:'TIPO INTERVENTO',sub:'',schede:3,s3cats:[1,2,3,4],
    cats:[1,2,3,4,6,7,8],lbl:{1:'costruzione',2:'ristrutturazione',3:'demolizione',4:'ampliamento',6:'consolidamento',7:'messa in sicurezza',8:'demoliz. e ricostruz. post sisma'},
    blk:{1:'COSTRUZIONE',2:'RISTRUTTURAZIONE',3:'DEMOLIZIONE',4:'AMPLIAMENTO',6:'CONSOLIDAMENTO',7:'MESSA IN SICUREZZA',8:'DEMOLIZ. E RICOSTRUZ. POST SISMA'}},
-  {key:'tipope',title:'TIPO OPERA',sub:'',schede:3,
+  {key:'tipope',title:'TIPO OPERA',sub:'',schede:3,s3cats:[1,2,3,4,5],
    cats:[1,2,3,4,5,6],lbl:{1:'civile',2:'produttivo',3:'trasporti',4:'ospedaliera',5:'scolastico',6:'altro'},
    blk:{1:'CIVILE',2:'PRODUTTIVO',3:'TRASPORTI',4:'OSPEDALIERO',5:'SCOLASTICO',6:'ALTRO'}},
   {key:'commtipo',title:'TIPO COMMITTENTE',sub:'',schede:3,
@@ -559,23 +559,31 @@ const XSD_FILES={
 }
 
 const OS_SUB={
-  IMP_LOG:'Logistica',IMP_IGS:'Apprestamenti igienico-sanitari',IMP_ELE:'Impianti elettrici',IMP_AGI:'Agibilità del cantiere',IMP_ORG:'Organizzazione del lavoro',IMP_SEG:'Segnaletica',
-  PLL_SCA:'Aree di scavo',PLL_DEM:'Aree di demolizione',PLL_PER:'Aree di pericolo',
+  IMP_LOG:'Logistica',IMP_IGS:'Apprestamenti igienico-sanitari',IMP_ELE:'Impianti elettrici',IMP_AGI:'Agibilità del cantiere',IMP_ORG:'Organizzazione del lavoro',IMP_SEG:'Segnaletica',IMP_CON:'Condizioni di contorno',
+  PLL_SCA:'Aree di scavo',PLL_DEM:'Aree di demolizione',PLL_PER:'Altre aree di pericolo',PLL_OCA:'Opere in c.a.',
   SOL_GRU:'Gru',SOL_AUT:'Autogru',SOL_ARG:'Argano',SOL_PIA:'Piattaforme di lavoro elevabili',
   ASU_ATT:'Attrezzature',ASU_SCA:'Scale',ASU_UTE:'Utensili',
   MAC_MMT:'Macchine movimento terra',MAC_MMM:'Macchine movimentazione materiale',MAC_MAS:'Macchine stradali',
   OPE_POF:'Ponteggi fissi',OPE_POS:'Ponteggi sospesi',OPE_POC:'Ponteggi su cavalletti',OPE_POT:'Ponti su ruote - trabattelli',OPE_DPC:'Altri DPC',
   PIN_IND:'Indumenti di protezione',PIN_TES:'Protezione della testa',PIN_PIE:'Protezione dei piedi',PIN_MAN:'Protezione delle mani',PIN_UDI:"Protezione dell'udito",PIN_CAD:'Protezione contro la caduta dall’alto',PIN_OCC:'Protezione degli occhi',PIN_RES:'Protezione delle vie respiratorie',
-  DOC_GEN:'Generale',DOC_MA4:'Macchine e attrezzature (art. 71, c4)',DOC_MA8:'Macchine e attrezzature (art. 71, c8)',DOC_DPI:'DPI',DOC_ELE:'Impianto elettrico e di terra',DOC_PON:'Ponteggi',
+  DOC_GEN:'Generale',DOC_GEN_SOL:'Apparecchi di sollevamento',DOC_MA4:'Macchine e attrezzature (art. 71, c4)',DOC_MA8:'Macchine e attrezzature (art. 71, c8)',DOC_DPI:'DPI',DOC_ELE:'Impianto elettrico e di terra',DOC_PON:'Ponteggi',
   SOG_FIG:'Nomine di figura di sistema',
   FOR_BAS:'Formazione di base',FOR_FIG:'Figura di sistema',FOR_RIS:'Form./addes. Rischi specifici',FOR_ATM:'Form./addes. Attrezzature/macchine'
 }
+
+/* 01/10/2026 — Dal confronto col report nazionale (Formedil Venezia 2024-25).
+   OS_SUB_ALIAS: sottoaree nostre che nel modello non hanno una riga propria. Gli accessori di
+   sollevamento (SOL_ASO) nella checklist nazionale sono voci della Gru (50-53).
+   OS_POT_NAZ: «N. verifiche potenziali» = le voci della checklist NAZIONALE per area (323 in tutto),
+   non le nostre: e' il numero che stampa l'Osservatorio per ogni ente. */
+const OS_SUB_ALIAS={SOL_ASO:'SOL_GRU'}
+const OS_POT_NAZ={1:43,2:23,3:34,4:35,5:20,6:48,7:20,8:55,9:11,10:34}
 
 const _CHK_PREF={
   'IMP_LOG':'Logistica','IMP_IGS':'Appr. igienico-sanitari',
   'IMP_ELE':'Impianti elettrici','IMP_AGI':'Agibilita cantiere',
   'IMP_ORG':'Organizzazione lavoro','IMP_SEG':'Segnaletica','IMP_CON':'Condizioni al contorno',
-  'PLL_SCA':'Aree di scavo','PLL_DEM':'Aree demolizione','PLL_OCA':'Altre aree pericolo','PLL_PER':'Opere in c.a.',
+  'PLL_SCA':'Aree di scavo','PLL_DEM':'Aree demolizione','PLL_OCA':'Opere in c.a.','PLL_PER':'Altre aree pericolo',
   'SOL_GRU':'Gru','SOL_AUT':'Autogru','SOL_ARG':'Argano',
   'SOL_PIA':'Piattaforme elevabili','SOL_ASO':'Altri sollevatori',
   'ASU_ATT':'Attrezzature','ASU_SCA':'Scale','ASU_UTE':'Utensili',

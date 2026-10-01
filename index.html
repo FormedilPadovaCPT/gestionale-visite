@@ -2308,7 +2308,7 @@ window.onunhandledrejection = function(e) {
 };
 </script>
 
-<script src="app-data.js?v=7"></script>
+<script src="app-data.js?v=8"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -5578,7 +5578,7 @@ async function loadStat(){
   // fetch visite con cantiere + impresa principale (paginato).
   // Default: SOLO esercizio corrente per un avvio veloce; lo storico completo
   // viene scaricato solo quando l'utente lo richiede dal menu esercizio.
-  const cols=`visita_id,data_visita,ipc,rlst_sn,acc_cant,tecnico_id,tipo_accesso,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantiere_id,impresa_id,vis_tip_int,vis_tip_ope,vis_importo,cantieri(comune_nome,cantiere_tip_int,cantiere_tip_ope,cantiere_importo),visite_imprese_presenti(is_principale,tipo_imp,impresa_id,imprese(impresa_nome,stato_cassa))`
+  const cols=`visita_id,data_visita,ipc,rlst_sn,acc_cant,tecnico_id,tipo_accesso,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantiere_id,impresa_id,vis_tip_int,vis_tip_ope,vis_importo,cantieri(comune_nome,cantiere_tip_int,cantiere_tip_ope,cantiere_importo),visite_imprese_presenti(is_principale,tipo_imp,ruolo,impresa_id,imprese(impresa_nome,stato_cassa))`
   let rows=[],from=0
   for(;;){
     let _q=sb.from('visite').select(cols).eq('elimina',0).order('data_visita',{ascending:true}).range(from,from+999)
@@ -5601,7 +5601,7 @@ async function loadStat(){
       /* 01/10/2026: stessa regola del Report visite — vale quello dichiarato nella visita, il cantiere
          solo se la visita non lo dice; prima questa pagina leggeva il cantiere e dava altri numeri */
       comune:comuneStat(c.comune_nome)||null, tipint:(r.vis_tip_int??c.cantiere_tip_int)||null, tipope:(r.vis_tip_ope??c.cantiere_tip_ope)||null, importo:(r.vis_importo??c.cantiere_importo)||null,
-      ruolo:(p&&p.tipo_imp)||null, ceiv:ceivStat(p&&p.imprese),
+      ruolo:(p&&tipoImpDaRiga(p))||null, ceiv:ceivStat(p&&p.imprese),
       impnome:(p&&p.imprese&&p.imprese.impresa_nome)||null, impid:(p&&p.impresa_id)||null,
       eserc:_esercizioDa(r.data_visita)
     }
@@ -10253,6 +10253,47 @@ function oxCatOf(v,c,ruolo){
   }
 }
 
+/* 01/10/2026 — Tre calcoli riallineati al modello nazionale (report di Formedil Venezia 2024-25).
+   1. Ruolo dell'impresa: si legge il ruolo scritto per esteso, nella scala a tre valori dell'Osservatorio
+      (subappaltatrice, autonomo e fornitrice confluiscono in «esecutrice», come nell'XML). Il codice
+      tipo_imp e' solo la riserva: le importazioni l'avevano scritto con significati diversi.
+   2. Visite secondo l'esito: «presenza NC-» e «presenza NC+» contano ogni visita che ne ha almeno una,
+      quindi una visita con entrambe sta in tutte e due le colonne (a Venezia la somma fa 756 su 627 visite).
+   3. Frequenza visite stesso cantiere/impresa: l'ordine della visita si conta su TUTTA la storia del
+      cantiere con quell'impresa, non nel solo periodo (a Venezia le prime visite sono 432 su 477 cantieri:
+      contando nel periodo sarebbe impossibile). */
+const OX_RUOLO_NAZ={'affidataria':1,'affidataria ed esecutrice':2,'esecutrice':3,'subappaltatrice':3,'lavoratore autonomo':3,'fornitrice':3}
+function oxRuoloNaz(r){
+  const t=String((r&&r.ruolo)||'').trim().toLowerCase()
+  if(OX_RUOLO_NAZ[t])return OX_RUOLO_NAZ[t]
+  const k=parseInt(r&&r.tipo_imp,10)||0
+  return k>=3?3:k
+}
+// V: visite con ncp, ncm, oss → [nessuna OSS e/o NC, presenza solo OSS, presenza NC-, presenza NC+]
+function oxEsitiVisite(V){
+  const e=[0,0,0,0]
+  ;(V||[]).forEach(v=>{
+    if(v.ncp>0)e[3]++
+    if(v.ncm>0)e[2]++
+    if(!(v.ncp>0)&&!(v.ncm>0)){if(v.oss>0)e[1]++;else e[0]++}
+  })
+  return e
+}
+// righe {visita_id,data_visita,cantiere_id,impresa_id} di tutta la storia → {visita_id: ordine da 0}
+function oxOrdineStoria(righe){
+  const g={}
+  ;(righe||[]).forEach(r=>{
+    const k=(r.cantiere_id||r.visita_id)+'|'+(r.impresa_id||'')
+    ;(g[k]=g[k]||[]).push(r)
+  })
+  const ord={}
+  Object.values(g).forEach(a=>{
+    a.sort((x,y)=>(x.data_visita||'').localeCompare(y.data_visita||'')||String(x.visita_id).localeCompare(String(y.visita_id)))
+    a.forEach((r,i)=>{ord[r.visita_id]=i})
+  })
+  return ord
+}
+
 // ══════════ GRAFICI CANVAS ══════════
 // Disegno a OXK px per mm (con supersampling OXSS): font in px coerenti.
 const OXK=4
@@ -10326,8 +10367,13 @@ function oxBars(o){
   const px=padL,pw=W-padL-padR,py=top,ph=H-top-padB
   const ser=o.series
   let max=0
-  ser.forEach(s=>s.data.forEach(v=>{if(v>max)max=v}))
-  if(o.lineData)o.lineData.forEach(v=>{if(v!=null&&v>max)max=v})
+  if(o.stacked){for(let i=0;i<o.cats.length;i++){let t=0;ser.forEach(s=>{t+=s.data[i]||0});if(t>max)max=t}}
+  else ser.forEach(s=>s.data.forEach(v=>{if(v>max)max=v}))
+  /* la linea ha una scala sua, come l'asse secondario del modello: sulla scala delle barre (centinaia
+     di visite) una media di 5-15 verifiche restava schiacciata sul fondo e non si leggeva */
+  let lmax=0
+  if(o.lineData)o.lineData.forEach(v=>{if(v!=null&&v>lmax)lmax=v})
+  lmax=oxNice(lmax||1)
   const ymax=oxNice(max||1)
   // griglia + asse Y
   g.strokeStyle='#e2e4e7';g.lineWidth=1
@@ -10340,15 +10386,17 @@ function oxBars(o){
     g.fillText(o.fmtAxis?o.fmtAxis(val):(val%1?oxIt(val,1):String(val)),px-4,yy+3)
   }
   const n=o.cats.length,k=ser.length
-  const slot=pw/n,grpW=slot*.72,bw=grpW/k
+  const slot=pw/n,grpW=slot*(o.stacked?.5:.72),bw=o.stacked?grpW:grpW/k
   for(let i=0;i<n;i++){
+    let base=0
     for(let j=0;j<k;j++){
       const v=ser[j].data[i]||0
       const bh=ymax?v/ymax*ph:0
-      const x=px+i*slot+(slot-grpW)/2+j*bw
+      const x=px+i*slot+(slot-grpW)/2+(o.stacked?0:j*bw)
       const col=(ser[j].colors&&ser[j].colors[i])||ser[j].color
       g.fillStyle=col
-      if(bh>0)g.fillRect(x,py+ph-bh,Math.max(bw-2,2),bh)
+      if(bh>0)g.fillRect(x,py+ph-base-bh,Math.max(bw-2,2),bh)
+      if(o.stacked)base+=bh
       if(o.labels!==false){
         const lbl=o.fmt?o.fmt(v):(v?String(v):(o.zeroLbl||''))
         if(lbl!==''){
@@ -10374,7 +10422,7 @@ function oxBars(o){
     for(let i=0;i<n;i++){
       const v=o.lineData[i]
       if(v==null)continue
-      const x=px+i*slot+slot/2,y=py+ph-(ymax?v/ymax*ph:0)
+      const x=px+i*slot+slot/2,y=py+ph-(v/lmax*ph)
       if(!started){g.moveTo(x,y);started=true}else g.lineTo(x,y)
     }
     g.stroke()
@@ -10409,7 +10457,7 @@ function oxPie3D(o){
     g.fillStyle=OXC.gr;g.font='bold 11px Helvetica,Arial';g.textAlign='center'
     g.fillText(o.title,W/2,14);top=20
   }
-  const legW=Math.min(W*.42,150)
+  const legW=o.noLegend?0:Math.min(W*.42,150)
   const tot=o.data.reduce((s,x)=>s+(x||0),0)
   const cx=(W-legW)/2,cy=top+(H-top)/2-5
   const rx=Math.min((W-legW)/2-16,(H-top)/2-16),ry=rx*.5,dp=Math.max(rx*.2,8)
@@ -10447,8 +10495,8 @@ function oxPie3D(o){
       if(frac<0.03)return
       const am=(s.a0+s.a1)/2
       const lx=cx+Math.cos(am)*rx*.62,ly=cy+Math.sin(am)*ry*.62
-      g.fillStyle='#fff'
-      g.fillText(String(s.v),lx,ly+3)
+      g.fillStyle=o.lblColor||'#fff'
+      g.fillText(o.fmt?o.fmt(s.v):String(s.v),lx,ly+3)
     })
   }else{
     g.fillStyle='#999';g.font='10px Helvetica,Arial';g.textAlign='center'
@@ -10457,7 +10505,7 @@ function oxPie3D(o){
   // legenda a destra
   g.font='8.5px Helvetica,Arial';g.textAlign='left'
   let ly=top+8
-  o.labels.forEach((lb,i)=>{
+  ;(o.noLegend?[]:o.labels).forEach((lb,i)=>{
     if(ly>H-6)return
     g.fillStyle=o.colors[i%o.colors.length];g.fillRect(W-legW+4,ly-7,8,8)
     g.fillStyle=OXC.gr
@@ -10553,14 +10601,17 @@ async function admGeneraReportOsservatorio(){
     const vids=visite.map(v=>v.visita_id)
 
     // ── 2. voci checklist: zona + verifiche potenziali ──
-    const{data:voci}=await sb.from('checklist_voci').select('codice,zona_osserv,is_nota')
-    const cod2zona={},zonaPot={}
+    const{data:voci,error:eVoci}=await sb.from('checklist_voci').select('codice,zona_osserv,is_nota,prefisso')
+    if(eVoci)throw eVoci
+    /* 01/10/2026: la sottoarea e' il prefisso della voce (prima si ricavava spezzando il codice, e
+       «DOC_GEN_SOL» finiva dentro «Generale»); le verifiche potenziali sono quelle nazionali */
+    const cod2zona={},cod2sub={},zonaPot=Object.assign({},OS_POT_NAZ)
     ;(voci||[]).forEach(v=>{
       if(!v.codice)return
       const z=v.zona_osserv||OS_ZP[v.codice.substring(0,3).toUpperCase()]
       if(!z)return
       cod2zona[v.codice]=z
-      if(!v.is_nota)zonaPot[z]=(zonaPot[z]||0)+1
+      if(v.prefisso)cod2sub[v.codice]=OS_SUB_ALIAS[v.prefisso]||v.prefisso
     })
 
     // ── 3. esiti checklist per visita ──
@@ -10582,16 +10633,27 @@ async function admGeneraReportOsservatorio(){
     for(let i=0;i<vids.length;i+=100){
       const b=[]
       for(let from=0;;from+=1000){
-        const{data:bb,error:e3}=await sb.from('visite_imprese_presenti').select('visita_id,tipo_imp,is_principale')
+        const{data:bb,error:e3}=await sb.from('visite_imprese_presenti').select('visita_id,tipo_imp,ruolo,is_principale')
           .in('visita_id',vids.slice(i,i+100)).order('id').range(from,from+999)
         if(e3)throw e3
         if(bb&&bb.length)b.push(...bb)
         if(!bb||bb.length<1000)break
       }
       ;(b||[]).forEach(r=>{
-        if(ruoloByVis[r.visita_id]===undefined||r.is_principale)ruoloByVis[r.visita_id]=parseInt(r.tipo_imp,10)||0
+        if(ruoloByVis[r.visita_id]===undefined||r.is_principale)ruoloByVis[r.visita_id]=oxRuoloNaz(r)
       })
     }
+
+    // ── 4b. ordine di ogni visita nella storia del cantiere con quell'impresa (fino alla fine del periodo) ──
+    const storia=[]
+    for(let from=0;;from+=1000){
+      const{data:b,error:e4}=await sb.from('visite').select('visita_id,data_visita,cantiere_id,impresa_id')
+        .lte('data_visita',al).eq('elimina',0).order('visita_id').range(from,from+999)
+      if(e4)throw e4
+      if(b&&b.length)storia.push(...b)
+      if(!b||b.length<1000)break
+    }
+    const ordStoria=oxOrdineStoria(storia)
 
     // ── 5. pre-elaborazione per visita ──
     const zoneByVis={},subByVis={},codByVis={}
@@ -10603,7 +10665,7 @@ async function admGeneraReportOsservatorio(){
       if(!z)return
       const zo=(zoneByVis[visita_id]=zoneByVis[visita_id]||{})
       const zz=(zo[z]=zo[z]||{ver:0,oss:0,ncm:0,ncp:0})
-      const subKey=codice.split('_').slice(0,2).join('_')
+      const subKey=cod2sub[codice]||codice.split('_').slice(0,2).join('_')
       const so=(subByVis[visita_id]=subByVis[visita_id]||{})
       const ss=(so[subKey]=so[subKey]||{ver:0,oss:0,ncm:0,ncp:0,zona:z})
       if(r===0){zz.ver++;ss.ver++}else if(r===1){zz.oss++;ss.oss++}else if(r===2){zz.ncm++;ss.ncm++}else{zz.ncp++;ss.ncp++}
@@ -10657,8 +10719,9 @@ async function admGeneraReportOsservatorio(){
     const byGrp={}
     V.forEach(v=>{(byGrp[v.grp]=byGrp[v.grp]||[]).push(v)})
     Object.values(byGrp).forEach(a=>a.sort((x,y)=>(x.data||'').localeCompare(y.data||'')))
+    // frequenza: ordine sulla storia intera (byGrp, nel solo periodo, resta per le matrici delle schede 3)
     const freq=[0,0,0,0]
-    Object.values(byGrp).forEach(a=>a.forEach((_,i)=>{freq[Math.min(i,3)]++}))
+    V.forEach(v=>{freq[Math.min(ordStoria[v.id]||0,3)]++})
 
     // ════════ PDF ════════
     const{jsPDF}=window.jspdf
@@ -10701,7 +10764,7 @@ async function admGeneraReportOsservatorio(){
     oxSec(doc,'FREQUENZA VISITE STESSO CANTIERE/IMPRESA',y2)
     doc.text("VISITE SECONDO L'ESITO DELLE VERIFICHE *",78,y2)
     doc.text('ESITO VERIFICHE *',146,y2)
-    const esitiVis=[0,0,0,0];V.forEach(v=>esitiVis[v.esito]++)
+    const esitiVis=oxEsitiVisite(V)
     const freqLbl=['prime visite','seconde visite','terze visite','visite oltre la terza']
     const esitoVisLbl=['nessuna OSS e/o NC','presenza solo OSS','presenza NC-','presenza NC+']
     const esitoVerLbl=['nessuna OSS e/o NC','OSS','NC-','NC+']
@@ -10788,6 +10851,8 @@ async function admGeneraReportOsservatorio(){
     for(const d of OXD){
       const cats=d._cats,k=cats.length
       const lbls=cats.map(c=>d._lbl(c))
+      // come nel modello: «nd» sta nelle tabelle, non nei grafici, nel coefficiente e nelle medie
+      const kk=d.cats.length,lblsG=lbls.slice(0,kk)
 
       // ───── SCHEDA 1 ─────
       newPage()
@@ -10818,14 +10883,15 @@ async function admGeneraReportOsservatorio(){
         didParseCell:dd=>{if(dd.section==='body'&&dd.row.index>=12){dd.cell.styles.fontStyle=dd.row.index===13?'bolditalic':'bold';dd.cell.styles.fillColor=OXT.tot}}})
       let yy=doc.lastAutoTable.finalY+4
       doc.addImage(oxBars({w:96,h:48,title:'VISITE E CANTIERI PER '+d.title.replace(' CANTIERE',''),
-        cats:lbls,series:[{label:'VISITE',color:OXC.s1,data:totVis},{label:'CANTIERI',color:OXC.s2,data:totCant}],
+        cats:lblsG,series:[{label:'VISITE',color:OXC.s1,data:totVis.slice(0,kk)},{label:'CANTIERI',color:OXC.s2,data:totCant.slice(0,kk)}],
         legend:'bottom',fmt:oxN,fontScale:.85,catFont:6.5}),'PNG',12,yy,96,48)
       doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setTextColor(86,92,102)
       doc.text('COEFFICIENTE VISITE/CANTIERI',155,yy+2,{align:'center'})
       oxTbl(doc,{startY:yy+3,margin:{left:112},tableWidth:86,
-        head:[lbls],body:[totVis.map((x,i)=>totCant[i]?oxIt(x/totCant[i],1):'-')],
+        head:[lblsG],body:[totVis.slice(0,kk).map((x,i)=>totCant[i]?oxIt(x/totCant[i],1):'-')],
         styles:{fontSize:5},headStyles:{fontSize:4.8}})
-      doc.addImage(oxPie3D({w:86,h:34,data:totVis,labels:lbls,colors:OXC.pie}),'PNG',112,yy+13,86,34)
+      // la torta del modello rappresenta i coefficienti visite/cantieri, non le visite
+      doc.addImage(oxPie3D({w:86,h:34,data:totVis.slice(0,kk).map((x,i)=>totCant[i]?x/totCant[i]:0),labels:lblsG,colors:OXC.pie,fmt:v=>oxIt(v,1)}),'PNG',112,yy+13,86,34)
       yy+=52
       oxSec(doc,'INADEMPIENZE RILEVATE',yy,d.sub)
       const ncpMx=OS_MESI.map(()=>cats.map(()=>0)),ncmMx=OS_MESI.map(()=>cats.map(()=>0))
@@ -10851,18 +10917,19 @@ async function admGeneraReportOsservatorio(){
         didParseCell:dd=>{if(dd.section==='body'&&dd.row.index>=12){dd.cell.styles.fontStyle=dd.row.index===13?'bolditalic':'bold';dd.cell.styles.fillColor=OXT.tot}}})
       yy=doc.lastAutoTable.finalY+4
       doc.addImage(oxBars({w:96,h:44,title:'INADEMPIENZE PER '+d.title.replace(' CANTIERE',''),
-        cats:lbls,series:[{label:'NC+',color:OXC.ncp,data:ncpCat},{label:'NC-',color:OXC.ncm,data:ncmCat}],
+        cats:lblsG,series:[{label:'NC+',color:OXC.ncp,data:ncpCat.slice(0,kk)},{label:'NC-',color:OXC.ncm,data:ncmCat.slice(0,kk)}],
         legend:'bottom',fmt:oxN,fontScale:.85,catFont:6.5}),'PNG',12,yy,96,44)
       doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setTextColor(86,92,102)
       doc.text('MEDIA INADEMPIENZE PER VISITA',155,yy+2,{align:'center'})
       oxTbl(doc,{startY:yy+3,margin:{left:112},tableWidth:86,
-        head:[['',...lbls]],
-        body:[['NC+',...cats.map((c,i)=>totVis[i]?oxIt(ncpCat[i]/totVis[i],1):'-')],
-              ['NC-',...cats.map((c,i)=>totVis[i]?oxIt(ncmCat[i]/totVis[i],1):'-')]],
+        head:[['',...lblsG]],
+        body:[['NC+',...d.cats.map((c,i)=>totVis[i]?oxIt(ncpCat[i]/totVis[i],1):'-')],
+              ['NC-',...d.cats.map((c,i)=>totVis[i]?oxIt(ncmCat[i]/totVis[i],1):'-')]],
         styles:{fontSize:5},headStyles:{fontSize:4.8},columnStyles:{0:{fontStyle:'bold'}}})
-      doc.addImage(oxBars({w:86,h:28,cats:lbls,
-        series:[{label:'NC+',color:OXC.ncp,data:cats.map((c,i)=>totVis[i]?ncpCat[i]/totVis[i]:0)},
-                {label:'NC-',color:OXC.ncm,data:cats.map((c,i)=>totVis[i]?ncmCat[i]/totVis[i]:0)}],
+      // barre impilate, come nel modello
+      doc.addImage(oxBars({w:86,h:28,cats:lblsG,stacked:true,
+        series:[{label:'NC+',color:OXC.ncp,data:d.cats.map((c,i)=>totVis[i]?ncpCat[i]/totVis[i]:0)},
+                {label:'NC-',color:OXC.ncm,data:d.cats.map((c,i)=>totVis[i]?ncmCat[i]/totVis[i]:0)}],
         legend:'right',labels:false,fmtAxis:v=>oxIt(v,1),fontScale:.8,catFont:6}),'PNG',112,yy+15,86,28)
       oxFooter(doc,pg)
 
@@ -10904,14 +10971,14 @@ async function admGeneraReportOsservatorio(){
       doc.text('Grafici area cantiere (barre verticali per numero visite, linea di tendenza per media verifiche per visita)',12,ys)
       ys+=2
       const miniZones=[1,2,3,4,5,6,7,8,10]
-      const miniLbls=cats.map(c=>c===0?'nd':d.lbl[c])
+      const miniLbls=lblsG
       const mW=61
       // altezza adattiva: le 3 righe di grafici + la sezione successiva devono stare in pagina
       const pitch1=Math.max(20,Math.min(28,(150-ys)/3))
       const mH=pitch1-2
       miniZones.forEach((z,mi)=>{
         const col=mi%3,row=Math.floor(mi/3)
-        const bars=zVis[z],line=bars.map((x,i)=>x?zVer[z][i]/x:null)
+        const bars=zVis[z].slice(0,kk),line=bars.map((x,i)=>x?zVer[z][i]/x:null)
         doc.addImage(oxMiniCombo({w:mW,h:mH,title:OS_ZONE_NAMI[z].toUpperCase(),cats:miniLbls,bars:bars,line:line}),
           'PNG',12+col*63,ys+row*pitch1,mW,mH)
       })
@@ -10950,8 +11017,8 @@ async function admGeneraReportOsservatorio(){
       miniZones.forEach((z,mi)=>{
         const col=mi%3,row=Math.floor(mi/3)
         const vr=zVer[z]
-        const pp=zNcp[z].map((x,i)=>vr[i]?x/vr[i]*100:0)
-        const qq=zNcm[z].map((x,i)=>vr[i]?x/vr[i]*100:0)
+        const pp=zNcp[z].slice(0,kk).map((x,i)=>vr[i]?x/vr[i]*100:0)
+        const qq=zNcm[z].slice(0,kk).map((x,i)=>vr[i]?x/vr[i]*100:0)
         doc.addImage(oxMiniNC({w:mW,h:mH2,title:OS_ZONE_NAMI[z].toUpperCase(),cats:miniLbls,ncp:pp,ncm:qq}),
           'PNG',12+col*63,ys+row*pitch2,mW,mH2)
       })
@@ -10963,10 +11030,10 @@ async function admGeneraReportOsservatorio(){
         newPage()
         oxHeader(doc,anno,d.title+' - scheda 3')
         doc.setFont('helvetica','bold');doc.setFontSize(6.6);doc.setTextColor(86,92,102)
-        doc.text('ANALISI VERIFICHE. VISITE MULTIPLE STESSO CANTIERE-IMPRESA. CONFRONTO TRA PRIMA E ULTIMA VISITA DELLA STESSA VERIFICA*',12,25)
+        doc.text('ANALISI VERIFICHE DELLE VISITE MULTIPLE STESSO CANTIERE-IMPRESA NEL PERIODO. CONFRONTO TRA PRIMA E ULTIMA VISITA DELLA STESSA VERIFICA*',12,25)
         let ym=31
         const esitoLblS=['nessun oss/nc','oss','nc-','nc+']
-        for(const c of d.cats){
+        for(const c of (d.s3cats||d.cats)){
           const mx=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]
           Object.values(byGrp).forEach(arr=>{
             if(arr.length<2)return
@@ -10999,9 +11066,12 @@ async function admGeneraReportOsservatorio(){
             body:esitoLblS.map((e,r)=>[e,...mx[r].map(x=>x?String(x):'')]),
             styles:{fontSize:5,cellPadding:{top:.9,bottom:.9,left:.5,right:.5}},headStyles:{fontSize:4.6},
             columnStyles:{0:{halign:'left',fontStyle:'bold',cellWidth:16}},didParseCell:heat})
+          // totale delle verifiche confrontate, sotto la matrice come nel modello
+          doc.setFont('helvetica','normal');doc.setFontSize(5.2);doc.setTextColor(86,92,102)
+          doc.text(String(mtot),65,doc.lastAutoTable.finalY+3,{align:'right'})
           oxTbl(doc,{startY:ym+5,margin:{left:70},tableWidth:50,
             head:[['',...esitoLblS]],
-            body:esitoLblS.map((e,r)=>[e,...mx[r].map(x=>mtot?oxPct(x/mtot*100):'-')]),
+            body:esitoLblS.map((e,r)=>[e,...mx[r].map(x=>(mtot&&x)?oxPct(x/mtot*100):'-')]),
             styles:{fontSize:5,cellPadding:{top:.9,bottom:.9,left:.5,right:.5}},headStyles:{fontSize:4.6},
             columnStyles:{0:{halign:'left',fontStyle:'bold',cellWidth:14}},didParseCell:heat})
           const sumLbl=['miglioramento','stabilità positiva','stabilità negativa','peggioramento']
@@ -11015,8 +11085,7 @@ async function admGeneraReportOsservatorio(){
                 dd.cell.styles.fillColor=[OXT.heatG,OXT.heatN,OXT.heatC,OXT.heatO][dd.row.index]
               }
             }})
-          doc.addImage(oxBars({w:26,h:22,cats:['','','',''],
-            series:[{label:'',color:'#fff',colors:OXC.trans,data:sumVal}],labels:false,fontScale:.75}),'PNG',172,ym+3,26,22)
+          doc.addImage(oxPie3D({w:26,h:22,data:sumVal,labels:sumLbl,colors:OXC.trans,noLegend:true,fmt:()=>''}),'PNG',172,ym+3,26,22)
           doc.setFontSize(4);doc.setFont('helvetica','normal');doc.setTextColor(86,92,102)
           const lgX=[172,185,172,185],lgY=[ym+28,ym+28,ym+31,ym+31]
           sumLbl.forEach((s,i)=>{
