@@ -4574,6 +4574,14 @@ async function saveVisita(stato){
     if(!_cvOk)return
   }
 
+  // l'incarico di un altro tecnico non si aggancia (02/10/2026): si ferma qui, con il motivo
+  const _protInc=(vGet('f-prot-int')||'').trim()
+  if(/^\d+$/.test(_protInc)&&await incDiChi(_protInc)==='altrui'){
+    toast(INC_MSG_ALTRUI(_protInc),'err',9000);activateTab(1)
+    const _pf=$('f-prot-int'); if(_pf) _pf.focus()
+    return
+  }
+
   // numero verbale corretto a mano dalla segreteria: verifica che sia libero
   const _nrNow=vGet('f-verbale').trim()
   if(_nrVerbEditVid&&_nrNow!==_nrVerbOrig){
@@ -14278,6 +14286,11 @@ async function incDaTendina(id){
     return
   }
   const mio=!!r.tecnico_email&&String(r.tecnico_email).toLowerCase()===String((S.user&&S.user.email)||'').toLowerCase()
+  /* la tendina dà a un tecnico solo i suoi; se per qualunque strada arriva quello di un altro, non si aggancia */
+  if(!mio&&r.tecnico_email&&!window.__isSegreteria&&await incDiChi(r.id)==='altrui'){
+    const _s=$('f-prot-inc'); if(_s) _s.value=''
+    toast(INC_MSG_ALTRUI(r.id),'err',9000); return
+  }
   if(mio&&!r.accettato_il){
     const ora=new Date().toISOString()
     const p={accettato_il:ora,accettato_da:S.user.email,rifiutato_il:null,rifiutato_da:null,rifiuto_motivo:null}
@@ -14484,10 +14497,34 @@ function incVerificaProt(){
   if(!v){ msg.textContent=''; return }
   if(!/^\d+$/.test(v)){ msg.innerHTML='<span style="color:#888">Testo libero: nessun incarico verrà agganciato.</span>'; return }
   const m=(_incApertiCache||[]).find(r=>String(r.id)===v)
-  if(m) msg.innerHTML='<span style="color:#27ae60">✓ Collegato a: '+esc(m.etichetta)+'</span>'
-  else  msg.innerHTML='<span style="color:#D9A400">⚠ Nessun incarico aperto con questo numero (la visita si salva comunque).</span>'
+  if(m){ msg.innerHTML='<span style="color:#27ae60">✓ Collegato a: '+esc(m.etichetta)+'</span>'; return }
+  msg.innerHTML='<span style="color:#D9A400">⚠ Nessun incarico aperto con questo numero (la visita si salva comunque).</span>'
+  /* non è fra i miei aperti: può essere di un altro tecnico, e allora non si aggancia */
+  const req=_incChiReq=(_incChiReq||0)+1
+  incDiChi(v).then(di=>{
+    if(req!==_incChiReq||(vGet('f-prot-int')||'').trim()!==v) return
+    if(di==='altrui') msg.innerHTML='<span style="color:#c0392b;font-weight:600">⛔ '+esc(INC_MSG_ALTRUI(v))+'</span>'
+  })
 }
 window.incVerificaProt=incVerificaProt
+
+/* (02/10/2026) DI CHI È L'INCARICO. Regola dell'utente: un tecnico non può agganciare
+   alla sua visita l'incarico di un altro; si ferma con un messaggio e, se è giusto che
+   lo faccia lui, la segreteria glielo riassegna. Il blocco vero sta nel database
+   (trigger trg_visite_incarico_altrui): qui si dice prima, con parole chiare.
+   Risposte di incarico_di_chi: mio · altrui · non_assegnato · gestione · inesistente.
+   Se la lettura fallisce si restituisce null e NON si blocca: decide il database. */
+var _incChiReq=0
+function INC_MSG_ALTRUI(n){return 'L\'incarico n. '+n+' è assegnato a un altro tecnico: non puoi agganciarlo alla tua visita. Contatta la segreteria: se è corretto che lo faccia tu, te lo riassegna.'}
+async function incDiChi(v){
+  if(!/^\d{1,18}$/.test(String(v||'').trim())) return null
+  try{
+    const{data,error}=await sb.rpc('incarico_di_chi',{p_id:+String(v).trim()})
+    if(error){ console.warn('incarico_di_chi:',error); return null }
+    return data||null
+  }catch(e){ console.warn('incarico_di_chi:',e); return null }
+}
+window.incDiChi=incDiChi
 
 /* Il client, lo stato e il toast vivono nello scope di QUESTO modulo:
    stage-relazione.js e' uno script a parte e senza queste righe non li

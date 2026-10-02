@@ -61,4 +61,24 @@ assert.ok(/const mio=/.test(dt[0]) && /if\(mio&&!r\.accettato_il\)/.test(dt[0]),
 /* un errore di lettura non è «incarico senza dati»: si dice */
 assert.ok(/if\(error\|\|!r\)\{[\s\S]{0,300}non sono riuscito a leggere/.test(dt[0]), 'la lettura fallita va detta');
 
+/* l'incarico di un altro tecnico non si aggancia (02/10/2026): il blocco vero è nel database
+   (supabase/sql/2026_10_02_incarico_di_un_altro_tecnico.sql), qui si controlla che l'app lo dica
+   prima, al salvataggio e sotto il campo, e che una lettura fallita NON blocchi */
+const sv = html.match(/async function saveVisita\(stato\)\{[\s\S]*?numero verbale corretto a mano/);
+assert.ok(sv && /await incDiChi\(_protInc\)==='altrui'\)\{[\s\S]{0,200}INC_MSG_ALTRUI\(_protInc\)[\s\S]{0,200}return/.test(sv[0]),
+  'il salvataggio deve fermarsi sull’incarico di un altro tecnico');
+const dc = html.match(/async function incDiChi\(v\)\{[\s\S]*?\r?\n\}/);
+assert.ok(dc && /rpc\('incarico_di_chi'/.test(dc[0]), 'incDiChi deve chiedere al database');
+assert.ok(/if\(error\)\{[^}]*return null/.test(dc[0]) && /catch\(e\)\{[^}]*return null/.test(dc[0]), 'lettura fallita = null, non «altrui»');
+const msg = html.match(/function INC_MSG_ALTRUI\(n\)\{[^\n]*\}/);
+assert.ok(msg, 'messaggio non trovato');
+const testo = Function(msg[0] + '; return INC_MSG_ALTRUI')()(968);
+assert.ok(/n\. 968/.test(testo) && /altro tecnico/.test(testo) && /segreteria/i.test(testo) && /riassegna/.test(testo), 'il messaggio deve dire di chi è e a chi rivolgersi');
+const vp = html.match(/function incVerificaProt\(\)\{[\s\S]*?\r?\n\}/);
+assert.ok(vp && /incDiChi\(v\)\.then/.test(vp[0]) && /di==='altrui'/.test(vp[0]), 'sotto il campo deve comparire l’avviso');
+const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'sql', '2026_10_02_incarico_di_un_altro_tecnico.sql'), 'utf8');
+assert.ok(/before insert or update of prot_int on public\.visite/.test(sql), 'il trigger deve stare sulle visite');
+assert.ok(/new\.prot_int is not distinct from old\.prot_int then return new/.test(sql), 'una visita il cui protocollo non cambia non si blocca');
+assert.ok(/if v_mail = '' then return new/.test(sql) && /is_gestione_incarichi\(\) then return new/.test(sql), 'importazioni e segreteria non si bloccano');
+
 console.log('ok — incarico nel primo passo');
