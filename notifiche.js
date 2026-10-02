@@ -314,7 +314,18 @@
         <input type="checkbox" id="adm-avv-verb" ${data.attivo ? 'checked' : ''} style="margin-top:3px;width:auto">
         <span>Manda una <b>notifica al coordinatore</b> quando un tecnico registra un <b>verbale definitivo</b>.</span>
       </label>
-      <p style="font-size:12px;color:#666;margin:4px 0">Una notifica per verbale, quando diventa definitivo (non a ogni salvataggio). Il testo &egrave; generico, senza nomi; toccandola si apre l'elenco delle visite. I verbali che registra il coordinatore non gli vengono notificati. ${dispositivi}</p>`);
+      <div style="font-size:12px;color:#666;margin:6px 0 2px">
+        <b>Da sapere</b>
+        <ul style="margin:4px 0 0 18px;padding:0;line-height:1.5">
+          <li>Arriva <b>una notifica per verbale</b>, quando diventa definitivo: non a ogni salvataggio, e non per le bozze.</li>
+          <li>Se due verbali vengono chiusi a <b>meno di due minuti</b> l'uno dall'altro, la notifica &egrave; <b>una sola</b>: aprendo l'elenco delle visite si vedono tutti e due.</li>
+          <li>Il testo &egrave; generico, <b>senza nomi</b> (si legge anche a schermo bloccato); toccandola si apre l'elenco delle visite.</li>
+          <li>I verbali che registra il coordinatore <b>non gli vengono notificati</b>, e nemmeno quelli caricati con un'importazione.</li>
+          <li>Arriva solo sui dispositivi su cui il coordinatore ha <b>attivato le notifiche</b> (riquadro &#128276; in Dashboard). ${dispositivi}</li>
+          <li>Se il telefono &egrave; in modalit&agrave; Non disturbare, riposo o risparmio energetico, la notifica pu&ograve; non comparire.</li>
+          <li>La casella la possono accendere e spegnere il coordinatore e la segreteria; vale da subito, per i verbali chiusi da quel momento.</li>
+        </ul>
+      </div>`);
     box.style.display = '';
     const c = $('adm-avv-verb');
     if (c) c.onchange = async () => {
