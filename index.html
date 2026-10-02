@@ -621,7 +621,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               <input type="time" id="f-da">
             </div>
             <div class="field" style="flex:0 0 110px">
-              <label>Ora fine</label>
+              <label>Ora fine *</label>
               <input type="time" id="f-a">
             </div>
             <div class="field" style="flex:1 1 240px;max-width:380px">
@@ -3522,7 +3522,7 @@ function impreseAccordionHTML(im,idx){
         <div class="field"><label>Partita IVA</label><input type="text" id="im-piva-${idx}" value="${im.piva||''}" placeholder="IT…" readonly style="background:#f8f8f8"></div>
         <div class="field"><label>Codice fiscale</label><input type="text" id="im-cf_imp-${idx}" value="${im.cf_imp||''}" placeholder="CF…" readonly style="background:#f8f8f8"></div>
         <div class="field">
-          <label>Tipologia</label>
+          <label>Tipologia (ruolo in cantiere) *</label>
           <select id="im-tipo-${idx}">
             <option value="">–</option>
             ${Object.entries(TIPO_IMP_OPT).map(([v,l])=>`<option value="${v}" ${im.tipo_imp==v?'selected':''}>${v} – ${l}</option>`).join('')}
@@ -4566,6 +4566,26 @@ function oraFineAllaChiusura(d){
   return{ora,motivo:'messa'}
 }
 
+/* (02/10/2026) CHE COSA MANCA PER CHIUDERE. Deciso dall'utente: il ruolo dell'impresa
+   («Tipologia») e l'ora di fine sono obbligatori per chiudere il verbale come definitivo.
+   Funzione pura: restituisce l'elenco di ciò che manca, col passo e il campo da aprire.
+   Vale quando il verbale DIVENTA definitivo: chi risalva un verbale che lo era già (anche i
+   vecchi importati, che questi dati possono non averli) non viene fermato.
+   d = {giaDefinitivo, oraA, imprese:[{impresa_id, impresa_nome, tipo_imp}]} */
+function mancaAllaChiusura(d){
+  d=d||{}
+  const out=[]
+  if(d.giaDefinitivo) return out
+  ;(d.imprese||[]).forEach((im,i)=>{
+    im=im||{}
+    if((im.impresa_id||String(im.impresa_nome||'').trim())&&!(+im.tipo_imp>0))
+      out.push({cosa:'ruolo',tab:2,campo:'im-tipo-'+i,testo:'Manca il ruolo dell\'impresa «'+(im.impresa_nome||im.impresa_id)+'»: è obbligatorio per chiudere il verbale. Sceglilo nel campo «Tipologia», nel passo Imprese.'})
+  })
+  if(!String(d.oraA||'').trim())
+    out.push({cosa:'ora-fine',tab:0,campo:'f-a',testo:'Manca l\'ora di fine: è obbligatoria per chiudere il verbale. Non posso metterla io, perché il verbale si chiude in un giorno diverso da quello della visita oppure l\'ora di adesso è prima dell\'ora di inizio: scrivila nel primo passo.'})
+  return out
+}
+
 async function saveVisita(stato){
   saveTabData()
   const cant_id=vGet('f-cant-id')
@@ -4577,21 +4597,31 @@ async function saveVisita(stato){
   if(!data_v){toast('Inserisci la data della visita','warn');activateTab(0);return}
   if(!tec_id){toast('Seleziona il tecnico (Tab Visita)','warn');activateTab(0);return}
 
-  // ora di fine non indicata: alla chiusura come definitivo ci va l'ora di adesso (02/10/2026).
-  // Sta PRIMA del controllo di coerenza, così il controllo vede l'ora che verrà salvata.
-  if(stato==='definitivo'&&!String(vGet('f-a')||'').trim()){
+  // ── CHIUSURA COME DEFINITIVO: ora di fine e ruolo delle imprese (02/10/2026) ──
+  // Sta PRIMA del controllo di coerenza, così il controllo vede quello che verrà salvato.
+  if(stato==='definitivo'){
     let _giaDef=false
     const _vidOra=S.fd.visita_id||S.savedId||null
     if(_vidOra){
       const{data:_vOra,error:_eOra}=await sb.from('visite').select('stato').eq('visita_id',_vidOra).maybeSingle()
-      _giaDef=!!_eOra||!!(_vOra&&_vOra.stato==='definitivo')   // lettura fallita: non si inventa un'ora
+      _giaDef=!!_eOra||!!(_vOra&&_vOra.stato==='definitivo')   // lettura fallita: non si inventa un'ora e non si blocca
     }
-    const _of=oraFineAllaChiusura({stato,giaDefinitivo:_giaDef,oraA:vGet('f-a'),oraDa:vGet('f-da'),dataVisita:data_v,
-      oggi:new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Rome'}),
-      adesso:new Date().toLocaleTimeString('it-IT',{timeZone:'Europe/Rome',hour:'2-digit',minute:'2-digit',hour12:false})})
-    if(_of.ora){vSet('f-a',_of.ora);toast('Ora di fine non indicata: ho messo '+_of.ora+', l\'ora di chiusura del verbale. Se la visita è finita a un\'altra ora, correggila e risalva.','ok',7000)}
-    else if(_of.motivo==='altro-giorno')toast('Manca l\'ora di fine. Il verbale si chiude in un giorno diverso da quello della visita, quindi non la metto io: se la ricordi, scrivila e risalva.','warn',8000)
-    else if(_of.motivo==='prima-dell-inizio')toast('Manca l\'ora di fine, e l\'ora di adesso è prima dell\'ora di inizio indicata: controlla gli orari.','warn',8000)
+    // ora di fine non indicata: ci va l'ora di adesso, se il verbale si chiude nel giorno della visita
+    if(!String(vGet('f-a')||'').trim()){
+      const _of=oraFineAllaChiusura({stato,giaDefinitivo:_giaDef,oraA:vGet('f-a'),oraDa:vGet('f-da'),dataVisita:data_v,
+        oggi:new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Rome'}),
+        adesso:new Date().toLocaleTimeString('it-IT',{timeZone:'Europe/Rome',hour:'2-digit',minute:'2-digit',hour12:false})})
+      if(_of.ora){vSet('f-a',_of.ora);toast('Ora di fine non indicata: ho messo '+_of.ora+', l\'ora di chiusura del verbale. Se la visita è finita a un\'altra ora, correggila e risalva.','ok',7000)}
+    }
+    // ruolo dell'impresa e ora di fine sono obbligatori: senza, il verbale non si chiude
+    const _manca=mancaAllaChiusura({giaDefinitivo:_giaDef,oraA:vGet('f-a'),imprese:S.imprese})
+    if(_manca.length){
+      const _m0=_manca[0]
+      toast(_m0.testo+(_manca.length>1?' (e altre '+(_manca.length-1)+' cose da completare)':''),'err',10000)
+      activateTab(_m0.tab)
+      setTimeout(()=>{const _el=$(_m0.campo);if(!_el)return;const _acc=_el.closest('.imp-acc-body');if(_acc)_acc.classList.add('open');_el.scrollIntoView({block:'center'});_el.focus()},150)
+      return
+    }
   }
 
   // controllo di coerenza prima del definitivo (controllo-verbale.js, 17/09/2026):
