@@ -44,6 +44,11 @@
       const { data, error } = await window.sb.from('s_mail_respinte')
         .select('id, ricevuta_il, destinatario, codice, permanente, motivo, nr_verbale, ruolo, impresa_nome, stato, oggetto_originale')
         .in('stato', ['nuova', 'avvisato'])
+        /* (02/10/2026) solo i rimbalzi di un verbale: il giro registra ogni
+           mail tornata alla casella dell'ufficio, anche quelle che con i
+           verbali non c'entrano. Le altre le guarda la segreteria, nella
+           scheda «Altre mail tornate indietro» del suo cruscotto. */
+        .not('nr_verbale', 'is', null)
         .order('ricevuta_il', { ascending: false })
         .limit(20);
       /* ⚠️ un errore di lettura non è «nessun rimbalzo»: si dice, non si
