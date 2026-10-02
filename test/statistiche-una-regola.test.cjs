@@ -77,4 +77,20 @@ const acc = estrai('async function autoAccCant(cantId){', '// ── MODAL NUOVO
 assert.ok(/gia\.stato==='definitivo'&&gia\.acc_cant/.test(acc), 'numero di accesso: un definitivo viene ricalcolato')
 assert.ok(/\.lte\('data_visita',dataV\)/.test(acc), 'numero di accesso: conta anche le visite successive')
 
+// ── 5. L'esercizio corrente sta nel menu anche quando è ancora vuoto (02/10/2026) ──
+// Il 1° ottobre l'esercizio nuovo non aveva visite: la pagina si apriva su «Tutto lo storico»
+// con il solo esercizio corrente caricato, e mostrava 0 sopralluoghi accanto a 145.997 verifiche.
+const mEs = html.match(/function eserciziPerMenu\(righe,cur\)\{[\s\S]*?\r?\n\}/)
+assert.ok(mEs, 'eserciziPerMenu non trovata')
+const eserciziPerMenu = Function(mEs[0] + '; return eserciziPerMenu')()
+assert.deepStrictEqual(eserciziPerMenu([{ eserc: '2024/2025' }, { eserc: '2025/2026' }, { eserc: null }], '2026/2027'),
+  ['2024/2025', '2025/2026', '2026/2027'], 'l’esercizio corrente vuoto deve stare nel menu')
+assert.deepStrictEqual(eserciziPerMenu([{ eserc: '2025/2026' }], '2025/2026'), ['2025/2026'], 'niente doppioni')
+assert.deepStrictEqual(eserciziPerMenu(null, '2026/2027'), ['2026/2027'])
+const fill = estrai('function _dashFillSelectors(){', 'function applyDashFilters(){')
+assert.ok(/const es=eserciziPerMenu\(_dashLite\|\|_dashRaw,cur\)/.test(fill), 'il menu degli esercizi deve passare da eserciziPerMenu')
+const filtri = estrai('function applyDashFilters(){', 'function _grp(')
+assert.ok(/if\(!fE&&!_dashScopeAll\)\{[\s\S]{0,300}loadStat\(\)[\s\S]{0,200}return/.test(filtri),
+  '«Tutto lo storico» senza lo storico caricato non si disegna: prima si carica')
+
 console.log('ok — statistiche: una regola sola (C.E.I.V. dalla lista, dati del cantiere dalla funzione comune, comuni unificati) e maschera protetta')

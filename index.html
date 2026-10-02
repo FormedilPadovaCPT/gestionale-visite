@@ -5675,9 +5675,18 @@ async function loadStat(){
   applyDashFilters()
 }
 
+/* Gli esercizi del menu: quelli che hanno visite PIU' quello corrente, anche se e' vuoto.
+   (02/10/2026) Il 1° ottobre l'esercizio nuovo non aveva ancora visite, quindi non era nel
+   menu: la pagina si apriva su «Tutto lo storico» avendo caricato solo l'esercizio corrente,
+   e mostrava zero sopralluoghi accanto a verifiche e macroaree di tutto lo storico (che il
+   database calcola da se' quando non riceve un periodo). */
+function eserciziPerMenu(righe,cur){
+  return Array.from(new Set((righe||[]).map(x=>x.eserc).filter(Boolean).concat(cur?[cur]:[]))).sort()
+}
+
 function _dashFillSelectors(){
   const cur=annoEdile().label
-  const es=Array.from(new Set((_dashLite||_dashRaw).map(x=>x.eserc).filter(Boolean))).sort()
+  const es=eserciziPerMenu(_dashLite||_dashRaw,cur)
   const selE=$('fd-eserc')
   if(selE&&!selE.dataset.init){
     selE.innerHTML='<option value="">Tutto lo storico</option>'+es.map(e=>`<option value="${e}">Es. ${e}</option>`).join('')
@@ -5716,6 +5725,14 @@ function _dashFillSelectors(){
 function applyDashFilters(){
   if(!_dashRaw)return
   const fE=$('fd-eserc')?$('fd-eserc').value:''
+  /* «Tutto lo storico» con il solo esercizio corrente caricato darebbe numeri di due periodi
+     diversi nella stessa pagina: prima si carica lo storico, poi si disegna */
+  if(!fE&&!_dashScopeAll){
+    _dashScopeAll=true
+    if($('fd-count'))$('fd-count').textContent='Caricamento storico completo…'
+    loadStat().catch(e=>{console.error('loadStat storico:',e);toast('Errore caricamento storico: '+e.message,'err')})
+    return
+  }
   const fT=$('fd-tec')?$('fd-tec').value:''
   const fTy=$('fd-tipo')?$('fd-tipo').value:''
   const fI=$('fd-ipc')?$('fd-ipc').value:''
@@ -5771,7 +5788,9 @@ function _dashRenderKpi(F){
 }
 
 function _dashRenderEsercizio(FE,selE){
-  const m=_grp(FE,x=>x.eserc);const L=Object.keys(m).sort()
+  const m=_grp(FE,x=>x.eserc)
+  if(selE&&!(selE in m))m[selE]=0   // l'esercizio scelto compare anche se e' ancora vuoto
+  const L=Object.keys(m).sort()
   _mkChart('ch-esercizio',{type:'bar',plugins:[datalabelPlugin],data:{labels:L.map(l=>'Es. '+l),datasets:[{data:L.map(l=>m[l]),backgroundColor:L.map(l=>l===selE?_DASH_C.orange:_DASH_C.grey),borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}})
 }
 
