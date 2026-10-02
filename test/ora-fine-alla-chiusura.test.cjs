@@ -49,26 +49,30 @@ const manca = Function(m2[0] + '; return mancaAllaChiusura')();
 const IMP = [{ impresa_id: '01234567890', impresa_nome: 'Rossi Costruzioni', tipo_imp: '2' }, { impresa_id: '09999999999', impresa_nome: 'Bianchi', tipo_imp: '' }];
 
 // tutto a posto: niente da completare
-assert.deepStrictEqual(manca({ giaDefinitivo: false, oraA: '11:47', imprese: [IMP[0]] }), []);
+assert.deepStrictEqual(manca({ giaDefinitivo: false, oraA: '11:47', lavorazioni: 1, imprese: [IMP[0]] }), []);
 // manca il ruolo della seconda impresa: si dice quale, e dove andare
-const r1 = manca({ giaDefinitivo: false, oraA: '11:47', imprese: IMP });
+const r1 = manca({ giaDefinitivo: false, oraA: '11:47', lavorazioni: 2, imprese: IMP });
 assert.strictEqual(r1.length, 1);
 assert.deepStrictEqual([r1[0].cosa, r1[0].tab, r1[0].campo], ['ruolo', 2, 'im-tipo-1']);
 assert.ok(/Bianchi/.test(r1[0].testo) && /obbligatorio/.test(r1[0].testo));
 // manca l'ora di fine
-const r2 = manca({ giaDefinitivo: false, oraA: '  ', imprese: [IMP[0]] });
+const r2 = manca({ giaDefinitivo: false, oraA: '  ', lavorazioni: 1, imprese: [IMP[0]] });
 assert.deepStrictEqual([r2.length, r2[0].cosa, r2[0].tab, r2[0].campo], [1, 'ora-fine', 0, 'f-a']);
-// mancano tutti e due: prima il ruolo, poi l'ora
-assert.deepStrictEqual(manca({ giaDefinitivo: false, oraA: '', imprese: IMP }).map((x) => x.cosa), ['ruolo', 'ora-fine']);
+// mancano tutti e tre: nell'ordine dei passi del verbale (Visita, Cantiere, Imprese)
+assert.deepStrictEqual(manca({ giaDefinitivo: false, oraA: '', lavorazioni: 0, imprese: IMP }).map((x) => x.cosa), ['ora-fine', 'lavorazioni', 'ruolo']);
+// nessuna lavorazione in corso: ne serve almeno una, e si va al passo Cantiere
+const r3 = manca({ giaDefinitivo: false, oraA: '11:47', lavorazioni: 0, imprese: [IMP[0]] });
+assert.deepStrictEqual([r3.length, r3[0].cosa, r3[0].tab, r3[0].campo], [1, 'lavorazioni', 1, 'lav-sel-genere']);
+assert.strictEqual(manca({ giaDefinitivo: false, oraA: '11:47', imprese: [IMP[0]] }).length, 1, 'lavorazioni non indicate = nessuna');
 // una riga impresa ancora vuota non conta; uno zero non è un ruolo
-assert.deepStrictEqual(manca({ giaDefinitivo: false, oraA: '10:00', imprese: [IMP[0], { impresa_id: '', impresa_nome: '', tipo_imp: '' }] }), []);
-assert.strictEqual(manca({ giaDefinitivo: false, oraA: '10:00', imprese: [{ impresa_nome: 'Verdi', tipo_imp: 0 }] }).length, 1);
+assert.deepStrictEqual(manca({ giaDefinitivo: false, oraA: '10:00', lavorazioni: 1, imprese: [IMP[0], { impresa_id: '', impresa_nome: '', tipo_imp: '' }] }), []);
+assert.strictEqual(manca({ giaDefinitivo: false, oraA: '10:00', lavorazioni: 1, imprese: [{ impresa_nome: 'Verdi', tipo_imp: 0 }] }).length, 1);
 // un verbale che era già definitivo non viene fermato (i vecchi importati possono non avere questi dati)
 assert.deepStrictEqual(manca({ giaDefinitivo: true, oraA: '', imprese: IMP }), []);
 
 /* nel salvataggio: dopo il tentativo di mettere l'ora, e fermandosi */
-assert.ok(/mancaAllaChiusura\(\{giaDefinitivo:_giaDef,oraA:vGet\('f-a'\),imprese:S\.imprese\}\)[\s\S]{0,700}return/.test(save[0]), 'se manca qualcosa il salvataggio si ferma');
+assert.ok(/mancaAllaChiusura\(\{giaDefinitivo:_giaDef,oraA:vGet\('f-a'\),lavorazioni:\(S\.lavorazioni\|\|\[\]\)\.length,imprese:S\.imprese\}\)[\s\S]{0,700}return/.test(save[0]), 'se manca qualcosa il salvataggio si ferma');
 assert.ok(save[0].indexOf('oraFineAllaChiusura({') < save[0].indexOf('mancaAllaChiusura({'), 'prima si prova a mettere l’ora, poi si controlla');
-assert.ok(/<label>Ora fine \*<\/label>/.test(html) && /<label>Tipologia \(ruolo in cantiere\) \*<\/label>/.test(html), 'i due campi obbligatori portano l’asterisco');
+assert.ok(/<label>Ora fine \*<\/label>/.test(html) && /<label>Tipologia \(ruolo in cantiere\) \*<\/label>/.test(html) && /<label>Lavorazioni in corso \* /.test(html), 'i tre campi obbligatori portano l’asterisco');
 
 console.log('ok — ora di fine alla chiusura');

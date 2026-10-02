@@ -883,7 +883,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
           <div class="field"><label>Stato dei lavori – fasi lavorazioni</label><textarea id="f-stato-lav" rows="2" placeholder="Descrizione stato avanzamento lavori"></textarea></div>
           <div class="field">
-            <label>Lavorazioni in corso</label>
+            <label>Lavorazioni in corso * <span style="font-weight:400;font-size:11px;color:#aaa">(almeno una)</span></label>
             <div style="display:flex;flex-direction:column;gap:8px;margin-top:5px">
               <div class="row" style="align-items:flex-end">
                 <div class="field" style="margin-bottom:0;flex:1">
@@ -4566,23 +4566,27 @@ function oraFineAllaChiusura(d){
   return{ora,motivo:'messa'}
 }
 
-/* (02/10/2026) CHE COSA MANCA PER CHIUDERE. Deciso dall'utente: il ruolo dell'impresa
-   («Tipologia») e l'ora di fine sono obbligatori per chiudere il verbale come definitivo.
-   Funzione pura: restituisce l'elenco di ciò che manca, col passo e il campo da aprire.
+/* (02/10/2026) CHE COSA MANCA PER CHIUDERE. Deciso dall'utente: l'ora di fine, almeno una
+   lavorazione in corso e il ruolo di ogni impresa («Tipologia») sono obbligatori per chiudere
+   il verbale come definitivo.
+   Funzione pura: restituisce l'elenco di ciò che manca, nell'ordine dei passi del verbale,
+   col passo e il campo da aprire.
    Vale quando il verbale DIVENTA definitivo: chi risalva un verbale che lo era già (anche i
    vecchi importati, che questi dati possono non averli) non viene fermato.
-   d = {giaDefinitivo, oraA, imprese:[{impresa_id, impresa_nome, tipo_imp}]} */
+   d = {giaDefinitivo, oraA, lavorazioni (quante), imprese:[{impresa_id, impresa_nome, tipo_imp}]} */
 function mancaAllaChiusura(d){
   d=d||{}
   const out=[]
   if(d.giaDefinitivo) return out
+  if(!String(d.oraA||'').trim())
+    out.push({cosa:'ora-fine',tab:0,campo:'f-a',testo:'Manca l\'ora di fine: è obbligatoria per chiudere il verbale. Non posso metterla io, perché il verbale si chiude in un giorno diverso da quello della visita oppure l\'ora di adesso è prima dell\'ora di inizio: scrivila nel primo passo.'})
+  if(!(+d.lavorazioni>0))
+    out.push({cosa:'lavorazioni',tab:1,campo:'lav-sel-genere',testo:'Mancano le lavorazioni in corso: per chiudere il verbale ne serve almeno una. Nel passo Cantiere scegli genere, fase e lavorazione e premi «+ Aggiungi».'})
   ;(d.imprese||[]).forEach((im,i)=>{
     im=im||{}
     if((im.impresa_id||String(im.impresa_nome||'').trim())&&!(+im.tipo_imp>0))
       out.push({cosa:'ruolo',tab:2,campo:'im-tipo-'+i,testo:'Manca il ruolo dell\'impresa «'+(im.impresa_nome||im.impresa_id)+'»: è obbligatorio per chiudere il verbale. Sceglilo nel campo «Tipologia», nel passo Imprese.'})
   })
-  if(!String(d.oraA||'').trim())
-    out.push({cosa:'ora-fine',tab:0,campo:'f-a',testo:'Manca l\'ora di fine: è obbligatoria per chiudere il verbale. Non posso metterla io, perché il verbale si chiude in un giorno diverso da quello della visita oppure l\'ora di adesso è prima dell\'ora di inizio: scrivila nel primo passo.'})
   return out
 }
 
@@ -4613,8 +4617,8 @@ async function saveVisita(stato){
         adesso:new Date().toLocaleTimeString('it-IT',{timeZone:'Europe/Rome',hour:'2-digit',minute:'2-digit',hour12:false})})
       if(_of.ora){vSet('f-a',_of.ora);toast('Ora di fine non indicata: ho messo '+_of.ora+', l\'ora di chiusura del verbale. Se la visita è finita a un\'altra ora, correggila e risalva.','ok',7000)}
     }
-    // ruolo dell'impresa e ora di fine sono obbligatori: senza, il verbale non si chiude
-    const _manca=mancaAllaChiusura({giaDefinitivo:_giaDef,oraA:vGet('f-a'),imprese:S.imprese})
+    // ora di fine, lavorazioni in corso e ruolo dell'impresa sono obbligatori: senza, il verbale non si chiude
+    const _manca=mancaAllaChiusura({giaDefinitivo:_giaDef,oraA:vGet('f-a'),lavorazioni:(S.lavorazioni||[]).length,imprese:S.imprese})
     if(_manca.length){
       const _m0=_manca[0]
       toast(_m0.testo+(_manca.length>1?' (e altre '+(_manca.length-1)+' cose da completare)':''),'err',10000)
