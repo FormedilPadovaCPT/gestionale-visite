@@ -577,6 +577,15 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <!-- TAB 0: DATI VISITA -->
       <div class="tab-content active" data-tab="0">
         <div class="card">
+          <!-- (02/10/2026) partire da un incarico: sta qui, nel primo passo, perche' scegliendolo
+               si compilano impresa e cantiere e non serve cercarli a mano nei passi dopo -->
+          <div id="inc-scelta-box" style="display:none;margin-bottom:12px;padding:10px 14px;background:#fff7f2;border-left:3px solid var(--orange);border-radius:8px">
+            <div class="field" style="margin:0">
+              <label>Parti da un tuo incarico <span style="font-weight:400;font-size:11px;color:#aaa">(se la visita nasce da una richiesta della segreteria)</span></label>
+              <select id="f-prot-inc"></select>
+              <div style="font-size:11px;color:#666;margin-top:3px">Scegliendolo lo accetti, e si compilano da soli il numero della richiesta, l'impresa e il cantiere, se la segreteria li ha indicati. Tutto resta modificabile.</div>
+            </div>
+          </div>
           <div class="sect-title">Verbale</div>
           <div class="row" style="align-items:flex-end">
             <div class="field" style="flex:0 0 180px">
@@ -736,7 +745,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
           <div class="row" style="margin-top:12px">
             <div class="field" style="flex:0 1 420px"><label>Accesso cantiere n° (dal DB cantiere)</label><input type="text" id="f-acc-cant2" placeholder="Codice accesso interno" readonly style="background:#f8f8f8"></div>
-            <div class="field"><label>Protocollo interno <span style="font-weight:400;font-size:11px;color:#aaa">(n° richiesta)</span></label><div style="display:flex;gap:6px"><input type="text" id="f-prot-int" placeholder="Prot. richiesta" style="flex:1;min-width:0"><select id="f-prot-inc" title="Scegli fra i tuoi incarichi aperti" style="flex:1.4;min-width:0;display:none"></select></div><div id="f-prot-msg" style="font-size:11px;margin-top:3px"></div></div>
+            <div class="field"><label>Protocollo interno <span style="font-weight:400;font-size:11px;color:#aaa">(n° richiesta)</span></label><div style="display:flex;gap:6px"><input type="text" id="f-prot-int" placeholder="Prot. richiesta" style="flex:1;min-width:0"></div><div id="f-prot-msg" style="font-size:11px;margin-top:3px"></div></div>
           </div>
           <div class="row">
             <div class="field" style="flex:0 1 260px"><label>Codice CNCE <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="text" id="f-cnce" placeholder="–" readonly style="background:#f8f8f8"></div>
@@ -14163,29 +14172,69 @@ async function incNuovaVisita(id,accetta){
     if(typeof incAggiornaNavBadge==='function') incAggiornaNavBadge()
   }
   initForm();navTo('form')
-  setTimeout(async()=>{
-    vSet('f-prot-int',String(id))
-    const _sel=$('f-prot-inc'); if(_sel) _sel.value=String(id)
-    if(typeof incVerificaProt==='function') incVerificaProt()
-    /* l'impresa principale dall'incarico (anche per le visite non stage):
-       la segreteria l'ha gia' agganciata all'anagrafica */
-    await incPrecompilaImpresa(r)
-    if(!r.cantiere_id){ incPrecompilaCantiere(r); return }
-    const{data:c}=await sb.from('cantieri').select('*').eq('cantiere_id',r.cantiere_id).maybeSingle()
-    if(!c){toast('Il cantiere indicato dalla segreteria non e\' piu\' in archivio: cercalo a mano','warn');return}
-    if(typeof _useCantiereEsistente==='function') await _useCantiereEsistente(c)
-    else{vSet('f-cant-id',c.cantiere_id);S.fd.cantiere_id=c.cantiere_id}
-  },120)
+  setTimeout(()=>{ incApplicaAllaVisita(r).catch(e=>console.warn('incarico → visita:',e)) },120)
 }
 
-/* L'impresa dell'incarico diventa l'impresa principale della visita, se il
-   tecnico non ne ha gia' scelta una. In anagrafica → selezionata come
-   esistente; solo col nome → il nome resta scritto e il tecnico completa. */
-async function incPrecompilaImpresa(r){
+/* (02/10/2026) CHE COSA PORTA UN INCARICO NELLA VISITA.
+   Funzione pura: dice che fare di impresa e cantiere, senza toccare niente.
+     niente   = l'incarico non lo indica, o la visita ha gia' lo stesso;
+     compila  = la visita e' vuota (o ha il solo nome della stessa impresa);
+     chiedi   = il tecnico ne ha gia' scelto un altro: si chiede prima di sostituire;
+     proponi  = cantiere non in archivio: scheda «Nuovo cantiere» gia' compilata.
+   att = {impresa_id, impresa_nome, cantiere_id} di quello che c'e' ora nella visita. */
+function incDecidi(r,att){
+  r=r||{}; att=att||{}
+  const n=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim()
+  let impresa='niente', cantiere='niente'
+  if(r.impresa_id||n(r.impresa)){
+    const stessoNome=!!n(r.impresa)&&n(att.impresa_nome)===n(r.impresa)
+    if(!att.impresa_id&&!n(att.impresa_nome)) impresa='compila'
+    else if(r.impresa_id&&String(att.impresa_id||'')===String(r.impresa_id)) impresa='niente'
+    else if(r.impresa_id&&!att.impresa_id&&stessoNome) impresa='compila'
+    else if(!r.impresa_id&&stessoNome) impresa='niente'
+    else impresa='chiedi'
+  }
+  if(r.cantiere_id){
+    if(!att.cantiere_id) cantiere='compila'
+    else if(String(att.cantiere_id)===String(r.cantiere_id)) cantiere='niente'
+    else cantiere='chiedi'
+  }else if(!att.cantiere_id&&(n(r.indirizzo)||n(r.comune))) cantiere='proponi'
+  return{impresa,cantiere}
+}
+
+/* L'incarico entra nella visita: numero della richiesta, impresa principale e
+   cantiere. E' la strada unica di «Nuova visita» / «Fai la visita» (pagina
+   Incarichi) e della tendina nel primo passo del verbale. Quello che il
+   tecnico ha gia' scelto non si sostituisce senza chiederglielo. */
+async function incApplicaAllaVisita(r){
+  vSet('f-prot-int',String(r.id))
+  const _sel=$('f-prot-inc'); if(_sel) _sel.value=String(r.id)
+  if(typeof incVerificaProt==='function') incVerificaProt()
   for(let k=0;k<20&&!(S.imprese&&S.imprese.length);k++) await new Promise(res=>setTimeout(res,100))
-  if(!S.imprese||!S.imprese.length) return
-  const pi=S.imprese.findIndex(x=>x.is_principale); const idx=pi>=0?pi:0
-  if(S.imprese[idx].impresa_id||S.imprese[idx].impresa_nome) return
+  const pi=(S.imprese||[]).findIndex(x=>x.is_principale); const idx=pi>=0?pi:0
+  const imp=(S.imprese&&S.imprese[idx])||null
+  const d=incDecidi(r,{impresa_id:imp&&imp.impresa_id,impresa_nome:imp&&imp.impresa_nome,cantiere_id:vGet('f-cant-id')})
+  if(imp&&(d.impresa==='compila'||(d.impresa==='chiedi'&&confirm('Nella visita l\'impresa principale è già «'+(imp.impresa_nome||imp.impresa_id)+'».\n\nLa sostituisco con quella dell\'incarico'+(r.impresa?' («'+r.impresa+'»)':'')+'?\n\nOK = sostituisco · Annulla = lascio com\'è'))))
+    await incMettiImpresa(r,idx,d.impresa==='chiedi')
+  if(d.cantiere==='proponi'){ incPrecompilaCantiere(r); return }
+  if(d.cantiere==='niente') return
+  const{data:c,error}=await sb.from('cantieri').select('*').eq('cantiere_id',r.cantiere_id).maybeSingle()
+  if(error){toast('Non sono riuscito a leggere il cantiere dell\'incarico: cercalo a mano','warn');return}
+  if(!c){toast('Il cantiere indicato dalla segreteria non e\' piu\' in archivio: cercalo a mano','warn');return}
+  if(d.cantiere==='chiedi'&&!confirm('Nella visita c\'è già un cantiere: «'+(vGet('f-cant-search')||vGet('f-cant-id'))+'».\n\nLo sostituisco con quello dell\'incarico («'+(c.cantiere_etichetta||[c.cantiere_indirizzo,c.cantiere_civico,c.comune_nome].filter(Boolean).join(' '))+'»)?\n\nOK = sostituisco · Annulla = lascio com\'è')) return
+  if(typeof _useCantiereEsistente==='function') await _useCantiereEsistente(c)
+  else{vSet('f-cant-id',c.cantiere_id);S.fd.cantiere_id=c.cantiere_id}
+}
+window.incApplicaAllaVisita=incApplicaAllaVisita
+
+/* L'impresa dell'incarico diventa l'impresa principale della visita.
+   In anagrafica → selezionata come esistente; solo col nome → il nome resta
+   scritto e il tecnico completa. Se ne sostituisce un'altra, i dati che la
+   identificavano si azzerano prima: non devono restare P.IVA e indirizzo
+   dell'impresa di prima sotto il nome di quella nuova. */
+async function incMettiImpresa(r,idx,sostituisce){
+  if(!S.imprese||!S.imprese[idx]) return
+  if(sostituisce) Object.assign(S.imprese[idx],{impresa_id:'',impresa_nome:'',piva:'',cf_imp:'',ind_imp:'',com_imp:'',ceiv:'',tipo_ccia:'',ccnl:''})
   if(r.impresa_id&&typeof _useImpresaEsistente==='function'){
     const{data:c}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,tipo_iscrizione_ccia,contratto_ccnl').eq('impresa_id',r.impresa_id).maybeSingle()
     if(c){ _useImpresaEsistente(c,idx); return }
@@ -14196,6 +14245,37 @@ async function incPrecompilaImpresa(r){
     toast('Impresa presa dall\'incarico ma non in anagrafica: completa i dati','warn')
   }
 }
+
+/* La tendina «Parti da un tuo incarico» del primo passo. Scegliere vale come
+   «Accetto» + «Nuova visita» della pagina Incarichi (deciso dall'utente il
+   02/10/2026). L'accettazione si scrive SOLO se l'incarico e' di chi sta
+   compilando: segreteria e coordinatore vedono nella tendina gli incarichi di
+   tutti, e non devono accettare al posto di un tecnico. */
+async function incDaTendina(id){
+  const{data:r,error}=await sb.from('incarichi').select('*').eq('id',+id).maybeSingle()
+  if(error||!r){
+    vSet('f-prot-int',String(id)); if(typeof incVerificaProt==='function') incVerificaProt()
+    toast('Numero della richiesta agganciato, ma non sono riuscito a leggere l\'incarico: impresa e cantiere vanno scelti a mano','warn',6000)
+    return
+  }
+  const mio=!!r.tecnico_email&&String(r.tecnico_email).toLowerCase()===String((S.user&&S.user.email)||'').toLowerCase()
+  if(mio&&!r.accettato_il){
+    const ora=new Date().toISOString()
+    const p={accettato_il:ora,accettato_da:S.user.email,rifiutato_il:null,rifiutato_da:null,rifiuto_motivo:null}
+    if(!r.presa_visione_il){p.presa_visione_il=ora;p.presa_visione_da=S.user.email}
+    const{error:eAcc}=await sb.from('incarichi').update(p).eq('id',r.id)
+    if(eAcc) toast('Incarico agganciato, ma l\'accettazione non è stata registrata: '+eAcc.message,'warn',6000)
+    else{
+      Object.assign(r,p)
+      const c=_incCache.find(x=>x.id===r.id); if(c) Object.assign(c,p)
+      if(typeof incAggiornaNavBadge==='function') incAggiornaNavBadge()
+    }
+  }
+  const d0=incDecidi(r,{})
+  await incApplicaAllaVisita(r)
+  if(d0.impresa==='niente'&&d0.cantiere==='niente') toast('Incarico n. '+r.id+' agganciato. Non indica né impresa né cantiere: sceglili tu nei passi dopo','ok',6000)
+}
+window.incDaTendina=incDaTendina
 
 /* Nessun cantiere agganciato (le visite stage): si apre la scheda «Nuovo
    cantiere» gia' compilata con via, civico e comune dell'incarico. Il tecnico
@@ -14326,18 +14406,21 @@ document.addEventListener('drop',function(ev){
 let _incApertiCache=null
 async function incCaricaTendina(){
   const sel=$('f-prot-inc'); if(!sel||!S.user) return
+  /* la tendina vive nel riquadro «Parti da un tuo incarico» del primo passo:
+     si mostra il riquadro intero, e solo se c'e' almeno un incarico aperto */
+  const mostra=on=>{ const b=$('inc-scelta-box'); if(b) b.style.display=on?'':'none' }
   try{
     const{data,error}=await sb.rpc('incarichi_miei_aperti')
     if(error) throw error
     _incApertiCache=data||[]
-    if(!_incApertiCache.length){ sel.style.display='none'; return }
+    if(!_incApertiCache.length){ mostra(false); return }
     sel.innerHTML='<option value="">— scegli dai tuoi incarichi —</option>'+
       _incApertiCache.map(r=>'<option value="'+r.id+'">'+esc(r.etichetta)+'</option>').join('')
-    sel.style.display=''
+    mostra(true)
     const cur=vGet('f-prot-int')
     if(cur&&_incApertiCache.some(r=>String(r.id)===String(cur))) sel.value=String(cur)
     incVerificaProt()
-  }catch(e){ sel.style.display='none'; console.warn('incarichi tendina:',e) }
+  }catch(e){ mostra(false); console.warn('incarichi tendina:',e) }
 }
 window.incCaricaTendina=incCaricaTendina
 
@@ -14403,8 +14486,10 @@ window.__app={vSet,vGet,initForm,autoAccCant,renderCantCard,
 
 document.addEventListener('change',function(ev){
   if(ev.target&&ev.target.id==='f-prot-inc'){
-    if(ev.target.value) vSet('f-prot-int',ev.target.value)
-    incVerificaProt()
+    /* scegliere un incarico lo accetta e compila impresa e cantiere (02/10/2026);
+       tornare su «— scegli —» non cancella niente di quello che c'e' */
+    if(ev.target.value) incDaTendina(ev.target.value).catch(e=>{console.warn('incarico dalla tendina:',e);toast('Incarico non agganciato: '+(e.message||e),'err')})
+    else incVerificaProt()
   }
 })
 document.addEventListener('input',function(ev){
@@ -14427,7 +14512,7 @@ document.addEventListener('input',function(ev){
 <script src="scheda-impresa.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=4"></script>
-<script src="aiuto.js?v=12"></script>
+<script src="aiuto.js?v=13"></script>
 <script src="mail-respinte-tec.js?v=2"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
