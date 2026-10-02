@@ -283,4 +283,48 @@
   }
 
   window.notificheBox = disegna;
+
+  /* ── AVVISO AL COORDINATORE A OGNI NUOVO VERBALE (02/10/2026) ──────────
+     Chiesto dall'utente: una notifica al coordinatore quando un tecnico
+     registra un verbale definitivo, «mettendo la scelta se attivare o no
+     nella scheda del coordinatore». L'interruttore sta nella Zona
+     Coordinatore e lo possono muovere il coordinatore e la segreteria (lo
+     decide il database: coord_avviso_verbali_stato / _imposta). La
+     notifica la accoda un trigger sulle visite: qui si accende e si spegne
+     soltanto. Nasce SPENTO.
+     Un errore di lettura non è «spento»: si dice (regola del 19/09). */
+  async function avvisoVerbali() {
+    const box = $('adm-avviso-verbali');
+    if (!box || !window.sb || !(window.S && window.S.user)) return;
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const cornice =(dentro) => `<div class="card" style="border-left:4px solid #565c66"><h3>&#128276; Avviso a ogni nuovo verbale</h3>${dentro}</div>`;
+    const { data, error } = await window.sb.rpc('coord_avviso_verbali_stato');
+    if (error) {
+      box.innerHTML = cornice(`<p style="font-size:12px;color:#c0392b;margin:4px 0">Non sono riuscito a leggere l'impostazione: ${esc(error.message)}</p>`);
+      box.style.display = '';
+      return;
+    }
+    if (!data) { box.style.display = 'none'; box.innerHTML = ''; return; }   /* né coordinatore né segreteria */
+    const n = Number(data.dispositivi || 0);
+    const dispositivi = n > 0
+      ? `Il coordinatore ha le notifiche attive su <b>${n}</b> ${n === 1 ? 'dispositivo' : 'dispositivi'}.`
+      : '<span style="color:#b35c00">Il coordinatore non ha ancora attivato le notifiche su nessun dispositivo: finch&eacute; non lo fa (riquadro &#128276; in Dashboard) non gli arriva niente.</span>';
+    box.innerHTML = cornice(`
+      <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;cursor:pointer;margin:6px 0">
+        <input type="checkbox" id="adm-avv-verb" ${data.attivo ? 'checked' : ''} style="margin-top:3px;width:auto">
+        <span>Manda una <b>notifica al coordinatore</b> quando un tecnico registra un <b>verbale definitivo</b>.</span>
+      </label>
+      <p style="font-size:12px;color:#666;margin:4px 0">Una notifica per verbale, quando diventa definitivo (non a ogni salvataggio). Il testo &egrave; generico, senza nomi; toccandola si apre l'elenco delle visite. I verbali che registra il coordinatore non gli vengono notificati. ${dispositivi}</p>`);
+    box.style.display = '';
+    const c = $('adm-avv-verb');
+    if (c) c.onchange = async () => {
+      const vuole = c.checked;
+      c.disabled = true;
+      const { error: e } = await window.sb.rpc('coord_avviso_verbali_imposta', { p_attivo: vuole });
+      c.disabled = false;
+      if (e) { c.checked = !vuole; avviso('Impostazione non salvata: ' + e.message, 'err'); return; }
+      avviso(vuole ? 'Avviso acceso: al prossimo verbale definitivo parte la notifica al coordinatore.' : 'Avviso spento.', 'ok');
+    };
+  }
+  window.avvisoVerbaliBox = avvisoVerbali;
 })();
