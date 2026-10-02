@@ -94,4 +94,13 @@ assert.ok(/mancaAllaChiusura\(\{giaDefinitivo:_giaDef,oraA:vGet\('f-a'\),lavoraz
 assert.ok(save[0].indexOf('oraFineAllaChiusura({') < save[0].indexOf('mancaAllaChiusura({'), 'prima si prova a mettere l’ora, poi si controlla');
 assert.ok(/<label>Ora fine \*<\/label>/.test(html) && /<label>Tipologia \(ruolo in cantiere\) \*<\/label>/.test(html) && /<label>Lavorazioni in corso \* /.test(html), 'i tre campi obbligatori portano l’asterisco');
 
+/* checklist, lavorazioni e imprese si riscrivono con delete + insert: l'esito va letto,
+   o un insert rifiutato lascia il verbale senza quelle righe in silenzio (02/10/2026) */
+for (const tab of ['visite_checklist', 'visite_lavorazioni', 'visite_imprese_presenti']) {
+  const nudi = html.match(new RegExp("(^|[^(])await sb\\.from\\('" + tab + "'\\)\\.(delete|insert)\\(", 'gm')) || [];
+  const letti = html.match(new RegExp("_scritto\\(await sb\\.from\\('" + tab + "'\\)\\.(delete|insert)\\(", 'g')) || [];
+  assert.strictEqual(letti.length, 2, tab + ': delete e insert devono passare da _scritto');
+  assert.strictEqual(nudi.filter((x) => !/_scritto\($/.test(x.slice(0, x.indexOf('await')))).length, 0, tab + ': una scrittura non legge l’esito');
+}
+
 console.log('ok — ora di fine alla chiusura');
