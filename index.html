@@ -4544,6 +4544,28 @@ function setupAC(inId,listId,fetchFn,onSel){
 }
 
 // ── SAVE ──
+/* (02/10/2026) ORA DI FINE ALLA CHIUSURA. Deciso dall'utente: se il tecnico non indica
+   l'ora di fine, ci va quella in cui il verbale viene chiuso come definitivo.
+   Funzione pura: restituisce l'ora da scrivere («HH:MM»), oppure null se non va toccato niente.
+   Non si scrive quando:
+     · il verbale non sta diventando definitivo, o lo era già (risalvare un vecchio verbale
+       non deve inventargli un'ora);
+     · il tecnico l'ha già indicata;
+     · il verbale si chiude in un giorno diverso da quello della visita: l'ora di adesso non
+       sarebbe quella della visita (motivo 'altro-giorno': lo si dice al tecnico);
+     · l'ora di adesso è prima dell'ora di inizio (motivo 'prima-dell-inizio').
+   d = {stato, giaDefinitivo, oraA, oraDa, dataVisita, oggi, adesso} */
+function oraFineAllaChiusura(d){
+  d=d||{}
+  if(d.stato!=='definitivo'||d.giaDefinitivo) return{ora:null,motivo:'non-serve'}
+  if(String(d.oraA||'').trim()) return{ora:null,motivo:'gia-indicata'}
+  if(!d.dataVisita||!d.oggi||String(d.dataVisita).slice(0,10)!==String(d.oggi)) return{ora:null,motivo:'altro-giorno'}
+  const ora=String(d.adesso||'').slice(0,5)
+  if(!/^\d{2}:\d{2}$/.test(ora)) return{ora:null,motivo:'non-serve'}
+  if(d.oraDa&&ora<String(d.oraDa).slice(0,5)) return{ora:null,motivo:'prima-dell-inizio'}
+  return{ora,motivo:'messa'}
+}
+
 async function saveVisita(stato){
   saveTabData()
   const cant_id=vGet('f-cant-id')
@@ -4554,6 +4576,23 @@ async function saveVisita(stato){
   if(S.imprese.length===0||!S.imprese[0].impresa_id){toast('Seleziona l\'impresa principale (Tab Imprese)','warn');activateTab(2);return}
   if(!data_v){toast('Inserisci la data della visita','warn');activateTab(0);return}
   if(!tec_id){toast('Seleziona il tecnico (Tab Visita)','warn');activateTab(0);return}
+
+  // ora di fine non indicata: alla chiusura come definitivo ci va l'ora di adesso (02/10/2026).
+  // Sta PRIMA del controllo di coerenza, così il controllo vede l'ora che verrà salvata.
+  if(stato==='definitivo'&&!String(vGet('f-a')||'').trim()){
+    let _giaDef=false
+    const _vidOra=S.fd.visita_id||S.savedId||null
+    if(_vidOra){
+      const{data:_vOra,error:_eOra}=await sb.from('visite').select('stato').eq('visita_id',_vidOra).maybeSingle()
+      _giaDef=!!_eOra||!!(_vOra&&_vOra.stato==='definitivo')   // lettura fallita: non si inventa un'ora
+    }
+    const _of=oraFineAllaChiusura({stato,giaDefinitivo:_giaDef,oraA:vGet('f-a'),oraDa:vGet('f-da'),dataVisita:data_v,
+      oggi:new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Rome'}),
+      adesso:new Date().toLocaleTimeString('it-IT',{timeZone:'Europe/Rome',hour:'2-digit',minute:'2-digit',hour12:false})})
+    if(_of.ora){vSet('f-a',_of.ora);toast('Ora di fine non indicata: ho messo '+_of.ora+', l\'ora di chiusura del verbale. Se la visita è finita a un\'altra ora, correggila e risalva.','ok',7000)}
+    else if(_of.motivo==='altro-giorno')toast('Manca l\'ora di fine. Il verbale si chiude in un giorno diverso da quello della visita, quindi non la metto io: se la ricordi, scrivila e risalva.','warn',8000)
+    else if(_of.motivo==='prima-dell-inizio')toast('Manca l\'ora di fine, e l\'ora di adesso è prima dell\'ora di inizio indicata: controlla gli orari.','warn',8000)
+  }
 
   // controllo di coerenza prima del definitivo (controllo-verbale.js, 17/09/2026):
   // avvisa, non blocca; un errore del controllo non ferma mai il salvataggio
