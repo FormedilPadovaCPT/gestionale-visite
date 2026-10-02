@@ -45,7 +45,26 @@ assert.ok(/if\(_of\.ora\)\{vSet\('f-a',_of\.ora\)/.test(save[0]), 'l’ora va sc
 /* ── ora di fine e ruolo dell'impresa OBBLIGATORI alla chiusura (02/10/2026, deciso dall'utente) ── */
 const m2 = html.match(/function mancaAllaChiusura\(d\)\{[\s\S]*?\r?\n\}/);
 assert.ok(m2, 'mancaAllaChiusura non trovata in index.html');
-const manca = Function(m2[0] + '; return mancaAllaChiusura')();
+const m3 = html.match(/function impresaDoppia\(imprese,id,esclusa\)\{[\s\S]*?\r?\n\}/);
+assert.ok(m3, 'impresaDoppia non trovata in index.html');
+const manca = Function(m3[0] + ';' + m2[0] + '; return mancaAllaChiusura')();
+const doppia = Function(m3[0] + '; return impresaDoppia')();
+
+/* ── la stessa impresa non entra due volte (dal verbale CPT/26_27/0002) ── */
+const G = { impresa_id: '00251920286', impresa_nome: 'Galiazzo' }, B = { impresa_id: '03236900274', impresa_nome: 'Boscolo' };
+assert.strictEqual(doppia([G, B]), null);
+assert.deepStrictEqual(doppia([G, B, { ...G }]), { prima: 0, riga: 2, nome: 'Galiazzo' });
+assert.strictEqual(doppia([G, { impresa_id: '', impresa_nome: '' }, { impresa_id: '' }]), null, 'le righe ancora vuote non sono doppioni');
+assert.strictEqual(doppia([{ impresa_id: 'abc123' }, { impresa_id: ' ABC123 ' }]).riga, 1, 'maiuscole e spazi non distinguono');
+// mentre si sceglie: c'è già in un'altra riga? (la riga che si sta compilando non conta)
+assert.deepStrictEqual(doppia([G, B, {}], '00251920286', 2), { prima: 0, riga: 2, nome: 'Galiazzo' });
+assert.strictEqual(doppia([G, B], '00251920286', 0), null, 'riscegliere la stessa impresa nella sua riga non è un doppione');
+assert.strictEqual(doppia([G, B], '09999999999', 1), null);
+// al salvataggio ferma sempre, anche un verbale già definitivo
+assert.strictEqual(manca({ giaDefinitivo: true, oraA: '10:00', lavorazioni: 1, imprese: [G, { ...G }] })[0].cosa, 'impresa-doppia');
+assert.ok(/due volte/.test(manca({ giaDefinitivo: false, oraA: '10:00', lavorazioni: 1, imprese: [{ ...G, tipo_imp: 1 }, { ...G, tipo_imp: 1 }] })[0].testo));
+assert.ok(/impresaDoppia\(S\.imprese,item\.id,idx\)/.test(html), 'la ricerca nella riga deve rifiutare un’impresa già presente');
+assert.ok(/function _useImpresaEsistente\(c,idx\)\{\r?\n  const _gia=impresaDoppia\(S\.imprese,c\.impresa_id,idx\)/.test(html), '«usa l’impresa esistente» deve rifiutare un doppione');
 const IMP = [{ impresa_id: '01234567890', impresa_nome: 'Rossi Costruzioni', tipo_imp: '2' }, { impresa_id: '09999999999', impresa_nome: 'Bianchi', tipo_imp: '' }];
 
 // tutto a posto: niente da completare

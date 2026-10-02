@@ -3467,6 +3467,9 @@ function renderImpreseAccordion(){
       const{data}=await qb
       return(data||[]).map(i=>({id:i.impresa_id,label:`${i.impresa_nome}${i.impresa_cf?' – '+i.impresa_cf:''}`,piva:i.piva||'',cf:i.impresa_cf||''}))
     },item=>{
+      /* la stessa impresa non entra due volte (02/10/2026) */
+      const _gia=impresaDoppia(S.imprese,item.id,idx)
+      if(_gia){toast('«'+(_gia.nome||item.label)+'» è già nel verbale, alla riga '+(_gia.prima+1)+': un\'impresa si mette una volta sola. I suoi lavoratori vanno indicati in quella riga.','warn',8000);$(`im-search-${idx}`).value='';return}
       S.imprese[idx].impresa_id=item.id
       S.imprese[idx].impresa_nome=item.label.split(' – ')[0]
       if(item.cf&&!S.imprese[idx].cf_imp)S.imprese[idx].cf_imp=item.cf
@@ -4372,6 +4375,8 @@ function _confirmSimiliCommittenti(simili){
 }
 // Usa un'impresa gia esistente al posto di crearne una nuova
 function _useImpresaEsistente(c,idx){
+  const _gia=impresaDoppia(S.imprese,c.impresa_id,idx)
+  if(_gia){hide('modal-imp');toast('«'+(c.impresa_nome||c.impresa_id)+'» è già nel verbale, alla riga '+(_gia.prima+1)+': un\'impresa si mette una volta sola.','warn',8000);return}
   Object.assign(S.imprese[idx],{
     impresa_id:c.impresa_id,
     impresa_nome:c.impresa_nome||'',
@@ -4566,6 +4571,21 @@ function oraFineAllaChiusura(d){
   return{ora,motivo:'messa'}
 }
 
+/* (02/10/2026) LA STESSA IMPRESA DUE VOLTE. Funzione pura: dato l'elenco delle imprese del
+   verbale restituisce la prima ripetizione {prima, riga, nome} oppure null. Con `id` e
+   `esclusa` dice se quell'impresa c'è già in una riga diversa da quella che si sta compilando. */
+function impresaDoppia(imprese,id,esclusa){
+  const k=s=>String(s||'').trim().toUpperCase()
+  const righe=(imprese||[]).map((im,i)=>({i,id:k(im&&im.impresa_id),nome:(im&&im.impresa_nome)||''})).filter(x=>x.id)
+  if(id!==undefined){
+    const g=righe.find(x=>x.id===k(id)&&x.i!==esclusa)
+    return g?{prima:g.i,riga:esclusa,nome:g.nome||g.id}:null
+  }
+  for(let a=0;a<righe.length;a++)for(let b=a+1;b<righe.length;b++)
+    if(righe[a].id===righe[b].id) return{prima:righe[a].i,riga:righe[b].i,nome:righe[a].nome||righe[a].id}
+  return null
+}
+
 /* (02/10/2026) CHE COSA MANCA PER CHIUDERE. Deciso dall'utente: l'ora di fine, almeno una
    lavorazione in corso e il ruolo di ogni impresa («Tipologia») sono obbligatori per chiudere
    il verbale come definitivo.
@@ -4577,6 +4597,10 @@ function oraFineAllaChiusura(d){
 function mancaAllaChiusura(d){
   d=d||{}
   const out=[]
+  /* la stessa impresa in due righe è sempre un errore, anche su un verbale già definitivo
+     (CPT/26_27/0002: la ricerca lasciava scegliere due volte la stessa ditta) */
+  const _dop=impresaDoppia(d.imprese)
+  if(_dop) out.push({cosa:'impresa-doppia',tab:2,campo:'im-search-'+_dop.riga,testo:'L\'impresa «'+_dop.nome+'» compare due volte nel verbale (righe '+(_dop.prima+1)+' e '+(_dop.riga+1)+'). Tienila una volta sola: togli la riga in più con la ✕, nel passo Imprese.'})
   if(d.giaDefinitivo) return out
   if(!String(d.oraA||'').trim())
     out.push({cosa:'ora-fine',tab:0,campo:'f-a',testo:'Manca l\'ora di fine: è obbligatoria per chiudere il verbale. Non posso metterla io, perché il verbale si chiude in un giorno diverso da quello della visita oppure l\'ora di adesso è prima dell\'ora di inizio: scrivila nel primo passo.'})
