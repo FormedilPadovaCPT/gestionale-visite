@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gestionale Visite – Formedil Padova</title>
 <!-- App installabile (17/09/2026): manifest + icone. Il service worker (sw.js) serve
      SOLO alle notifiche e non mette niente in cache: il gestionale si carica dalla rete come prima. -->
@@ -173,6 +173,23 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 .check-label{flex:1;font-size:13px;color:#333;line-height:1.3}
 .check-radios{display:flex;gap:3px;flex-shrink:0}
 .check-radios label{display:flex;flex-direction:column;align-items:center;cursor:pointer;margin:0}
+/* (03/10/2026) TELEFONO E TABLET. La pagina si può di nuovo ingrandire con due dita: prima era bloccato, e in
+   cantiere con la luce forte serve. Sugli schermi a tocco i campi hanno il testo a 16px: sotto quella misura
+   l'iPhone ingrandisce da solo la pagina a ogni tocco su un campo. Pulsanti ed esiti della check-list più
+   grandi, perché si premono col dito; sul telefono la voce va sopra e gli esiti sotto. Sul PC non cambia niente. */
+@media (pointer:coarse){
+  input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{font-size:16px!important}
+  .btn-primary,.btn-secondary,.btn-success,.btn-outline,.btn-warn,.btn-danger{min-height:44px}
+  .btn-sm{min-height:36px}
+  nav button{min-height:40px}
+  .check-radios .radio-chip{display:inline-block;padding:9px 11px;font-size:12px}   /* più specifica: la regola di base viene dopo */
+  .check-radios{gap:5px}
+}
+@media (pointer:coarse) and (max-width:600px){
+  .check-item>div:first-child{flex-wrap:wrap}
+  .check-item .check-label{flex:1 1 100%;font-size:14px}
+  .check-radios{margin-left:auto}
+}
 .check-radios input[type=radio]{display:none}
 .radio-chip{font-size:11px;font-weight:700;padding:3px 6px;border-radius:4px;border:2px solid #ccc;background:#fff;color:#999;cursor:pointer}
 .check-radios input[type=radio]:checked+.radio-chip.na{border-color:#aaa;background:#eee;color:#555}
