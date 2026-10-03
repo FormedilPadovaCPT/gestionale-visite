@@ -10,7 +10,7 @@ const VerbalePDF = require('../verbale-pdf.js');
 /* le tabelle vere, lette da app-data.js */
 const src = fs.readFileSync(path.join(__dirname, '..', 'app-data.js'), 'utf8');
 const tabella = (nome) => {
-  const m = src.match(new RegExp('const ' + nome + '=(\{[^}]*\})'));
+  const m = src.match(new RegExp('const ' + nome + '=(\\{[^}]*\\})'));
   assert.ok(m, nome + ' non trovata in app-data.js');
   return Function('return ' + m[1])();
 };
