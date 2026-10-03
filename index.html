@@ -212,6 +212,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 .ac-list{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:200px;overflow-y:auto;z-index:300;box-shadow:var(--shadow)}
 .ac-list div{padding:8px 12px;cursor:pointer;font-size:13px}
 .ac-list div:hover,.ac-list div.active{background:#fef8f5;color:var(--orange)}
+.ac-list div.ac-nota,.ac-list div.ac-nota:hover{cursor:default;color:#888;font-style:italic;font-size:12px;background:#fafafa;border-top:1px solid var(--border)}
 /* RIEPILOGO */
 .riepilogo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
 .rp-item{background:var(--light);padding:8px 11px;border-radius:var(--radius)}
@@ -3524,10 +3525,12 @@ function renderImpreseAccordion(){
   // Autocomplete for each impresa
   S.imprese.forEach((_,idx)=>{
     setupAC(`im-search-${idx}`,`im-list-${idx}`, async q=>{
-      let qb=sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva').eq('elimina',0).order('impresa_nome').limit(20)
-      if(q)qb=qb.or(`impresa_nome.ilike.%${q}%,impresa_cf.ilike.%${q}%,piva.ilike.%${q}%`)
-      const{data}=await qb
-      return(data||[]).map(i=>({id:i.impresa_id,label:`${i.impresa_nome}${i.impresa_cf?' – '+i.impresa_cf:''}`,piva:i.piva||'',cf:i.impresa_cf||''}))
+      // (03/10/2026) parola per parola, e fino a AC_MAX righe: con «basso» le imprese sono 37 e la tendina ne dava 20
+      let qb=sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva').eq('elimina',0).order('impresa_nome').limit(AC_MAX+1)
+      if(q)qb=_perParole(qb,q,['impresa_nome','impresa_cf','piva'])
+      const{data,error}=await qb
+      if(error)throw new Error(error.message)
+      return _acTaglia((data||[]).map(i=>({id:i.impresa_id,label:`${i.impresa_nome}${i.impresa_cf?' – '+i.impresa_cf:''}`,piva:i.piva||'',cf:i.impresa_cf||''})))
     },item=>{
       /* la stessa impresa non entra due volte (02/10/2026) */
       const _gia=impresaDoppia(S.imprese,item.id,idx)
@@ -4197,10 +4200,11 @@ window.salvaCommittente=salvaCommittente
 
 // ── AUTOCOMPLETE COMMITTENTE ──
 setupAC('mc-comm-search','mc-comm-list', async q=>{
-  let qb=sb.from('committenti').select('committente_id,committente_nome,cf_piva,piva,tipo_sogg').eq('elimina',0).order('committente_nome').limit(20)
+  let qb=sb.from('committenti').select('committente_id,committente_nome,cf_piva,piva,tipo_sogg').eq('elimina',0).order('committente_nome').limit(AC_MAX+1)
   if(q)qb=_perParole(qb,q,['committente_nome','cf_piva','piva'])
-  const{data}=await qb
-  return(data||[]).map(c=>({id:c.committente_id,label:c.committente_nome,extra:c}))
+  const{data,error}=await qb
+  if(error)throw new Error(error.message)
+  return _acTaglia((data||[]).map(c=>({id:c.committente_id,label:c.committente_nome,extra:c})))
 }, it=>{
   vSet('mc-comm-id',it.id)
   const co=it.extra||{}
@@ -4215,10 +4219,11 @@ setupAC('mc-comm-search','mc-comm-list', async q=>{
   }
 })()
 setupAC('f-comm-search','comm-list', async q=>{
-  let qb=sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,email,telefono,piva,tipo_sogg').eq('elimina',0).order('committente_nome').limit(20)
+  let qb=sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,email,telefono,piva,tipo_sogg').eq('elimina',0).order('committente_nome').limit(AC_MAX+1)
   if(q)qb=_perParole(qb,q,['committente_nome','cf_piva','piva'])
-  const{data}=await qb
-  return(data||[]).map(c=>({id:c.committente_id,label:c.committente_nome,extra:c}))
+  const{data,error}=await qb
+  if(error)throw new Error(error.message)
+  return _acTaglia((data||[]).map(c=>({id:c.committente_id,label:c.committente_nome,extra:c})))
 },item=>{
   vSet('f-comm-id',item.id)
   if(item.extra){
@@ -4636,12 +4641,23 @@ $('btn-mc-save').onclick=async()=>{
 }
 
 // ── GENERIC AUTOCOMPLETE ──
+/* (03/10/2026) QUANTE RIGHE MOSTRA UNA TENDINA DI RICERCA, e che cosa dice quando non bastano.
+   Prima erano 20 in ordine alfabetico e basta: con «basso» le imprese sono 37, e quella cercata — la 32ª —
+   non compariva mai, senza che niente lo dicesse (segnalato dall'utente). Ora sono AC_MAX, e se ce ne sono
+   altre la tendina lo scrive in fondo: una lista tagliata in silenzio sembra una lista completa. */
+const AC_MAX=60
+function _acTaglia(items){if(items.length>AC_MAX){items=items.slice(0,AC_MAX);items.troppi=true}return items}
 function setupAC(inId,listId,fetchFn,onSel){
   const inp=$(inId),lst=$(listId)
   if(!inp||!lst)return
   let tm=null,lq=''
   const renderItems=async(q)=>{
-    const items=await fetchFn(q)
+    let items
+    // una ricerca non riuscita non è «nessun risultato»: si dice
+    try{items=await fetchFn(q)}catch(e){
+      lst.innerHTML='<div class="ac-nota" style="color:#c0392b">Non sono riuscito a cercare ('+String(e&&e.message||e).replace(/[<>&]/g,'')+'). Riprova.</div>'
+      lst.classList.remove('hidden');return
+    }
     if(!items.length){
       lst.innerHTML='<div style="color:#aaa;font-style:italic">Nessun risultato</div>'
       lst.classList.remove('hidden')
@@ -4649,6 +4665,7 @@ function setupAC(inId,listId,fetchFn,onSel){
       return
     }
     lst.innerHTML=items.map((it,i)=>`<div data-i="${i}">${it.label}</div>`).join('')
+      +(items.troppi?'<div class="ac-nota">Ce ne sono altre: queste sono le prime '+AC_MAX+' in ordine alfabetico. Aggiungi una parola (un nome, la partita IVA) per restringere.</div>':'')
     lst.classList.remove('hidden')
     lst.querySelectorAll('div[data-i]').forEach((d,i)=>{
       d.onclick=()=>{inp.value=items[i].label;lst.classList.add('hidden');onSel(items[i])}
