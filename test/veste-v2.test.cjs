@@ -273,4 +273,9 @@ assert.ok(js.includes('body.v2 .sogg-toggle label span{display:block;padding:5px
 assert.ok(html.includes('.tipo-chip span{display:block;padding:5px 13px;border-radius:20px;border:2px solid var(--border)'), 'se cambia la forma di «Pubblico / Privato» va cambiata anche questa');
 assert.ok(html.includes('name="comm-sogg" id="comm-radio-pf" value="PF" checked') && html.includes('name="mc-sogg" id="mc-sogg-pf" value="PF" checked'), 'i campi restano quelli di sempre, nel verbale e nella scheda del cantiere');
 
+/* ── «Cantieri vicini a me» solo su telefono e tablet, con la stessa regola di mappa.js ── */
+const mappaJs = fs.readFileSync(path.join(radice, 'mappa.js'), 'utf8');
+assert.ok(js.includes('#v2-vicini{display:none;margin:0 0 12px}') && js.includes('@media (max-width:1024px),(pointer:coarse){#v2-vicini{display:block}}'), 'sul PC il pulsante dei cantieri vicini non si deve vedere');
+assert.ok(mappaJs.includes("'(max-width: 1024px), (pointer: coarse)'"), 'la regola «telefono o tablet» deve restare la stessa di mappa.js: se cambia lì va cambiata anche nella veste');
+
 console.log('veste-v2: ok');

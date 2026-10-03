@@ -292,7 +292,9 @@ body.v2 #view-form .tab-area>#inc-scelta-box>.field{display:none}
 .v2-scheda small{display:block;font-size:12px;color:#888}
 .v2-scheda b{display:block;font-size:15px;font-weight:600;color:#3d4249;margin:2px 0}
 .v2-scheda .v2-km{color:var(--orange);font-weight:600;font-size:12px}
-#v2-vicini{margin:0 0 12px}
+/* solo su telefono e tablet, come «Cantieri vicino a te» dell'app (mappa.js): sul PC la posizione non serve */
+#v2-vicini{display:none;margin:0 0 12px}
+@media (max-width:1024px),(pointer:coarse){#v2-vicini{display:block}}
 #v2-vicini .v2-nota{font-size:12.5px;color:#888;margin-top:6px}
 #v2-tipo-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
 #v2-tipo-chips button{background:#fff;border:1.5px solid var(--border);border-radius:50px;padding:7px 14px;font-size:13px;font-weight:600;color:#565C66;min-height:0}
