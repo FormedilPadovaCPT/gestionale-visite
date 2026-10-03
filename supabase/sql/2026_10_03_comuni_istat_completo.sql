@@ -63,3 +63,24 @@ update public.cantieri c
  where c.cantiere_id in (select cantiere_id from archivio.bk_2026_10_03b_cantieri_comune_cod)
    and c.cantiere_comune_cod is distinct from public.calcola_comune_cod_al(c.comune_nome,
          coalesce((select max(v.data_visita) from public.visite v where v.cantiere_id = c.cantiere_id and v.elimina = 0), current_date));
+
+-- ── Dopo il caricamento dell'elenco completo (migrazione cantieri_codice_comune_da_elenco_istat_2026_10_03) ──
+-- I cantieri senza codice lo prendono dal nome (118), e i 4 con un codice che non era del loro comune — rimasto
+-- quello di prima al cambio di comune — si correggono. Vale il codice alla data dell'ultima visita, o di oggi.
+-- Copia di prima in archivio.bk_2026_10_03c_cantieri_comune_cod (122 righe).
+-- Restano senza codice 5 cantieri col comune «-», «ND», vuoto o «SVIZZERA».
+create table if not exists archivio.bk_2026_10_03c_cantieri_comune_cod as
+select c.cantiere_id, c.comune_nome, c.cantiere_comune_cod, now() as copiato_il
+  from public.cantieri c
+ where (upper(btrim(c.comune_nome)) = 'BEVILACQUA VR' and coalesce(c.cantiere_comune_cod,'') !~ '^[0-9]{6}$')
+    or (public.calcola_comune_cod(c.comune_nome) is not null
+        and c.cantiere_comune_cod is distinct from public.calcola_comune_cod_al(c.comune_nome,
+              coalesce((select max(v.data_visita) from public.visite v where v.cantiere_id = c.cantiere_id and v.elimina = 0), current_date)));
+revoke all on archivio.bk_2026_10_03c_cantieri_comune_cod from public, anon, authenticated;
+update public.cantieri c
+   set cantiere_comune_cod = public.calcola_comune_cod_al(c.comune_nome,
+         coalesce((select max(v.data_visita) from public.visite v where v.cantiere_id = c.cantiere_id and v.elimina = 0), current_date))
+ where c.cantiere_id in (select cantiere_id from archivio.bk_2026_10_03c_cantieri_comune_cod)
+   and public.calcola_comune_cod(c.comune_nome) is not null;
+update public.cantieri set cantiere_comune_cod = '023008'
+ where upper(btrim(comune_nome)) = 'BEVILACQUA VR' and coalesce(cantiere_comune_cod,'') !~ '^[0-9]{6}$';
