@@ -88,4 +88,32 @@ for (const [re, che] of [[/saveVisita/, 'salvare il verbale'], [/chiudi_verbale/
 assert.ok(/non letto/.test(js), 'un conteggio non riuscito si dice: mai uno zero al posto di un errore');
 assert.strictEqual(s.v2.esercizi().length, 2);
 
+/* ── «Oggi»: gli incarichi stanno in cima, subito dopo le bozze (chiesto dall'utente: sotto tutto il resto non li vedrebbe nessuno) ── */
+const ordine = (id) => { const k = 'body.v2[data-v2-vista="dashboard"] #' + id + '{order:'; const i = js.indexOf(k); assert.ok(i >= 0, 'manca l’ordine di ' + id); return +js[i + k.length]; };
+assert.ok(ordine('v2-bozze') < ordine('view-incarichi') && ordine('view-incarichi') < ordine('view-dashboard') && ordine('view-dashboard') < ordine('view-scadenze'), 'ordine di «Oggi»: bozze, incarichi, cruscotto, scadenze');
+
+/* ── «Vedi come: Presidenza»: solo ciò che è della Presidenza (nell'app vera lo fa il database) ── */
+const dir = fs.readFileSync(path.join(radice, 'direzione.js'), 'utf8');
+assert.ok(/if \(modo === 'direzione' && come\(\)\) \{\s+righe = righe\.filter\(\(r\) => r\.decisore === come\(\)\);\s+if \(come\(\) === 'presidenza'\) auto = \{ autorizzazioni: \[\], critici: \[\] \};/.test(dir), 'nell’anteprima il registro deve mostrare le sole questioni del ruolo guardato, e alla Presidenza niente autorizzazioni né conferme del Direttore');
+assert.ok(/const anteprima = modo === 'direzione' && !!come\(\);/.test(dir) && /const gestisce = !anteprima && \(R\.coord \|\| R\.segr\);/.test(dir), 'nell’anteprima non si mostrano i pulsanti di un altro ruolo');
+assert.ok(/if \(!v \|\| !v\.accesa \|\| !v\.accesa\(\)\) return null;/.test(dir), 'fuori dall’anteprima «come» deve essere vuoto: la pagina vera non cambia');
+const fn = dir.match(/function criticiDemandati\(casi, eventi, chi\) \{[\s\S]*?\r?\n  \}/);
+assert.ok(fn, 'non trovo criticiDemandati in direzione.js');
+const criticiDemandati = Function(fn[0] + '; return criticiDemandati')();
+const casi = [{ id: 1, stato: 'aperto', impresa_nome: 'A', cantiere_desc: 'via 1', data_evento: '2026-09-20' }, { id: 2, stato: 'aperto', impresa_nome: 'B', cantiere_desc: 'via 2', data_evento: '2026-09-25' },
+  { id: 3, stato: 'chiuso', impresa_nome: 'C' }, { id: 4, stato: 'aperto', impresa_nome: 'D' }];
+const eventi = [
+  { critico_id: 1, tipo: 'demandata', dati: { chi: 'direttore' }, created_at: '2026-09-21T08:00:00Z' },                 // solo al Direttore
+  { critico_id: 2, tipo: 'demandata', dati: { chi: 'direttore' }, created_at: '2026-09-26T08:00:00Z' },
+  { critico_id: 2, tipo: 'autorizzazione_direttore', dati: {}, created_at: '2026-09-27T08:00:00Z' },                     // il Direttore ha risposto
+  { critico_id: 2, tipo: 'demandata', dati: { chi: 'presidenza' }, created_at: '2026-09-28T08:00:00Z' },                 // poi alla Presidenza
+  { critico_id: 3, tipo: 'demandata', dati: { chi: 'presidenza' }, created_at: '2026-09-10T08:00:00Z' },                 // caso chiuso
+  { critico_id: 4, tipo: 'demandata', dati: { chi: 'presidenza' }, created_at: '2026-09-11T08:00:00Z' },
+  { critico_id: 4, tipo: 'decisione_organo', dati: {}, created_at: '2026-09-12T08:00:00Z' },                             // la Presidenza ha già deciso
+];
+assert.deepStrictEqual(criticiDemandati(casi, eventi, 'presidenza').map((c) => c.id), [2], 'alla Presidenza: solo il caso demandato a lei e non ancora deciso');
+assert.deepStrictEqual(criticiDemandati(casi, eventi, 'direttore').map((c) => c.id), [1], 'al Direttore: solo il caso che aspetta lui');
+assert.strictEqual(criticiDemandati(casi, eventi, 'presidenza')[0].dal, '2026-09-28');
+assert.deepStrictEqual(criticiDemandati(casi, [], 'presidenza'), [], 'senza richieste, niente');
+
 console.log('veste-v2: ok');

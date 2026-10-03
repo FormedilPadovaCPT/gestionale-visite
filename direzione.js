@@ -138,6 +138,40 @@
   /* ════════════════════════════════════════════════════════════
      1. CANTIERI CRITICI — le conferme che aspettano il Direttore
      ════════════════════════════════════════════════════════════ */
+  /* ── ANTEPRIMA «VEDI COME…» (veste v2, 03/10/2026) ──
+     La segreteria che guarda la pagina «come Presidenza» o «come Direttore» deve vedere ciò che vedrebbe
+     quel ruolo. Nell'app vera lo fa già il database: alla Presidenza dà le sole questioni indirizzate a
+     lei e i cantieri critici che le sono stati demandati. Nell'anteprima i permessi restano quelli della
+     segreteria, quindi il filtro va rifatto qui. «come» è null per chiunque non stia usando l'anteprima:
+     in quel caso non cambia niente. */
+  function come() {
+    try { const v = window.vesteV2; if (!v || !v.accesa || !v.accesa()) return null; const r = v.ruolo(); return r === 'presidenza' || r === 'direttore' ? r : null; } catch (_e) { return null; }
+  }
+  /* pura: i casi demandati a «chi» e non ancora decisi da lui — la stessa regola di s_direzione_in_attesa */
+  function criticiDemandati(casi, eventi, chi) {
+    const chiude = chi === 'presidenza' ? 'decisione_organo' : 'autorizzazione_direttore';
+    const out = [];
+    (casi || []).forEach((c) => {
+      if (c.stato === 'chiuso' || c.stato === 'annullato') return;
+      const suoi = (eventi || []).filter((e) => e.critico_id === c.id);
+      const chiesta = suoi.filter((e) => e.tipo === 'demandata' && e.dati && e.dati.chi === chi).map((e) => String(e.created_at)).sort().pop();
+      if (!chiesta) return;
+      if (suoi.some((e) => e.tipo === chiude && String(e.created_at) > chiesta)) return;
+      out.push({ id: c.id, impresa: c.impresa_nome, cantiere: c.cantiere_desc, data_evento: c.data_evento, dal: chiesta.slice(0, 10) });
+    });
+    return out.sort((a, b) => String(a.dal).localeCompare(String(b.dal)));
+  }
+  async function criticiCome(chi) {
+    const sb = window.sb;
+    const { data: casi, error } = await sb.from('s_cantieri_critici').select('id,impresa_nome,cantiere_desc,data_evento,stato').not('stato', 'in', '(chiuso,annullato)');
+    if (error) throw new Error(error.message);
+    if (!casi || !casi.length) return [];
+    const { data: eventi, error: e2 } = await sb.from('s_cantieri_critici_eventi').select('critico_id,tipo,dati,created_at')
+      .in('critico_id', casi.map((c) => c.id)).in('tipo', ['demandata', 'decisione_organo', 'autorizzazione_direttore']);
+    if (e2) throw new Error(e2.message);
+    return criticiDemandati(casi, eventi, chi);
+  }
+
   async function inAttesa() {
     const { data, error } = await window.sb.rpc('s_direzione_in_attesa');
     if (error) throw new Error(error.message);
@@ -260,6 +294,11 @@
       if (error) throw new Error(error.message);
       righe = data || [];
       if (R.direttore || R.coord || R.segr) { try { auto = await inAttesa(); } catch (e) { console.warn('in attesa:', e); } }
+      // anteprima «Vedi come…»: le sole questioni di quel ruolo; autorizzazioni e conferme sono del Direttore
+      if (modo === 'direzione' && come()) {
+        righe = righe.filter((r) => r.decisore === come());
+        if (come() === 'presidenza') auto = { autorizzazioni: [], critici: [] };
+      }
     } catch (e) { errore = e.message || String(e); }
     if (errore) {
       host.innerHTML = `<div class="card" style="border-left:4px solid #c0392b"><h3>📋 Questioni in attesa di decisione</h3><p style="font-size:13px;color:#c0392b;margin:0">Non sono riuscito a leggere il registro: ${esc(errore)}</p></div>`;
@@ -290,8 +329,9 @@
     if ((_filtroQ === 'alta' && !nAlta) || (_filtroQ === 'scadute' && !nScad)) _filtroQ = 'tutte';
     const vista = lista.filter((x) => _filtroQ === 'alta' ? altaDi(x) === 0 : _filtroQ === 'scadute' ? scadutaDi(x) : true);
 
-    const puoRispondere = (dec) => (dec === 'direttore' && R.direttore) || (dec === 'presidenza' && R.presidenza) || (dec === 'commissione' && (R.coord || R.segr));
-    const gestisce = R.coord || R.segr;
+    const anteprima = modo === 'direzione' && !!come();   // si guarda la pagina di un altro ruolo: niente pulsanti, per rispondere serve il suo accesso
+    const puoRispondere = (dec) => !anteprima && ((dec === 'direttore' && R.direttore) || (dec === 'presidenza' && R.presidenza) || (dec === 'commissione' && (R.coord || R.segr)));
+    const gestisce = !anteprima && (R.coord || R.segr);
     const chiCorto = (c) => String(c || '—').replace(/\s*\(dal vault\)/, '').replace(/^Segreteria Area Sicurezza$/, 'Segreteria');
     const decBadge = (d) => `<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:#888">${esc(DECISORI[d] || d)}</span>`;
 
@@ -571,8 +611,14 @@
      3. LA PAGINA «DIREZIONE» (Direttore) / «PRESIDENZA»
      ════════════════════════════════════════════════════════════ */
   async function carica() {
-    const R = await ruoli();
-    const nome = $('dir-nome'); if (nome) nome.textContent = S().viewerNome || '';
+    const Rv = await ruoli();
+    const _come = come();
+    // ciò che si MOSTRA: nell'anteprima è il ruolo guardato, altrimenti chi è collegato
+    const R = _come ? { direttore: _come === 'direttore', presidenza: _come === 'presidenza', coord: false, segr: false } : Rv;
+    const nome = $('dir-nome'); if (nome) nome.textContent = _come ? '(anteprima)' : (S().viewerNome || '');
+    // la pagina della Presidenza si chiama Presidenza, come la voce del menu
+    const tit = nome && nome.parentNode && nome.parentNode.firstChild;
+    if (tit && tit.nodeType === 3) tit.textContent = (R.presidenza && !R.direttore ? '🏛️ Presidenza — ' : '🏛️ Direzione — ');
     const intro = $('dir-intro');
     if (intro) intro.textContent = R.direttore
       ? 'Quello che aspetta te: autorizzazioni dei servizi CPT, conferme sui cantieri critici e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
@@ -583,7 +629,11 @@
     if (R.direttore && typeof window.loadAutorizzazioni === 'function') window.loadAutorizzazioni().catch((e) => console.warn('autorizzazioni:', e));
     else if (aut) aut.innerHTML = '';
     if (R.direttore || R.presidenza) {
-      try { const a = await inAttesa(); boxCritici(cri, a.critici || []); } catch (e) { boxCritici(cri, [], e.message || String(e)); }
+      try {
+        // nell'anteprima i casi demandati a quel ruolo si leggono dalle tabelle: la funzione del database risponde per chi è collegato
+        const critici = _come ? await criticiCome(_come) : ((await inAttesa()).critici || []);
+        boxCritici(cri, critici);
+      } catch (e) { boxCritici(cri, [], e.message || String(e)); }
     } else if (cri) cri.innerHTML = '';
     await decisioniBox($('dir-decisioni'), 'direzione');
     badge().catch(() => {});
@@ -831,5 +881,5 @@
     document.head.appendChild(st);
   })();
 
-  window.direzione = { carica, badge, zonaCoord, decisioniBox, obiettivi, kpiCeiv, apriCritico };
+  window.direzione = { carica, badge, zonaCoord, decisioniBox, obiettivi, kpiCeiv, apriCritico, criticiDemandati };
 })();

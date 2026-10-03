@@ -152,7 +152,15 @@ body.v2 #view-admin tr:hover td,body.v2 #view-segreteria tr:hover td{background:
 body.v2 .adm-wrap details summary{color:#6b7078!important}
 /* «Oggi»: la mappa sta in Cantieri; chi è di sola lettura la tiene (per lui la pagina si chiama Mappa) */
 body.v2:not(.viewer-mode) #dash-map-card{display:none}
-body.v2 .v2-sotto{margin-top:18px}
+/* «Oggi»: prima le bozze aperte, poi GLI INCARICHI (chiesto dall'utente: sotto tutto il resto non li vedrebbe nessuno),
+   poi il cruscotto e in fondo le scadenze. Le pagine sono quelle di sempre: cambia solo l'ordine in cui si vedono. */
+body.v2[data-v2-vista="dashboard"]:not(.viewer-mode) main{display:flex;flex-direction:column}
+body.v2[data-v2-vista="dashboard"] #v2-bozze{order:0}
+body.v2[data-v2-vista="dashboard"] #view-incarichi{order:1}
+body.v2[data-v2-vista="dashboard"] #view-dashboard{order:2}
+body.v2[data-v2-vista="dashboard"] #view-scadenze{order:3}
+body.v2:not([data-v2-vista="dashboard"]) #v2-bozze{display:none}
+.v2-sezione{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#565C66;margin:6px 2px 10px}
 #v2-torna{display:inline-flex;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--orange);background:#fff;border:1.5px solid var(--orange);border-radius:50px;padding:5px 14px;min-height:0}
 @media(max-width:720px){#v2-uff-menu{flex:1 1 100%;position:static;display:flex;flex-wrap:wrap;gap:4px}#v2-uff-menu button{width:auto;padding:7px 12px;border:1px solid var(--border)}#v2-uff-menu hr{display:none}body.v2 nav{padding:0 10px}}
 `;
@@ -256,7 +264,7 @@ body.v2 .v2-sotto{margin-top:18px}
     if (!document.body.classList.contains('v2')) return;
     document.body.classList.remove('v2');
     if (_letturaFinta) { document.body.classList.remove('viewer-mode'); _letturaFinta = false; }
-    ['v2-barra', 'v2-altre', 'v2-uff-menu', 'v2-scrivania', 'v2-bozze', 'v2-sintesi', 'v2-torna'].forEach((id) => { const e = $(id); if (e) e.remove(); });
+    ['v2-barra', 'v2-altre', 'v2-uff-menu', 'v2-scrivania', 'v2-rimandi', 'v2-bozze', 'v2-sintesi', 'v2-torna', 'v2-tit-inc', 'v2-tit-scad'].forEach((id) => { const e = $(id); if (e) e.remove(); });
     const u = $('view-segreteria'); if (u) { u.classList.remove('v2-uff'); u.querySelectorAll('.adm-section').forEach((s) => { s.style.display = ''; }); }
     menuComEra();
   }
@@ -369,9 +377,9 @@ body.v2 .v2-sotto{margin-top:18px}
 
   /* ── OGGI: le bozze aperte di chi è collegato ── */
   async function bozze() {
-    const vista = $('view-dashboard'); const sb = window.sb; if (!vista || !sb) return;
+    const vista = $('view-dashboard'); const sb = window.sb; if (!vista || !vista.parentNode || !sb) return;
     let el = $('v2-bozze');
-    if (!el) { el = document.createElement('div'); el.id = 'v2-bozze'; vista.insertBefore(el, vista.firstChild); }
+    if (!el) { el = document.createElement('div'); el.id = 'v2-bozze'; vista.parentNode.insertBefore(el, vista.parentNode.firstChild); }
     const tid = S().tecnico && S().tecnico.tecnico_id;
     if (!tid || RUOLI[ruolo()].lettura) { el.innerHTML = ''; return; }
     const { data, error } = await sb.from('visite')
@@ -387,6 +395,16 @@ body.v2 .v2-sotto{margin-top:18px}
       el.addEventListener('click', (e) => { const b = e.target.closest('[data-v2-bozza]'); if (b && typeof window.riapriBozza === 'function') window.riapriBozza(b.dataset.v2Bozza); });
       el._v2ascolta = true;
     }
+  }
+
+  /* in «Oggi» incarichi e scadenze portano un titolo; quando si aprono da sole, no */
+  function titoliOggi(si) {
+    [['view-incarichi', 'v2-tit-inc', '📥 I tuoi incarichi'], ['view-scadenze', 'v2-tit-scad', '⏰ Rientri in scadenza']].forEach(([vista, id, testo]) => {
+      const v = $(vista); if (!v) return;
+      let t = $(id);
+      if (!si) { if (t) t.remove(); return; }
+      if (!t) { t = document.createElement('div'); t.id = id; t.className = 'v2-sezione'; t.textContent = testo; v.insertBefore(t, v.firstChild); }
+    });
   }
 
   /* ── DIREZIONE e PRESIDENZA: una sintesi, così la pagina non è mai vuota ── */
@@ -446,6 +464,7 @@ body.v2 .v2-sotto{margin-top:18px}
       if (view === 'dashboard' && r.lettura) setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
       if (view === 'segreteria') ufficio();
       if (view === 'direzione') sintesi().catch((e) => console.warn('veste v2, sintesi:', e));
+      titoliOggi(view === 'dashboard' && !r.lettura);
       if (view === 'dashboard' && !r.lettura) { bozze().catch((e) => console.warn('veste v2, bozze:', e)); return ['scadenze', 'incarichi']; }
       return [];
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
