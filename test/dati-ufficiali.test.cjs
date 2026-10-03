@@ -71,6 +71,20 @@ const assert = require('assert')
   assert.strictEqual(parse.scadenzaToken(finto).toISOString(), '2026-10-04T00:31:03.000Z')
   assert.strictEqual(parse.scadenzaToken('non-una-chiave'), null)
 
+  // la chiave nella mail di InfoCamere (testo vero del 03/10, chiave finta)
+  const jwt = exp => 'eyJhbGciOiJIUzI1NiJ9.' + Buffer.from(JSON.stringify({ sub: 'prova', exp })).toString('base64url') + '.firma_finta-1'
+  const mail = `Gentile Utente,
+
+Si prega di tenere presente che questo token ha una validità di 6 ore dall'invio di questa email.
+
+Authorization Token: ${jwt(1791073863)}
+
+Cordiali saluti.`
+  assert.strictEqual(parse.chiaveDaMail(mail), jwt(1791073863))
+  assert.strictEqual(parse.chiaveDaMail('Gentile Utente, nessuna chiave qui'), '')
+  assert.strictEqual(parse.chiavePiuNuova([jwt(1791073863), jwt(1791095000), 'rotta']), jwt(1791095000), 'vale la chiave che scade più tardi')
+  assert.strictEqual(parse.chiavePiuNuova([]), '')
+
   // ── forme giuridiche: solo voci della tendina, mai a stima ──
   assert.strictEqual(parse.formaApp("SOCIETA' A RESPONSABILITA' LIMITATA SEMPLIFICATA"), 'S.r.l.s')
   assert.strictEqual(parse.formaApp("SOCIETA' A RESPONSABILITA' LIMITATA CON UNICO SOCIO"), 'S.r.l. Unipersonale')

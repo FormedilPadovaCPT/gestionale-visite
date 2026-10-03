@@ -67,6 +67,23 @@ export function scadenzaToken(token) {
   } catch (_) { return null }
 }
 
+// La chiave nella mail di InfoCamere: «Authorization Token: eyJ…» (testo del
+// 03/10/2026). Si accetta solo una stringa con la forma di un JWT.
+export function chiaveDaMail(testo) {
+  const m = String(testo || '').match(/Authorization\s+Token:\s*([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/i)
+  return m ? m[1] : ''
+}
+
+// Fra più chiavi, quella che scade più tardi (le mail arrivano tutte uguali)
+export function chiavePiuNuova(chiavi) {
+  let migliore = '', exp = 0
+  for (const c of chiavi || []) {
+    const s = scadenzaToken(c)
+    if (s && s.getTime() > exp) { exp = s.getTime(); migliore = c }
+  }
+  return migliore
+}
+
 // <imprese><data-erogazione .../><dati-impresa ...>...</dati-impresa></imprese>
 // Nessuna impresa trovata = risposta 200 con la sola data-erogazione.
 export function parseInfocamere(xml) {
