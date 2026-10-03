@@ -86,9 +86,12 @@ begin
       esito := esito || jsonb_build_object('cosa','cantiere-indirizzo','tab',1,'campo','scheda-cantiere',
         'testo','Scheda del cantiere: mancano indirizzo o civico (se il civico non c''è si scrive SNC).');
     end if;
-    if coalesce(c.cantiere_comune_cod,'') !~ '^[0-9]{6}$' then
+    -- (03/10/2026, pomeriggio) il tecnico deve SCRIVERE il comune; il codice ISTAT lo ricava il gestionale.
+    -- Se il nome c'è ma la tabella comuni_istat non lo riconosce (cantiere fuori provincia), il verbale si
+    -- chiude lo stesso: la visita resta ferma per l'Osservatorio (osservatorio_controllo) e la vede la segreteria.
+    if trim(coalesce(c.comune_nome,'')) = '' then
       esito := esito || jsonb_build_object('cosa','cantiere-comune','tab',1,'campo','scheda-cantiere',
-        'testo','Scheda del cantiere: manca il comune (con il suo codice ISTAT). È obbligatorio per l''Osservatorio.');
+        'testo','Scheda del cantiere: manca il comune. È obbligatorio per l''Osservatorio.');
     end if;
     if c.cantiere_tip_int is null or c.cantiere_tip_int not between 1 and 4 then
       esito := esito || jsonb_build_object('cosa','cantiere-intervento','tab',1,'campo','scheda-cantiere',

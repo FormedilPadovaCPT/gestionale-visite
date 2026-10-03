@@ -115,7 +115,7 @@ assert.strictEqual(tab.N[3], 'Metalmeccanico Industria', 'contratto: la scheda d
 // tendina del contratto e tabella della scheda: stesse voci
 const selCcnl = estrai(html, '<select id="mi-ccnl">', '</select>', 'index.html')
 for (const m of selCcnl.matchAll(/<option value="(\d+)">([^<]+)<\/option>/g)) assert.strictEqual(tab.N[m[1]], m[2], 'contratto ' + m[1])
-assert.ok(/\?\+co\.committente_tipo:3/.test(oss), 'XML: un committente senza tipo deve andare come 3 «Non disponibile», non 1 «Pubblico»')
+assert.ok(/function ossCommittenteTipo\(co\)\{const t=\+\(co&&co\.committente_tipo\);return t===1\|\|t===2\|\|t===3\?t:null\}/.test(oss), 'XML: un committente senza tipo non esce più (03/10/2026: prima andava come 3 «Non disponibile», e prima ancora come 1 «Pubblico»)')
 assert.ok(/if\(ccia&&ccia<=3\)/.test(oss), 'XML: l’iscrizione camerale ammette solo 1, 2, 3')
 
 // ── 7. le tendine dei dati del cantiere e della visita sono le tabelle del manuale dell'Osservatorio ──

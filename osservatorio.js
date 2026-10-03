@@ -16,7 +16,7 @@
 
    _inChunks, _splitFigura, _figSnap e _ordinaNomeCognomeDaCF servono
    anche fuori dall'Osservatorio (rubrica, committenti, persone): per
-   questo vengono restituiti. admExportOsservatorio e admOssTuttoArchivio
+   questo vengono restituiti. admExportOsservatorio, admOssControlla, admOssTessera e admOssTuttoArchivio
    si agganciano a window per gli onclick inline del pannello Segreteria.
    ============================================================ */
 
@@ -133,20 +133,361 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
   }
   window.admOssTuttoArchivio=admOssTuttoArchivio
 
+  /* ══ (03/10/2026) ESPORTAZIONE SENZA VALORI DI RIPIEGO ═══════════════════
+     Fino a oggi, dove mancava un dato obbligatorio, qui si metteva un valore
+     di ripiego (ruolo → 2, tipo di intervento → 8, opera → 16, importo → 11,
+     durata → 7, tipo del committente → 3) e lo si diceva a file già scaricati.
+     Da oggi una visita a cui manca un dato obbligatorio per l'Osservatorio
+     NON ESCE, e lo si dice prima.
+       · Che cosa è «pronto» lo decide il database: osservatorio_controllo()
+         (supabase/sql/2026_10_03_osservatorio_controllo.sql). Senza la sua
+         risposta non si esporta.
+       · Le funzioni oss* qui sotto sono pure e NON hanno ripieghi: se un dato
+         manca restituiscono null o l'elenco di ciò che manca. Sono la seconda
+         rete: se scartano una visita che il database dava per pronta, le due
+         regole non sono più allineate, e il riepilogo lo dice.
+       · Cantieri, imprese, committenti e tecnici escono solo se li cita una
+         visita esportata. */
+  const TIPO_MAP={1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:2,9:3,10:2,11:2,12:3}
+  const RUOLO_MAP={'affidataria':1,'affidataria ed esecutrice':2,'esecutrice':3,'subappaltatrice':3,'lavoratore autonomo':3,'fornitrice':3}
+  const TIPOIMP_MAP={1:1,2:2,3:3,4:3,5:3}   // visite_imprese_presenti.tipo_imp → ruolo nazionale
+  const RANK={1:3,2:2,3:1}
+  // riga principale di visite_imprese_presenti → 1 affidataria, 2 affidataria ed esecutrice, 3 esecutrice; null se non si sa
+  function ossRuolo(riga){
+    if(!riga)return null
+    return RUOLO_MAP[String(riga.ruolo||'').trim().toLowerCase()]||TIPOIMP_MAP[+riga.tipo_imp]||null
+  }
+  // Il tipo di visita per l'Osservatorio lo calcola il database (visite.tipo_accesso_naz, 30/09/2026):
+  // serie, asseverazione e attestazione/consulenza → 2 «Su richiesta»; stage e progetti SPISAL → 3
+  // «Per protocolli di intesa». TIPO_MAP è la stessa conversione. Senza tipo di accesso: null.
+  function ossTipoVisita(v){
+    const n=+(v&&v.tipo_accesso_naz)
+    if(n>=1&&n<=7)return n
+    return TIPO_MAP[+(v&&v.tipo_accesso)]||null
+  }
+  // che cosa manca alla scheda del cantiere per l'Osservatorio (codici uguali a osservatorio_controllo)
+  function ossCantiereManca(c){
+    const manca=[]
+    if(!c)return['cantiere']
+    const ti=+c.cantiere_tip_int||0,to=+c.cantiere_tip_ope||0,im=+c.cantiere_importo||0,du=+c.cantiere_durata||0
+    if(String(c.cantiere_indirizzo||'').trim().length<2)manca.push('cantiere-indirizzo')
+    if(!String(c.cantiere_civico||'').trim())manca.push('cantiere-civico')
+    if(!/^\d{6}$/.test(String(c.cantiere_comune_cod||'')))manca.push('cantiere-comune')
+    if(ti<1||ti>4)manca.push('cantiere-intervento')     // 5 «Altro» era nostro: la tabella nazionale non lo prevede
+    if(to<1||to>16)manca.push('cantiere-opera')          // codifica nazionale 1-16 (30/09/2026)
+    if(im<1||im>11)manca.push('cantiere-importo')        // 11 = non disponibile (ammesso)
+    if(du<1||du>7)manca.push('cantiere-durata')          // 7 = non disponibile (ammesso)
+    return manca
+  }
+  // tabella 6 del manuale: 1 Pubblico, 2 Privato, 3 Non disponibile. Senza tipo: null (prima usciva 3)
+  function ossCommittenteTipo(co){const t=+(co&&co.committente_tipo);return t===1||t===2||t===3?t:null}
+  // check-list → valutazioni per visita (dedup sull'id dell'Osservatorio, vale l'esito peggiore)
+  function ossValutazioni(chk){
+    const valPerVisita={}
+    ;(chk||[]).forEach(r=>{
+      const oid=CHK2OSS[r.codice];if(!oid)return
+      const val=String(r.valore||'')
+      if(val==='NA'||val==='nota'&&!r.nota)return
+      const esito=_OSS_ESITO[val]??null
+      if(val!=='NC+'&&val!=='NC-'&&val!=='OSS'&&val!=='VER'&&val!=='nota')return
+      const m=valPerVisita[r.visita_id]=valPerVisita[r.visita_id]||{}
+      const cur=m[oid]
+      const nota=(r.nota||'').trim()
+      if(!cur)m[oid]={esito,nota}
+      else{
+        if(esito&&(!cur.esito||RANK[esito]>RANK[cur.esito]))cur.esito=esito
+        if(nota)cur.nota=(cur.nota?cur.nota+' · ':'')+nota
+      }
+    })
+    return valPerVisita
+  }
+  /* Quali visite escono. ferme = Set degli id che il database non dà per pronti.
+     Restituisce {esporta:[{v,vals,ruolo,tipo}], scarti:[{v,perche:[codici]}]}: gli scarti sono
+     visite che il database dava per pronte e che qui non hanno tutto. */
+  function ossScegli({visite,ferme,valPerVisita,ruoloRiga,cantMap,commMap,impMap,tecMap}){
+    const esporta=[],scarti=[]
+    ;(visite||[]).forEach(v=>{
+      if(ferme&&ferme.has(v.visita_id))return
+      const perche=[]
+      const vals=valPerVisita[v.visita_id]
+      if(!vals||!Object.keys(vals).length)perche.push('checklist')
+      const imp=impMap[v.impresa_id]
+      if(!imp||String(imp.impresa_nome||'').trim().length<2)perche.push('impresa')
+      const ruolo=ossRuolo(ruoloRiga[v.visita_id])
+      if(!ruolo)perche.push('ruolo')
+      const tipo=ossTipoVisita(v)
+      if(!tipo)perche.push('tipo-visita')
+      const tec=tecMap[v.tecnico_id]
+      if(!tec||!String(tec.tecnico_cognome||'').trim())perche.push('tecnico')
+      const c=cantMap[v.cantiere_id]
+      perche.push(...ossCantiereManca(c))
+      const cid=c?String(c.cantiere_committente_id||'').trim():''
+      if(cid){
+        const co=commMap[cid]
+        if(!co||String(co.committente_nome||'').trim().length<2)perche.push('committente')
+        else if(!ossCommittenteTipo(co))perche.push('committente-tipo')
+      }
+      if(perche.length)scarti.push({v,perche})
+      else esporta.push({v,vals,ruolo,tipo})
+    })
+    return{esporta,scarti}
+  }
+  // I cinque file, con le sole visite scelte e le sole anagrafiche che quelle visite citano.
+  function ossXml({esporta,cantMap,commMap,impMap,tecMap}){
+    let xv='<?xml version="1.0" encoding="utf-8"?>\n<visite>\n'
+    let nVal=0
+    const cantIds=new Set(),impIds=new Set(),tecIds=new Set()
+    esporta.forEach(({v,vals,ruolo,tipo})=>{
+      cantIds.add(v.cantiere_id);impIds.add(v.impresa_id);tecIds.add(v.tecnico_id)
+      xv+='<visita>'
+      xv+=_xel('elimina',0)
+      xv+=_xel('visitaId',v.visita_id,50)+_xel('cantiereId',v.cantiere_id,50)+_xel('impresaId',v.impresa_id,50)+_xel('tecnicoId',v.tecnico_id,50)
+      if(v.tecnico2_id&&tecMap[v.tecnico2_id]){xv+=_xel('secondoTecnicoId',v.tecnico2_id,50);tecIds.add(v.tecnico2_id)}
+      xv+=_xel('visitaImpresaRuolo',ruolo)
+      /* (03/10/2026) visitaImpresaEmailRefVis è l'e-mail del referente DELL'IMPRESA in quella visita.
+         Qui ci finiva quella del committente (41 visite nell'invio del 22/07/2026). Un indirizzo
+         legato alla singola visita non lo registriamo: il campo è facoltativo e non si esporta;
+         l'e-mail dell'impresa va già nel file delle imprese (impresaEmailRef). */
+      if(v.nr_imp!=null)xv+=_xel('visitaImpreseCantiereNum',v.nr_imp)
+      if(v.nr_lavoratori!=null)xv+=_xel('visitaLavoratoriCantiereNum',v.nr_lavoratori)
+      if(v.nr_ind!=null)xv+=_xel('visitaLavoratoriCantiereAutNum',v.nr_ind)
+      xv+=_xel('visitaTipo',tipo)
+      const rl=(v.rl_nome&&v.rl_cog)?{nome:v.rl_nome,cognome:v.rl_cog}:_splitNome(v.resp_lav)
+      if(rl&&rl.cognome.length>=2&&rl.nome.length>=2)xv+=`<responsabileLavori cognomeResponsabileLavori="${_xesc(rl.cognome.slice(0,128))}" nomeResponsabileLavori="${_xesc(rl.nome.slice(0,128))}" />`
+      const csp=(v.csp_nome&&v.csp_cog)?{nome:v.csp_nome,cognome:v.csp_cog}:_splitNome(v.csp),cse=(v.cse_nome&&v.cse_cog)?{nome:v.cse_nome,cognome:v.cse_cog}:_splitNome(v.cse)
+      let cAttr=`tipoPresenzaCoordinamento="${v.coord?1:2}"`
+      if(csp&&csp.cognome.length>=2&&csp.nome.length>=2)cAttr+=` cognomeCoordinatoreFaseProgettazione="${_xesc(csp.cognome.slice(0,128))}" nomeCoordinatoreFaseProgettazione="${_xesc(csp.nome.slice(0,128))}"`
+      if(cse&&cse.cognome.length>=2&&cse.nome.length>=2)cAttr+=` cognomeCoordinatoreFaseEsecuzione="${_xesc(cse.cognome.slice(0,128))}" nomeCoordinatoreFaseEsecuzione="${_xesc(cse.nome.slice(0,128))}"`
+      xv+=`<coordinamento ${cAttr} />`
+      if(v.note_lav)xv+=_xel('visitaFasiLavorazioneNotaGen',v.note_lav,5000)
+      xv+='<visitaValutazioni>'
+      Object.entries(vals).forEach(([oid,x])=>{
+        let a=`visitaZonaId="${_xesc(oid)}"`
+        if(x.esito)a+=` visitaZonaEsito="${x.esito}"`
+        if(x.nota)a+=` visitaZonaNote="${_xesc(x.nota.slice(0,1000))}"`
+        xv+=`<visitaValutazione ${a} />`
+      })
+      nVal+=Object.keys(vals).length
+      xv+='</visitaValutazioni>'
+      xv+=_xel('visitaData',v.data_visita)
+      const oi=String(v.ora_visita||'').match(/^(\d{1,2}):(\d{2})/)
+      if(oi){xv+=_xel('visitaOraInizio',+oi[1])+_xel('visitaMinutiInizio',+oi[2])}
+      const of=String(v.ora_fine||'').match(/^(\d{1,2}):(\d{2})/)
+      if(of){xv+=_xel('visitaOraFine',+of[1])+_xel('visitaMinutiFine',+of[2])}
+      xv+='</visita>\n'
+    })
+    xv+='</visite>'
+    // ── XML CANTIERI ──
+    let xc='<?xml version="1.0" encoding="utf-8"?>\n<cantieri>\n'
+    const commIds=new Set()
+    ;[...cantIds].forEach(id=>{
+      const c=cantMap[id]
+      xc+='<cantiere>'+_xel('elimina',0)+_xel('cantiereId',c.cantiere_id,50)
+      xc+=_xel('cantiereIndirizzo',String(c.cantiere_indirizzo).trim(),200)+_xel('cantiereCivico',String(c.cantiere_civico).trim(),50)
+      if(c.cantiere_etichetta)xc+=_xel('cantiereEtichetta',c.cantiere_etichetta,50)
+      if(c.cantiere_cnce)xc+=_xel('cantiereCNCE',c.cantiere_cnce,50)
+      xc+=_xel('cantiereComuneCod',c.cantiere_comune_cod)
+      if(c.cantiere_cap)xc+=_xel('cantiereCap',c.cantiere_cap,5)
+      xc+=_xel('cantiereTipInt',+c.cantiere_tip_int)+_xel('cantiereTipOpe',+c.cantiere_tip_ope)
+      if(c.cantiere_tip_ope_altro)xc+=_xel('cantiereTipOpeAltro',c.cantiere_tip_ope_altro,128)
+      xc+=_xel('cantiereImporto',+c.cantiere_importo)+_xel('cantiereDurata',+c.cantiere_durata)
+      const cid=String(c.cantiere_committente_id||'').trim()
+      if(cid){xc+=_xel('cantiereCommittenteId',cid,50);commIds.add(cid)}
+      xc+='</cantiere>\n'
+    })
+    xc+='</cantieri>'
+    // ── XML IMPRESE ──
+    const CCIA_MAP={'artigiana':1,'industriale':2,'cooperativa':3,'commerciale':4,'altro':5}
+    const CCNL_MAP={'edilizia industria':1,'edilizia artigianato':2}
+    let xi='<?xml version="1.0" encoding="utf-8"?>\n<imprese>\n'
+    ;[...impIds].forEach(id=>{
+      const im=impMap[id]
+      xi+='<impresa>'+_xel('elimina',0)+_xel('impresaId',im.impresa_id,50)+_xel('impresaNome',String(im.impresa_nome).trim(),256)
+      if(im.impresa_cf)xi+=_xel('impresaCF',String(im.impresa_cf).slice(0,16))
+      if(im.impresa_email_ref)xi+=_xel('impresaEmailRef',im.impresa_email_ref,128)
+      const rawCcia=String(im.tipo_iscrizione_ccia||'').trim()
+      const ccia=/^[1-5]$/.test(rawCcia)?+rawCcia:CCIA_MAP[rawCcia.toLowerCase()]
+      // lo schema dell'Osservatorio ammette solo 1, 2, 3: un 4 o un 5 farebbe scartare il file (il campo e' facoltativo)
+      if(ccia&&ccia<=3)xi+=_xel('tipoIscrizioneCcia',ccia)
+      const rawCcnl=String(im.contratto_ccnl||'').trim()
+      const ccnl=/^([1-9]|1[0-3])$/.test(rawCcnl)?+rawCcnl:CCNL_MAP[rawCcnl.toLowerCase()]
+      if(ccnl){xi+=_xel('contrattoCcnl',ccnl);if(im.contratto_ccnl_altro)xi+=_xel('contrattoCcnlAltro',im.contratto_ccnl_altro,128)}
+      xi+='</impresa>\n'
+    })
+    xi+='</imprese>'
+    // ── XML COMMITTENTI ──
+    let xm='<?xml version="1.0" encoding="utf-8"?>\n<committenti>\n'
+    ;[...commIds].forEach(id=>{
+      const co=commMap[id]
+      xm+='<committente>'+_xel('elimina',0)+_xel('committenteId',co.committente_id,50)+_xel('committenteNome',String(co.committente_nome).trim(),256)+_xel('committenteTipo',ossCommittenteTipo(co))+'</committente>\n'
+    })
+    xm+='</committenti>'
+    // ── XML TECNICI ──
+    let xt='<?xml version="1.0" encoding="utf-8"?>\n<tecnici>\n'
+    ;[...tecIds].forEach(id=>{
+      const t=tecMap[id]
+      xt+='<tecnico>'+_xel('elimina',0)+_xel('tecnicoId',t.tecnico_id,50)+_xel('tecnicoCognome',String(t.tecnico_cognome).trim(),256)
+      if(t.tecnico_nome)xt+=_xel('tecnicoNome',t.tecnico_nome,256)
+      xt+='</tecnico>\n'
+    })
+    xt+='</tecnici>'
+    return{xv,xc,xi,xm,xt,nVis:esporta.length,nVal,nCant:cantIds.size,nImp:impIds.size,nComm:commIds.size,nTec:tecIds.size}
+  }
+
+  // ── Il controllo e il suo elenco ──────────────────────────────
+  async function _ossLeggiControllo(dal,al,dettaglio){
+    const{data,error}=await sb.rpc('osservatorio_controllo',{p_dal:dal,p_al:al,p_dettaglio:dettaglio!==false})
+    if(error)throw new Error('non sono riuscito a controllare i dati obbligatori ('+error.message+'). Senza controllo non si esporta: riprova')
+    if(!data||typeof data.definitive!=='number')throw new Error('il controllo dei dati obbligatori ha risposto in modo inatteso. Senza controllo non si esporta')
+    return data
+  }
+  const _ossData=d=>{const m=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?m[3]+'/'+m[2]+'/'+m[1]:String(d||'')}
+  const _ossBreve=t=>String(t||'').replace(/^Scheda del cantiere: /,'').replace(/\s*\(.*\)\s*$/,'')
+  const _OSS_DI_VISITA=['impresa','ruolo','tipo-visita','checklist','tecnico','cantiere']
+  function _ossElenco(ctrl,o){
+    o=o||{}
+    const testo={};(ctrl.motivi||[]).forEach(m=>{testo[m.cosa]=m.testo})
+    const cosa=l=>(l||[]).map(k=>_xesc(_ossBreve(testo[k]||k))).join(' · ')
+    const blocchi=(ctrl.motivi||[]).filter(m=>m.blocca),avvisi=(ctrl.motivi||[]).filter(m=>!m.blocca)
+    const th='style="text-align:left;padding:3px 8px;color:rgba(255,255,255,.5);font-weight:600;border-bottom:1px solid rgba(255,255,255,.15)"'
+    const td='style="padding:3px 8px;border-bottom:1px solid rgba(255,255,255,.07);vertical-align:top"'
+    let h=`Dal <b>${_ossData(ctrl.dal)}</b> al <b>${_ossData(ctrl.al)}</b>: <b>${ctrl.definitive}</b> visite definitive · <b style="color:#95C22F">${ctrl.pronte} pronte</b>`
+    if(ctrl.ferme)h+=` · <b style="color:#f39c12">${ctrl.ferme} ferme</b>`
+    if(ctrl.con_avvisi)h+=` · ${ctrl.con_avvisi} pronte con un «Non disponibile»`
+    h+='<br>'
+    if(ctrl.non_definitive)h+=`<span style="color:#f39c12">⚠ ${ctrl.non_definitive} visite del periodo sono ancora bozze: restano fuori finché non si chiudono.</span><br>`
+    if(!ctrl.definitive)return h+'Nessuna visita definitiva nel periodo.'
+    if(!ctrl.ferme&&!(o.scarti&&o.scarti.length))h+='<span style="color:#95C22F">✔ Tutte le visite definitive hanno i dati obbligatori per l\'Osservatorio.</span><br>'
+    if(ctrl.ferme){
+      h+='<div style="margin-top:8px"><b style="color:#f39c12">Perché sono ferme</b> (una visita ferma non entra nei file finché il dato non c\'è):</div>'
+      h+=blocchi.map(m=>`• ${_xesc(m.testo)} — <b>${m.visite}</b> ${m.visite===1?'visita':'visite'}${m.dove==='cantiere'?', '+m.cantieri+(m.cantieri===1?' cantiere':' cantieri'):''}`).join('<br>')+'<br>'
+      const cf=(ctrl.cantieri||[]).filter(c=>(c.blocchi||[]).length)
+      if(cf.length){
+        h+=`<div style="margin-top:10px"><b>Cantieri da completare (${cf.length})</b> — «✏️ Scheda» apre la scheda del cantiere; poi premi di nuovo «🔎 Controlla».</div>`
+        h+=`<div style="max-height:340px;overflow:auto;margin-top:4px"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr><th ${th}>Cantiere</th><th ${th}>Comune</th><th ${th}>Visite</th><th ${th}>Che cosa manca</th><th ${th}></th></tr>`
+        h+=cf.map(c=>`<tr><td ${td}>${_xesc(c.cantiere||c.cantiere_id)}</td><td ${td}>${_xesc(c.comune||'')}</td><td ${td}>${c.visite}</td><td ${td}>${cosa(c.blocchi)}</td><td ${td}><button class="btn-outline btn-sm" data-oss-cant="${_xesc(c.cantiere_id)}" data-aiuto="Apre la scheda del cantiere per completare il dato che manca. Dopo il salvataggio premi di nuovo «🔎 Controlla».">✏️ Scheda</button></td></tr>`).join('')
+        h+='</table></div>'
+      }
+      const vf=(ctrl.visite||[]).filter(v=>(v.blocchi||[]).some(k=>_OSS_DI_VISITA.includes(k)))
+      if(vf.length){
+        h+=`<div style="margin-top:10px"><b>Verbali da completare (${vf.length})</b> — «✏️ Verbale» lo apre in modifica: dopo la correzione va salvato.</div>`
+        h+=`<div style="max-height:260px;overflow:auto;margin-top:4px"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr><th ${th}>Verbale</th><th ${th}>Data</th><th ${th}>Tecnico</th><th ${th}>Impresa</th><th ${th}>Che cosa manca</th><th ${th}></th></tr>`
+        h+=vf.map(v=>`<tr><td ${td}>${_xesc(v.nr_verbale||v.visita_id)}</td><td ${td}>${_ossData(v.data)}</td><td ${td}>${_xesc(v.tecnico||'')}</td><td ${td}>${_xesc(v.impresa||'')}</td><td ${td}>${cosa((v.blocchi||[]).filter(k=>_OSS_DI_VISITA.includes(k)))}</td><td ${td}><button class="btn-outline btn-sm" data-oss-vis="${_xesc(v.visita_id)}" data-aiuto="Apre il verbale definitivo in modifica, dopo una conferma. Corretto il dato, va salvato di nuovo.">✏️ Verbale</button></td></tr>`).join('')
+        h+='</table></div>'
+      }
+    }
+    if(o.scarti&&o.scarti.length){
+      h+=`<div style="margin-top:10px;color:#e74c3c"><b>⚠ ${o.scarti.length} visite scartate dal controllo dell'esportazione</b>: il database le dava per pronte, ma al momento di scrivere i file mancava un dato. Non sono nei file. Va segnalato a chi mantiene il gestionale.<br>`
+      h+=o.scarti.slice(0,40).map(s=>_xesc(s.v.nr_verbale||s.v.visita_id)+' ('+s.perche.map(k=>_xesc(_ossBreve(testo[k]||k))).join(', ')+')').join('; ')+(o.scarti.length>40?'…':'')+'</div>'
+    }
+    if(avvisi.length){
+      const ca=(ctrl.cantieri||[]).filter(c=>(c.avvisi||[]).length)
+      h+=`<details style="margin-top:10px"><summary style="cursor:pointer;color:rgba(255,255,255,.6)">ℹ Escono lo stesso, con un dato «Non disponibile» o incompleto (${avvisi.map(m=>m.cantieri).reduce((a,b)=>a+b,0)} segnalazioni su ${ca.length||'alcuni'} cantieri)</summary>`
+      h+=avvisi.map(m=>`• ${_xesc(m.testo)} — ${m.cantieri} ${m.cantieri===1?'cantiere':'cantieri'}, ${m.visite} ${m.visite===1?'visita':'visite'}`).join('<br>')
+      if(ca.length){
+        h+=`<div style="max-height:260px;overflow:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr><th ${th}>Cantiere</th><th ${th}>Comune</th><th ${th}>Visite</th><th ${th}>Che cosa</th><th ${th}></th></tr>`
+        h+=ca.map(c=>`<tr><td ${td}>${_xesc(c.cantiere||c.cantiere_id)}</td><td ${td}>${_xesc(c.comune||'')}</td><td ${td}>${c.visite}</td><td ${td}>${cosa(c.avvisi)}</td><td ${td}><button class="btn-outline btn-sm" data-oss-cant="${_xesc(c.cantiere_id)}" data-aiuto="Apre la scheda del cantiere per completare il dato che manca. Dopo il salvataggio premi di nuovo «🔎 Controlla».">✏️ Scheda</button></td></tr>`).join('')
+        h+='</table></div>'
+      }
+      h+='</details>'
+    }
+    return h
+  }
+  // un solo ascoltatore per i pulsanti dell'elenco e della tessera: gli id non passano da un onclick scritto a mano
+  function _ossClick(e){
+    const b=e.target&&e.target.closest?e.target.closest('[data-oss-cant],[data-oss-vis],[data-oss-az],[data-oss-dal]'):null
+    if(!b)return
+    if(b.dataset.ossCant){if(typeof window.admEditCantiere==='function')window.admEditCantiere(b.dataset.ossCant);return}
+    if(b.dataset.ossVis){if(typeof window.modificaVisitaCoord==='function')window.modificaVisitaCoord(b.dataset.ossVis);return}
+    if(b.dataset.ossAz==='scarica'){_ossScarica();return}
+    if(b.dataset.ossDal){vSet('oss-dal',b.dataset.ossDal);vSet('oss-al',b.dataset.ossAl);admOssControlla();const r=$('oss-report');if(r&&r.scrollIntoView)r.scrollIntoView({behavior:'smooth',block:'center'})}
+  }
+  function _ossAscolta(el){if(el&&!el._ossAscolta){el.addEventListener('click',_ossClick);el._ossAscolta=true}}
+
+  let _ossPronti=null   // file già costruiti, in attesa di «Scarica lo stesso»
+  function _ossScarica(){
+    if(!_ossPronti){toast('Non ci sono file pronti: premi «Genera file XML»','warn');return}
+    const p=_ossPronti
+    p.files.forEach((f,i)=>setTimeout(()=>_xdl(f[0],f[1]),i*600))
+    toast('File XML scaricati: '+p.nVis+' visite','ok')
+    const s=$('oss-scarica-box')
+    if(s)s.innerHTML=`<b style="color:#95C22F">✔ Scaricati 5 file con ${p.nVis} visite.</b> <span style="color:rgba(255,255,255,.55)">Se il browser chiede il permesso per i «download multipli», autorizzalo, altrimenti salva solo il primo.</span>`
+  }
+
+  /* «🔎 Controlla»: solo l'elenco, senza leggere tutto e senza scaricare niente. */
+  async function admOssControlla(){
+    if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
+    const dal=vGet('oss-dal'),al=vGet('oss-al'),rep=$('oss-report')
+    if(!dal||!al){toast('Imposta le date Dal e Al','warn');return}
+    _ossPronti=null
+    _ossAscolta(rep)
+    if(rep)rep.innerHTML='⏳ Controllo dei dati obbligatori…'
+    try{
+      const ctrl=await _ossLeggiControllo(dal,al,true)
+      if(rep)rep.innerHTML=_ossElenco(ctrl)
+    }catch(e){
+      console.error('admOssControlla:',e)
+      if(rep)rep.innerHTML='<span style="color:#e74c3c">Errore: '+_xesc(e.message||e)+'</span>'
+    }
+  }
+  window.admOssControlla=admOssControlla
+
+  /* Tessera «Pronti per l'Osservatorio»: l'esercizio in corso e quello prima, tutto l'anno.
+     L'esercizio va dal 1/10 al 30/9. Se la lettura fallisce lo si dice: mai uno zero al posto di un errore. */
+  function ossEsercizi(oggi){
+    const d=oggi||new Date(),a=d.getMonth()>=9?d.getFullYear():d.getFullYear()-1
+    const es=y=>({nome:y+'-'+String(y+1).slice(2),dal:y+'-10-01',al:(y+1)+'-09-30'})
+    return[es(a),es(a-1)]
+  }
+  async function admOssTessera(){
+    const box=$('oss-tessera');if(!box)return
+    if(!S.user||S.user.email!==ADMIN_EMAIL){box.innerHTML='';return}
+    _ossAscolta(box)
+    box.innerHTML='<span style="color:rgba(255,255,255,.45)">⏳ Conto le visite pronte per l\'Osservatorio…</span>'
+    const righe=[]
+    for(const es of ossEsercizi()){
+      try{
+        const c=await _ossLeggiControllo(es.dal,es.al,false)
+        let r=`<b>Esercizio ${es.nome}</b>: ${c.definitive} visite definitive`
+        if(c.definitive){
+          r+=` · <b style="color:#95C22F">${c.pronte} pronte</b>`
+          r+=c.ferme?` · <b style="color:#f39c12">${c.ferme} da sistemare</b>`:' · nessuna da sistemare'
+          if(c.con_avvisi)r+=` · ${c.con_avvisi} con un «Non disponibile»`
+        }
+        if(c.non_definitive)r+=` · ${c.non_definitive} bozze`
+        if(c.definitive||c.non_definitive)r+=` <button class="btn-outline btn-sm" style="margin-left:6px" data-oss-dal="${es.dal}" data-oss-al="${es.al}" data-aiuto="Mette nelle date questo esercizio e mostra, qui sotto, le visite che non possono ancora andare all'Osservatorio. Non scarica niente.">Vedi l'elenco</button>`
+        righe.push(r)
+      }catch(e){
+        console.warn('admOssTessera:',e)
+        righe.push(`<b>Esercizio ${es.nome}</b>: <span style="color:#e74c3c">non sono riuscito a leggere (${_xesc(e.message||e)})</span>`)
+      }
+    }
+    box.innerHTML='<div style="font-weight:700;margin-bottom:4px">🎯 Pronti per l\'Osservatorio</div>'+righe.join('<br>')
+  }
+  window.admOssTessera=admOssTessera
+
   async function admExportOsservatorio(){
     if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
     const dal=vGet('oss-dal'),al=vGet('oss-al')
     const rep=$('oss-report')
     if(!dal||!al){toast('Imposta le date Dal e Al','warn');return}
     const btn=$('oss-genera');const _t=btn.textContent;btn.disabled=true;btn.textContent='⏳ Estrazione…'
+    _ossPronti=null
+    _ossAscolta(rep)
     if(rep)rep.innerHTML='Estrazione in corso…'
     try{
-      // 1. visite definitive nell'intervallo (nessun tetto: si pagina finche' finiscono)
       const _passo=(t)=>{if(rep)rep.innerHTML='⏳ '+t}
+      // 0. che cosa è pronto lo dice il database: senza la sua risposta non si esporta
+      _passo('Controllo dei dati obbligatori…')
+      const ctrl=await _ossLeggiControllo(dal,al,true)
+      if(!ctrl.definitive){if(rep)rep.innerHTML=_ossElenco(ctrl);toast('Nessuna visita definitiva nell\'intervallo','warn');return}
+      const ferme=new Set((ctrl.visite||[]).map(x=>x.visita_id))
+      if(ferme.size!==ctrl.ferme)throw new Error('il controllo dice '+ctrl.ferme+' visite ferme ma ne elenca '+ferme.size+'. Senza un elenco completo non si esporta')
+      // 1. visite definitive nell'intervallo (nessun tetto: si pagina finche' finiscono)
       const visite=[]
       for(let vfrom=0;;vfrom+=1000){
         const{data:vs,error:ev}=await sb.from('visite')
-          .select('visita_id,nr_verbale,cantiere_id,impresa_id,tecnico_id,tecnico2_id,tipo_accesso,tipo_accesso_naz,data_visita,ora_visita,ora_fine,nr_imp,nr_lavoratori,nr_ind,resp_lav,csp,cse,coord,note_lav,comm_email,rl_nome,rl_cog,csp_nome,csp_cog,cse_nome,cse_cog')
+          .select('visita_id,nr_verbale,cantiere_id,impresa_id,tecnico_id,tecnico2_id,tipo_accesso,tipo_accesso_naz,data_visita,ora_visita,ora_fine,nr_imp,nr_lavoratori,nr_ind,resp_lav,csp,cse,coord,note_lav,rl_nome,rl_cog,csp_nome,csp_cog,cse_nome,cse_cog')
           .eq('elimina',0).eq('stato','definitivo').gte('data_visita',dal).lte('data_visita',al)
           .order('data_visita').order('visita_id').range(vfrom,vfrom+999)
         if(ev)throw new Error(ev.message)
@@ -154,193 +495,59 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
         _passo('Lettura visite: '+visite.length+'…')
         if(!vs||vs.length<1000)break
       }
-      /* Le NON definitive restano fuori per regola dell'Osservatorio, ma
-         nell'invio massiccio bisogna saperlo: si contano e si dichiarano. */
-      let nonDef=0
-      try{
-        const{count}=await sb.from('visite').select('visita_id',{count:'exact',head:true})
-          .eq('elimina',0).neq('stato','definitivo').gte('data_visita',dal).lte('data_visita',al)
-        nonDef=count||0
-      }catch(_e){}
-      if(!visite.length){if(rep)rep.innerHTML='Nessuna visita definitiva nell\'intervallo.';toast('Nessuna visita nell\'intervallo','warn');return}
-      const vids=visite.map(v=>v.visita_id)
+      /* fra il controllo e la lettura qualcuno può aver chiuso un verbale: una visita che il
+         controllo non ha visto non si esporta alla cieca. Si rifà da capo. */
+      if(visite.length!==ctrl.definitive)throw new Error('mentre leggevo, le visite definitive del periodo sono cambiate ('+ctrl.definitive+' al controllo, '+visite.length+' alla lettura). Premi di nuovo «Genera file XML»')
+      const buone=visite.filter(v=>!ferme.has(v.visita_id))
+      const vids=buone.map(v=>v.visita_id)
       // 2. checklist, ruolo impresa principale
-      _passo(visite.length+' visite lette. Lettura check-list…')
-      const chk=await _inChunks('visite_checklist','visita_id,codice,valore,nota','visita_id',vids,
-        null,(n)=>_passo('Lettura check-list: '+n.toLocaleString('it-IT')+' righe…'))
+      _passo(buone.length+' visite pronte su '+visite.length+'. Lettura check-list…')
+      const chk=vids.length?await _inChunks('visite_checklist','visita_id,codice,valore,nota','visita_id',vids,
+        null,(n)=>_passo('Lettura check-list: '+n.toLocaleString('it-IT')+' righe…')):[]
       _passo(chk.length.toLocaleString('it-IT')+' righe di check-list. Lettura anagrafiche…')
-      const vip=await _inChunks('visite_imprese_presenti','visita_id,ruolo,is_principale','visita_id',vids,q=>q.eq('is_principale',true))
-      const ruoloMap={};vip.forEach(r=>{if(!ruoloMap[r.visita_id])ruoloMap[r.visita_id]=r.ruolo})
+      const vip=vids.length?await _inChunks('visite_imprese_presenti','visita_id,ruolo,tipo_imp,is_principale','visita_id',vids,q=>q.eq('is_principale',true)):[]
+      const ruoloRiga={};vip.forEach(r=>{if(!ruoloRiga[r.visita_id])ruoloRiga[r.visita_id]=r})
       // 3. anagrafiche collegate
-      const cantIds=[...new Set(visite.map(v=>v.cantiere_id).filter(Boolean))]
-      const cants=await _inChunks('cantieri','cantiere_id,cantiere_indirizzo,cantiere_civico,cantiere_etichetta,cantiere_cnce,cantiere_comune_cod,cantiere_cap,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_committente_id,comune_nome','cantiere_id',cantIds)
+      const mappa=(righe,k)=>{const m={};righe.forEach(r=>{m[String(r[k])]=r});return m}
+      const cantIds=[...new Set(buone.map(v=>v.cantiere_id).filter(Boolean))]
+      const cants=cantIds.length?await _inChunks('cantieri','cantiere_id,cantiere_indirizzo,cantiere_civico,cantiere_etichetta,cantiere_cnce,cantiere_comune_cod,cantiere_cap,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_committente_id,comune_nome','cantiere_id',cantIds):[]
       const commIds=[...new Set(cants.map(c=>String(c.cantiere_committente_id||'').trim()).filter(Boolean))]
       const comms=commIds.length?await _inChunks('committenti','committente_id,committente_nome,committente_tipo','committente_id',commIds,q=>q.eq('elimina',0)):[]
-      const impIds=[...new Set(visite.map(v=>v.impresa_id).filter(Boolean))]
-      const imps=await _inChunks('imprese','impresa_id,impresa_nome,impresa_cf,impresa_email_ref,tipo_iscrizione_ccia,contratto_ccnl,contratto_ccnl_altro','impresa_id',impIds)
-      const tecIds=[...new Set(visite.flatMap(v=>[v.tecnico_id,v.tecnico2_id]).filter(Boolean))]
-      const tecs=await _inChunks('tecnici','tecnico_id,tecnico_cognome,tecnico_nome','tecnico_id',tecIds)
-
-      const W={senzaChk:[],senzaImpresa:[],cantIncompleti:[],ruoloDefault:0,tipoExtra:0}
-      // ── checklist → valutazioni per visita (dedup su id osservatorio, esito peggiore) ──
-      const RANK={1:3,2:2,3:1}
-      const valPerVisita={}
-      chk.forEach(r=>{
-        const oid=CHK2OSS[r.codice];if(!oid)return
-        const val=String(r.valore||'')
-        if(val==='NA'||val==='nota'&&!r.nota)return
-        const esito=_OSS_ESITO[val]??null
-        if(val!=='NC+'&&val!=='NC-'&&val!=='OSS'&&val!=='VER'&&val!=='nota')return
-        const m=valPerVisita[r.visita_id]=valPerVisita[r.visita_id]||{}
-        const cur=m[oid]
-        const nota=(r.nota||'').trim()
-        if(!cur)m[oid]={esito,nota}
-        else{
-          if(esito&&(!cur.esito||RANK[esito]>RANK[cur.esito]))cur.esito=esito
-          if(nota)cur.nota=(cur.nota?cur.nota+' · ':'')+nota
-        }
-      })
-      // ── XML VISITE ──
-      // Il tipo di visita per l'Osservatorio lo calcola il database (visite.tipo_accesso_naz, 30/09/2026, deciso
-      // dall'utente): serie, asseverazione e attestazione/consulenza → 2 «Su richiesta»; stage e progetti SPISAL →
-      // 3 «Per protocolli di intesa». Questa tabella è la stessa conversione, di riserva se il campo mancasse.
-      const TIPO_MAP={1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:2,9:3,10:2,11:2,12:3}
-      const RUOLO_MAP={'affidataria':1,'affidataria ed esecutrice':2,'esecutrice':3,'subappaltatrice':3,'lavoratore autonomo':3,'fornitrice':3}
-      let xv='<?xml version="1.0" encoding="utf-8"?>\n<visite>\n'
-      let nVis=0,nVal=0
-      visite.forEach(v=>{
-        const vals=valPerVisita[v.visita_id]
-        if(!vals||!Object.keys(vals).length){W.senzaChk.push(v.nr_verbale||v.visita_id);return}
-        if(!v.impresa_id){W.senzaImpresa.push(v.nr_verbale||v.visita_id);return}
-        const ta=+v.tipo_accesso||0
-        if(ta>7)W.tipoExtra++
-        const tipo=+v.tipo_accesso_naz||TIPO_MAP[ta]||5
-        let ruolo=RUOLO_MAP[String(ruoloMap[v.visita_id]||'').toLowerCase()]
-        if(!ruolo){ruolo=2;W.ruoloDefault++}
-        xv+='<visita>'
-        xv+=_xel('elimina',0)
-        xv+=_xel('visitaId',v.visita_id,50)+_xel('cantiereId',v.cantiere_id,50)+_xel('impresaId',v.impresa_id,50)+_xel('tecnicoId',v.tecnico_id,50)
-        if(v.tecnico2_id)xv+=_xel('secondoTecnicoId',v.tecnico2_id,50)
-        xv+=_xel('visitaImpresaRuolo',ruolo)
-        /* (03/10/2026) visitaImpresaEmailRefVis è l'e-mail del referente DELL'IMPRESA in quella visita.
-           Qui ci finiva quella del committente (41 visite nell'invio del 22/07/2026). Un indirizzo
-           legato alla singola visita non lo registriamo: il campo è facoltativo e non si esporta;
-           l'e-mail dell'impresa va già nel file delle imprese (impresaEmailRef). */
-        if(v.nr_imp!=null)xv+=_xel('visitaImpreseCantiereNum',v.nr_imp)
-        if(v.nr_lavoratori!=null)xv+=_xel('visitaLavoratoriCantiereNum',v.nr_lavoratori)
-        if(v.nr_ind!=null)xv+=_xel('visitaLavoratoriCantiereAutNum',v.nr_ind)
-        xv+=_xel('visitaTipo',tipo)
-        const rl=(v.rl_nome&&v.rl_cog)?{nome:v.rl_nome,cognome:v.rl_cog}:_splitNome(v.resp_lav)
-        if(rl&&rl.cognome.length>=2&&rl.nome.length>=2)xv+=`<responsabileLavori cognomeResponsabileLavori="${_xesc(rl.cognome.slice(0,128))}" nomeResponsabileLavori="${_xesc(rl.nome.slice(0,128))}" />`
-        const csp=(v.csp_nome&&v.csp_cog)?{nome:v.csp_nome,cognome:v.csp_cog}:_splitNome(v.csp),cse=(v.cse_nome&&v.cse_cog)?{nome:v.cse_nome,cognome:v.cse_cog}:_splitNome(v.cse)
-        let cAttr=`tipoPresenzaCoordinamento="${v.coord?1:2}"`
-        if(csp&&csp.cognome.length>=2&&csp.nome.length>=2)cAttr+=` cognomeCoordinatoreFaseProgettazione="${_xesc(csp.cognome.slice(0,128))}" nomeCoordinatoreFaseProgettazione="${_xesc(csp.nome.slice(0,128))}"`
-        if(cse&&cse.cognome.length>=2&&cse.nome.length>=2)cAttr+=` cognomeCoordinatoreFaseEsecuzione="${_xesc(cse.cognome.slice(0,128))}" nomeCoordinatoreFaseEsecuzione="${_xesc(cse.nome.slice(0,128))}"`
-        xv+=`<coordinamento ${cAttr} />`
-        if(v.note_lav)xv+=_xel('visitaFasiLavorazioneNotaGen',v.note_lav,5000)
-        xv+='<visitaValutazioni>'
-        Object.entries(vals).forEach(([oid,x])=>{
-          let a=`visitaZonaId="${_xesc(oid)}"`
-          if(x.esito)a+=` visitaZonaEsito="${x.esito}"`
-          if(x.nota)a+=` visitaZonaNote="${_xesc(x.nota.slice(0,1000))}"`
-          xv+=`<visitaValutazione ${a} />`
-        })
-        nVal+=Object.keys(vals).length
-        xv+='</visitaValutazioni>'
-        xv+=_xel('visitaData',v.data_visita)
-        const oi=String(v.ora_visita||'').match(/^(\d{1,2}):(\d{2})/)
-        if(oi){xv+=_xel('visitaOraInizio',+oi[1])+_xel('visitaMinutiInizio',+oi[2])}
-        const of=String(v.ora_fine||'').match(/^(\d{1,2}):(\d{2})/)
-        if(of){xv+=_xel('visitaOraFine',+of[1])+_xel('visitaMinutiFine',+of[2])}
-        xv+='</visita>\n'
-        nVis++
-      })
-      xv+='</visite>'
-      // ── XML CANTIERI ──
-      let xc='<?xml version="1.0" encoding="utf-8"?>\n<cantieri>\n'
-      cants.forEach(c=>{
-        const miss=[]
-        let ti=+c.cantiere_tip_int||0
-        if(![1,2,3,4,6,7,8].includes(ti)){miss.push('tipo intervento');ti=8}
-        let to=+c.cantiere_tip_ope||0
-        if(to<1||to>16){miss.push('tipo opera');to=16}   // codifica nazionale 1-16 (30/09/2026)
-        let im=+c.cantiere_importo||0
-        if(im<1||im>14){miss.push('importo');im=11}
-        let du=+c.cantiere_durata||0
-        if(du<1||du>7){miss.push('durata');du=7}   // codifica nazionale 1-7: 7 = non disponibile (30/09/2026)
-        let ind=String(c.cantiere_indirizzo||'').trim();if(ind.length<2){ind=(c.comune_nome||'ND');miss.push('indirizzo')}
-        let civ=String(c.cantiere_civico||'').trim()||'SN'
-        if(miss.length)W.cantIncompleti.push((c.cantiere_etichetta||ind)+' ('+miss.join(', ')+')')
-        xc+='<cantiere>'+_xel('elimina',0)+_xel('cantiereId',c.cantiere_id,50)
-        xc+=_xel('cantiereIndirizzo',ind,200)+_xel('cantiereCivico',civ,50)
-        if(c.cantiere_etichetta)xc+=_xel('cantiereEtichetta',c.cantiere_etichetta,50)
-        if(c.cantiere_cnce)xc+=_xel('cantiereCNCE',c.cantiere_cnce,50)
-        if(/^\d{6}$/.test(String(c.cantiere_comune_cod||'')))xc+=_xel('cantiereComuneCod',c.cantiere_comune_cod)
-        if(c.cantiere_cap)xc+=_xel('cantiereCap',c.cantiere_cap,5)
-        xc+=_xel('cantiereTipInt',ti)+_xel('cantiereTipOpe',to)
-        if(c.cantiere_tip_ope_altro)xc+=_xel('cantiereTipOpeAltro',c.cantiere_tip_ope_altro,128)
-        xc+=_xel('cantiereImporto',im)+_xel('cantiereDurata',du)
-        const cid=String(c.cantiere_committente_id||'').trim()
-        if(cid)xc+=_xel('cantiereCommittenteId',cid,50)
-        xc+='</cantiere>\n'
-      })
-      xc+='</cantieri>'
-      // ── XML IMPRESE ──
-      const CCIA_MAP={'artigiana':1,'industriale':2,'cooperativa':3,'commerciale':4,'altro':5}
-      const CCNL_MAP={'edilizia industria':1,'edilizia artigianato':2}
-      let xi='<?xml version="1.0" encoding="utf-8"?>\n<imprese>\n'
-      imps.forEach(im=>{
-        let nome=String(im.impresa_nome||'').trim();if(nome.length<2)nome=(nome+' – ND').trim()
-        xi+='<impresa>'+_xel('elimina',0)+_xel('impresaId',im.impresa_id,50)+_xel('impresaNome',nome,256)
-        if(im.impresa_cf)xi+=_xel('impresaCF',String(im.impresa_cf).slice(0,16))
-        if(im.impresa_email_ref)xi+=_xel('impresaEmailRef',im.impresa_email_ref,128)
-        const rawCcia=String(im.tipo_iscrizione_ccia||'').trim()
-        const ccia=/^[1-5]$/.test(rawCcia)?+rawCcia:CCIA_MAP[rawCcia.toLowerCase()]
-        // lo schema dell'Osservatorio ammette solo 1, 2, 3: un 4 o un 5 farebbe scartare il file (il campo e' facoltativo)
-        if(ccia&&ccia<=3)xi+=_xel('tipoIscrizioneCcia',ccia)
-        const rawCcnl=String(im.contratto_ccnl||'').trim()
-        const ccnl=/^([1-9]|1[0-3])$/.test(rawCcnl)?+rawCcnl:CCNL_MAP[rawCcnl.toLowerCase()]
-        if(ccnl){xi+=_xel('contrattoCcnl',ccnl);if(im.contratto_ccnl_altro)xi+=_xel('contrattoCcnlAltro',im.contratto_ccnl_altro,128)}
-        xi+='</impresa>\n'
-      })
-      xi+='</imprese>'
-      // ── XML COMMITTENTI ──
-      let xm='<?xml version="1.0" encoding="utf-8"?>\n<committenti>\n'
-      comms.forEach(co=>{
-        let nome=String(co.committente_nome||'').trim();if(nome.length<2)nome=(nome+' – ND').trim()
-        // tabella 6 del manuale: 1 Pubblico, 2 Privato, 3 Non disponibile. Senza tipo va 3: prima andava 1 «Pubblico»
-        const tipo=[1,2,3].includes(+co.committente_tipo)?+co.committente_tipo:3
-        xm+='<committente>'+_xel('elimina',0)+_xel('committenteId',co.committente_id,50)+_xel('committenteNome',nome,256)+_xel('committenteTipo',tipo)+'</committente>\n'
-      })
-      xm+='</committenti>'
-      // ── XML TECNICI ──
-      let xt='<?xml version="1.0" encoding="utf-8"?>\n<tecnici>\n'
-      tecs.forEach(t=>{
-        xt+='<tecnico>'+_xel('elimina',0)+_xel('tecnicoId',t.tecnico_id,50)+_xel('tecnicoCognome',t.tecnico_cognome||'ND',256)
-        if(t.tecnico_nome)xt+=_xel('tecnicoNome',t.tecnico_nome,256)
-        xt+='</tecnico>\n'
-      })
-      xt+='</tecnici>'
-      // ── download ──
+      const impIds=[...new Set(buone.map(v=>v.impresa_id).filter(Boolean))]
+      const imps=impIds.length?await _inChunks('imprese','impresa_id,impresa_nome,impresa_cf,impresa_email_ref,tipo_iscrizione_ccia,contratto_ccnl,contratto_ccnl_altro','impresa_id',impIds):[]
+      const tecIds=[...new Set(buone.flatMap(v=>[v.tecnico_id,v.tecnico2_id]).filter(Boolean))]
+      const tecs=tecIds.length?await _inChunks('tecnici','tecnico_id,tecnico_cognome,tecnico_nome','tecnico_id',tecIds):[]
+      const cantMap=mappa(cants,'cantiere_id'),commMap=mappa(comms,'committente_id'),impMap=mappa(imps,'impresa_id'),tecMap=mappa(tecs,'tecnico_id')
+      // 4. quali escono (nessun valore di ripiego) e i cinque file
+      const valPerVisita=ossValutazioni(chk)
+      const{esporta,scarti}=ossScegli({visite:buone,ferme:null,valPerVisita,ruoloRiga,cantMap,commMap,impMap,tecMap})
+      const x=ossXml({esporta,cantMap,commMap,impMap,tecMap})
       const tag=dal.replace(/-/g,'')+'_'+al.replace(/-/g,'')
-      const files=[['Visite_'+tag+'.xml',xv],['Cantieri_'+tag+'.xml',xc],['Imprese_'+tag+'.xml',xi],['Committenti_'+tag+'.xml',xm],['Tecnici_'+tag+'.xml',xt]]
-      files.forEach((f,i)=>setTimeout(()=>_xdl(f[0],f[1]),i*600))
+      const files=[['Visite_'+tag+'.xml',x.xv],['Cantieri_'+tag+'.xml',x.xc],['Imprese_'+tag+'.xml',x.xi],['Committenti_'+tag+'.xml',x.xm],['Tecnici_'+tag+'.xml',x.xt]]
       const _peso=files.reduce((t,f)=>t+f[1].length,0)
+      const fuori=ferme.size+scarti.length+(ctrl.non_definitive||0)
       // ── riepilogo ──
-      let h=`<b style="color:#95C22F">✔ Estrazione completata (${dal} → ${al})</b> <span style="color:rgba(255,255,255,.45)">— 5 file, ${(_peso/1048576).toFixed(1)} MB</span><br>`
-      h+=`<span style="color:rgba(255,255,255,.55)">Il browser scarica cinque file di seguito: se chiede il permesso per i «download multipli», autorizzalo, altrimenti ne salva solo il primo.</span><br>`
-      h+=`Visite esportate: <b>${nVis}</b> su ${visite.length} definitive · Cantieri: <b>${cants.length}</b> · Imprese: <b>${imps.length}</b> · Committenti: <b>${comms.length}</b> · Tecnici: <b>${tecs.length}</b><br>`
-      h+=`<span style="color:rgba(255,255,255,.55)">Righe lette: check-list <b>${chk.length.toLocaleString('it-IT')}</b> · valutazioni scritte <b>${nVal.toLocaleString('it-IT')}</b>. Nessun limite di righe: le letture sono paginate e ordinate sulla chiave primaria.</span><br>`
-      if(nonDef)h+=`<span style="color:#f39c12">⚠ ${nonDef} visite del periodo NON sono definitive e restano fuori dall'invio: chiudile prima di trasmettere.</span><br>`
-      if(W.senzaChk.length)h+=`<span style="color:#f39c12">⚠ ${W.senzaChk.length} visite ESCLUSE perché senza checklist compilata (obbligatoria per l'Osservatorio): ${W.senzaChk.slice(0,30).join(', ')}${W.senzaChk.length>30?'…':''}</span><br>`
-      if(W.senzaImpresa.length)h+=`<span style="color:#f39c12">⚠ ${W.senzaImpresa.length} visite escluse senza impresa principale: ${W.senzaImpresa.slice(0,20).join(', ')}</span><br>`
-      if(W.cantIncompleti.length)h+=`<span style="color:#f39c12">⚠ ${W.cantIncompleti.length} cantieri con dati obbligatori mancanti (esportati con valore di ripiego): ${W.cantIncompleti.slice(0,15).join('; ')}${W.cantIncompleti.length>15?'…':''}</span><br>`
-      if(W.ruoloDefault)h+=`<span style="color:#f39c12">⚠ ${W.ruoloDefault} visite senza ruolo impresa: usato "Affidataria ed esecutrice"</span><br>`
-      if(W.tipoExtra)h+=`<span style="color:rgba(255,255,255,.5)">ℹ ${W.tipoExtra} visite con tipo accesso locale (visite in serie/stage/asseverazione) ricondotte ai tipi Osservatorio</span><br>`
+      let h=''
+      if(!x.nVis){
+        h+='<b style="color:#e74c3c">Nessuna visita del periodo ha tutti i dati obbligatori: non c\'è niente da scaricare.</b><br>'
+      }else if(fuori){
+        /* se qualcosa resta fuori i file NON si scaricano da soli: prima si legge l'elenco */
+        _ossPronti={files,nVis:x.nVis}
+        h+=`<div id="oss-scarica-box" style="margin-bottom:8px"><b style="color:#f39c12">I file sono pronti ma non completi: ${x.nVis} visite su ${visite.length} definitive.</b> Restano fuori le visite dell'elenco qui sotto. Se le sistemi prima, l'invio è completo.<br>`
+        h+=`<button class="btn-outline btn-sm" style="margin-top:6px" data-oss-az="scarica" data-aiuto="Scarica i cinque file con le sole visite pronte: quelle dell'elenco restano fuori dall'invio.">⬇ Scarica lo stesso i 5 file con le sole ${x.nVis} visite pronte</button></div>`
+      }else{
+        files.forEach((f,i)=>setTimeout(()=>_xdl(f[0],f[1]),i*600))
+        h+=`<b style="color:#95C22F">✔ Estrazione completata (${_ossData(dal)} → ${_ossData(al)})</b> <span style="color:rgba(255,255,255,.45)">— 5 file, ${(_peso/1048576).toFixed(1)} MB</span><br>`
+        h+=`<span style="color:rgba(255,255,255,.55)">Il browser scarica cinque file di seguito: se chiede il permesso per i «download multipli», autorizzalo, altrimenti ne salva solo il primo.</span><br>`
+        toast('File XML generati: '+x.nVis+' visite','ok')
+      }
+      h+=`Nei file: visite <b>${x.nVis}</b> · cantieri <b>${x.nCant}</b> · imprese <b>${x.nImp}</b> · committenti <b>${x.nComm}</b> · tecnici <b>${x.nTec}</b> <span style="color:rgba(255,255,255,.45)">(solo le anagrafiche citate dalle visite esportate)</span><br>`
+      h+=`<span style="color:rgba(255,255,255,.55)">Righe lette: check-list <b>${chk.length.toLocaleString('it-IT')}</b> · valutazioni scritte <b>${x.nVal.toLocaleString('it-IT')}</b>. Nessun valore di ripiego: un dato obbligatorio che manca tiene fuori la visita.</span><br>`
+      h+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.12)">'+_ossElenco(ctrl,{scarti})+'</div>'
       if(rep)rep.innerHTML=h
-      toast('File XML generati: '+nVis+' visite','ok')
     }catch(e){
       console.error('admExportOsservatorio:',e)
+      _ossPronti=null
       if(rep)rep.innerHTML='<span style="color:#e74c3c">Errore: '+_xesc(e.message||e)+'</span>'
       toast('Errore estrazione: '+(e.message||e),'err')
     }finally{btn.disabled=false;btn.textContent=_t}
@@ -349,7 +556,8 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
 
   return {
     _inChunks, _splitFigura, _figSnap, _ordinaNomeCognomeDaCF, _splitNome,
-    _xesc, _xel, _xdl, admOssTuttoArchivio, admExportOsservatorio,
-    CHK2OSS, _OSS_ESITO, _PK_CHUNK,
+    _xesc, _xel, _xdl, admOssTuttoArchivio, admExportOsservatorio, admOssControlla, admOssTessera,
+    ossRuolo, ossTipoVisita, ossCantiereManca, ossCommittenteTipo, ossValutazioni, ossScegli, ossXml, ossEsercizi, _ossElenco,
+    CHK2OSS, _OSS_ESITO, _PK_CHUNK, TIPO_MAP, RUOLO_MAP,
   }
 }

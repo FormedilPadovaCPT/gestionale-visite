@@ -1602,11 +1602,13 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <!-- Estrazione XML Osservatorio -->
         <div class="adm-section">
           <div class="adm-section-title">📤 Estrazione XML per l'Osservatorio visite</div>
-          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:10px">Seleziona l'intervallo di date: vengono generati i 5 file XML (visite definitive, cantieri, imprese, committenti e tecnici collegati) conformi agli schemi XSD, pronti per la trasmissione all'Osservatorio nazionale.</p>
+          <div id="oss-tessera" style="font-size:12px;color:rgba(255,255,255,.8);line-height:1.8;background:rgba(255,255,255,.05);border-radius:8px;padding:10px 12px;margin-bottom:12px"></div>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:10px">Seleziona l'intervallo di date: vengono generati i 5 file XML (visite definitive, cantieri, imprese, committenti e tecnici collegati) conformi agli schemi XSD, pronti per la trasmissione all'Osservatorio nazionale. Dal 3 ottobre 2026 <b>escono solo le visite che hanno tutti i dati obbligatori</b>: nessun valore di ripiego. «🔎 Controlla» mostra quali restano fuori e perché, senza scaricare niente.</p>
           <div class="adm-date-row" style="align-items:flex-end">
             <div class="field" style="min-width:140px"><label>Dal</label><input type="date" id="oss-dal"></div>
             <div class="field" style="min-width:140px"><label>Al</label><input type="date" id="oss-al"></div>
             <button class="btn-outline" id="oss-tutto" onclick="admOssTuttoArchivio()" title="Riempie le date con la prima e l'ultima visita definitiva presenti in archivio">🗄 Tutto l'archivio</button>
+            <button class="btn-outline" id="oss-controlla" onclick="admOssControlla()">🔎 Controlla</button>
             <button class="btn-primary" id="oss-genera" onclick="admExportOsservatorio()">📤 Genera file XML</button>
           </div>
           <div id="oss-report" style="font-size:12px;color:rgba(255,255,255,.7);margin-top:10px;line-height:1.5"></div>
@@ -3585,6 +3587,8 @@ $('btn-add-imp').onclick=()=>{
   if(_in){try{_in.scrollIntoView({behavior:'smooth',block:'center'})}catch(_e){};_in.focus({preventScroll:true})}
 }
 
+// (03/10/2026) funzione pura: nessun lavoratore dichiarato, né dipendenti né autonomi
+function zeroLavoratori(tot){return !!tot&&(+tot.nr_lavoratori||0)===0&&(+tot.nr_ind||0)===0}
 // Totali lavoratori/imprese calcolati dalle imprese inserite
 function computeImpTotals(righe){
   const list=(righe||S.imprese||[]).filter(im=>im.impresa_id)
@@ -4882,6 +4886,14 @@ async function saveVisita(stato){
         }
       }
     }
+  }
+
+  /* (03/10/2026) ZERO LAVORATORI. Un verbale con nessun lavoratore in cantiere può essere vero
+     (cantiere fermo), ma più spesso è un campo saltato: 15 visite del 2025-26. Si chiede prima
+     di chiudere; Annulla riporta al passo Imprese e non salva niente. */
+  if(stato==='definitivo'&&zeroLavoratori(computeImpTotals())&&!confirm('NESSUN LAVORATORE IN CANTIERE\n\nNelle imprese presenti non hai indicato nessun lavoratore: né dipendenti né autonomi.\n\nOK = è così, in cantiere non c\'era nessuno al lavoro\nAnnulla = torno al passo Imprese e scrivo quanti erano (non salvo niente)')){
+    activateTab(2)
+    return
   }
 
   // l'incarico di un altro tecnico non si aggancia (02/10/2026): si ferma qui, con il motivo
@@ -9570,6 +9582,7 @@ function sgrInit(){
   if(dal&&!dal.value)dal.value=`${y}-01-01`
   if(al&&!al.value)al.value=today.toISOString().split('T')[0]
   admLoadPromemoria()
+  if(typeof window.admOssTessera==='function')window.admOssTessera().catch(e=>console.warn('tessera Osservatorio:',e))
 }
 window.sgrInit=sgrInit
 
@@ -14679,6 +14692,25 @@ function incDecidi(r,att){
   return{impresa,cantiere}
 }
 
+/* (03/10/2026) IL TIPO DI ACCESSO CHE L'INCARICO DICE DA SÉ. Funzione pura.
+   «Tipologia di accesso» non è più precompilata su «Programmata»: quando la visita nasce da
+   un incarico, però, il tipo lo sa già la richiesta. Si propone solo quando la richiesta lo
+   dice senza dubbi; altrimenti null, e lo sceglie il tecnico. Il campo resta modificabile. */
+function incTipoAccesso(r){
+  r=r||{}
+  const t=String(r.tipo_richiesta||'').toLowerCase(),g=String(r.tipologia_richiesta||'').toLowerCase()
+  if(t.includes(';'))return null                                   // più richieste insieme: non si indovina
+  if(r.stage_elenco_id||/stage/.test(t)||/stage/.test(g))return 9  // Visita STAGE/ASL
+  if(/serie di visite/.test(t)||/serie di visite/.test(g))return 8 // Adesione servizio visite in serie
+  if(/asseverazione/.test(t))return 10                             // Per attività di Asseverazione
+  if(/spisal/.test(t))return 12                                    // Progetto SPISAL
+  if(/segnalazione/.test(t)||/segnalazione/.test(g))return 1       // Su segnalazione
+  if(/attestazione/.test(t))return 11                              // Attestazione / consulenza e monitoraggio
+  if(/^sopralluogo (urgente )?in cantiere/.test(t))return 2        // Su richiesta
+  return null
+}
+window.incTipoAccesso=incTipoAccesso
+
 /* L'incarico entra nella visita: numero della richiesta, impresa principale e
    cantiere. E' la strada unica di «Nuova visita» / «Fai la visita» (pagina
    Incarichi) e della tendina nel primo passo del verbale. Quello che il
@@ -14687,6 +14719,12 @@ async function incApplicaAllaVisita(r){
   vSet('f-prot-int',String(r.id))
   const _sel=$('f-prot-inc'); if(_sel) _sel.value=String(r.id)
   if(typeof incVerificaProt==='function') incVerificaProt()
+  const _ta=incTipoAccesso(r)
+  if(_ta&&!vGet('f-tipo')){
+    vSet('f-tipo',String(_ta))
+    const _to=$('f-tipo'),_tn=(_to&&_to.selectedOptions&&_to.selectedOptions[0]&&_to.selectedOptions[0].textContent)||String(_ta)
+    toast('Tipologia di accesso presa dall\'incarico: «'+_tn+'». Se non è così, cambiala nel primo passo.','ok',6000)
+  }
   for(let k=0;k<20&&!(S.imprese&&S.imprese.length);k++) await new Promise(res=>setTimeout(res,100))
   const pi=(S.imprese||[]).findIndex(x=>x.is_principale); const idx=pi>=0?pi:0
   const imp=(S.imprese&&S.imprese[idx])||null
@@ -15018,7 +15056,7 @@ document.addEventListener('input',function(ev){
 <script src="scheda-impresa.js?v=2"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
-<script src="aiuto.js?v=15"></script>
+<script src="aiuto.js?v=16"></script>
 <script src="mail-respinte-tec.js?v=2"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
