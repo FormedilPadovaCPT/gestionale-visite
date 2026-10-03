@@ -250,7 +250,9 @@ body.v2.viewer-mode #v2-oggi{display:none}
 #v2-azioni button:hover{border-color:var(--orange)}
 #v2-azioni button:active{transform:scale(.97)}
 #v2-azioni button span{font-size:20px;line-height:1}
-/* Servizi CPT in verde e Asseverazione in blu, come i pulsanti di sempre (chiesto dall'utente) */
+/* Segnala cantiere in arancione, Servizi CPT in verde e Asseverazione in blu, come i pulsanti di sempre (chiesto dall'utente) */
+#v2-azioni button.v2-arancio{background:#e7500f;border-color:#e7500f;color:#fff;font-weight:600}
+#v2-azioni button.v2-arancio:hover{border-color:#B33B05}
 #v2-azioni button.v2-verde{background:#95C22F;border-color:#7aa527;color:#fff;font-weight:600}
 #v2-azioni button.v2-blu{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
 #v2-azioni button.v2-verde:hover{border-color:#5f8a1a}#v2-azioni button.v2-blu:hover{border-color:#1e40af}
@@ -641,7 +643,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
      disegnano soltanto. Le pagine Scadenze e Incarichi restano a sé, col loro numero nel menu. */
   /* quarto elemento: la classe del riquadro. L'Asseverazione preme il pulsante di sempre (nav-assev), che la veste tiene
      nascosto nel menu: compare solo a chi è asseveratore, cioè a chi quel pulsante l'aveva già (dataset.v2Mostra). */
-  const AZIONI = [['btn-segnala-dash', '📍', 'Segnala cantiere'], ['btn-diniego-dash', '🚫', 'Accesso negato'], ['btn-qr-servizi', '📱', 'QR servizi CPT'],
+  const AZIONI = [['btn-segnala-dash', '📍', 'Segnala cantiere', 'v2-arancio'], ['btn-diniego-dash', '🚫', 'Accesso negato'], ['btn-qr-servizi', '📱', 'QR servizi CPT'],
     ['btn-servizi-cpt', '↗', 'Servizi CPT', 'v2-verde'], ['nav-assev', '✅', 'Asseverazione', 'v2-blu'],
     ['btn-dove-sono', '📡', 'Dove sono?'], ['btn-appunti', '📝', 'Appunti cantiere']];
   const azioneVisibile = (id) => {

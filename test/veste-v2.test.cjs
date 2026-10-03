@@ -103,6 +103,7 @@ assert.ok(!js.includes('Altre app ▾') && !js.includes('function altreApp') && 
 // Asseverazione (blu, solo per chi l'aveva) e Servizi CPT (verde) sono riquadri di «Oggi»
 assert.ok(js.includes("['btn-servizi-cpt', '↗', 'Servizi CPT', 'v2-verde'], ['nav-assev', '✅', 'Asseverazione', 'v2-blu']"), 'Servizi CPT verde e Asseverazione blu fra i riquadri di «Oggi»');
 assert.ok(js.includes("#v2-azioni button.v2-verde{background:#95C22F") && js.includes("#v2-azioni button.v2-blu{background:#2563eb"), 'i colori sono quelli dei pulsanti di sempre');
+assert.ok(js.includes("['btn-segnala-dash', '📍', 'Segnala cantiere', 'v2-arancio']") && js.includes("#v2-azioni button.v2-arancio{background:#e7500f"), '«Segnala cantiere» è arancione pieno, come il pulsante di prima');
 assert.ok(js.includes("if (o.dataset.v2Mostra !== undefined) return o.dataset.v2Mostra !== 'none';"), 'l’Asseverazione compare solo a chi è asseveratore: si guarda com’era il pulsante prima della veste');
 // in «Vedi come…» conta il tecnico guardato, non la segreteria che guarda (l'utente vedeva il riquadro blu anche per un non asseveratore)
 assert.ok(js.includes("if (simula() && Array.isArray(window.__assevEmails)) return ruolo() !== 'tecnico' && ruolo() !== 'coordinatore' ? false : window.__assevEmails.includes(diChi().email);") && html.includes(';window.__assevEmails=ASSEV_EMAILS'), 'in «Vedi come…» il riquadro Asseverazione segue il tecnico guardato');
