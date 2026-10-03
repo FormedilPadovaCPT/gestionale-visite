@@ -186,4 +186,30 @@ assert.ok(js.includes('const RIGHE2 = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];')
 assert.ok(js.includes("vaiFase(2, n);") && js.includes("function vaiFase(f, tab) { _fase = f; document.body.classList.remove('v2-area-chiusa'); premiPasso("), 'la riga apre la pagina di sempre premendo il pulsante del passo, e andando avanti una riga chiusa si riapre');
 assert.ok(js.includes("function areeComEra() { document.querySelectorAll('#view-form .v2-area').forEach((r) => r.remove());"), 'spegnendo la veste le righe spariscono');
 
+/* ── terzo momento: una pagina sola, con «Prima di chiudere» ── */
+assert.ok(js.includes('body.v2.v2-fase3 #view-form .tab-content[data-tab="13"]{display:block') && js.includes('body.v2.v2-fase3 #view-form .tab-content[data-tab="15"]{display:block'), 'note, foto e riepilogo stanno insieme sullo schermo');
+assert.ok(js.includes("if (!_fase3) { _fase3 = true; [13, 14, 15].forEach((n) => premiPasso(n)); }"), 'entrando nel terzo momento si aprono i tre passi di sempre, così l’app li prepara');
+// l'elenco aiuta, non decide: i suoi nomi sono quelli di verbale_mancanze, e il controllo vero resta al database
+const sqlVc = fs.readFileSync(path.join(radice, 'supabase', 'sql', '2026_10_03_verbale_completo.sql'), 'utf8');
+const req = s.v2.requisiti();
+assert.ok(req.length >= 12, 'mi aspetto almeno dodici voci in «Prima di chiudere»');
+for (const r of req) if (r.cosa !== 'cantiere') assert.ok(sqlVc.includes("'cosa','" + r.cosa + "'"), 'la voce «' + r.cosa + '» non esiste in verbale_mancanze: le due liste devono parlare la stessa lingua');
+assert.ok(req.every((r) => r.ok === false || r.ok === true) && req.filter((r) => r.ok).length <= 1, 'a maschera vuota non deve risultare a posto quasi niente');
+assert.ok(js.includes('il controllo vero lo fa il gestionale quando premi «Definitivo»'), 'l’elenco deve dire che non è lui a decidere');
+
+/* ── telefono: menu in basso e tabelle come schede; pillole che premono i filtri di sempre ── */
+assert.ok(/@media\(max-width:720px\)\{\s+body\.v2 nav\{position:fixed;left:0;right:0;bottom:0;/.test(js), 'sul telefono il menu sta in basso');
+assert.ok(js.includes('body.v2[data-v2-vista="form"] nav{display:none}'), 'nel verbale il menu in basso lascia il posto ad avanti e indietro');
+assert.ok(js.includes("body.v2 .v2-schede td::before{content:attr(data-l);"), 'sul telefono ogni cella porta il nome della sua colonna');
+assert.strictEqual(s.v2.gruppoStat('IPC per n° accesso al cantiere'), 'rischio');
+assert.strictEqual(s.v2.gruppoStat('Tipologia di visita'), 'attivita');
+assert.strictEqual(s.v2.gruppoStat('Tipologia di opera'), 'territorio');
+assert.strictEqual(s.v2.gruppoStat('Qualcosa di nuovo'), '', 'un grafico senza gruppo resta sempre visibile');
+const stat = html.slice(html.indexOf('<section id="view-statistiche"'), html.indexOf('<section id="view-committenti"'));
+const grafici = [...stat.matchAll(/<div class="card[^>]*>\s*<h3[^>]*>([^<]+)/g)].map((m) => m[1]);
+assert.ok(grafici.length >= 16, 'mi aspetto almeno 16 grafici nelle Statistiche');
+const senzaGruppo = grafici.filter((g) => !s.v2.gruppoStat(g));
+assert.deepStrictEqual(senzaGruppo, [], 'grafici senza gruppo (resterebbero sempre in vista): ' + senzaGruppo.join(' | '));
+assert.ok(js.includes("sel.value = v; const c = $('btn-cerca'); if (c) c.click();") && js.includes("sel.dispatchEvent(new Event('change')); pilloleRubrica();"), 'le pillole di Visite e Rubrica devono premere i filtri di sempre');
+
 console.log('veste-v2: ok');

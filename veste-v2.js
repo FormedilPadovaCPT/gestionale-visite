@@ -289,6 +289,46 @@ body.v2.v2-fase2.v2-area-chiusa #view-form .tab-content.active{display:none}
 body.v2.v2-fase2 #view-form .tab-content{margin-bottom:10px}
 body.v2.v2-fase2 #view-form .tab-content>.card>h3:first-child{display:none}
 @media(max-width:600px){.v2-area .v2-riep{white-space:normal;text-align:right;font-size:12px}}
+/* terzo momento: una pagina sola — a sinistra note e foto, a destra il riepilogo con «Prima di chiudere», ora di fine, Bozza e Definitivo */
+body.v2.v2-fase3 #view-form #tab-bar{display:none}
+body.v2.v2-fase3 #view-form .tab-area{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:14px;align-items:start}
+body.v2.v2-fase3 #view-form .tab-content[data-tab="13"]{display:block;grid-column:1;grid-row:1}
+body.v2.v2-fase3 #view-form .tab-content[data-tab="14"]{display:block;grid-column:1;grid-row:2}
+body.v2.v2-fase3 #view-form .tab-content[data-tab="15"]{display:block;grid-column:2;grid-row:1 / span 2}
+@media(max-width:900px){body.v2.v2-fase3 #view-form .tab-area{display:block}}
+#v2-requisiti{margin:14px 0 4px;padding-top:12px;border-top:2px solid #F4F4F4}
+#v2-requisiti .v2-req{display:flex;gap:8px;align-items:center;padding:5px 0;font-size:13.5px}
+#v2-requisiti .v2-spunta{flex:0 0 20px;height:20px;border-radius:50%;background:#E3E4E6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+#v2-requisiti .v2-req.ok .v2-spunta{background:#95C22F}
+#v2-requisiti .v2-req span.v2-rt{flex:1;color:#3d4249}
+#v2-requisiti .v2-req.ok span.v2-rt{color:#888}
+#v2-requisiti a{color:var(--orange);font-weight:600;cursor:pointer;white-space:nowrap}
+#v2-requisiti small{display:block;color:#888;font-size:12px;margin-top:6px;line-height:1.4}
+/* il cantiere scelto, in evidenza */
+body.v2 #cant-info-card{border:2px solid var(--orange)!important;background:#FFF8F4!important;border-radius:8px!important}
+/* pillole di Visite, Rubrica e Statistiche */
+.v2-pillole{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.v2-pillole button{border-radius:50px;border:1.5px solid var(--border);background:#fff;padding:6px 14px;font-size:13px;font-weight:600;color:#565C66;min-height:0}
+.v2-pillole button.on{background:var(--orange);border-color:var(--orange);color:#fff}
+body.v2 .v2-nasc{display:none!important}
+/* TELEFONO: il menu sta in basso (scorre col dito, niente è nascosto) e le tabelle diventano schede */
+@media(max-width:720px){
+  body.v2 nav{position:fixed;left:0;right:0;bottom:0;top:auto;height:58px;background:#fff;border-top:1px solid #DDD;z-index:300;padding:0 6px;gap:2px;overflow-x:auto;box-shadow:0 -2px 8px rgba(0,0,0,.08)}
+  body.v2 nav button{color:#565C66;font-size:12px;font-weight:600;padding:6px 10px;border:0;flex:0 0 auto;margin-left:0!important}
+  body.v2 nav button.active,body.v2 nav button:hover{color:var(--orange);background:#FFF8F4;border:0}
+  body.v2 nav button.v2-cta,body.v2 nav button.v2-cta.active{color:#fff;background:var(--orange)}
+  body.v2 main{padding-bottom:76px!important}
+  body.v2[data-v2-vista="form"] nav{display:none}
+  #v2-barra{overflow-x:auto;flex-wrap:nowrap;white-space:nowrap}
+  body.v2 .v2-schede .tbl-wrap{overflow:visible}
+  body.v2 .v2-schede table,body.v2 .v2-schede tbody,body.v2 .v2-schede tr,body.v2 .v2-schede td{display:block;width:100%}
+  body.v2 .v2-schede thead{display:none}
+  body.v2 .v2-schede tbody tr{background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.12);padding:10px 12px;margin-bottom:10px}
+  body.v2 .v2-schede td{border:0!important;padding:3px 0!important;display:flex;gap:8px;justify-content:space-between;align-items:baseline;text-align:right;white-space:normal!important}
+  body.v2 .v2-schede td::before{content:attr(data-l);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#888;text-align:left;flex:0 0 36%}
+  body.v2 .v2-schede td[data-l=""]::before{content:none}
+  body.v2 .v2-schede td:empty{display:none}
+}
 .v2-sezione{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#565C66;margin:6px 2px 10px}
 #v2-torna{display:inline-flex;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--orange);background:#fff;border:1.5px solid var(--orange);border-radius:50px;padding:5px 14px;min-height:0}
 @media(max-width:720px){#v2-uff-menu{flex:1 1 100%;position:static;display:flex;flex-wrap:wrap;gap:4px}#v2-uff-menu button{width:auto;padding:7px 12px;border:1px solid var(--border)}#v2-uff-menu hr{display:none}body.v2 nav{padding:0 10px}}
@@ -660,6 +700,7 @@ body.v2.v2-fase2 #view-form .tab-content>.card>h3:first-child{display:none}
   function avantiIndietro(e, dir) {
     if (!document.body.classList.contains('v2')) return;
     e.stopImmediatePropagation(); e.preventDefault();
+    if (_fase === 3) { if (dir < 0) vaiFase(2, 12); return; }   // il terzo momento è una pagina sola
     const seq = FASI[_fase].tabs, i = seq.indexOf(tabOra());
     if (dir > 0) {
       if (_fase === 1) return vaiFase(2, 0);
@@ -685,7 +726,11 @@ body.v2.v2-fase2 #view-form .tab-content>.card>h3:first-child{display:none}
     if (n) n.addEventListener('click', (e) => avantiIndietro(e, +1), true);
     if (bar) bar.addEventListener('click', () => { _daBarra = true; setTimeout(() => { _daBarra = false; }, 0); }, true);
     const vf = $('view-form');
-    if (vf) ['change', 'input'].forEach((ev) => vf.addEventListener(ev, () => { if (document.body.classList.contains('v2') && _fase === 2) setTimeout(() => { try { areeRighe(); } catch (_e) { /* il riepilogo è un di più */ } }, 0); }));
+    if (vf) ['change', 'input'].forEach((ev) => vf.addEventListener(ev, () => {
+      if (!document.body.classList.contains('v2')) return;
+      if (_fase === 2) setTimeout(() => { try { areeRighe(); } catch (_e) { /* il riepilogo è un di più */ } }, 0);
+      if (_fase === 3 && ev === 'change') terzoAggiorna();
+    }));
   }
   function verbalePrepara() {
     const vista = $('view-form'); if (!vista) return false;
@@ -719,13 +764,14 @@ body.v2.v2-fase2 #view-form .tab-content>.card>h3:first-child{display:none}
     const nr = $('v2-fasi-nr'); if (nr) nr.textContent = ($('f-verbale') && $('f-verbale').value) || 'nuovo';
     momentoUno();
     try { if (_fase !== 2) document.body.classList.remove('v2-area-chiusa'); areeRighe(); } catch (e) { console.warn('veste v2 (righe):', e); }
+    try { terzoMomento(); } catch (e) { console.warn('veste v2 (terzo momento):', e); }
     const b0 = document.querySelector('#tab-bar .tab-btn[data-ti="0"]'); if (b0) b0.textContent = _fase === 2 ? '👤 Persona presente' : '📋 Visita';
     const p = $('btn-prev'), n = $('btn-next'), t = tabOra();
     if (p) { p.disabled = _fase === 1; p.textContent = '‹ Indietro'; }
-    if (n) { n.disabled = t === 15; n.textContent = _fase === 1 ? 'In cantiere ›' : (_fase === 2 && t === 12) ? 'A fine visita ›' : 'Successivo ›'; }
+    if (n) { n.disabled = _fase === 3 || t === 15; n.textContent = _fase === 1 ? 'In cantiere ›' : (_fase === 2 && t === 12) ? 'A fine visita ›' : 'Successivo ›'; }
   }
   function verbaleComEra() {
-    momentoUnoComEra(); areeComEra();
+    momentoUnoComEra(); areeComEra(); pagineComEra(); _fase3 = false;
     const f = $('v2-fasi'); if (f) f.remove();
     [1, 2, 3].forEach((x) => document.body.classList.remove('v2-fase' + x));
     const inc = $('inc-scelta-box'), card = document.querySelector('#view-form .tab-content[data-tab="0"] > .card');
@@ -901,6 +947,134 @@ body.v2.v2-fase2 #view-form .tab-content>.card>h3:first-child{display:none}
   }
   function areeComEra() { document.querySelectorAll('#view-form .v2-area').forEach((r) => r.remove()); document.body.classList.remove('v2-area-chiusa'); }
 
+  /* ── TERZO MOMENTO: «Prima di chiudere» ──
+     Un elenco che aiuta, calcolato da ciò che c'è nella maschera: NON è il giudice. A decidere se il verbale si chiude
+     resta il database, quando si preme «Definitivo»: se manca altro, lo elenca lui. I nomi delle voci
+     sono gli stessi di verbale_mancanze, così le due liste parlano la stessa lingua. */
+  function requisiti() {
+    const v = (id) => String(($(id) || {}).value || '').trim();
+    const imp = (S().imprese || []).filter((x) => x.impresa_id || x.impresa_nome);
+    const chk = S().checklist || {}, note = S().noteChk || {};
+    const valutate = Object.keys(chk).filter((c) => ['VER', 'OSS', 'NC-', 'NC+'].includes(chk[c]));
+    const haNota = (c) => !!String(note[c] || '').trim() || !!String(note[String(c).replace(/_\d+$/, '') + '_N'] || '').trim();
+    const ncSenza = valutate.filter((c) => (chk[c] === 'NC+' || chk[c] === 'NC-') && !haNota(c));
+    return [
+      { cosa: 'cantiere', ok: !!v('f-cant-id'), testo: 'Cantiere scelto', campo: 'f-cant-search' },
+      { cosa: 'ora-inizio', ok: !!v('f-data') && !!v('f-da'), testo: 'Data e ora di inizio', campo: v('f-data') ? 'f-da' : 'f-data' },
+      { cosa: 'tipo-accesso', ok: !!v('f-tipo'), testo: 'Tipologia di accesso', campo: 'f-tipo' },
+      { cosa: 'committente', ok: !!v('f-comm-id'), testo: 'Committente', campo: 'f-comm-search', tab: 1 },
+      { cosa: 'coordinamento', ok: v('f-coord') !== '', testo: 'Coordinamento della sicurezza: Sì o No', campo: 'f-coord', tab: 1 },
+      { cosa: 'lavorazioni', ok: (S().lavorazioni || []).length > 0, testo: 'Almeno una lavorazione in corso', tab: 1 },
+      { cosa: 'persona-presente', ok: !!(v('f-ppre-nome') || v('f-ppre-cog')), testo: 'Persona presente', campo: 'f-ppre-cog' },
+      { cosa: 'persona-qualifica', ok: !!v('f-qual-ppre'), testo: 'Qualifica della persona presente', campo: 'f-qual-ppre' },
+      { cosa: 'imprese', ok: imp.length > 0, testo: 'Almeno un\'impresa', tab: 2 },
+      { cosa: 'ruolo', ok: imp.length > 0 && imp.every((x) => x.tipo_imp), testo: 'Ruolo di ogni impresa', tab: 2 },
+      { cosa: 'checklist', ok: valutate.length > 0, testo: 'Almeno una voce valutata nella check-list', tab: 3 },
+      { cosa: 'nc-senza-nota', ok: ncSenza.length === 0, testo: 'Ogni non conformità con la sua nota' + (ncSenza.length ? ' (' + ncSenza.length + ' senza)' : ''), tab: 3 },
+      { cosa: 'ora-fine', ok: !!v('f-a'), testo: 'Ora di fine', campo: 'f-a', nota: 'se chiudi oggi e la lasci vuota, ci va l\'ora di chiusura' },
+    ];
+  }
+  function vaiA(r) {
+    const el = r.campo ? $(r.campo) : null, pag = el && el.closest ? el.closest('.tab-content') : null;
+    const tab = pag && pag.dataset.tab != null ? Number(pag.dataset.tab) : (r.tab != null ? r.tab : 15);
+    const persona = !!(el && el.closest && el.closest('.v2-persona'));
+    vaiFase(tab === 0 ? (persona ? 2 : 1) : (faseDi(tab) || 1), tab);
+    setTimeout(() => { try { if (el && el.offsetParent !== null) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); if (el.focus) el.focus(); } } catch (_e) { /* il campo c'è, ma non prende il cursore */ } }, 150);
+  }
+  function requisitiDisegna() {
+    const fine = $('f-a'), campo = fine && fine.closest('.field'); if (!campo) return;
+    let el = $('v2-requisiti');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'v2-requisiti'; campo.parentNode.insertBefore(el, campo);
+      el.addEventListener('click', (e) => { const a = e.target.closest('a[data-req]'); if (a) vaiA(requisiti()[Number(a.dataset.req)]); });
+    }
+    const r = requisiti(), mancano = r.filter((x) => !x.ok).length;
+    el.innerHTML = '<div class="v2-titolo">Prima di chiudere' + (mancano ? ' · mancano ' + mancano : ' · tutto a posto') + '</div>'
+      + r.map((x, i) => `<div class="v2-req${x.ok ? ' ok' : ''}"><span class="v2-spunta">${x.ok ? '✓' : ''}</span><span class="v2-rt">${esc(x.testo)}${!x.ok && x.nota ? ' <span style="color:#888">— ' + esc(x.nota) + '</span>' : ''}</span>${x.ok || x.cosa === 'ora-fine' ? '' : `<a data-req="${i}">Completa ›</a>`}</div>`).join('')
+      + '<small>È un aiuto: il controllo vero lo fa il gestionale quando premi «Definitivo». Se manca altro (per esempio un dato della scheda del cantiere) te lo elenca lui, e il verbale resta bozza.</small>';
+  }
+  /* entrando nel terzo momento si aprono, in fila, i tre passi di sempre: così l'app prepara le note (la data di
+     rientro suggerita), le foto e il riepilogo. Poi restano tutti e tre sullo schermo. */
+  let _fase3 = false, _aggiorna3 = null;
+  function terzoMomento() {
+    if (_fase !== 3) { _fase3 = false; return; }
+    if (!_fase3) { _fase3 = true; [13, 14, 15].forEach((n) => premiPasso(n)); }
+    requisitiDisegna();
+  }
+  function terzoAggiorna() {
+    if (_fase !== 3) return;
+    clearTimeout(_aggiorna3);
+    _aggiorna3 = setTimeout(() => { try { premiPasso(15); requisitiDisegna(); } catch (_e) { /* il riepilogo si rifà al prossimo cambio */ } }, 300);
+  }
+
+  /* ── TELEFONO: le tabelle diventano schede ──
+     Ogni cella prende il nome della sua colonna, e il foglio di stile (sotto i 720 px) la mostra come riga di una scheda.
+     La tabella resta quella dell'app: ordinamenti, pulsanti e filtri non cambiano. */
+  const _osservate = new Set();
+  function celleConNome(sez) {
+    sez.querySelectorAll('table').forEach((tb) => {
+      const nomi = [...tb.querySelectorAll('thead th')].map((x) => x.textContent.replace(/[▲▼↕⇅]/g, '').trim());
+      if (!nomi.length) return;
+      tb.querySelectorAll('tbody tr').forEach((tr) => { [...tr.children].forEach((td, i) => { if (td.dataset.l === undefined) td.dataset.l = td.colSpan > 1 ? '' : (nomi[i] || ''); }); });
+    });
+  }
+  function schedeTelefono(view) {
+    if (!['lista', 'scadenze', 'cantieri'].includes(view)) return;
+    const sez = $('view-' + view); if (!sez) return;
+    sez.classList.add('v2-schede'); celleConNome(sez);
+    if (!_osservate.has(view) && typeof MutationObserver === 'function') {
+      _osservate.add(view);
+      let inCoda = false;
+      new MutationObserver(() => { if (inCoda || !document.body.classList.contains('v2')) return; inCoda = true; setTimeout(() => { inCoda = false; celleConNome(sez); }, 60); }).observe(sez, { childList: true, subtree: true });
+    }
+  }
+
+  /* ── PILLOLE: Visite (stato), Rubrica (tipo), Statistiche (gruppo di grafici) ──
+     Premono i filtri che ci sono già, o mostrano e nascondono i riquadri: niente di nuovo da calcolare. */
+  function pillole(id, dove, voci, attiva, alClic) {
+    let el = $(id);
+    if (!el) { if (!dove || !dove.parentNode) return; el = document.createElement('div'); el.id = id; el.className = 'v2-pillole'; dove.parentNode.insertBefore(el, dove); el.addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (b) alClic(b.dataset.v); }); }
+    el.innerHTML = voci.map(([v, nome]) => `<button type="button" data-v="${esc(v)}" class="${String(v) === String(attiva) ? 'on' : ''}">${esc(nome)}</button>`).join('');
+  }
+  function pilloleVisite() {
+    const sel = $('q-stato'), barra = document.querySelector('#view-lista .search-bar'); if (!sel || !barra) return;
+    pillole('v2-pill-lista', barra, [['', 'Tutte'], ['bozza', 'Bozze'], ['definitivo', 'Definitive']], sel.value, (v) => { sel.value = v; const c = $('btn-cerca'); if (c) c.click(); pilloleVisite(); });
+  }
+  function pilloleRubrica() {
+    const sel = $('rub-cat'); if (!sel) return;
+    const riga = sel.closest('.search-bar') || sel.parentNode;
+    pillole('v2-pill-rub', riga, [...sel.options].map((o) => [o.value, o.value ? o.textContent : 'Tutti']), sel.value, (v) => { sel.value = v; sel.dispatchEvent(new Event('change')); pilloleRubrica(); });
+  }
+  const GRUPPI_STAT = [
+    ['attivita', 'Attività', ['Visite per esercizio', 'Attività mensile', 'Sopralluoghi per tecnico', 'Produttività', 'Affiancamento', 'Tipologia di visita']],
+    ['rischio', 'Rischio', ['IPC', 'NC+', 'Imprese ricorrenti', 'Ruolo impresa', 'Iscrizione']],
+    ['territorio', 'Territorio e cantieri', ['Top 20 comuni', 'Tipo di intervento', 'Tipologia di opera', 'Importo']],
+  ];
+  const gruppoStat = (titolo) => { const g = GRUPPI_STAT.find((x) => x[2].some((c) => String(titolo || '').includes(c))); return g ? g[0] : ''; };
+  let _statGruppo = '';
+  function pilloleStatistiche() {
+    const sez = $('view-statistiche'); if (!sez) return;
+    const carte = [...sez.querySelectorAll('.card')].filter((c) => c.querySelector(':scope > h3'));
+    const prima = carte.find((c) => gruppoStat(c.querySelector(':scope > h3').textContent));
+    if (!prima) return;
+    carte.forEach((c) => { const g = gruppoStat(c.querySelector(':scope > h3').textContent); c.classList.toggle('v2-nasc', !!g && !!_statGruppo && g !== _statGruppo); });
+    pillole('v2-pill-stat', prima.parentNode === sez ? prima : (prima.closest('#view-statistiche > *') || prima), [['', 'Tutti i grafici']].concat(GRUPPI_STAT.map((g) => [g[0], g[1]])), _statGruppo,
+      (v) => { _statGruppo = v; pilloleStatistiche(); window.dispatchEvent(new Event('resize')); });
+  }
+  function pagine(view) {
+    try {
+      schedeTelefono(view);
+      if (view === 'lista') pilloleVisite();
+      if (view === 'rubrica') pilloleRubrica();
+      if (view === 'statistiche') pilloleStatistiche();
+    } catch (e) { console.warn('veste v2 (pagine):', e); }
+  }
+  function pagineComEra() {
+    ['v2-requisiti', 'v2-pill-lista', 'v2-pill-rub', 'v2-pill-stat'].forEach((id) => { const e = $(id); if (e) e.remove(); });
+    document.querySelectorAll('.v2-schede').forEach((e) => e.classList.remove('v2-schede'));
+    document.querySelectorAll('.v2-nasc').forEach((e) => e.classList.remove('v2-nasc'));
+  }
+
   function momentoUno() { try { incarichiSchede(); cantieriVicini(); tipoPulsanti(); } catch (e) { console.warn('veste v2 (primo momento):', e); } }
   function momentoUnoComEra() {
     ['v2-inc-schede', 'v2-vicini', 'v2-tipo-chips'].forEach((id) => { const e = $(id); if (e) e.remove(); });
@@ -961,6 +1135,7 @@ body.v2.v2-fase2 #view-form .tab-content>.card>h3:first-child{display:none}
       torna(view);
       const r = RUOLI[ruolo()];
       if (view === 'form') verbaleApplica();
+      pagine(view);
       if (view === 'segreteria') ufficio();
       if (view === 'direzione') sintesi().catch((e) => console.warn('veste v2, sintesi:', e));
       if (view === 'dashboard' && !r.lettura) {
@@ -973,5 +1148,5 @@ body.v2.v2-fase2 #view-form .tab-content>.card>h3:first-child{display:none}
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }
 
-  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo };
+  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat };
 })();
