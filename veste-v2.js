@@ -18,9 +18,9 @@
      · pagina di apertura per ruolo (decise dall'utente): segreteria su
        Ufficio › Scrivania, tecnico e coordinatore su Oggi, Direttore su
        Direzione, Presidenza sulla sua pagina, consiglieri sulla Mappa (senza calendario);
-     · «Oggi»: bozze aperte, cruscotto e sotto le scadenze, che sono la
-       pagina di sempre (nessuna regola riscritta). Gli incarichi restano una
-       pagina a sé, con la voce nel menu e il numero che lampeggia;
+     · «Oggi»: il cruscotto di sempre, con la mappa dei cantieri in
+       monitoraggio, e in cima le bozze aperte. Scadenze e incarichi restano
+       pagine a sé, con la voce nel menu e il numero che lampeggia;
      · «Ufficio»: gli strumenti della pagina Segreteria raggruppati con un
        menu a lato, più una Scrivania con i numeri di ciò che aspetta;
      · «Vedi come…»: la segreteria vede menu e pagine degli altri ruoli.
@@ -46,12 +46,14 @@
 
   /* (03/10/2026, corretto dall'utente) «Nuova visita» sta subito dopo «Oggi», prima di «Visite», come nell'app di oggi:
      resta arancione, ma non in fondo a destra. */
+  /* (03/10/2026, corretto dall'utente) Anche le SCADENZE tornano una pagina a sé, e in «Oggi» resta la mappa dei
+     cantieri in monitoraggio com'era: «Oggi» è il cruscotto di sempre, con in più le bozze aperte in cima. */
   /* (03/10/2026, corretto dall'utente) Per il tecnico gli INCARICHI tornano una pagina a sé, con la voce nel menu e il
      numero che lampeggia quando ce ne sono di nuovi, come nell'app di oggi: dentro «Oggi» si perdevano. */
   const RUOLI = {
     segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'segreteria'], apre: 'segreteria' },
-    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'incarichi', 'statistiche'],       apre: 'dashboard' },
-    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'incarichi', 'statistiche', '|', 'admin'], apre: 'dashboard' },
+    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche'], apre: 'dashboard' },
+    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', '|', 'admin'], apre: 'dashboard' },
     direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione',   lettura: true },
     presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione',   lettura: true },
     // (03/10/2026, corretto dall'utente dopo aver guardato l'anteprima) il consigliere apre sulla Mappa e non vede il calendario
@@ -154,14 +156,11 @@ body.v2 .adm-wrap th{color:#6b7078!important}
 body.v2 .adm-wrap td{color:#3d4249}
 body.v2 #view-admin tr:hover td,body.v2 #view-segreteria tr:hover td{background:#FEF9F7!important;color:#3d4249}
 body.v2 .adm-wrap details summary{color:#6b7078!important}
-/* «Oggi»: la mappa sta in Cantieri; chi è di sola lettura la tiene (per lui la pagina si chiama Mappa) */
-body.v2:not(.viewer-mode) #dash-map-card{display:none}
-/* «Oggi»: le bozze aperte, il cruscotto e in fondo le scadenze. Gli incarichi NON stanno qui: hanno la loro pagina
-   e la voce nel menu col numero che lampeggia (chiesto dall'utente). */
+/* «Oggi» è il cruscotto di sempre, mappa dei cantieri in monitoraggio compresa, con le bozze aperte in cima.
+   Scadenze e incarichi NON stanno qui: hanno la loro pagina e la voce nel menu, come oggi (chiesto dall'utente). */
 body.v2[data-v2-vista="dashboard"]:not(.viewer-mode) main{display:flex;flex-direction:column}
 body.v2[data-v2-vista="dashboard"] #v2-bozze{order:0}
 body.v2[data-v2-vista="dashboard"] #view-dashboard{order:2}
-body.v2[data-v2-vista="dashboard"] #view-scadenze{order:3}
 body.v2:not([data-v2-vista="dashboard"]) #v2-bozze{display:none}
 .v2-sezione{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#565C66;margin:6px 2px 10px}
 #v2-torna{display:inline-flex;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--orange);background:#fff;border:1.5px solid var(--orange);border-radius:50px;padding:5px 14px;min-height:0}
@@ -400,16 +399,6 @@ body.v2:not([data-v2-vista="dashboard"]) #v2-bozze{display:none}
     }
   }
 
-  /* in «Oggi» incarichi e scadenze portano un titolo; quando si aprono da sole, no */
-  function titoliOggi(si) {
-    [['view-scadenze', 'v2-tit-scad', '⏰ Rientri in scadenza']].forEach(([vista, id, testo]) => {
-      const v = $(vista); if (!v) return;
-      let t = $(id);
-      if (!si) { if (t) t.remove(); return; }
-      if (!t) { t = document.createElement('div'); t.id = id; t.className = 'v2-sezione'; t.textContent = testo; v.insertBefore(t, v.firstChild); }
-    });
-  }
-
   /* ── DIREZIONE e PRESIDENZA: una sintesi, così la pagina non è mai vuota ── */
   async function sintesi() {
     const vista = $('view-direzione'); const sb = window.sb; if (!vista || !sb) return;
@@ -463,12 +452,9 @@ body.v2:not([data-v2-vista="dashboard"]) #v2-bozze{display:none}
       if (ruolo() === 'segreteria' && ['admin', 'committenti', 'incarichi'].includes(view)) { const u = document.querySelector('nav button[data-view="segreteria"]'); if (u) u.classList.add('active'); }
       torna(view);
       const r = RUOLI[ruolo()];
-      // la mappa era nascosta: quando torna in vista va rimisurata
-      if (view === 'dashboard' && r.lettura) setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
       if (view === 'segreteria') ufficio();
       if (view === 'direzione') sintesi().catch((e) => console.warn('veste v2, sintesi:', e));
-      titoliOggi(view === 'dashboard' && !r.lettura);
-      if (view === 'dashboard' && !r.lettura) { bozze().catch((e) => console.warn('veste v2, bozze:', e)); return ['scadenze']; }
+      if (view === 'dashboard' && !r.lettura) bozze().catch((e) => console.warn('veste v2, bozze:', e));
       return [];
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }
