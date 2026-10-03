@@ -198,8 +198,7 @@ assert.ok(req.every((r) => r.ok === false || r.ok === true) && req.filter((r) =>
 assert.ok(js.includes('il controllo vero lo fa il gestionale quando premi «Definitivo»'), 'l’elenco deve dire che non è lui a decidere');
 
 /* ── telefono: menu in basso e tabelle come schede; pillole che premono i filtri di sempre ── */
-assert.ok(/@media\(max-width:720px\)\{\s+body\.v2 nav\{position:fixed;left:0;right:0;bottom:0;/.test(js), 'sul telefono il menu sta in basso');
-assert.ok(js.includes('body.v2[data-v2-vista="form"] nav{display:none}'), 'nel verbale il menu in basso lascia il posto ad avanti e indietro');
+assert.ok(!/body\.v2 nav\{position:fixed/.test(js), 'sul telefono il menu resta in alto, per tutti (deciso dall’utente dopo averlo provato in basso)');
 assert.ok(js.includes("body.v2 .v2-schede td::before{content:attr(data-l);"), 'sul telefono ogni cella porta il nome della sua colonna');
 assert.strictEqual(s.v2.gruppoStat('IPC per n° accesso al cantiere'), 'rischio');
 assert.strictEqual(s.v2.gruppoStat('Tipologia di visita'), 'attivita');

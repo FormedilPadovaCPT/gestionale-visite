@@ -311,14 +311,10 @@ body.v2 #cant-info-card{border:2px solid var(--orange)!important;background:#FFF
 .v2-pillole button{border-radius:50px;border:1.5px solid var(--border);background:#fff;padding:6px 14px;font-size:13px;font-weight:600;color:#565C66;min-height:0}
 .v2-pillole button.on{background:var(--orange);border-color:var(--orange);color:#fff}
 body.v2 .v2-nasc{display:none!important}
-/* TELEFONO: il menu sta in basso (scorre col dito, niente è nascosto) e le tabelle diventano schede */
+/* TELEFONO: il menu resta IN ALTO, come oggi, per tutti (provato dall'utente sul telefono il 03/10/2026: in basso
+   non gli è piaciuto, sopra è più funzionale). Le tabelle diventano schede. */
 @media(max-width:720px){
-  body.v2 nav{position:fixed;left:0;right:0;bottom:0;top:auto;height:58px;background:#fff;border-top:1px solid #DDD;z-index:300;padding:0 6px;gap:2px;overflow-x:auto;box-shadow:0 -2px 8px rgba(0,0,0,.08)}
-  body.v2 nav button{color:#565C66;font-size:12px;font-weight:600;padding:6px 10px;border:0;flex:0 0 auto;margin-left:0!important}
-  body.v2 nav button.active,body.v2 nav button:hover{color:var(--orange);background:#FFF8F4;border:0}
-  body.v2 nav button.v2-cta,body.v2 nav button.v2-cta.active{color:#fff;background:var(--orange)}
-  body.v2 main{padding-bottom:76px!important}
-  body.v2[data-v2-vista="form"] nav{display:none}
+  body.v2 nav button{margin-left:0!important}
   #v2-barra{overflow-x:auto;flex-wrap:nowrap;white-space:nowrap}
   body.v2 .v2-schede .tbl-wrap{overflow:visible}
   body.v2 .v2-schede table,body.v2 .v2-schede tbody,body.v2 .v2-schede tr,body.v2 .v2-schede td{display:block;width:100%}
