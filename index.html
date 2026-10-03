@@ -868,7 +868,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             dalle imprese inserite nella scheda <strong>Imprese</strong>, indicando i dipendenti in cantiere per ciascuna.
           </p>
           <div class="row">
-          <div class="field"><label>Importo lavori</label>
+          <div class="field"><label>Importo lavori *</label>
             <select id="f-importo">
               <option value="">– Seleziona –</option>
               <option value="1">Fino a 250.000 €</option><option value="2">250.001 – 500.000 €</option>
@@ -3712,7 +3712,7 @@ function initCantSearch(){
     lst.querySelectorAll('div[data-i]').forEach((d,i)=>{d.onclick=()=>{lst.classList.add('hidden');onSel(items[i])}})
   }
   const trig=()=>{clearTimeout(tm);tm=setTimeout(()=>render(false),280)}
-  inA.oninput=trig
+  inA.oninput=()=>{staccaCantiere();trig()}   // (03/10/2026) il testo cambiato non è più il cantiere di prima
   if(inC)inC.oninput=trig
   inA.ondblclick=()=>{clearTimeout(tm);render(true)}
   document.addEventListener('click',e=>{if(!inA.contains(e.target)&&!lst.contains(e.target)&&!(inC&&inC.contains(e.target)))lst.classList.add('hidden')})
@@ -3837,15 +3837,52 @@ function importoVerbaleAzione(scelto,cant){
   if(c&&c!==11&&String(cant.cantiere_cnce||'').trim())return 'chiedi'
   return 'scrivi'
 }
-// Propone la fascia 'Importo lavori' dal dato del cantiere, se presente e non gia scelta
+/* (03/10/2026, deciso dall'utente) CAMBIARE CANTIERE STACCA QUELLO DI PRIMA.
+   Dal verbale CPT/26_27/0002: il tecnico ha riscritto nel campo l'indirizzo di un altro lotto, ma il
+   cantiere scelto prima restava agganciato e il verbale è finito sul cantiere sbagliato. Ora, appena si
+   scrive nel campo, il cantiere di prima si stacca: per salvare va scelto dall'elenco, o creato. */
+function staccaCantiere(){
+  if(!vGet('f-cant-id'))return
+  vSet('f-cant-id','');S.fd.cantiere_id=null
+  ;['f-cnce','f-cod-uni','f-data-ult'].forEach(id=>vSet(id,''))
+  hideCantCard()
+  const det=$('cant-detail');if(det)det.textContent='⚠ Nessun cantiere scelto: sceglilo dall’elenco che compare scrivendo, oppure creane uno nuovo.'
+  toast('Hai cambiato il testo del cantiere: quello scelto prima non è più collegato al verbale. Scegli il cantiere giusto dall’elenco, oppure creane uno nuovo.','warn',8000)
+}
+
+/* (03/10/2026, regola dell'utente) CODICI FISCALI E PARTITE IVA SEMPRE IN MAIUSCOLO, senza spazi,
+   comunque li si scriva: si sistemano mentre si scrive, in ogni campo CF/P.IVA dell'app.
+   Il database fa lo stesso sulle colonne descrittive (trigger tg_norm_cf). */
+function normCf(s){return String(s==null?'':s).replace(/\s+/g,'').toUpperCase()}
+const CAMPO_CF=/^(?:(?:f|mc|ec|ei|mi|mp)-(?:comm-)?(?:cf|piva|cfpiva)(?:-pg)?|im-(?:cf_imp|piva)-\d+)$/
+document.addEventListener('input',e=>{
+  const el=e.target
+  if(!el||el.tagName!=='INPUT'||!CAMPO_CF.test(el.id||''))return
+  const v=el.value,n=normCf(v)
+  if(v===n)return
+  const pos=el.selectionStart
+  const cur=normCf(v.slice(0,pos==null?v.length:pos)).length
+  el.value=n
+  try{el.setSelectionRange(cur,cur)}catch(_){}
+},true)
+
+/* (03/10/2026, deciso dall'utente) IMPORTO LAVORI DALLA SCHEDA DEL CANTIERE.
+   Quando si sceglie un cantiere, la tendina prende SEMPRE l'importo della sua scheda, anche se ne
+   mostrava già un altro (del cantiere scelto prima, o del verbale da cui si è partiti): prima restava
+   quello vecchio, e al salvataggio finiva sulla scheda del cantiere nuovo — importi cambiati a caso.
+   Se la scheda non ce l'ha, la tendina si svuota: l'importo è obbligatorio e il tecnico lo stima. */
 function proponiImportoCantiere(imp){
   const el=$('f-importo');if(!el)return
-  if(imp==null||String(imp).trim()==='')return
-  if(el.value)return
-  if(!el.querySelector('option[value="'+imp+'"]'))return
-  el.value=String(imp)
-  el.style.background='#eef9f0'
-  el.title='Proposto dalla scheda del cantiere. Se lo cambi, al salvataggio si aggiorna la scheda del cantiere; per i cantieri della Cassa Edile (codice CNCE) ti viene chiesta conferma.'
+  const v=imp==null?'':String(imp).trim()
+  if(v&&el.querySelector('option[value="'+v+'"]')){
+    el.value=v
+    el.style.background='#eef9f0'
+    el.title='Dalla scheda del cantiere. Se lo cambi, al salvataggio si aggiorna la scheda del cantiere; per i cantieri della Cassa Edile (codice CNCE) ti viene chiesta conferma.'
+  }else{
+    el.value=''
+    el.style.background=''
+    el.title='La scheda del cantiere non ha l’importo: scegli la fascia (se non la conosci, stimala). Al salvataggio entra anche nella scheda del cantiere.'
+  }
 }
 async function proponiCommittenteCantiere(cantId){
   try{
@@ -4593,7 +4630,12 @@ function impresaDoppia(imprese,id,esclusa){
    col passo e il campo da aprire.
    Vale quando il verbale DIVENTA definitivo: chi risalva un verbale che lo era già (anche i
    vecchi importati, che questi dati possono non averli) non viene fermato.
-   d = {giaDefinitivo, oraA, lavorazioni (quante), imprese:[{impresa_id, impresa_nome, tipo_imp}]} */
+   (03/10/2026, deciso dall'utente) Anche l'IMPORTO DEI LAVORI, perché lo chiede l'Osservatorio
+   nazionale: se non lo conosce nessuno il tecnico ne stima la fascia, «Non disponibile» non basta.
+   E ALMENO UN'IMPRESA CON L'E-MAIL (in anagrafica o nel campo «Email invio verbale»): senza, il
+   verbale arriverebbe solo alle figure del cantiere. `mailAnagrafica` = {IMPRESA_ID: true/false};
+   se la lettura non è riuscita è null e il controllo non si fa (lo dice il salvataggio).
+   d = {giaDefinitivo, oraA, importo, lavorazioni (quante), imprese:[{impresa_id, impresa_nome, tipo_imp, email_verbale}], mailAnagrafica} */
 function mancaAllaChiusura(d){
   d=d||{}
   const out=[]
@@ -4604,6 +4646,11 @@ function mancaAllaChiusura(d){
   if(d.giaDefinitivo) return out
   if(!String(d.oraA||'').trim())
     out.push({cosa:'ora-fine',tab:0,campo:'f-a',testo:'Manca l\'ora di fine: è obbligatoria per chiudere il verbale. Non posso metterla io, perché il verbale si chiude in un giorno diverso da quello della visita oppure l\'ora di adesso è prima dell\'ora di inizio: scrivila nel primo passo.'})
+  const _imp=+d.importo||0
+  if(!(_imp>=1&&_imp<=10))
+    out.push({cosa:'importo',tab:1,campo:'f-importo',testo:_imp===11
+      ?'L\'importo dei lavori è «Non disponibile»: per chiudere il verbale serve una fascia, perché la chiede l\'Osservatorio nazionale. Se non lo conosci, scegli quella che stimi, nel passo Cantiere.'
+      :'Manca l\'importo dei lavori: è obbligatorio per chiudere il verbale, perché lo chiede l\'Osservatorio nazionale. Se la scheda del cantiere non ce l\'ha e non lo conosci, scegli la fascia che stimi, nel passo Cantiere.'})
   if(!(+d.lavorazioni>0))
     out.push({cosa:'lavorazioni',tab:1,campo:'lav-sel-genere',testo:'Mancano le lavorazioni in corso: per chiudere il verbale ne serve almeno una. Nel passo Cantiere scegli genere, fase e lavorazione e premi «+ Aggiungi».'})
   ;(d.imprese||[]).forEach((im,i)=>{
@@ -4611,6 +4658,12 @@ function mancaAllaChiusura(d){
     if((im.impresa_id||String(im.impresa_nome||'').trim())&&!(+im.tipo_imp>0))
       out.push({cosa:'ruolo',tab:2,campo:'im-tipo-'+i,testo:'Manca il ruolo dell\'impresa «'+(im.impresa_nome||im.impresa_id)+'»: è obbligatorio per chiudere il verbale. Sceglilo nel campo «Tipologia», nel passo Imprese.'})
   })
+  if(d.mailAnagrafica){
+    const _righe=(d.imprese||[]).filter(im=>im&&String(im.impresa_id||'').trim())
+    const _conMail=_righe.some(im=>String(im.email_verbale||'').trim()||d.mailAnagrafica[String(im.impresa_id).trim().toUpperCase()])
+    if(_righe.length&&!_conMail)
+      out.push({cosa:'email-impresa',tab:2,campo:'im-email_verbale-0',testo:'Nessuna impresa del verbale ha un indirizzo e-mail, né in anagrafica né nel campo «Email invio verbale»: il verbale arriverebbe solo alle figure del cantiere. Chiedi l\'indirizzo in cantiere e scrivilo nella riga dell\'impresa, nel passo Imprese.'})
+  }
   return out
 }
 
@@ -4641,8 +4694,18 @@ async function saveVisita(stato){
         adesso:new Date().toLocaleTimeString('it-IT',{timeZone:'Europe/Rome',hour:'2-digit',minute:'2-digit',hour12:false})})
       if(_of.ora){vSet('f-a',_of.ora);toast('Ora di fine non indicata: ho messo '+_of.ora+', l\'ora di chiusura del verbale. Se la visita è finita a un\'altra ora, correggila e risalva.','ok',7000)}
     }
-    // ora di fine, lavorazioni in corso e ruolo dell'impresa sono obbligatori: senza, il verbale non si chiude
-    const _manca=mancaAllaChiusura({giaDefinitivo:_giaDef,oraA:vGet('f-a'),lavorazioni:(S.lavorazioni||[]).length,imprese:S.imprese})
+    // (03/10/2026) quali imprese hanno un'e-mail in anagrafica: almeno una deve ricevere il verbale
+    let _mailAnag=null
+    if(!_giaDef){
+      const _ids=[...new Set(S.imprese.map(im=>String(im.impresa_id||'').trim()).filter(Boolean))]
+      if(_ids.length){
+        const{data:_mi,error:_eMi}=await sb.from('imprese').select('impresa_id,impresa_email_ref,impresa_email2,impresa_email3').in('impresa_id',_ids)
+        if(_eMi)toast('Non sono riuscito a controllare le e-mail delle imprese ('+_eMi.message+'): verifica tu che almeno una ce l\'abbia.','warn',8000)
+        else{_mailAnag={};(_mi||[]).forEach(r=>{_mailAnag[String(r.impresa_id).trim().toUpperCase()]=[r.impresa_email_ref,r.impresa_email2,r.impresa_email3].some(x=>String(x||'').trim())})}
+      }
+    }
+    // ora di fine, importo, lavorazioni in corso, ruolo dell'impresa e un'impresa con l'e-mail sono obbligatori: senza, il verbale non si chiude
+    const _manca=mancaAllaChiusura({giaDefinitivo:_giaDef,oraA:vGet('f-a'),importo:vGet('f-importo'),lavorazioni:(S.lavorazioni||[]).length,imprese:S.imprese,mailAnagrafica:_mailAnag})
     if(_manca.length){
       const _m0=_manca[0]
       toast(_m0.testo+(_manca.length>1?' (e altre '+(_manca.length-1)+' cose da completare)':''),'err',10000)
@@ -4667,7 +4730,11 @@ async function saveVisita(stato){
         ppreQual:vGet('f-qual-ppre'),
         oggi:new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Rome'}),
         cantiereId:cant_id, visitaId:S.fd.visita_id||S.savedId||null,
-        impresaId:S.imprese[0].impresa_id, tecnicoId:tec_id
+        impresaId:S.imprese[0].impresa_id, tecnicoId:tec_id,
+        // (03/10/2026) committente del verbale e figure: il controllo li confronta con la scheda del cantiere e fra loro
+        commVerbale:vGet('f-comm-id')||vGet('f-comm-cf')||vGet('f-comm-piva')||vGet('f-comm-cf-pg'),
+        commVerbaleNome:[vGet('f-comm-nome'),vGet('f-comm-cog')].map(x=>(x||'').trim()).filter(Boolean).join(' ')||vGet('f-comm-rag-soc')||'',
+        figure:['rl','csp','cse','comm','ppre'].map(k=>({ruolo:k,titolo:vGet('f-'+k+'-titolo'),nome:vGet('f-'+k+'-nome'),cog:vGet('f-'+k+'-cog')}))
       })
     }catch(_cv){console.warn('controllo verbale:',_cv)}
     if(!_cvOk)return
@@ -4897,6 +4964,13 @@ async function saveVisita(stato){
       is_principale:i===0,ordine:i
     }))
     if(impRows.length)_scritto(await sb.from('visite_imprese_presenti').insert(impRows),'le imprese presenti')
+    // (03/10/2026) l'indirizzo scritto in «Email invio verbale» entra in anagrafica, se lì non ce n'è nessuno
+    for(const _im of S.imprese){
+      const _ev=String(_im.email_verbale||'').trim(),_id=String(_im.impresa_id||'').trim()
+      if(!_ev||!_id||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(_ev))continue
+      const{error:_eEv}=await sb.from('imprese').update({impresa_email_ref:_ev}).eq('impresa_id',_id).or('impresa_email_ref.is.null,impresa_email_ref.eq.')
+      if(_eEv)toast('L\'indirizzo dell\'impresa non è entrato in anagrafica: '+_eEv.message,'warn')
+    }
 
     // Snapshot (non-blocking: se la tabella non esiste non blocca il salvataggio)
     try{
@@ -7910,7 +7984,9 @@ async function upsertPersoneVisita(){
 function _evRenderList(){
   const emails=window._evEmails||[]
   const box=$('email-verbale-list');if(!box)return
-  box.innerHTML=emails.map((e,i)=>`
+  // (03/10/2026, regola dell'utente) almeno un'impresa deve ricevere il verbale
+  const _senzaImpresa=!emails.some(e=>e.ruolo==='Impresa'||e.extra)
+  box.innerHTML=(_senzaImpresa?`<div style="background:#fdecea;border-left:3px solid #c0392b;padding:8px 10px;border-radius:4px;margin-bottom:6px;font-size:13px;color:#7b241c">⚠ <b>Nessuna impresa fra i destinatari</b>: nessuna impresa del verbale ha un indirizzo e-mail, e il verbale arriverebbe solo alle figure del cantiere. Aggiungi l’indirizzo dell’impresa con <b>+ Aggiungi</b>: senza, l’invio non parte.</div>`:'')+emails.map((e,i)=>`
     <div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #eee;font-size:13px">
       <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--grey);min-width:72px;letter-spacing:.4px">${esc(e.ruolo)}</span>
       <span style="flex:1;color:#333">${esc(e.nome)}</span>
@@ -8536,7 +8612,7 @@ URL: www.formedilpadova.it`
 }
 
 // ── EMAIL VERBALE ──
-function inviEmailVerbale(){
+async function inviEmailVerbale(){
   window._evContext=null
   window._evRettifica=null
   _setEvModalRett(false)
@@ -8566,11 +8642,22 @@ function inviEmailVerbale(){
     const cseNome=[vGet('f-cse-nome'),vGet('f-cse-cog')].filter(Boolean).join(' ')||'CSE'
     emails.push({ruolo:'CSE',nome:cseNome,email:cseEmail})
   }
-  // Imprese – email verbale override
+  // Imprese: l'indirizzo scritto nel verbale («Email invio verbale») e, se è vuoto, quello dell'anagrafica.
+  // (03/10/2026) Prima l'anagrafica non veniva letta, anche se il campo dice «lascia vuoto per usare quella
+  // in anagrafica»: i verbali CPT/26_27/0001 e 0002 sono partiti senza nessuna impresa fra i destinatari.
+  const _impIds=[...new Set(S.imprese.map(im=>String(im.impresa_id||'').trim()).filter(Boolean))]
+  const _anag={}
+  let _anagErr=null
+  if(_impIds.length){
+    const{data:_ia,error:_eIa}=await sb.from('imprese').select('impresa_id,impresa_email_ref,impresa_email2,impresa_email3').in('impresa_id',_impIds)
+    if(_eIa)_anagErr=_eIa.message
+    ;(_ia||[]).forEach(r=>{_anag[String(r.impresa_id).trim()]=[r.impresa_email_ref,r.impresa_email2,r.impresa_email3].map(x=>String(x||'').trim()).find(Boolean)||''})
+  }
   S.imprese.forEach((im,idx)=>{
-    const ev=(im.email_verbale||vGet(`im-email_verbale-${idx}`)||'').trim()
+    const ev=(im.email_verbale||vGet(`im-email_verbale-${idx}`)||'').trim()||_anag[String(im.impresa_id||'').trim()]||''
     if(ev) emails.push({ruolo:'Impresa',nome:im.impresa_nome||`Impresa ${idx+1}`,email:ev,impresa_id:im.impresa_id||null})
   })
+  if(_anagErr)toast('Non sono riuscito a leggere le e-mail delle imprese in anagrafica ('+_anagErr+'): controlla i destinatari prima di inviare.','warn',8000)
   emails.push({ruolo:'CPT',nome:'Formedil Padova – Area Sicurezza',email:'cpt@formedilpadova.it'})
 
   if(!emails.length){toast('Nessun indirizzo email presente tra le figure della visita','warn');return}
@@ -8670,6 +8757,8 @@ $('btn-ev-invia').onclick=async()=>{
   if(!emails.length){toast('Nessun destinatario','warn');return}
   const vid=S.savedId||S.fd?.visita_id||window._evContext?.vid
   if(!vid){toast('Salva prima la visita','warn');return}
+  // (03/10/2026, regola dell'utente) almeno un'impresa deve ricevere il verbale: senza, arriverebbe solo alle figure
+  if(!emails.some(e=>e.ruolo==='Impresa'||e.extra)){toast('Nessuna impresa fra i destinatari: il verbale arriverebbe solo alle figure del cantiere. Aggiungi l\'indirizzo dell\'impresa con «+ Aggiungi» e poi invia.','err',9000);const _x=$('ev-extra');if(_x)_x.focus();return}
   if(window._evInviiNonLetti===vid&&!window._evRettifica){toast('Non sono riuscito a verificare se questo verbale è già stato inviato: invio fermato. Ricarica e riapri la visita, così si capisce se è un primo invio o una rettifica.','err',9000);return}
 
   const btn=$('btn-ev-invia')
@@ -12363,7 +12452,9 @@ async function nuovaVisitaDaVerbale(vid, mode){
         S.fd.comune_nome=r.data.comune_nome||''
         S.fd.cantiere_indirizzo=r.data.cantiere_indirizzo||''
         S.fd.cantiere_civico=r.data.cantiere_civico||''
+        vSet('f-data-ult',r.data.data_ult||'')
         renderCantCard(r.data)
+        proponiImportoCantiere(r.data.cantiere_importo)
       }
       await autoAccCant(cid)
       toast('Nuova visita — dati del cantiere importati','ok')
@@ -14665,10 +14756,10 @@ document.addEventListener('input',function(ev){
 <!-- accesso negato al cantiere: il tecnico segnala, la segreteria gestisce -->
 <script src="diniego-accesso.js?v=4"></script>
 <script src="cantieri-critici-coord.js?v=3"></script>
-<script src="controllo-verbale.js?v=1"></script>
+<script src="controllo-verbale.js?v=2"></script>
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
 <script src="riepilogo-verbali.js?v=2"></script>
-<script src="scheda-impresa.js?v=1"></script>
+<script src="scheda-impresa.js?v=2"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
 <script src="aiuto.js?v=13"></script>

@@ -37,6 +37,13 @@ assert.ok(!/RLST[^<]*(attiv|in carico|affidat[oa])/i.test(h), 'dell\'RLST si dic
 // la formazione dei lavoratori è dell'ufficio corsi: qui non compare
 assert.ok(!/formazione/i.test(h), 'la formazione non va nella scheda')
 
+// (03/10/2026) nessuna e-mail registrata: avviso; con un indirizzo, niente avviso; senza la chiave (funzione vecchia), niente avviso
+assert.ok(!h.includes('Nessuna e-mail registrata'), 'senza la chiave email non si avvisa')
+const conMail = S.html({ ...dati, impresa: { ...dati.impresa, email: 'info@icm.it', email2: null, email3: null, pec: null } })
+assert.ok(!conMail.includes('Nessuna e-mail registrata'))
+const senzaMail = S.html({ ...dati, impresa: { ...dati.impresa, email: null, email2: '  ', email3: null, pec: 'icm@pec.it' } })
+assert.ok(senzaMail.includes('Nessuna e-mail registrata') && senzaMail.includes('solo la PEC'), 'manca l’avviso senza e-mail')
+
 // niente impresa, niente scheda
 assert.strictEqual(S.html(null), '')
 assert.strictEqual(S.html({}), '')

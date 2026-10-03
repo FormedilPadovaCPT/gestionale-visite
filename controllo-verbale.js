@@ -27,6 +27,14 @@
       avvisano (misurato sui verbali 2025-26).
    5. Persona presente senza qualifica, o qualifica senza nome.
    6. Data della visita nel futuro; ora di fine prima dell'inizio.
+   7. (03/10/2026) Committente del verbale diverso da quello della
+      scheda del cantiere scelto: è il segno di un altro lotto o di un
+      altro cantiere (verbale CPT/26_27/0002, finito sul lotto del
+      vicino). Si confrontano solo codici fiscali e partite IVA.
+   8. (03/10/2026) Due figure con lo stesso nome e cognomi quasi
+      uguali («Bortolomami» / «Bortolami»), o la stessa persona con
+      due titoli diversi: un refuso crea una persona doppia in
+      anagrafica.
 
    Lo stesso CNCE su due cantieri senza lotto non si controlla
    qui: lo rifiuta già il database (indice ux_cantieri_cnce_attivi).
@@ -44,7 +52,29 @@
     'niente da (?:segnalare|rilevare|evidenziare)',
     '(?:cantiere|situazione) (?:regolare|in regola|a norma|ben organizzat[oa])',
     '(?:completamente|pienamente|perfettamente) (?:a norma|in regola|regolare)',
+    /* (03/10/2026) la frase del verbale CPT/26_27/0002 non era riconosciuta:
+       «non sono state rilevate non conformità … correttamente organizzato e conforme alle misure» */
+    'non (?:sono stat[ei]|[eè] stat[ao]|si sono|vi sono|ci sono)(?: \\S+){0,2} (?:non conformit[aà]|criticit[aà]|irregolarit[aà]|anomali[ae]|carenze)',
+    'non si (?:rilevano|riscontrano|evidenziano|segnalano)(?: \\S+){0,2} (?:non conformit[aà]|criticit[aà]|irregolarit[aà]|anomali[ae]|carenze)',
+    'correttamente organizzat[oa]',
+    'conforme alle (?:misure|norme|prescrizioni)',
+    '(?:cantiere|situazione) risulta (?:regolare|in regola|a norma|conforme|ben organizzat[oa])',
   ].join('|'), 'i');
+
+  const RUOLI_FIGURA = { rl: 'responsabile dei lavori', csp: 'CSP', cse: 'CSE', comm: 'committente', ppre: 'persona presente' };
+  const pulisci = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const codice = (s) => String(s || '').replace(/\s+/g, '').toUpperCase();
+  const eCodice = (s) => /^[A-Z0-9]{16}$/.test(s) || /^\d{11}$/.test(s);
+  function distanza(a, b) {
+    const m = a.length, n = b.length;
+    let prec = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+      const riga = [i];
+      for (let j = 1; j <= n; j++) riga[j] = Math.min(prec[j] + 1, riga[j - 1] + 1, prec[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prec = riga;
+    }
+    return prec[n];
+  }
 
   const giorno = (s) => {
     if (!s) return null;
@@ -135,6 +165,42 @@
     if (nome && !qual) avvisi.push({ chi: 'ppre-qualifica', testo: `Persona presente «${nome}» senza qualifica («In qualità di»).` });
     if (!nome && qual) avvisi.push({ chi: 'ppre-nome', testo: `Qualifica della persona presente («${qual}») senza nome.` });
 
+    /* 7. committente del verbale ≠ committente della scheda del cantiere */
+    if (d.commCantiereErrore) {
+      avvisi.push({ chi: 'controllo-non-fatto', testo: `Non sono riuscito a leggere il committente della scheda del cantiere (${d.commCantiereErrore}): controlla tu che il cantiere scelto sia quello giusto.` });
+    } else {
+      const cv = codice(d.commVerbale), cc = codice(d.commCantiere);
+      if (eCodice(cv) && eCodice(cc) && cv !== cc) {
+        avvisi.push({
+          chi: 'committente-cantiere',
+          testo: `Il committente del verbale (${d.commVerbaleNome ? d.commVerbaleNome + ', ' : ''}${cv}) non è quello della scheda del cantiere scelto (${d.commCantiereNome ? d.commCantiereNome + ', ' : ''}${cc}). Se è un altro cantiere — un altro lotto, un altro committente — sceglilo dall'elenco o creane uno nuovo: altrimenti il verbale finisce sul cantiere sbagliato.`,
+        });
+      }
+    }
+
+    /* 8. figure con nomi quasi uguali, o la stessa persona con due titoli */
+    const fig = (d.figure || []).map((f) => ({ ...f, n: pulisci(f.nome), c: pulisci(f.cog), t: pulisci(f.titolo).replace(/\.$/, '') }))
+      .filter((f) => f.n && f.c);
+    const visti = new Set();
+    for (let i = 0; i < fig.length; i++) {
+      for (let j = i + 1; j < fig.length; j++) {
+        const a = fig[i], b = fig[j];
+        if (a.n !== b.n) continue;
+        const ra = RUOLI_FIGURA[a.ruolo] || a.ruolo, rb = RUOLI_FIGURA[b.ruolo] || b.ruolo;
+        if (a.c !== b.c) {
+          const k = [a.c, b.c].sort().join('|');
+          if (visti.has(k) || Math.min(a.c.length, b.c.length) < 4 || distanza(a.c, b.c) > 2) continue;
+          visti.add(k);
+          avvisi.push({ chi: 'nomi-simili', testo: `«${String(a.nome).trim()} ${String(a.cog).trim()}» (${ra}) e «${String(b.nome).trim()} ${String(b.cog).trim()}» (${rb}) hanno lo stesso nome e cognomi quasi uguali: è la stessa persona scritta in due modi? Se sì, correggi il cognome sbagliato, altrimenti in anagrafica nasce una persona doppia.` });
+        } else if (a.t && b.t && a.t !== b.t) {
+          const k = 't|' + a.c + '|' + a.n;
+          if (visti.has(k)) continue;
+          visti.add(k);
+          avvisi.push({ chi: 'titoli-diversi', testo: `«${String(a.nome).trim()} ${String(a.cog).trim()}» compare come ${String(a.titolo).trim()} (${ra}) e come ${String(b.titolo).trim()} (${rb}): il titolo va scritto uguale.` });
+        }
+      }
+    }
+
     /* 6. date e orari */
     const oggi = giorno(d.oggi);
     if (dv && oggi && dv > oggi) avvisi.push({ chi: 'data-futura', testo: `La data della visita (${fmt(dv)}) è nel futuro.` });
@@ -188,10 +254,20 @@
     });
   }
 
+  /* committente della scheda del cantiere scelto (03/10/2026): l'errore si dice, non si tace */
+  async function committenteCantiere({ cantiereId }) {
+    if (!radice.sb || !cantiereId) return {};
+    const { data, error } = await radice.sb.from('cantieri')
+      .select('cantiere_committente_id, committenti(committente_nome)').eq('cantiere_id', cantiereId).maybeSingle();
+    if (error) return { commCantiereErrore: error.message };
+    return { commCantiere: data && data.cantiere_committente_id || '', commCantiereNome: data && data.committenti && data.committenti.committente_nome || '' };
+  }
+
   /* chiamata da saveVisita: true = si salva, false = si torna al verbale */
   async function verifica(d) {
     const altri = await stessoGiorno(d);
-    const avvisi = analizza({ ...d, stessoGiorno: altri });
+    const comm = await committenteCantiere(d);
+    const avvisi = analizza({ ...d, ...comm, stessoGiorno: altri });
     if (!avvisi.length) return true;
     return chiedi(avvisi);
   }

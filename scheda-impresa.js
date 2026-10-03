@@ -71,6 +71,17 @@
       ${imp.ccnl ? `<span style="color:#666;font-size:12px">CCNL ${esc(imp.ccnl)}</span>` : ''}
     </div>`)
 
+    // (03/10/2026, chiesto dall'utente) nessuna e-mail registrata: il verbale all'impresa non arriverebbe.
+    // Si guarda solo se la funzione restituisce gli indirizzi (chiave presente), per non avvisare a vuoto.
+    if ('email' in imp) {
+      const mail = [imp.email, imp.email2, imp.email3].map(x => String(x || '').trim()).filter(Boolean)
+      if (!mail.length) {
+        righe.push(`<div style="background:#fdecea;border-left:3px solid #c0392b;padding:6px 10px;border-radius:4px;margin-bottom:6px;font-size:12px;color:#7b241c">
+          ✉️ <b>Nessuna e-mail registrata</b> per questa impresa${imp.pec ? ' (c’è solo la PEC)' : ''}: chiedi l’indirizzo in cantiere e scrivilo in «Email invio verbale», altrimenti il verbale non le arriva.
+        </div>`)
+      }
+    }
+
     // Cantieri critici aperti: è la cosa che il tecnico deve sapere prima di entrare
     const critici = d.critici || []
     if (critici.length) {

@@ -88,7 +88,7 @@ const save = estrai(html, 'async function saveVisita(stato){', 'function buildSn
 // nei cantieri con codice CNCE la scheda porta il dato della Cassa Edile: si sovrascrive solo con la conferma del tecnico
 const azCtx = {}
 vm.createContext(azCtx)
-vm.runInContext(estrai(html, 'function importoVerbaleAzione(scelto,cant){', '// Propone la fascia', 'index.html') + '\nthis.az=importoVerbaleAzione', azCtx)
+vm.runInContext(estrai(html, 'function importoVerbaleAzione(scelto,cant){', '/* (03/10/2026, deciso dall\'utente) CAMBIARE CANTIERE', 'index.html') + '\nthis.az=importoVerbaleAzione', azCtx)
 const az = azCtx.az
 assert.strictEqual(az(2, { cantiere_importo: 1, cantiere_cnce: 'CNCE-PD-123' }), 'chiedi', 'cantiere della Cassa Edile: prima di cambiare l’importo si chiede')
 assert.strictEqual(az(1, { cantiere_importo: 1, cantiere_cnce: 'CNCE-PD-123' }), 'niente')
