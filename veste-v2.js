@@ -18,9 +18,10 @@
      · pagina di apertura per ruolo (decise dall'utente): segreteria su
        Ufficio › Scrivania, tecnico e coordinatore su Oggi, Direttore su
        Direzione, Presidenza sulla sua pagina, consiglieri sulla Mappa (senza calendario);
-     · «Oggi»: il cruscotto di sempre, con la mappa dei cantieri in
-       monitoraggio, e in cima le bozze aperte. Scadenze e incarichi restano
-       pagine a sé, con la voce nel menu e il numero che lampeggia;
+     · «Oggi»: il riepilogo del prototipo sui dati veri — bozze aperte,
+       rientri scaduti e incarichi da evadere con «Avvia visita», azioni
+       rapide, obiettivo del mese, avvisi — e sotto il cruscotto di sempre con
+       la mappa. Scadenze e incarichi restano anche pagine a sé nel menu;
      · «Ufficio»: gli strumenti della pagina Segreteria raggruppati con un
        menu a lato, più una Scrivania con i numeri di ciò che aspetta;
      · «Vedi come…»: la segreteria vede menu e pagine degli altri ruoli.
@@ -179,12 +180,31 @@ body.v2 #view-admin tr:hover td,body.v2 #view-segreteria tr:hover td{background:
 body.v2 .adm-wrap details summary{color:#6b7078!important}
 /* «Oggi» è il cruscotto di sempre, mappa dei cantieri in monitoraggio compresa, con le bozze aperte in cima.
    Scadenze e incarichi NON stanno qui: hanno la loro pagina e la voce nel menu, come oggi (chiesto dall'utente). */
-body.v2[data-v2-vista="dashboard"]:not(.viewer-mode) main{display:flex;flex-direction:column}
-body.v2[data-v2-vista="dashboard"] #v2-bozze{order:0}
-body.v2[data-v2-vista="dashboard"] #view-dashboard{order:2}
-body.v2:not([data-v2-vista="dashboard"]) #v2-bozze{display:none}
-/* chi è di sola lettura ha Segnala, QR e Servizi nel menu: nella pagina della mappa non servono due volte */
-body.v2.viewer-mode #dash-segnala-wrap{display:none!important}
+/* «Oggi»: il riepilogo a due colonne del prototipo. I pulsanti di sempre diventano tasselli (premono gli stessi
+   pulsanti, che restano nascosti); chi è di sola lettura li ha nel menu. Sotto resta il cruscotto, con la mappa. */
+body.v2 #dash-segnala-wrap,body.v2:not(.viewer-mode) #btn-dove-sono,body.v2:not(.viewer-mode) #btn-appunti{display:none!important}
+body.v2.viewer-mode #v2-oggi{display:none}
+#v2-oggi{margin-bottom:18px}
+#v2-oggi .v2-data{font-size:13px;color:#888}
+#v2-oggi h2{font-size:26px;font-weight:600;margin:2px 0 14px;color:#565C66}
+#v2-oggi .v2-colonne{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+#v2-oggi .v2-c1{flex:1 1 520px;min-width:0}
+#v2-oggi .v2-c2{flex:1 1 280px;min-width:0}
+#v2-oggi .v2-testa{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
+#v2-oggi .v2-testa small{font-size:12.5px;color:#888}
+#v2-oggi .v2-riga{padding:12px 0}
+#v2-oggi .v2-sopra{font-size:12.5px;color:#888;margin-bottom:2px}
+#v2-oggi .v2-rosso{color:#C62828;font-weight:600;font-size:13px}
+#v2-oggi .v2-ipc{font-size:11px;font-weight:700;border-radius:4px;padding:2px 7px;text-transform:uppercase;letter-spacing:.3px;margin-right:6px}
+#v2-oggi .v2-ipc.ALTO{color:#C0392B;background:#FDE8E8}#v2-oggi .v2-ipc.MEDIO{color:#E67E22;background:#FEF3E2}#v2-oggi .v2-ipc.BASSO{color:#8A6D00;background:#FFF8CC}
+#v2-oggi .v2-bottoni{display:flex;gap:6px;flex:0 0 auto}
+#v2-oggi .v2-piede{border-top:1px solid #F4F4F4;padding-top:10px;margin-top:2px;font-size:13px}
+#v2-oggi .v2-piede a{color:var(--orange);font-weight:600;text-decoration:none;cursor:pointer}
+#v2-azioni{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px}
+#v2-azioni button{background:#fff;border:1px solid var(--border);border-radius:8px;min-height:72px;padding:8px;font-size:13px;color:#565C66;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;white-space:normal;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+#v2-azioni button:hover{border-color:var(--orange)}
+#v2-azioni button:active{transform:scale(.97)}
+#v2-azioni button span{font-size:20px;line-height:1}
 .v2-sezione{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#565C66;margin:6px 2px 10px}
 #v2-torna{display:inline-flex;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--orange);background:#fff;border:1.5px solid var(--orange);border-radius:50px;padding:5px 14px;min-height:0}
 @media(max-width:720px){#v2-uff-menu{flex:1 1 100%;position:static;display:flex;flex-wrap:wrap;gap:4px}#v2-uff-menu button{width:auto;padding:7px 12px;border:1px solid var(--border)}#v2-uff-menu hr{display:none}body.v2 nav{padding:0 10px}}
@@ -289,7 +309,8 @@ body.v2.viewer-mode #dash-segnala-wrap{display:none!important}
     if (!document.body.classList.contains('v2')) return;
     document.body.classList.remove('v2');
     if (_letturaFinta) { document.body.classList.remove('viewer-mode'); _letturaFinta = false; }
-    ['v2-barra', 'v2-altre', 'v2-uff-menu', 'v2-scrivania', 'v2-rimandi', 'v2-bozze', 'v2-sintesi', 'v2-torna', 'v2-az-segnala', 'v2-az-qr', 'v2-az-servizi'].forEach((id) => { const e = $(id); if (e) e.remove(); });
+    ['v2-barra', 'v2-altre', 'v2-uff-menu', 'v2-scrivania', 'v2-rimandi', 'v2-sintesi', 'v2-torna', 'v2-az-segnala', 'v2-az-qr', 'v2-az-servizi'].forEach((id) => { const e = $(id); if (e) e.remove(); });
+    ['v2-bozze', 'v2-rientri', 'v2-incarichi', 'v2-azioni', 'v2-oggi-data', 'v2-oggi-ciao'].forEach((id) => { const e = $(id); if (e) e.innerHTML = ''; });   // obiettivo e avvisi sono quelli di sempre: restano
     const u = $('view-segreteria'); if (u) { u.classList.remove('v2-uff'); u.querySelectorAll('.adm-section').forEach((s) => { s.style.display = ''; }); }
     menuComEra();
   }
@@ -402,9 +423,7 @@ body.v2.viewer-mode #dash-segnala-wrap{display:none!important}
 
   /* ── OGGI: le bozze aperte di chi è collegato ── */
   async function bozze() {
-    const vista = $('view-dashboard'); const sb = window.sb; if (!vista || !vista.parentNode || !sb) return;
-    let el = $('v2-bozze');
-    if (!el) { el = document.createElement('div'); el.id = 'v2-bozze'; vista.parentNode.insertBefore(el, vista.parentNode.firstChild); }
+    const sb = window.sb; const el = $('v2-bozze'); if (!el || !sb) return;
     const tid = S().tecnico && S().tecnico.tecnico_id;
     if (!tid || RUOLI[ruolo()].lettura) { el.innerHTML = ''; return; }
     const { data, error } = await sb.from('visite')
@@ -420,6 +439,104 @@ body.v2.viewer-mode #dash-segnala-wrap{display:none!important}
       el.addEventListener('click', (e) => { const b = e.target.closest('[data-v2-bozza]'); if (b && typeof window.riapriBozza === 'function') window.riapriBozza(b.dataset.v2Bozza); });
       el._v2ascolta = true;
     }
+  }
+
+  /* ── OGGI: il riepilogo del prototipo, sui dati veri ──
+     Rientri e incarichi li calcolano loadScadenze e loadIncarichi (index.html), che poi chiamano pronto(): qui si
+     disegnano soltanto. Le pagine Scadenze e Incarichi restano a sé, col loro numero nel menu. */
+  const AZIONI = [['btn-segnala-dash', '📍', 'Segnala cantiere'], ['btn-diniego-dash', '🚫', 'Accesso negato'], ['btn-qr-servizi', '📱', 'QR servizi CPT'],
+    ['btn-servizi-cpt', '↗', 'Servizi CPT'], ['btn-dove-sono', '📡', 'Dove sono?'], ['btn-appunti', '📝', 'Appunti cantiere']];
+  const _dati = { scadenze: undefined, incarichi: undefined, quando: 0 };
+  const gg = (d) => { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] : ''; };
+  const mappa = (lat, lng, testo) => 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(lat != null && lng != null && lat !== '' && lng !== '' ? lat + ',' + lng : testo);
+
+  function oggiPagina() {
+    const vista = $('view-dashboard'); if (!vista) return;
+    let box = $('v2-oggi');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'v2-oggi';
+      box.innerHTML = '<div class="v2-data" id="v2-oggi-data"></div><h2 id="v2-oggi-ciao"></h2><div class="v2-colonne">'
+        + '<div class="v2-c1"><div id="v2-bozze"></div><div id="v2-rientri"></div><div id="v2-incarichi"></div></div>'
+        + '<div class="v2-c2"><div id="v2-azioni"></div><div id="v2-posto-obiettivo"></div><div id="v2-posto-avvisi"></div></div></div>';
+      vista.insertBefore(box, vista.firstChild);
+      // obiettivo del mese e bacheca avvisi sono quelli di sempre: si spostano nella colonna, non si rifanno
+      const ob = $('card-target-mese'); if (ob) $('v2-posto-obiettivo').appendChild(ob);
+      const av = $('avvisi-banner'); if (av) $('v2-posto-avvisi').appendChild(av);
+      box.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-v2-preme],[data-v2-ritorno],[data-v2-incarico],[data-v2-vai]'); if (!b) return;
+        if (b.dataset.v2Preme) { const d = $(b.dataset.v2Preme); if (d) d.click(); return; }
+        if (b.dataset.v2Vai && typeof window.navTo === 'function') { window.navTo(b.dataset.v2Vai); return; }
+        if (b.dataset.v2Ritorno) {
+          if (typeof window.chiediNuovaVisitaRitorno === 'function') window.chiediNuovaVisitaRitorno(b.dataset.v2Ritorno, b.dataset.v2Verbale || '');
+          else if (typeof window.navTo === 'function') window.navTo('scadenze');
+          return;
+        }
+        if (b.dataset.v2Incarico && typeof window.incNuovaVisita === 'function') window.incNuovaVisita(Number(b.dataset.v2Incarico), b.dataset.v2Mio === '1');
+      });
+    }
+    const ora = new Date(), h = ora.getHours();
+    const data = ora.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+    $('v2-oggi-data').textContent = data.charAt(0).toUpperCase() + data.slice(1);
+    const nome = (S().tecnico && S().tecnico.tecnico_nome) || '';
+    $('v2-oggi-ciao').textContent = (h < 13 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera') + (nome ? ', ' + nome : '');
+    $('v2-azioni').innerHTML = AZIONI.filter(([id]) => { const o = $(id); return o && o.style.display !== 'none'; })
+      .map(([id, icona, testo]) => `<button type="button" data-v2-preme="${id}"><span>${icona}</span>${esc(testo)}</button>`).join('');
+    oggiDisegna();
+  }
+
+  function oggiDisegna() {
+    const tutti = eSegreteria();                      // la segreteria vede i rientri e gli incarichi di tutti; il tecnico i suoi
+    const mio = S().tecnico && S().tecnico.tecnico_id;
+    const r = $('v2-rientri');
+    if (r) {
+      const d = _dati.scadenze;
+      if (d === undefined) r.innerHTML = '<div class="v2-card" style="color:#888">⏳ Leggo i rientri scaduti…</div>';
+      else if (d === null) r.innerHTML = '<div class="v2-card" style="color:#C0392B">Non sono riuscito a leggere i rientri: apri la pagina Scadenze.</div>';
+      else {
+        const urg = (d.urgenti || []).filter((v) => tutti || v.tecnico_id === mio);
+        const pross = (d.prossime || []).filter((v) => tutti || v.tecnico_id === mio);
+        const righe = urg.slice(0, 5).map((v) => {
+          const c = v.cantieri || {}, ind = [c.cantiere_indirizzo, c.cantiere_civico].filter(Boolean).join(' ') || c.cantiere_etichetta || '—';
+          const g = Math.abs(v.diffDays || 0), ipc = String(v.ipc || '').toUpperCase();
+          return `<div class="v2-riga"><div class="v2-t"><div class="v2-sopra">${['ALTO', 'MEDIO', 'BASSO'].includes(ipc) ? `<span class="v2-ipc ${ipc}">${ipc}</span>` : ''}<span class="v2-rosso">${g ? 'Rientro scaduto da ' + g + (g === 1 ? ' giorno' : ' giorni') : 'Rientro previsto oggi'}</span></div>`
+            + `<b>${esc(ind)}${c.comune_nome ? ', ' + esc(c.comune_nome) : ''}</b><small>ultima ${esc(v.nr_verbale || '—')} del ${gg(v.data_visita)}${tutti && d.tecMap && d.tecMap[v.tecnico_id] ? ' · ' + esc(d.tecMap[v.tecnico_id]) : ''}</small></div>`
+            + `<div class="v2-bottoni"><a class="btn-outline btn-sm" style="text-decoration:none;border-color:var(--border);color:#565C66" target="_blank" rel="noopener" href="${esc(mappa(c.lat, c.lng, ind + ' ' + (c.comune_nome || '')))}" data-aiuto="Apre il navigatore verso il cantiere.">🧭</a>`
+            + `<button type="button" class="btn-outline btn-sm" data-v2-ritorno="${esc(v.visita_id)}" data-v2-verbale="${esc(v.nr_verbale || '')}" data-aiuto="Apre una nuova visita di ritorno su questo cantiere, con cantiere, imprese e non conformità da rivedere già compilati.">Avvia visita</button></div></div>`;
+        }).join('');
+        r.innerHTML = `<div class="v2-card"><div class="v2-testa"><div class="v2-titolo">⚠️ Rientri scaduti${tutti ? ' · tutti i tecnici' : ''}</div><small>IPC più alto prima</small></div>`
+          + (urg.length ? righe : '<div style="padding:8px 0;color:#5F8A12">Nessun rientro scaduto.</div>')
+          + `<div class="v2-piede"><a data-v2-vai="scadenze">Tutte le scadenze › </a><span style="color:#888">${urg.length} ${urg.length === 1 ? 'scaduto' : 'scaduti'} · ${pross.length} nei prossimi 60 giorni</span></div></div>`;
+      }
+    }
+    const i = $('v2-incarichi');
+    if (i) {
+      const d = _dati.incarichi;
+      if (d === undefined) i.innerHTML = '<div class="v2-card" style="color:#888">⏳ Leggo gli incarichi…</div>';
+      else if (d === null) i.innerHTML = '<div class="v2-card" style="color:#C0392B">Non sono riuscito a leggere gli incarichi: apri la pagina Incarichi.</div>';
+      else {
+        const io = email();
+        const aperti = d.filter((x) => x.stato === 'aperto');
+        const righe = aperti.slice(0, 5).map((x) => {
+          const suo = !!x.tecnico_email && String(x.tecnico_email).toLowerCase() === io;
+          const visita = typeof window.incTipoAccesso === 'function' && window.incTipoAccesso(x) != null;
+          const dove = [x.indirizzo, x.comune].filter(Boolean).join(', ');
+          return `<div class="v2-riga"><div class="v2-t"><div class="v2-sopra">n. ${esc(x.id)} · ${esc(x.tipo_richiesta || 'richiesta')}${x.data_richiesta ? ' · dal ' + gg(x.data_richiesta) : ''}${!x.presa_visione_il ? ' · <b style="color:var(--orange)">nuovo</b>' : ''}</div>`
+            + `<b>${esc(x.impresa || x.richiedente || '—')}</b><small>${dove ? '› ' + esc(dove) : ''}${tutti && x.tecnico_nome ? (dove ? ' · ' : '') + esc(x.tecnico_nome) : ''}</small></div>`
+            + `<div class="v2-bottoni">${dove ? `<a class="btn-outline btn-sm" style="text-decoration:none;border-color:var(--border);color:#565C66" target="_blank" rel="noopener" href="${esc(mappa(null, null, dove))}" data-aiuto="Apre il navigatore verso l'indirizzo dell'incarico.">🧭</a>` : ''}`
+            + (visita && (suo || tutti)
+              ? `<button type="button" class="btn-outline btn-sm" data-v2-incarico="${esc(x.id)}" data-v2-mio="${suo ? 1 : 0}" data-aiuto="Apre il verbale con impresa e cantiere dell'incarico già compilati. Se l'incarico è tuo, lo accetta.">Avvia visita</button>`
+              : `<button type="button" class="btn-outline btn-sm" data-v2-vai="incarichi" data-aiuto="Apre la pagina Incarichi, dove accetti, rifiuti o chiudi l'incarico.">Apri</button>`)
+            + '</div></div>';
+        }).join('');
+        i.innerHTML = `<div class="v2-card"><div class="v2-testa"><div class="v2-titolo">📥 Incarichi da evadere${tutti ? ' · tutti i tecnici' : ''}</div><small>dalla segreteria</small></div>`
+          + (aperti.length ? righe : '<div style="padding:8px 0;color:#5F8A12">Nessun incarico da evadere.</div>')
+          + `<div class="v2-piede"><a data-v2-vai="incarichi">Tutti gli incarichi › </a><span style="color:#888">${aperti.length} ${aperti.length === 1 ? 'aperto' : 'aperti'}</span></div></div>`;
+      }
+    }
+  }
+  /* chiamata da navTo quando loadScadenze / loadIncarichi hanno finito: dati = null se la lettura è fallita */
+  function pronto(tipo, dati) {
+    try { _dati[tipo] = dati == null ? null : dati; if (tipo === 'scadenze') _dati.quando = Date.now(); oggiDisegna(); } catch (e) { console.warn('veste v2 (pronto):', e); }
   }
 
   /* ── DIREZIONE e PRESIDENZA: una sintesi, così la pagina non è mai vuota ── */
@@ -477,10 +594,15 @@ body.v2.viewer-mode #dash-segnala-wrap{display:none!important}
       const r = RUOLI[ruolo()];
       if (view === 'segreteria') ufficio();
       if (view === 'direzione') sintesi().catch((e) => console.warn('veste v2, sintesi:', e));
-      if (view === 'dashboard' && !r.lettura) bozze().catch((e) => console.warn('veste v2, bozze:', e));
+      if (view === 'dashboard' && !r.lettura) {
+        oggiPagina();
+        bozze().catch((e) => console.warn('veste v2, bozze:', e));
+        // lo scadenzario legge tutte le visite: si rifà al più ogni due minuti
+        return Date.now() - _dati.quando > 120000 ? ['dati:scadenze', 'dati:incarichi'] : ['dati:incarichi'];
+      }
       return [];
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }
 
-  window.vesteV2 = { prima, dopo, accesa, ruolo, RUOLI, GRUPPI, esercizi, gruppoDi };
+  window.vesteV2 = { prima, dopo, pronto, accesa, ruolo, RUOLI, GRUPPI, esercizi, gruppoDi };
 })();

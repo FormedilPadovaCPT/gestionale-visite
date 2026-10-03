@@ -2783,11 +2783,11 @@ function navTo(view){
   if(view==='admin'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.avvisoVerbaliBox)window.avvisoVerbaliBox().catch(e=>console.warn('avviso verbali:',e));admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
   if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e));if(window.direzione)window.direzione.obiettivi().catch(e=>console.warn('obiettivi:',e))}
   if(view==='committenti')admLoadCommittenti().catch(e=>console.error('committenti:',e))
-  // veste v2: «Oggi» mostra sotto anche le scadenze e gli incarichi, disegnati dalle funzioni di sempre
+  /* veste v2: il riepilogo «Oggi» chiede i rientri e gli incarichi. Li calcolano le funzioni di sempre
+     (loadScadenze, loadIncarichi: nessuna regola riscritta) e la veste riceve il risultato già pronto. */
   if(window.vesteV2){for(const _v of(window.vesteV2.dopo(view)||[])){
-    $('view-'+_v)?.classList.remove('hidden')
-    if(_v==='scadenze')loadScadenze().catch(e=>console.warn('veste v2, scadenze:',e))
-    if(_v==='incarichi'&&typeof loadIncarichi==='function')loadIncarichi().catch(e=>console.warn('veste v2, incarichi:',e))
+    if(_v==='dati:scadenze')loadScadenze().then(()=>window.vesteV2.pronto('scadenze',_scadErrore?null:_scadData)).catch(e=>{console.warn('veste v2, scadenze:',e);window.vesteV2.pronto('scadenze',null,e)})
+    if(_v==='dati:incarichi'&&typeof loadIncarichi==='function')loadIncarichi().then(()=>window.vesteV2.pronto('incarichi',_incErrore?null:_incCache)).catch(e=>{console.warn('veste v2, incarichi:',e);window.vesteV2.pronto('incarichi',null,e)})
   }}
 }
 window.navTo=navTo
@@ -6570,6 +6570,7 @@ function calcRientroFormedil(dataVisita, acc, ipc){
 }
 
 async function loadScadenze(){
+  _scadErrore=null
   const oggi=new Date();oggi.setHours(0,0,0,0)
   const ipcOrd={ALTO:0,MEDIO:1,BASSO:2,NR:3,'':3}
 
@@ -6582,7 +6583,7 @@ async function loadScadenze(){
       const{data:vs,error:ev}=await sb.from('visite')
         .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,acc_cant,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_civico,cantiere_etichetta,comune_nome,lat,lng,geocode_status,cantiere_chiuso)')
         .eq('elimina',0).order('data_visita',{ascending:false}).order('nr_verbale',{ascending:false}).range(off,off+PAGE-1)
-      if(ev){console.error('loadScadenze visite',ev);toast('Non sono riuscito a leggere tutte le visite ('+ev.message+'): lo scadenzario è incompleto, ricarica prima di fidarti.','err');break}
+      if(ev){_scadErrore=ev.message||String(ev);console.error('loadScadenze visite',ev);toast('Non sono riuscito a leggere tutte le visite ('+ev.message+'): lo scadenzario è incompleto, ricarica prima di fidarti.','err');break}
       if(!vs||!vs.length)break
       visite=visite.concat(vs)
       if(vs.length<PAGE)break
@@ -6712,6 +6713,7 @@ async function loadScadenze(){
 
 // Dati scadenze calcolati (riutilizzati dal filtro senza rileggere il DB)
 let _scadData=null
+let _scadErrore=null   // l'ultima lettura delle visite per lo scadenzario è fallita: chi mostra un riepilogo non deve dire «nessun rientro» (03/10/2026)
 // ── Filtri fini scadenze (comuni/zona, IPC, finestra rientro) ──
 const _scadF={comSel:new Set(),ipc:'',gg:''}
 function _scadPass(v){
@@ -14315,12 +14317,14 @@ const INC_COL={'Sopralluogo urgente in Cantiere':'#c0392b','Sopralluogo in Canti
   /* le consulenze con uscita create dall'app segreteria (10/09/2026) */
   'Consulenza in sede Impresa':'#2c7a7b','Consulenza in Cantiere':'#2c7a7b'}
 let _incCache=[]
+let _incErrore=null   // l'ultima lettura degli incarichi è fallita: chi mostra un riepilogo non deve dire «nessuno» (03/10/2026)
 async function loadIncarichi(){
   if(!$('inc-list')||!S.user) return
   const gest=!!window.__isSegreteria
   let q=sb.from('incarichi').select('*').order('data_richiesta',{ascending:false}).order('id',{ascending:false}).limit(500)
   const{data,error}=await q
-  if(error){ console.warn('incarichi:',error); return }
+  if(error){ console.warn('incarichi:',error); _incErrore=error.message||String(error); return }
+  _incErrore=null
   _incCache=data||[]
   if(!_incCache.length && !gest){ incAggiornaBanner(); incAggiornaNavBadge(); renderIncarichi(); return }
   incPopolaFiltri()
@@ -15100,7 +15104,7 @@ document.addEventListener('input',function(ev){
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=7"></script>
-<script src="veste-v2.js?v=8"></script>
+<script src="veste-v2.js?v=9"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

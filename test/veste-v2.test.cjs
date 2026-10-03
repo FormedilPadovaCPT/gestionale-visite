@@ -51,7 +51,9 @@ assert.strictEqual(s.v2.accesa(), true);
 assert.strictEqual(s.v2.prima('dashboard'), 'segreteria', 'la segreteria apre su Ufficio');
 assert.ok(s.classi.has('v2'));
 assert.strictEqual(s.v2.prima('dashboard'), null, 'la pagina di apertura si sceglie una volta sola: poi «Oggi» è «Oggi»');
-assert.deepStrictEqual(s.v2.dopo('dashboard'), [], '«Oggi» è il cruscotto di sempre: scadenze e incarichi hanno la loro pagina');
+assert.deepStrictEqual(s.v2.dopo('dashboard'), ['dati:scadenze', 'dati:incarichi'], '«Oggi» chiede i dati di rientri e incarichi (le pagine restano a sé: non si mostrano sotto)');
+s.v2.pronto('scadenze', { urgenti: [], prossime: [], tecMap: {} });
+assert.deepStrictEqual(s.v2.dopo('dashboard'), ['dati:incarichi'], 'lo scadenzario, che legge tutte le visite, non si rifà a ogni clic');
 assert.deepStrictEqual(s.v2.dopo('lista'), []);
 
 /* ── menu e apertura per ruolo, come decisi dall'utente ── */
@@ -98,8 +100,14 @@ assert.ok(/non letto/.test(js), 'un conteggio non riuscito si dice: mai uno zero
 assert.strictEqual(s.v2.esercizi().length, 2);
 
 /* ── «Oggi»: gli incarichi stanno in cima, subito dopo le bozze (chiesto dall'utente: sotto tutto il resto non li vedrebbe nessuno) ── */
-const ordine = (id) => { const k = 'body.v2[data-v2-vista="dashboard"] #' + id + '{order:'; const i = js.indexOf(k); assert.ok(i >= 0, 'manca l’ordine di ' + id); return +js[i + k.length]; };
-assert.ok(ordine('v2-bozze') < ordine('view-dashboard'), 'in «Oggi» le bozze aperte stanno sopra il cruscotto');
+// «Oggi» è il riepilogo del prototipo: bozze, rientri scaduti, incarichi; azioni, obiettivo, avvisi (chiesto dall'utente con la schermata del prototipo)
+assert.ok(/id="v2-bozze"><\/div><div id="v2-rientri"><\/div><div id="v2-incarichi"><\/div>/.test(js), 'colonna principale di «Oggi»: bozze, rientri, incarichi');
+assert.ok(/id="v2-azioni"><\/div><div id="v2-posto-obiettivo"><\/div><div id="v2-posto-avvisi"><\/div>/.test(js), 'colonna laterale di «Oggi»: azioni, obiettivo, avvisi');
+// rientri e incarichi li calcolano le funzioni di sempre, e la veste riceve il risultato
+assert.ok(html.includes("loadScadenze().then(()=>window.vesteV2.pronto('scadenze',_scadErrore?null:_scadData))") && html.includes("loadIncarichi().then(()=>window.vesteV2.pronto('incarichi',_incErrore?null:_incCache))"), 'i dati di «Oggi» devono venire da loadScadenze e loadIncarichi, e una lettura fallita deve arrivare come fallita');
+assert.ok(js.includes('Non sono riuscito a leggere i rientri') && js.includes('Non sono riuscito a leggere gli incarichi'), 'una lettura fallita si dice: mai «nessun rientro» o «nessun incarico» al posto di un errore');
+assert.ok(js.includes('window.chiediNuovaVisitaRitorno(') && js.includes('window.incNuovaVisita('), '«Avvia visita» deve usare le funzioni di sempre');
+assert.ok(js.includes("data-v2-mio=\"${suo ? 1 : 0}\"") && js.includes("b.dataset.v2Mio === '1'"), 'l’incarico si accetta solo se è di chi preme');
 assert.ok(!/#dash-map-card\{display:none\}/.test(js), 'la mappa dei cantieri in monitoraggio resta in «Oggi» (corretto dall’utente il 03/10/2026)');
 // gli incarichi del tecnico: pagina a sé e voce nel menu, col numero che lampeggia (corretto dall'utente il 03/10/2026)
 for (const k of ['tecnico', 'coordinatore']) assert.ok(R[k].menu.includes('incarichi') && R[k].menu.includes('scadenze') && R[k].menu.indexOf('scadenze') < R[k].menu.indexOf('incarichi'), k + ' deve avere «Scadenze» e «Incarichi» nel menu, in quest’ordine');
