@@ -13,9 +13,8 @@
    protetto da try/catch e non cambia niente finché la veste è spenta).
 
    CHE COSA FA, in questo primo pezzo (non tocca il verbale):
-     · menu per ruolo: Oggi · Visite · Cantieri · Rubrica · Statistiche, a
-       destra Ufficio (segreteria) o Coordinamento (coordinatore) e
-       «Nuova visita»; Direzione, Presidenza e consiglieri hanno il menu corto;
+     · menu per ruolo: Oggi · Nuova visita · Visite · Cantieri · Rubrica ·
+       Statistiche, a destra Ufficio (segreteria) o Coordinamento (coordinatore); Direzione, Presidenza e consiglieri hanno il menu corto;
      · pagina di apertura per ruolo (decise dall'utente): segreteria su
        Ufficio › Scrivania, tecnico e coordinatore su Oggi, Direttore su
        Direzione, Presidenza sulla sua pagina, consiglieri sulla Mappa (senza calendario);
@@ -45,10 +44,12 @@
   const leggi = (st, k) => { try { return st.getItem(k); } catch (_e) { return null; } };
   const scrivi = (st, k, v) => { try { v == null ? st.removeItem(k) : st.setItem(k, v); } catch (_e) { /* archivio del browser non disponibile */ } };
 
+  /* (03/10/2026, corretto dall'utente) «Nuova visita» sta subito dopo «Oggi», prima di «Visite», come nell'app di oggi:
+     resta arancione, ma non in fondo a destra. */
   const RUOLI = {
-    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'segreteria', 'form'], apre: 'segreteria' },
-    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'form'],               apre: 'dashboard' },
-    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'admin', 'form'],      apre: 'dashboard' },
+    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'segreteria'], apre: 'segreteria' },
+    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche'],                    apre: 'dashboard' },
+    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'admin'],      apre: 'dashboard' },
     direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione',   lettura: true },
     presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione',   lettura: true },
     // (03/10/2026, corretto dall'utente dopo aver guardato l'anteprima) il consigliere apre sulla Mappa e non vede il calendario

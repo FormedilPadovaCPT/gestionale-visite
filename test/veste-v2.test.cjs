@@ -70,7 +70,7 @@ for (const k of ['direttore', 'presidenza', 'consigliere']) {
 assert.ok(!R.tecnico.menu.includes('segreteria') && !R.tecnico.menu.includes('admin'), 'il tecnico non vede Ufficio né Coordinamento');
 assert.ok(R.coordinatore.menu.includes('admin') && !R.coordinatore.menu.includes('segreteria'));
 assert.ok(R.segreteria.menu.includes('segreteria'));
-for (const k of ['segreteria', 'tecnico', 'coordinatore']) assert.strictEqual(R[k].menu[R[k].menu.length - 1], 'form', '«Nuova visita» è l’ultima voce, a destra');
+for (const k of ['segreteria', 'tecnico', 'coordinatore']) assert.deepStrictEqual(R[k].menu.slice(0, 3), ['dashboard', 'form', 'lista'], '«Nuova visita» sta subito dopo «Oggi», prima di «Visite» (corretto dall’utente il 03/10/2026)');
 
 /* ── Ufficio: i gruppi coprono tutti gli strumenti della pagina Segreteria; ciò che non rientra va in «Altro» ── */
 const sezione = html.slice(html.indexOf('<section id="view-segreteria"'), html.indexOf('</section>', html.indexOf('<section id="view-segreteria"')));
