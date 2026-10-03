@@ -1527,6 +1527,33 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div id="adm-imp-empty" class="hidden" style="text-align:center;padding:16px;color:rgba(255,255,255,.35);font-size:13px">Nessuna impresa trovata</div>
         </div>
 
+        <!-- Imprese visitate senza codice fiscale (03/10/2026) -->
+        <div class="adm-section">
+          <div class="adm-section-title">🪪 Imprese visitate senza codice fiscale</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:12px">Le imprese che compaiono in almeno un verbale e non hanno il codice fiscale, dalla visita più recente. Scrivi il codice e premi «Salva»: la riga sparisce dall'elenco. Per le società il codice fiscale è di norma uguale alla partita IVA: «= P.IVA» la copia nel campo, e resta da confermare con «Salva». Per le ditte individuali è quello del titolare, e va cercato.</p>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+            <button class="btn-primary btn-sm" id="btn-imp-senza-cf" onclick="admImpSenzaCf()">📋 Carica l'elenco</button>
+            <span id="imp-senza-cf-conto" style="font-size:12px;color:rgba(255,255,255,.6)"></span>
+          </div>
+          <div class="tbl-wrap" style="background:rgba(255,255,255,.05);border-radius:8px;max-height:520px;overflow:auto">
+            <table style="color:rgba(255,255,255,.85);font-size:12px;width:100%">
+              <thead>
+                <tr style="border-bottom:1px solid rgba(255,255,255,.15)">
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Ragione sociale</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Comune</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">P.IVA</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Visite</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Ultima</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Codice fiscale</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-imp-senza-cf">
+                <tr><td colspan="6" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Premi «Carica l'elenco»</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- Gestione cantieri -->
         <div class="adm-section">
           <div class="adm-section-title">🏗️ Gestione cantieri</div>
@@ -11809,6 +11836,100 @@ window._impSelToggle=_impSelToggle
 window._impSelClear=_impSelClear
 window.admFondiImprese=admFondiImprese
 window.admLoadImprese = admLoadImprese
+
+/* ── IMPRESE VISITATE SENZA CODICE FISCALE (03/10/2026, chiesto dall'utente) ──
+   Il codice fiscale resta facoltativo nel verbale; qui la segreteria vede quali imprese ne sono
+   prive e le sistema a mano. L'elenco lo dà il database (imprese_senza_cf).
+   Il codice si controlla prima di salvarlo: un errore di battitura in un codice fiscale è il modo
+   più facile di creare un'impresa che non si ritrova più. */
+function pivaValida(x){
+  const p=String(x||'').replace(/\s+/g,'')
+  if(!/^\d{11}$/.test(p))return false
+  let t=0
+  for(let i=0;i<11;i++){let d=+p[i];if(i%2===1){d*=2;if(d>9)d-=9}t+=d}
+  return t%10===0
+}
+function cfPersonaValido(x){
+  const c=String(x||'').replace(/\s+/g,'').toUpperCase()
+  if(!/^[A-Z0-9]{15}[A-Z]$/.test(c))return false
+  const DISPARI=[1,0,5,7,9,13,15,17,19,21,2,4,18,20,11,3,6,8,12,14,16,10,22,25,24,23]
+  let t=0
+  for(let i=0;i<15;i++){
+    const ch=c[i],k=/\d/.test(ch)?+ch:ch.charCodeAt(0)-65
+    t+=(i%2===0)?DISPARI[k]:k
+  }
+  return String.fromCharCode(65+t%26)===c[15]
+}
+/* funzione pura: '' se il codice va bene, altrimenti il motivo */
+function cfImpresaProblema(x){
+  const c=String(x||'').replace(/\s+/g,'').toUpperCase()
+  if(!c)return 'Scrivi il codice fiscale.'
+  if(/^\d+$/.test(c)){
+    if(c.length!==11)return 'Un codice fiscale numerico ha 11 cifre: qui ce ne sono '+c.length+'.'
+    return pivaValida(c)?'':'La cifra di controllo non torna: ricontrolla le 11 cifre.'
+  }
+  if(c.length!==16)return 'Il codice fiscale di una persona ha 16 caratteri: qui ce ne sono '+c.length+'.'
+  return cfPersonaValido(c)?'':'Il carattere di controllo non torna: ricontrolla il codice.'
+}
+const FORME_SOCIETA=['S.r.l.','S.r.l.s','S.n.c.','S.A.S.','S.p.A.','S.coop.','Consorzio']
+let _impSenzaCf=[]
+async function admImpSenzaCf(){
+  const tb=$('tbody-imp-senza-cf'),conto=$('imp-senza-cf-conto')
+  if(!tb)return
+  tb.innerHTML='<tr><td colspan="6" style="padding:16px;text-align:center;color:rgba(255,255,255,.35)">Caricamento…</td></tr>'
+  const{data,error}=await sb.rpc('imprese_senza_cf')
+  if(error){
+    tb.innerHTML='<tr><td colspan="6" style="padding:16px;text-align:center;color:#e74c3c">Non sono riuscito a leggere l\'elenco: '+esc(error.message)+'</td></tr>'
+    if(conto)conto.textContent=''
+    return
+  }
+  _impSenzaCf=data||[]
+  _impSenzaCfDisegna()
+}
+function _impSenzaCfDisegna(){
+  const tb=$('tbody-imp-senza-cf'),conto=$('imp-senza-cf-conto')
+  if(conto)conto.textContent=_impSenzaCf.length?(_impSenzaCf.length+' imprese senza codice fiscale'):''
+  if(!_impSenzaCf.length){tb.innerHTML='<tr><td colspan="6" style="padding:16px;text-align:center;color:#95C22F">Nessuna impresa visitata è senza codice fiscale.</td></tr>';return}
+  const cella='padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.07)'
+  tb.innerHTML=_impSenzaCf.map((r,i)=>{
+    const piva=String(r.piva||'').replace(/\s+/g,'')
+    const societa=FORME_SOCIETA.includes(r.tipo_impresa)&&pivaValida(piva)
+    return '<tr>'
+      +'<td style="'+cella+'">'+esc(r.impresa_nome||'')+'</td>'
+      +'<td style="'+cella+'">'+esc(r.comune||'')+'</td>'
+      +'<td style="'+cella+';font-family:monospace">'+esc(piva)+(piva&&!pivaValida(piva)?' <span title="La partita IVA non supera il controllo delle cifre" style="color:#f39c12">⚠</span>':'')+'</td>'
+      +'<td style="'+cella+'">'+(+r.n_visite||0)+'</td>'
+      +'<td style="'+cella+'">'+esc(r.ultima_visita?fmtDate(r.ultima_visita):'')+'</td>'
+      +'<td style="'+cella+';white-space:nowrap"><input type="text" id="ei-cf-'+i+'" maxlength="16" style="width:170px;font-family:monospace;text-transform:uppercase;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff">'
+      +(societa?' <button class="btn-outline btn-sm" type="button" onclick="admImpCopiaPiva('+i+')">= P.IVA</button>':'')
+      +' <button class="btn-primary btn-sm" type="button" onclick="admImpSalvaCf('+i+')">Salva</button></td>'
+      +'</tr>'
+  }).join('')
+}
+function admImpCopiaPiva(i){
+  const r=_impSenzaCf[i];if(!r)return
+  vSet('ei-cf-'+i,String(r.piva||'').replace(/\s+/g,''))
+  toast('Ho copiato la partita IVA nel campo: per una società di norma coincide col codice fiscale. Se è così, premi «Salva».','ok',6000)
+}
+async function admImpSalvaCf(i){
+  const r=_impSenzaCf[i];if(!r)return
+  const cf=normCf(vGet('ei-cf-'+i))
+  const problema=cfImpresaProblema(cf)
+  if(problema){toast(problema,'err',7000);const e=$('ei-cf-'+i);if(e)e.focus();return}
+  // lo stesso codice fiscale su un'altra impresa: è un doppione da unire, non un dato da salvare
+  const{data:altra,error:eAltra}=await sb.from('imprese').select('impresa_id,impresa_nome').eq('impresa_cf',cf).neq('impresa_id',r.impresa_id).eq('elimina',0).limit(1)
+  if(eAltra){toast('Non sono riuscito a controllare se il codice è già di un\'altra impresa ('+eAltra.message+'): non salvo.','err',8000);return}
+  if(altra&&altra.length){toast('Questo codice fiscale è già dell\'impresa «'+altra[0].impresa_nome+'». Se è la stessa impresa, uniscile da «Gestione imprese»: qui non salvo.','err',10000);return}
+  const{data:fatto,error}=await sb.from('imprese').update({impresa_cf:cf}).eq('impresa_id',r.impresa_id).select('impresa_id')
+  if(error){toast('Codice fiscale non salvato: '+error.message,'err',8000);return}
+  if(!fatto||!fatto.length){toast('Codice fiscale non salvato: il database non ha aggiornato nessuna riga.','err',8000);return}
+  _impSenzaCf.splice(i,1)
+  _impSenzaCfDisegna()
+  toast('Codice fiscale salvato per «'+r.impresa_nome+'»','ok')
+}
+window.admImpSenzaCf=admImpSenzaCf
+window.admImpCopiaPiva=admImpCopiaPiva
+window.admImpSalvaCf=admImpSalvaCf
 window.admEditImpresa = admEditImpresa
 
 // ── GESTIONE COMMITTENTI (pagina dedicata, solo segreteria) ──
@@ -14897,7 +15018,7 @@ document.addEventListener('input',function(ev){
 <script src="scheda-impresa.js?v=2"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
-<script src="aiuto.js?v=14"></script>
+<script src="aiuto.js?v=15"></script>
 <script src="mail-respinte-tec.js?v=2"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>

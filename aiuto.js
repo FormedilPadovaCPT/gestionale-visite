@@ -76,6 +76,8 @@ window.AIUTO_TESTI = {
   'btn-edit-cant': 'Corregge e completa i dati del cantiere selezionato: indirizzo, comune, tipo di intervento e di opera, durata, importo, committente, posizione. Vale per tutte le visite di quel cantiere, anche quelle passate. Con la scheda incompleta il verbale non si chiude.',
   'btn-ora-inizio': 'Scrive nel campo l\'ora di adesso. L\'ora di inizio non è più già compilata: va indicata, perché quella di apertura della maschera non è detto che sia quella della visita.',
   'btn-ora-fine': 'Scrive l\'ora di adesso come ora di fine della visita. Se lasci il campo vuoto e chiudi il verbale nel giorno della visita, ci va l\'ora in cui lo chiudi.',
+  'btn-imp-senza-cf': 'Elenca le imprese che compaiono in almeno un verbale e non hanno il codice fiscale, dalla visita più recente. Solo lettura: non cambia niente finché non premi «Salva» su una riga.',
+  't:= p.iva': 'Copia la partita IVA nel campo del codice fiscale: per una società di norma coincidono. Non salva: se è giusto, premi «Salva».',
   'btn-new-comm': 'Crea un committente nuovo. Cerca prima per nome: i doppioni poi vanno uniti a mano.',
   'btn-edit-comm': 'Completa o corregge i dati del committente selezionato.',
   'btn-save-comm': 'Salva le modifiche al committente.',
