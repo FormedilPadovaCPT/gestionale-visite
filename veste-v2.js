@@ -55,7 +55,8 @@
     tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche'], apre: 'dashboard' },
     coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', '|', 'admin'], apre: 'dashboard' },
     direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione',   lettura: true },
-    presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione',   lettura: true },
+    // il calendario è del solo Direttore (deciso dall'utente il 03/10/2026): la Presidenza vede quello che le compete
+    presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard'],                 apre: 'direzione',   lettura: true },
     // (03/10/2026, corretto dall'utente dopo aver guardato l'anteprima) il consigliere apre sulla Mappa e non vede il calendario
     consigliere:  { nome: 'Consigliere',     menu: ['dashboard', 'statistiche'],                              apre: 'dashboard',   lettura: true },
   };

@@ -2598,10 +2598,12 @@ async function onLogin(user){
     // menu spariva del tutto e con lui le Statistiche, uscite dalla Dashboard il 23/09.
     // Stesso giorno, corretto: si apre sempre su Mappa (prima Direttore e Presidenza
     // atterravano dritti su Direzione, che resta comunque la terza scheda per loro).
+    // (03/10/2026, deciso dall'utente) «Prossimi appuntamenti» è del SOLO Direttore: Presidenza e
+    // consiglieri non lo vedono piu' (la Presidenza vede quello che le compete, nella sua pagina).
     const _nv=document.querySelector('nav')
     if(_nv){_nv.classList.remove('hidden')
       _nv.querySelectorAll('button').forEach(b=>{const v=b.dataset.view
-        b.style.display=(v==='dashboard'||v==='statistiche'||v==='appuntamenti'||(v==='direzione'&&(S.direttore||S.presidenza)))?'':'none'})
+        b.style.display=(v==='dashboard'||v==='statistiche'||(v==='appuntamenti'&&S.direttore)||(v==='direzione'&&(S.direttore||S.presidenza)))?'':'none'})
       const _bd=_nv.querySelector('button[data-view="dashboard"]');if(_bd)_bd.textContent='🗺️ Mappa'
       const _bdir=_nv.querySelector('button[data-view="direzione"]');if(_bdir&&S.presidenza&&!S.direttore)_bdir.firstChild.textContent='🏛️ Presidenza'
     }
@@ -2760,6 +2762,8 @@ function navTo(view){
   /* (03/10/2026) VESTE V2, in anteprima (veste-v2.js): la accende solo la segreteria. Può cambiare la pagina di
      destinazione (apertura per ruolo). Spenta, o se il file non si è caricato, non fa niente. */
   if(window.vesteV2){const _v2=window.vesteV2.prima(view);if(_v2)view=_v2}
+  // il calendario è del solo Direttore (03/10/2026): chi è di sola lettura e non è lui non ci arriva nemmeno per altra via
+  if(view==='appuntamenti'&&S.viewer&&!S.direttore)view='dashboard'
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
   ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','appuntamenti','direzione','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
@@ -15086,7 +15090,7 @@ document.addEventListener('input',function(ev){
 <script src="scheda-impresa.js?v=2"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
-<script src="aiuto.js?v=16"></script>
+<script src="aiuto.js?v=17"></script>
 <script src="mail-respinte-tec.js?v=2"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
@@ -15096,7 +15100,7 @@ document.addEventListener('input',function(ev){
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=7"></script>
-<script src="veste-v2.js?v=6"></script>
+<script src="veste-v2.js?v=7"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

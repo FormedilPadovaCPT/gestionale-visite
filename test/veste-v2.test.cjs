@@ -63,6 +63,11 @@ assert.strictEqual(R.direttore.apre, 'direzione', 'il Direttore apre su Direzion
 assert.strictEqual(R.presidenza.apre, 'direzione', 'la Presidenza apre sulla sua pagina');
 assert.strictEqual(R.consigliere.apre, 'dashboard', 'i consiglieri aprono sulla Mappa (corretto dall’utente il 03/10/2026)');
 assert.deepStrictEqual(R.consigliere.menu, ['dashboard', 'statistiche'], 'il consigliere vede Mappa e Statistiche: niente calendario');
+// il calendario «Prossimi appuntamenti» è del solo Direttore (deciso dall'utente il 03/10/2026)
+assert.ok(R.direttore.menu.includes('appuntamenti'), 'il Direttore vede il calendario');
+for (const k of ['presidenza', 'consigliere', 'tecnico', 'coordinatore', 'segreteria']) assert.ok(!R[k].menu.includes('appuntamenti'), k + ' non deve vedere il calendario');
+assert.ok(html.includes("(v==='appuntamenti'&&S.direttore)"), 'nell’app di oggi la voce «Prossimi appuntamenti» si mostra al solo Direttore');
+assert.ok(html.includes("if(view==='appuntamenti'&&S.viewer&&!S.direttore)view='dashboard'"), 'chi è di sola lettura e non è il Direttore non arriva al calendario');
 for (const k of ['direttore', 'presidenza', 'consigliere']) {
   assert.ok(R[k].lettura, k + ' è di sola lettura');
   for (const no of ['form', 'lista', 'cantieri', 'rubrica', 'segreteria', 'admin', 'incarichi', 'scadenze']) assert.ok(!R[k].menu.includes(no), k + ' non deve avere «' + no + '» nel menu');
