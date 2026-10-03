@@ -874,7 +874,8 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
      Tre aiuti sopra i campi di sempre. Nessuno scrive dati per conto suo: ognuno preme o riempie il campo che
      c'è già (la tendina dell'incarico, la scelta del cantiere, la tendina della tipologia). */
 
-  /* 1 · «Perché sei qui»: gli incarichi aperti come schede. La scheda preme la tendina «Parti da un tuo incarico»,
+  /* 1 · «Parti da un tuo incarico» (nel prototipo «Perché sei qui»: l'utente ha chiesto se fosse la stessa cosa, e il
+     titolo è tornato quello che i tecnici conoscono e che sta nel manuale): gli incarichi aperti come schede. La scheda preme la tendina «Parti da un tuo incarico»,
      che fa tutto quello che fa oggi (accetta l'incarico se è tuo, compila impresa e cantiere). */
   function incarichiSchede() {
     const box = $('inc-scelta-box'), sel = $('f-prot-inc'); if (!box || !sel) return;
@@ -897,7 +898,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       const dove = x ? [x.indirizzo, x.comune].filter(Boolean).join(', ') : '';
       return `<button type="button" class="v2-scheda${sel.value === o.value ? ' on' : ''}" data-inc="${esc(o.value)}"><small>n. ${esc(o.value)}${x && x.tipo_richiesta ? ' · ' + esc(x.tipo_richiesta) : ''}</small><b>${esc(x && x.impresa ? x.impresa : nome)}</b>${dove ? '<small>› ' + esc(dove) + '</small>' : ''}</button>`;
     });
-    el.innerHTML = '<div class="v2-titolo" style="margin-bottom:10px">Perché sei qui</div><div class="v2-griglia">' + schede.join('')
+    el.innerHTML = '<div class="v2-titolo" style="margin-bottom:10px">Parti da un tuo incarico</div><div class="v2-griglia">' + schede.join('')
       + `<button type="button" class="v2-scheda v2-tratt${sel.value ? '' : ' on'}" data-inc=""><b>Visita d'iniziativa</b><small>Nessun incarico collegato</small></button></div>`;
   }
 

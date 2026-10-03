@@ -278,4 +278,7 @@ const mappaJs = fs.readFileSync(path.join(radice, 'mappa.js'), 'utf8');
 assert.ok(js.includes('#v2-vicini{display:none;margin:0 0 12px}') && js.includes('@media (max-width:1024px),(pointer:coarse){#v2-vicini{display:block}}'), 'sul PC il pulsante dei cantieri vicini non si deve vedere');
 assert.ok(mappaJs.includes("'(max-width: 1024px), (pointer: coarse)'"), 'la regola «telefono o tablet» deve restare la stessa di mappa.js: se cambia lì va cambiata anche nella veste');
 
+// il riquadro degli incarichi tiene il nome che i tecnici conoscono e che sta nel manuale
+assert.ok(js.includes('>Parti da un tuo incarico</div>') && !js.includes('>Perché sei qui</div>'), 'il titolo delle schede degli incarichi è «Parti da un tuo incarico»');
+
 console.log('veste-v2: ok');
