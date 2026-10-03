@@ -2757,6 +2757,9 @@ function showScr(n){
   ;['loading','login','pwd','app'].forEach(s=>$(('screen-'+s))?.classList.toggle('hidden',s!==n))
 }
 function navTo(view){
+  /* (03/10/2026) VESTE V2, in anteprima (veste-v2.js): la accende solo la segreteria. Può cambiare la pagina di
+     destinazione (apertura per ruolo). Spenta, o se il file non si è caricato, non fa niente. */
+  if(window.vesteV2){const _v2=window.vesteV2.prima(view);if(_v2)view=_v2}
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
   ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','appuntamenti','direzione','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
@@ -2776,6 +2779,12 @@ function navTo(view){
   if(view==='admin'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.avvisoVerbaliBox)window.avvisoVerbaliBox().catch(e=>console.warn('avviso verbali:',e));admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
   if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e));if(window.direzione)window.direzione.obiettivi().catch(e=>console.warn('obiettivi:',e))}
   if(view==='committenti')admLoadCommittenti().catch(e=>console.error('committenti:',e))
+  // veste v2: «Oggi» mostra sotto anche le scadenze e gli incarichi, disegnati dalle funzioni di sempre
+  if(window.vesteV2){for(const _v of(window.vesteV2.dopo(view)||[])){
+    $('view-'+_v)?.classList.remove('hidden')
+    if(_v==='scadenze')loadScadenze().catch(e=>console.warn('veste v2, scadenze:',e))
+    if(_v==='incarichi'&&typeof loadIncarichi==='function')loadIncarichi().catch(e=>console.warn('veste v2, incarichi:',e))
+  }}
 }
 window.navTo=navTo
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
@@ -15087,6 +15096,7 @@ document.addEventListener('input',function(ev){
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=6"></script>
+<script src="veste-v2.js?v=1"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
