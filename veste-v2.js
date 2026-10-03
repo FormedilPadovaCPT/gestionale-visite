@@ -1,18 +1,22 @@
 /* ============================================================
-   VESTE V2 — ANTEPRIMA (03/10/2026, decisa dall'utente)
+   VESTE V2 (03/10/2026) — nata come anteprima della sola segreteria, dalla
+   sera dello stesso giorno è LA VESTE DI TUTTI (deciso dall'utente dopo
+   averla guardata ruolo per ruolo).
 
-   La proposta di design «Gestionale Visite v2» piace, ma è stata disegnata
-   sulla pagina pubblica, senza conoscere ruoli e regole. Questa è la sua
+   La proposta di design «Gestionale Visite v2» è stata disegnata sulla
+   pagina pubblica, senza conoscere ruoli e regole. Questa è la sua
    riprogettazione dentro l'app vera, come SECONDA VESTE dello stesso codice:
    stessa app, stesso database, stesse funzioni. Non è una seconda app.
 
-   CHI LA VEDE. Solo la segreteria, e solo se la accende col pulsante
-   «🎨 Veste nuova» in alto. Tutti gli altri, e la segreteria stessa quando è
-   spenta, vedono l'app di oggi: se questo file non si carica, o qui dentro
-   qualcosa va storto, l'app di oggi continua a funzionare (ogni ingresso è
-   protetto da try/catch e non cambia niente finché la veste è spenta).
+   CHI LA VEDE. Chiunque sia collegato, col menu e le pagine del SUO ruolo
+   (quello vero dell'accesso: tecnico, coordinatore, segreteria, Direttore,
+   Presidenza, consigliere). Il pulsante in alto «↩ Veste di prima» riporta
+   quel dispositivo all'app com'era, e «🎨 Veste nuova» la riaccende: è la
+   rete di sicurezza. Se questo file non si carica, o qui dentro qualcosa va
+   storto, l'app di prima continua a funzionare (ogni ingresso è protetto da
+   try/catch e non cambia niente finché la veste è spenta).
 
-   CHE COSA FA, in questo primo pezzo (non tocca il verbale):
+   CHE COSA FA:
      · menu per ruolo: Oggi · Nuova visita · Visite · Cantieri · Rubrica ·
        Statistiche, a destra Ufficio (segreteria) o Coordinamento (coordinatore); Direzione, Presidenza e consiglieri hanno il menu corto;
      · pagina di apertura per ruolo (decise dall'utente): segreteria su
@@ -24,7 +28,7 @@
        la mappa. Scadenze e incarichi restano anche pagine a sé nel menu;
      · «Ufficio»: gli strumenti della pagina Segreteria raggruppati con un
        menu a lato, più una Scrivania con i numeri di ciò che aspetta;
-     · «Vedi come…»: la segreteria vede menu e pagine degli altri ruoli.
+     · «Vedi come…» (SOLO segreteria): vede menu e pagine degli altri ruoli.
        Cambia ciò che si vede, NON i permessi: i dati restano quelli che il
        database dà alla segreteria.
 
@@ -40,8 +44,8 @@
    ============================================================ */
 (function () {
   'use strict';
-  const CHIAVE = 'gv-veste';              // localStorage: 'v2' = veste nuova accesa su questo dispositivo
-  const CHIAVE_RUOLO = 'gv-v2-ruolo';     // sessionStorage: il ruolo di «Vedi come…»
+  const CHIAVE = 'gv-veste';              // localStorage: 'classica' = su questo dispositivo si è scelto di tornare alla veste di prima
+  const CHIAVE_RUOLO = 'gv-v2-ruolo';     // sessionStorage: il ruolo di «Vedi come…» (vale solo per la segreteria)
   const SEGRETERIA = 'cptpd@did.formedilpadova.it';
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -119,30 +123,42 @@
   const S = () => window.S || {};
   const email = () => String((S().user && S().user.email) || '').toLowerCase();
   const eSegreteria = () => !!email() && email() === SEGRETERIA && !S().viewer;
-  const accesa = () => eSegreteria() && leggi(localStorage, CHIAVE) === 'v2';
-  const ruolo = () => { const r = leggi(sessionStorage, CHIAVE_RUOLO); return RUOLI[r] ? r : 'segreteria'; };
+  /* Accesa per chiunque sia collegato; spenta solo dove qualcuno ha scelto «↩ Veste di prima». */
+  const accesa = () => !!email() && leggi(localStorage, CHIAVE) !== 'classica';
+  /* IL RUOLO VERO, dall'accesso: chi è di sola lettura lo dice S.viewer (con S.direttore / S.presidenza), la segreteria
+     la sua e-mail, il coordinatore il permesso sulla pagina Coordinamento (window.__isCoordPage, messo all'accesso). */
+  const ruoloVero = () => {
+    const s = S();
+    if (s.viewer) return s.direttore ? 'direttore' : s.presidenza ? 'presidenza' : 'consigliere';
+    if (email() === SEGRETERIA) return 'segreteria';
+    return window.__isCoordPage ? 'coordinatore' : 'tecnico';
+  };
+  /* «Vedi come…»: solo la segreteria può GUARDARE la pagina di un altro ruolo. Per chiunque altro il ruolo scritto
+     nel browser non conta niente: vale quello dell'accesso. */
+  const simula = () => { if (!eSegreteria()) return false; const r = leggi(sessionStorage, CHIAVE_RUOLO); return !!RUOLI[r] && r !== 'segreteria'; };
+  const ruolo = () => (simula() ? leggi(sessionStorage, CHIAVE_RUOLO) : ruoloVero());
 
-  /* ── il pulsante che accende e spegne (solo segreteria) ── */
+  /* ── il pulsante che spegne e riaccende la veste, per tutti: è la rete di sicurezza ── */
   function pulsante() {
     let b = $('btn-veste-v2');
-    if (!eSegreteria()) { if (b) b.remove(); return; }
+    if (!email()) { if (b) b.remove(); return; }
     const area = document.querySelector('.user-area'); if (!area) return;
     if (!b) {
       b = document.createElement('button');
       b.id = 'btn-veste-v2'; b.type = 'button';
       b.style.cssText = 'background:transparent;border:1px solid rgba(255,255,255,.6);color:#fff;font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer';
       b.addEventListener('click', () => {
-        scrivi(localStorage, CHIAVE, accesa() ? null : 'v2');
+        scrivi(localStorage, CHIAVE, accesa() ? 'classica' : 'v2');
         scrivi(sessionStorage, CHIAVE_RUOLO, null);
         location.reload();
       });
       area.insertBefore(b, area.firstChild);
     }
     const on = accesa();
-    b.textContent = on ? '↩ Veste di oggi' : '🎨 Veste nuova';
+    b.textContent = on ? '↩ Veste di prima' : '🎨 Veste nuova';
     b.setAttribute('data-aiuto', on
-      ? 'Torna all\'app com\'è oggi. La veste nuova è un\'anteprima che vedi solo tu: gli altri non se ne accorgono.'
-      : 'Accende l\'anteprima della veste nuova (menu per ruolo, Oggi, Ufficio). La vedi solo tu, su questo dispositivo; i dati e le funzioni sono gli stessi. Si spegne dallo stesso pulsante.');
+      ? 'Riporta questo dispositivo al gestionale com’era prima della veste nuova. Dati e funzioni sono gli stessi: cambia solo come sono disposti. Si riaccende dallo stesso pulsante.'
+      : 'Riaccende la veste nuova su questo dispositivo: menu per ruolo, pagina «Oggi», verbale in tre momenti. Dati e funzioni sono gli stessi.');
   }
 
   /* ── stile: solo quando la veste è accesa ── */
@@ -327,6 +343,15 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
    non gli è piaciuto, sopra è più funzionale). Le tabelle diventano schede. */
 @media(max-width:720px){
   body.v2 nav button{margin-left:0!important}
+  /* solo per il TECNICO: bozze, poi i riquadri delle azioni, poi rientri e incarichi (con molti rientri le azioni finivano troppo sotto) */
+  body.v2[data-v2-ruolo="tecnico"] #v2-oggi .v2-colonne{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:0}
+  body.v2[data-v2-ruolo="tecnico"] #v2-oggi .v2-c1,body.v2[data-v2-ruolo="tecnico"] #v2-oggi .v2-c2{display:contents}
+  body.v2[data-v2-ruolo="tecnico"] #v2-bozze{order:1}
+  body.v2[data-v2-ruolo="tecnico"] #v2-azioni{order:2}
+  body.v2[data-v2-ruolo="tecnico"] #v2-rientri{order:3}
+  body.v2[data-v2-ruolo="tecnico"] #v2-incarichi{order:4}
+  body.v2[data-v2-ruolo="tecnico"] #v2-posto-obiettivo{order:5}
+  body.v2[data-v2-ruolo="tecnico"] #v2-posto-avvisi{order:6}
   #v2-barra{overflow-x:auto;flex-wrap:nowrap;white-space:nowrap}
   body.v2 .v2-schede .tbl-wrap{overflow:visible}
   body.v2 .v2-schede table,body.v2 .v2-schede tbody,body.v2 .v2-schede tr,body.v2 .v2-schede td{display:block;width:100%}
@@ -377,6 +402,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
   /* ── la barra «Vedi come…» ── */
   function barra() {
     let el = $('v2-barra');
+    if (!eSegreteria()) { if (el) el.remove(); return; }   // la barra è della sola segreteria
     if (!el) {
       const nav = document.querySelector('nav'); if (!nav || !nav.parentNode) return;
       el = document.createElement('div'); el.id = 'v2-barra';
@@ -390,7 +416,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       });
     }
     const att = ruolo();
-    el.innerHTML = '<b>Anteprima della veste nuova · Vedi come:</b>'
+    el.innerHTML = '<b>Vedi come:</b>'
       + Object.entries(RUOLI).map(([k, r]) => `<button type="button" data-ruolo="${k}" class="${k === att ? 'on' : ''}">${esc(r.nome)}</button>`).join('')
       + ((att === 'tecnico' || att === 'coordinatore') && _tecnici && _tecnici.length
         ? '<select id="v2-quale-tec" style="width:auto;font:600 12px Barlow,sans-serif;padding:3px 8px;border-radius:50px;margin-left:6px" data-aiuto="Di quale tecnico vedere la pagina: rientri, incarichi e bozze sono i suoi.">'
@@ -418,6 +444,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
 
   function prepara() {
     document.body.classList.add('v2');
+    document.body.dataset.v2Ruolo = ruolo();
     stile(); menu(); barra(); tieniEtichette(); verbaleAggancia();
     const lettura = !!RUOLI[ruolo()].lettura;
     if (lettura && !document.body.classList.contains('viewer-mode')) { document.body.classList.add('viewer-mode'); _letturaFinta = true; }
@@ -426,6 +453,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
   function spegni() {
     if (!document.body.classList.contains('v2')) return;
     document.body.classList.remove('v2');
+    delete document.body.dataset.v2Ruolo;
     if (_letturaFinta) { document.body.classList.remove('viewer-mode'); _letturaFinta = false; }
     ['v2-barra', 'v2-altre', 'v2-uff-menu', 'v2-scrivania', 'v2-rimandi', 'v2-sintesi', 'v2-torna', 'v2-dir-pulsanti', 'v2-az-segnala', 'v2-az-qr', 'v2-az-servizi'].forEach((id) => { const e = $(id); if (e) e.remove(); });
     ['v2-bozze', 'v2-rientri', 'v2-incarichi', 'v2-azioni', 'v2-oggi-data', 'v2-oggi-ciao'].forEach((id) => { const e = $(id); if (e) e.innerHTML = ''; });   // obiettivo e avvisi sono quelli di sempre: restano
@@ -1157,7 +1185,11 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
   function prima(view) {
     try {
       if (!S().user) return null;
-      if (_utente !== email()) { _utente = email(); _aperta = false; }
+      if (_utente !== email()) {
+        _utente = email(); _aperta = false;
+        // nello stesso browser è entrato un altro: il riquadro dell'Asseverazione segue il nuovo accesso
+        const a = $('nav-assev'); if (a && a.dataset.v2Mostra !== undefined) a.dataset.v2Mostra = a.style.display;
+      }
       pulsante();
       if (!accesa()) { spegni(); return null; }
       prepara();
@@ -1189,5 +1221,5 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }
 
-  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat, luminanza, contrasto, leggibile };
+  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, ruoloVero, simula, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat, luminanza, contrasto, leggibile };
 })();

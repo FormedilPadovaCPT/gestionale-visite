@@ -2651,7 +2651,7 @@ async function onLogin(user){
   const _uem=(user.email||'').toLowerCase()
   const isSegreteria=_uem==='cptpd@did.formedilpadova.it'
   const isCoordPage=isSegreteria||_uem==='nicola.demarco@did.formedilpadova.it'
-  window.__isCoord=isSegreteria;window.__isSegreteria=isSegreteria
+  window.__isCoord=isSegreteria;window.__isSegreteria=isSegreteria;window.__isCoordPage=isCoordPage
   const navAdm=$('nav-admin')
   if(navAdm)navAdm.style.display=isCoordPage?'':'none'
   const navSgr=$('nav-segreteria')
@@ -15104,8 +15104,8 @@ document.addEventListener('input',function(ev){
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
-<script src="direzione.js?v=7"></script>
-<script src="veste-v2.js?v=18"></script>
+<script src="direzione.js?v=8"></script>
+<script src="veste-v2.js?v=19"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

@@ -142,10 +142,11 @@
      La segreteria che guarda la pagina «come Presidenza» o «come Direttore» deve vedere ciò che vedrebbe
      quel ruolo. Nell'app vera lo fa già il database: alla Presidenza dà le sole questioni indirizzate a
      lei e i cantieri critici che le sono stati demandati. Nell'anteprima i permessi restano quelli della
-     segreteria, quindi il filtro va rifatto qui. «come» è null per chiunque non stia usando l'anteprima:
+     segreteria, quindi il filtro va rifatto qui. «come» è null per chiunque non stia GUARDANDO la pagina di un altro
+     (vesteV2.simula): il Direttore e la Presidenza veri hanno la loro pagina intera, coi pulsanti per rispondere:
      in quel caso non cambia niente. */
   function come() {
-    try { const v = window.vesteV2; if (!v || !v.accesa || !v.accesa()) return null; const r = v.ruolo(); return r === 'presidenza' || r === 'direttore' ? r : null; } catch (_e) { return null; }
+    try { const v = window.vesteV2; if (!v || !v.simula || !v.simula()) return null; const r = v.ruolo(); return r === 'presidenza' || r === 'direttore' ? r : null; } catch (_e) { return null; }
   }
   /* pura: i casi demandati a «chi» e non ancora decisi da lui — la stessa regola di s_direzione_in_attesa */
   function criticiDemandati(casi, eventi, chi) {

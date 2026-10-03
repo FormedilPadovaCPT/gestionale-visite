@@ -1,7 +1,8 @@
 // node test/veste-v2.test.cjs
-// (03/10/2026) La veste v2 è un'ANTEPRIMA: la accende solo la segreteria, col suo pulsante.
+// (03/10/2026) La veste v2, nata come anteprima della sola segreteria, dalla sera dello stesso giorno è la veste di TUTTI.
 // Quello che questi controlli tengono fermo:
-//   · spenta — o per chiunque non sia la segreteria — non cambia niente dell'app di oggi;
+//   · ognuno la vede col menu del SUO ruolo vero; solo la segreteria può guardare la pagina di un altro («Vedi come…»);
+//   · dove qualcuno ha scelto «↩ Veste di prima», o senza nessuno collegato, non cambia niente dell'app di prima;
 //   · gli agganci in index.html sono due righe in navTo, e non rompono niente se il file manca;
 //   · menu e pagina di apertura per ruolo sono quelli decisi dall'utente;
 //   · niente salvataggio automatico e niente chiusura del verbale da qui (paletti dell'utente).
@@ -20,23 +21,23 @@ assert.ok(/<script src="veste-v2\.js\?v=\d+"><\/script>/.test(html), 'manca lo s
 assert.ok(/ veste-v2\.js /.test(wf) && /- 'veste-v2\.js'/.test(wf), 'veste-v2.js deve stare nell’elenco dei file pubblicati e in quello che fa partire la pubblicazione');
 
 /* ── un finto browser, quanto basta per chiamare prima() e dopo() ── */
-function ambiente({ email, viewer, veste }) {
+function ambiente({ email, viewer, veste, direttore, presidenza, coord, come }) {
   const archivio = (iniziale) => { const m = new Map(Object.entries(iniziale || {})); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
   const classi = new Set();
   const finto = () => ({ style: {}, dataset: {}, classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, addEventListener() {}, appendChild() {}, insertBefore() {}, remove() {}, querySelector: () => null, querySelectorAll: () => [], setAttribute() {}, firstChild: null, childNodes: [] });
   const document = { body: { classList: { add: (c) => classi.add(c), remove: (c) => classi.delete(c), contains: (c) => classi.has(c) }, dataset: {} },
     head: finto(), getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], createElement: finto, addEventListener() {} };
-  const window = { S: { user: email ? { email } : null, viewer: !!viewer } };
-  new Function('window', 'document', 'localStorage', 'sessionStorage', 'location', 'MutationObserver', js)(window, document, archivio(veste ? { 'gv-veste': 'v2' } : {}), archivio(), { reload() {} }, undefined);
+  const window = { S: { user: email ? { email } : null, viewer: !!viewer, direttore: !!direttore, presidenza: !!presidenza }, __isCoordPage: !!coord };
+  new Function('window', 'document', 'localStorage', 'sessionStorage', 'location', 'MutationObserver', js)(window, document, archivio(veste === false ? { 'gv-veste': 'classica' } : veste ? { 'gv-veste': 'v2' } : {}), archivio(come ? { 'gv-v2-ruolo': come } : {}), { reload() {} }, undefined);
   return { v2: window.vesteV2, classi };
 }
 
-/* ── spenta, o per chi non è la segreteria: niente ── */
+/* ── spenta: dove si è scelta la veste di prima, o senza nessuno collegato, non cambia niente ── */
 for (const caso of [
-  { email: 'cptpd@did.formedilpadova.it', veste: false, che: 'segreteria con la veste spenta' },
-  { email: 'franco.caon@did.formedilpadova.it', veste: true, che: 'un tecnico, anche se sul dispositivo la veste è rimasta accesa' },
-  { email: 'cptpd@did.formedilpadova.it', veste: true, viewer: true, che: 'un accesso di sola lettura' },
-  { email: null, veste: true, che: 'nessuno collegato' },
+  { email: 'cptpd@did.formedilpadova.it', veste: false, che: 'segreteria che ha scelto la veste di prima' },
+  { email: 'franco.caon@did.formedilpadova.it', veste: false, che: 'un tecnico che ha scelto la veste di prima' },
+  { email: 'direttore@example.it', veste: false, viewer: true, direttore: true, che: 'il Direttore che ha scelto la veste di prima' },
+  { email: null, che: 'nessuno collegato' },
 ]) {
   const a = ambiente(caso);
   assert.strictEqual(a.v2.accesa(), false, caso.che + ': la veste non deve risultare accesa');
@@ -44,6 +45,37 @@ for (const caso of [
   assert.deepStrictEqual(a.v2.dopo('dashboard'), [], caso.che + ': nessuna pagina in più');
   assert.ok(!a.classi.has('v2'), caso.che + ': la pagina non deve prendere la veste');
 }
+
+/* ── accesa per tutti, ognuno col SUO ruolo vero e la sua pagina di apertura ── */
+for (const caso of [
+  { email: 'franco.caon@did.formedilpadova.it', ruolo: 'tecnico', apre: 'dashboard', che: 'un tecnico' },
+  { email: 'franco.caon@did.formedilpadova.it', veste: true, ruolo: 'tecnico', apre: 'dashboard', che: 'un tecnico col vecchio valore nel browser' },
+  { email: 'nicola.demarco@did.formedilpadova.it', coord: true, ruolo: 'coordinatore', apre: 'dashboard', che: 'il coordinatore' },
+  { email: 'direttore@example.it', viewer: true, direttore: true, ruolo: 'direttore', apre: 'direzione', che: 'il Direttore' },
+  { email: 'presidente@example.it', viewer: true, presidenza: true, ruolo: 'presidenza', apre: 'direzione', che: 'la Presidenza' },
+  { email: 'consigliere@example.it', viewer: true, ruolo: 'consigliere', apre: 'dashboard', che: 'un consigliere' },
+  { email: 'cptpd@did.formedilpadova.it', ruolo: 'segreteria', apre: 'segreteria', che: 'la segreteria' },
+  // il ruolo scritto nel browser («Vedi come…») vale solo per la segreteria: nessun altro può darsi un ruolo
+  { email: 'franco.caon@did.formedilpadova.it', come: 'direttore', ruolo: 'tecnico', apre: 'dashboard', che: 'un tecnico che si scrive «direttore» nel browser' },
+  { email: 'consigliere@example.it', viewer: true, come: 'segreteria', ruolo: 'consigliere', apre: 'dashboard', che: 'un consigliere che si scrive «segreteria» nel browser' },
+  { email: 'cptpd@did.formedilpadova.it', viewer: true, come: 'tecnico', ruolo: 'consigliere', apre: 'dashboard', che: 'l’e-mail della segreteria entrata in sola lettura' },
+]) {
+  const a = ambiente(caso);
+  assert.strictEqual(a.v2.accesa(), true, caso.che + ': la veste è accesa');
+  assert.strictEqual(a.v2.ruolo(), caso.ruolo, caso.che + ': ruolo');
+  assert.strictEqual(a.v2.simula(), false, caso.che + ': non sta guardando la pagina di un altro');
+  assert.strictEqual(a.v2.prima('dashboard'), caso.apre, caso.che + ': pagina di apertura');
+  assert.ok(a.classi.has('v2'), caso.che + ': la pagina prende la veste');
+}
+// la segreteria che guarda «come Direttore»: vede quel menu, e la pagina Direzione sa che è un'anteprima (niente pulsanti)
+const sim = ambiente({ email: 'cptpd@did.formedilpadova.it', come: 'direttore' });
+assert.strictEqual(sim.v2.ruolo(), 'direttore'); assert.strictEqual(sim.v2.ruoloVero(), 'segreteria'); assert.strictEqual(sim.v2.simula(), true);
+assert.ok(js.includes("if (!eSegreteria()) { if (el) el.remove(); return; }   // la barra è della sola segreteria"), '«Vedi come…» è della sola segreteria');
+assert.ok(html.includes('window.__isCoordPage=isCoordPage'), 'all’accesso l’app deve dire alla veste chi è coordinatore');
+assert.ok(js.includes("scrivi(localStorage, CHIAVE, accesa() ? 'classica' : 'v2');") && js.includes("'↩ Veste di prima'"), 'il pulsante per tornare alla veste di prima deve restare, per tutti: è la rete di sicurezza');
+// telefono, solo tecnico: i riquadri delle azioni sopra i rientri
+assert.ok(js.includes('body.v2[data-v2-ruolo="tecnico"] #v2-azioni{order:2}') && js.includes('body.v2[data-v2-ruolo="tecnico"] #v2-rientri{order:3}') && js.includes('body.v2[data-v2-ruolo="tecnico"] #v2-bozze{order:1}'), 'sul telefono del tecnico: bozze, azioni, rientri');
+assert.ok(js.indexOf('body.v2[data-v2-ruolo="tecnico"] #v2-azioni{order:2}') > js.indexOf('@media(max-width:720px){'), 'lo spostamento vale solo sul telefono');
 
 /* ── accesa dalla segreteria ── */
 const s = ambiente({ email: 'CPTPD@did.formedilpadova.it', veste: true });
@@ -125,7 +157,7 @@ assert.ok(!js.includes('#view-incarichi{order') && !js.includes('#view-scadenze{
 const dir = fs.readFileSync(path.join(radice, 'direzione.js'), 'utf8');
 assert.ok(/if \(modo === 'direzione' && come\(\)\) \{\s+righe = righe\.filter\(\(r\) => r\.decisore === come\(\)\);\s+if \(come\(\) === 'presidenza'\) auto = \{ autorizzazioni: \[\], critici: \[\] \};/.test(dir), 'nell’anteprima il registro deve mostrare le sole questioni del ruolo guardato, e alla Presidenza niente autorizzazioni né conferme del Direttore');
 assert.ok(/const anteprima = modo === 'direzione' && !!come\(\);/.test(dir) && /const gestisce = !anteprima && \(R\.coord \|\| R\.segr\);/.test(dir), 'nell’anteprima non si mostrano i pulsanti di un altro ruolo');
-assert.ok(/if \(!v \|\| !v\.accesa \|\| !v\.accesa\(\)\) return null;/.test(dir), 'fuori dall’anteprima «come» deve essere vuoto: la pagina vera non cambia');
+assert.ok(/if \(!v \|\| !v\.simula \|\| !v\.simula\(\)\) return null;/.test(dir), 'fuori da «Vedi come…» «come» deve essere vuoto: il Direttore e la Presidenza veri hanno la pagina intera, coi pulsanti');
 const fn = dir.match(/function criticiDemandati\(casi, eventi, chi\) \{[\s\S]*?\r?\n  \}/);
 assert.ok(fn, 'non trovo criticiDemandati in direzione.js');
 const criticiDemandati = Function(fn[0] + '; return criticiDemandati')();
