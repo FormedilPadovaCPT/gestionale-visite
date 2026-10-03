@@ -1572,6 +1572,33 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
         </div>
 
+        <!-- Imprese con l'indirizzo e-mail di un'altra impresa (03/10/2026) -->
+        <div class="adm-section">
+          <div class="adm-section-title">📧 Imprese con l'indirizzo di un'altra impresa</div>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:12px">Imprese che hanno in scheda un indirizzo e-mail che <strong>somiglia al nome di un'altra impresa</strong> e che quell'altra impresa ha a sua volta: di solito è l'indirizzo dell'impresa principale finito nella scheda di un subappaltatore, e i suoi verbali partono verso l'indirizzo sbagliato. È un indizio, non una prova: decidi tu riga per riga. La colonna «Cassa Edile» dice che cosa risulta nella lista della Cassa. Ogni decisione resta scritta, con l'indirizzo che c'era.</p>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+            <button class="btn-primary btn-sm" id="btn-imp-mail" onclick="admImpMailAltri()" data-aiuto="Cerca nel database le imprese che hanno in scheda l'indirizzo e-mail di un'altra impresa. Ci mette qualche secondo. Non cambia niente: mostra solo l'elenco.">📋 Carica elenco</button>
+            <label style="font-size:12px;color:rgba(255,255,255,.6);display:inline-flex;gap:6px;align-items:center;width:auto;cursor:pointer"><input type="checkbox" id="chk-imp-mail-tutte" style="width:auto;margin:0" onchange="admImpMailTutte(this.checked)"> mostra anche quelle con lo stesso indirizzo alla Cassa Edile</label>
+            <span id="imp-mail-conto" style="font-size:12px;color:rgba(255,255,255,.6)"></span>
+          </div>
+          <div class="tbl-wrap" style="background:rgba(255,255,255,.05);border-radius:8px;max-height:560px;overflow:auto">
+            <table style="color:rgba(255,255,255,.85);font-size:12px;width:100%">
+              <thead>
+                <tr style="border-bottom:1px solid rgba(255,255,255,.15)">
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Impresa</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Indirizzo in scheda</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Sembra di</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Cassa Edile</th>
+                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Che cosa fare</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-imp-mail">
+                <tr><td colspan="5" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Premi «Carica elenco»</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- Gestione cantieri -->
         <div class="adm-section">
           <div class="adm-section-title">🏗️ Gestione cantieri</div>
@@ -12083,6 +12110,75 @@ async function admImpSalvaCf(i){
 window.admImpSenzaCf=admImpSenzaCf
 window.admImpCopiaPiva=admImpCopiaPiva
 window.admImpSalvaCf=admImpSalvaCf
+
+/* ── IMPRESE CON L'INDIRIZZO E-MAIL DI UN'ALTRA IMPRESA (03/10/2026, chiesto dall'utente) ──
+   Dal verbale CPT/26_27/0003: l'indirizzo dell'impresa principale era finito nelle schede di due
+   lavoratori autonomi. L'elenco lo dà il database (imprese_mail_di_altri): lo stesso indirizzo su
+   più imprese con partita IVA diversa, che somiglia al nome di una e non delle altre. È un indizio:
+   qui non si corregge niente da soli, decide la segreteria riga per riga (impresa_mail_decidi), e
+   ogni decisione resta scritta con l'indirizzo che c'era. */
+/* funzione pura: l'indirizzo ha l'aria di una PEC? (alla PEC la posta ordinaria spesso non arriva) */
+function mailSembraPec(m){
+  const d=String(m||'').toLowerCase().split('@')[1]||''
+  return /(^|\.)pec(\.|imprese)|pec\.[a-z.]+$|legalmail|postecert|sicurezzapostale|(^|\.)cert\./.test(d)
+}
+let _impMail=[],_impMailTutteLeRighe=false
+async function admImpMailAltri(){
+  const tb=$('tbody-imp-mail'),conto=$('imp-mail-conto')
+  if(!tb)return
+  tb.innerHTML='<tr><td colspan="5" style="padding:16px;text-align:center;color:rgba(255,255,255,.35)">Caricamento… (qualche secondo)</td></tr>'
+  const{data,error}=await sb.rpc('imprese_mail_di_altri')
+  if(error){
+    tb.innerHTML='<tr><td colspan="5" style="padding:16px;text-align:center;color:#e74c3c">Non sono riuscito a leggere l\'elenco: '+esc(error.message)+'</td></tr>'
+    if(conto)conto.textContent=''
+    return
+  }
+  _impMail=data||[]
+  _impMailDisegna()
+}
+function admImpMailTutte(si){_impMailTutteLeRighe=!!si;_impMailDisegna()}
+function _impMailDisegna(){
+  const tb=$('tbody-imp-mail'),conto=$('imp-mail-conto')
+  if(!tb)return
+  const stesse=_impMail.filter(r=>r.stessa_della_cassa).length
+  if(conto)conto.textContent=_impMail.length?((_impMail.length-stesse)+' da guardare'+(stesse?' · altre '+stesse+' hanno lo stesso indirizzo anche alla Cassa Edile':'')):''
+  const righe=_impMail.map((r,i)=>({r,i})).filter(x=>_impMailTutteLeRighe||!x.r.stessa_della_cassa)
+  if(!righe.length){tb.innerHTML='<tr><td colspan="5" style="padding:16px;text-align:center;color:#95C22F">'+(_impMail.length?'Restano solo imprese che hanno dichiarato lo stesso indirizzo anche alla Cassa Edile: spunta la casella per vederle.':'Nessuna impresa ha in scheda l\'indirizzo di un\'altra impresa.')+'</td></tr>';return}
+  const cella='padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.07);vertical-align:top'
+  const pec=m=>mailSembraPec(m)?' <span title="Ha l\'aria di una PEC: la posta ordinaria spesso non arriva" style="color:#f39c12;font-weight:700">PEC</span>':''
+  tb.innerHTML=righe.map(({r,i})=>{
+    const cassa=r.stessa_della_cassa?'<span style="color:#95C22F">✓ lo stesso indirizzo</span>'
+      :r.mail_cassa?('<span style="font-family:monospace">'+esc(r.mail_cassa)+'</span>'+pec(r.mail_cassa))
+      :r.in_cassa?'<span style="color:rgba(255,255,255,.45)">nella lista, senza e-mail</span>'
+      :'<span style="color:rgba(255,255,255,.45)">non è nella lista</span>'
+    return '<tr>'
+      +'<td style="'+cella+'"><strong>'+esc(r.impresa_nome||r.impresa_id)+'</strong><div style="font-size:11px;color:rgba(255,255,255,.45)">'+esc([r.comune,r.piva?('P.IVA '+r.piva):'',(+r.n_visite?(r.n_visite+(+r.n_visite===1?' verbale':' verbali')):'nessun verbale')].filter(Boolean).join(' · '))+'</div></td>'
+      +'<td style="'+cella+'"><span style="font-family:monospace">'+esc(r.mail)+'</span>'+pec(r.mail)+'</td>'
+      +'<td style="'+cella+'">'+esc(r.titolare_nome||'')+(+r.condivisa_con>1?'<div style="font-size:11px;color:rgba(255,255,255,.45)">lo hanno anche altre '+(r.condivisa_con-1)+'</div>':'')+'</td>'
+      +'<td style="'+cella+'">'+cassa+'</td>'
+      +'<td style="'+cella+';white-space:nowrap">'
+      +(r.mail_cassa&&!r.stessa_della_cassa?'<button class="btn-primary btn-sm" type="button" onclick="admImpMailDecidi('+i+',\'cassa\')" data-aiuto="Sostituisce nella scheda di questa impresa l\'indirizzo sospetto con quello che risulta alla Cassa Edile. Chiede conferma; resta scritto che cosa c\'era prima.">Usa quello della Cassa</button> ':'')
+      +'<button class="btn-warn btn-sm" type="button" onclick="admImpMailDecidi('+i+',\'togli\')" data-aiuto="Toglie l\'indirizzo dalla scheda di questa impresa, che resta senza e-mail finché non si conosce la sua. L\'altra impresa non viene toccata. Chiede conferma; resta scritto che cosa c\'era.">Togli</button> '
+      +'<button class="btn-outline btn-sm" type="button" onclick="admImpMailDecidi('+i+',\'conferma\')" data-aiuto="L\'indirizzo è davvero anche di questa impresa (stessa proprietà, stesso ufficio): non cambia niente e la riga esce dall\'elenco per sempre.">È il suo</button>'
+      +'</td></tr>'
+  }).join('')
+}
+async function admImpMailDecidi(i,cosa){
+  const r=_impMail[i];if(!r)return
+  const nome=r.impresa_nome||r.impresa_id
+  let chiedi=null
+  if(cosa==='togli')chiedi='TOGLIERE L\'INDIRIZZO\n\nDalla scheda di «'+nome+'» tolgo:\n   '+r.mail+'\n\nL\'impresa resta senza e-mail finché non si conosce la sua. «'+(r.titolare_nome||'L\'altra impresa')+'» non viene toccata. Resta scritto che cosa c\'era.\n\nOK = tolgo\nAnnulla = lascio com\'è'
+  if(cosa==='cassa')chiedi='USARE L\'INDIRIZZO DELLA CASSA EDILE\n\nNella scheda di «'+nome+'» al posto di:\n   '+r.mail+'\nmetto:\n   '+r.mail_cassa+(mailSembraPec(r.mail_cassa)?'\n\n⚠ Ha l\'aria di una PEC: la posta ordinaria spesso non arriva a una PEC. Se è così, meglio «Togli».':'')+'\n\nOK = sostituisco\nAnnulla = lascio com\'è'
+  if(chiedi&&!confirm(chiedi))return
+  const{data,error}=await sb.rpc('impresa_mail_decidi',{p_impresa_id:r.impresa_id,p_mail:r.mail,p_decisione:cosa})
+  if(error||!data||!data.ok){toast('Non fatto: '+((error&&error.message)||'nessuna risposta dal database')+'.','err',9000);return}
+  _impMail.splice(i,1)
+  _impMailDisegna()
+  toast(cosa==='togli'?'Indirizzo tolto dalla scheda di «'+nome+'»':cosa==='cassa'?'«'+nome+'»: ora ha '+(data.nuova_mail||'l\'indirizzo della Cassa Edile'):'«'+nome+'»: confermato, la riga non comparirà più','ok',6000)
+}
+window.admImpMailAltri=admImpMailAltri
+window.admImpMailTutte=admImpMailTutte
+window.admImpMailDecidi=admImpMailDecidi
 window.admEditImpresa = admEditImpresa
 
 // ── GESTIONE COMMITTENTI (pagina dedicata, solo segreteria) ──
@@ -15233,7 +15329,7 @@ document.addEventListener('input',function(ev){
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=8"></script>
-<script src="veste-v2.js?v=24"></script>
+<script src="veste-v2.js?v=25"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

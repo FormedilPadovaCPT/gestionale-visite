@@ -536,7 +536,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     { k: 'comunicazioni', nome: 'Comunicazioni', titoli: ['Promemoria ricontrolli', 'Campagna informativa'], rimandi: [['admin', '📢 Bacheca avvisi ai tecnici', 'sta nella pagina del coordinamento']] },
     { k: 'incarichi', nome: 'Incarichi', titoli: ['Incarichi ai tecnici'], rimandi: [['incarichi', '📋 Incarichi aperti', 'l\'elenco di tutti gli incarichi, da assegnare e da chiudere']] },
     { k: 'anagrafiche', nome: 'Anagrafiche', titoli: ['Gestione imprese', 'Gestione cantieri'], rimandi: [['committenti', '👤 Committenti', 'ricerca, modifica e unione dei committenti'], ['rubrica', '📒 Persone e contatti', 'la rubrica, con la pulizia dei doppioni']] },
-    { k: 'qualita', nome: 'Qualità dati', titoli: ['Imprese visitate senza codice fiscale', 'Riaggancio cantieri senza CNCE', 'Controllo duplicati CNCE'] },
+    { k: 'qualita', nome: 'Qualità dati', titoli: ['Imprese visitate senza codice fiscale', 'Imprese con l\'indirizzo di un\'altra impresa', 'Riaggancio cantieri senza CNCE', 'Controllo duplicati CNCE'] },
     { k: 'report', nome: 'Report ed export', titoli: ['Estrazione XML', 'Schema XSD', 'Estrazione CEIV', 'Report statistico', 'Excel'] },
     { k: 'obiettivi', nome: 'Obiettivo dell\'esercizio', titoli: ['Obiettivo visite'] },
   ];
@@ -606,10 +606,11 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     const [esOra, esPrima] = esercizi();
     const rpc = async (f, a) => { const { data, error } = await sb.rpc(f, a); if (error) throw new Error(error.message); return data; };
     const righe = async (q) => { const { count, error } = await q; if (error) throw new Error(error.message); return count || 0; };
-    const [ossPrima, ossOra, senzaCf, proposte, incarichi, bozze, questioni] = await Promise.all([
+    const [ossPrima, ossOra, senzaCf, mailAltri, proposte, incarichi, bozze, questioni] = await Promise.all([
       conta(async () => (await rpc('osservatorio_controllo', { p_dal: esPrima.dal, p_al: esPrima.al, p_dettaglio: false })).ferme),
       conta(async () => (await rpc('osservatorio_controllo', { p_dal: esOra.dal, p_al: esOra.al, p_dettaglio: false })).ferme),
       conta(async () => ((await rpc('imprese_senza_cf')) || []).length),
+      conta(async () => ((await rpc('imprese_mail_di_altri')) || []).filter((r) => !r.stessa_della_cassa).length),
       conta(async () => { if (!window.propChius || !window.propChius.aperte) throw new Error('funzione non disponibile'); return (await window.propChius.aperte()).size; }),
       conta(() => righe(sb.from('incarichi').select('id', { count: 'exact', head: true }).eq('stato', 'aperto'))),
       conta(() => righe(sb.from('visite').select('visita_id', { count: 'exact', head: true }).eq('elimina', 0).eq('stato', 'bozza'))),
@@ -622,7 +623,8 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       + rigaScr(questioni, 'Questioni in attesa di decisione', 'aperte da coordinatore e segreteria per Direzione e Presidenza', 'vai:admin', 'Apri')
       + rigaScr(incarichi, 'Incarichi aperti', 'da assegnare, da evadere o con la visita fatta e da chiudere', 'vai:incarichi', 'Apri')
       + rigaScr(bozze, 'Verbali ancora in bozza', 'di tutti i tecnici: restano fuori da statistiche e Osservatorio finché non si chiudono', 'vai:lista', 'Apri')
-      + rigaScr(senzaCf, 'Imprese visitate senza codice fiscale', 'per le società «= P.IVA» lo copia: resta da confermare', 'gruppo:qualita', 'Apri');
+      + rigaScr(senzaCf, 'Imprese visitate senza codice fiscale', 'per le società «= P.IVA» lo copia: resta da confermare', 'gruppo:qualita', 'Apri')
+      + rigaScr(mailAltri, 'Imprese con l\'indirizzo di un\'altra impresa', 'i loro verbali partono verso l\'indirizzo sbagliato: si decide riga per riga', 'gruppo:qualita', 'Apri');
   }
 
   /* ── OGGI: le bozze aperte di chi è collegato ── */
