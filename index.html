@@ -2368,7 +2368,7 @@ window.onunhandledrejection = function(e) {
 };
 </script>
 
-<script src="app-data.js?v=10"></script>
+<script src="app-data.js?v=11"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -3568,6 +3568,8 @@ function renderImpreseAccordion(){
       const el=$(`im-${f}-${idx}`)
       if(el)el.oninput=()=>S.imprese[idx][f]=el.value
     })
+    // (03/10/2026) l'indirizzo di un'altra impresa del verbale non si può scrivere qui: si controlla uscendo dal campo
+    {const _em=$(`im-email_verbale-${idx}`);if(_em)_em.onchange=()=>{mailImpresaControlla(idx).catch(e=>console.warn('controllo e-mail impresa:',e))}}
     ;['nr_lav','nr_lav_str'].forEach(f=>{
       const el=$(`im-${f}-${idx}`)
       if(el)el.oninput=()=>S.imprese[idx][f]=+el.value||0
@@ -4817,6 +4819,30 @@ function cantiereMancanze(d){
   return out
 }
 
+/* (03/10/2026, sera) E-MAIL DELLE IMPRESE DEL VERBALE. La regola è mailImpreseDoppie (app-data.js).
+   _mailAnagImprese legge gli indirizzi che le imprese del verbale hanno in anagrafica:
+   {IMPRESA_ID maiuscolo: [indirizzi]}, oppure null se la lettura non riesce (non è «nessun indirizzo»). */
+async function _mailAnagImprese(){
+  const ids=[...new Set(S.imprese.map(im=>String(im.impresa_id||'').trim()).filter(Boolean))]
+  if(!ids.length)return{}
+  const{data,error}=await sb.from('imprese').select('impresa_id,impresa_email_ref,impresa_email2,impresa_email3').in('impresa_id',ids)
+  if(error){console.warn('e-mail delle imprese non lette:',error.message);return null}
+  const m={};(data||[]).forEach(r=>{m[String(r.impresa_id).trim().toUpperCase()]=[r.impresa_email_ref,r.impresa_email2,r.impresa_email3]})
+  return m
+}
+/* Uscendo dal campo «Email invio verbale»: se l'indirizzo è di un'altra impresa del verbale si toglie
+   subito, con il motivo. Il salvataggio rifà lo stesso controllo: questo serve a dirlo prima. */
+async function mailImpresaControlla(idx){
+  const im=S.imprese[idx]
+  if(!im||!String(im.email_verbale||'').trim()||S.imprese.filter(x=>x&&x.impresa_id).length<2)return
+  const anag=await _mailAnagImprese()
+  const err=mailImpreseDoppie(S.imprese,anag).find(x=>x.campo==='im-email_verbale-'+idx)
+  if(!err)return
+  im.email_verbale=''
+  const el=$(`im-email_verbale-${idx}`);if(el)el.value=''
+  toast(err.testo,'err',12000)
+}
+
 /* (03/10/2026) L'ELENCO INTERO DI CIÒ CHE MANCA, non un errore per volta. Le righe vengono dal
    database (chiudi_verbale → verbale_mancanze) o dal controllo dei doppioni: {cosa, tab, campo, testo}.
    Toccando una riga si va al campo. «scheda-cantiere» apre la scheda del cantiere scelto. */
@@ -4853,6 +4879,9 @@ function mostraMancanze(lista,opt){
     +'<ol style="margin:0 0 14px;padding-left:22px;line-height:1.4">'
     +lista.map((m,i)=>'<li style="margin-bottom:8px"><button type="button" data-i="'+i+'" style="all:unset;cursor:pointer;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #e3e3e3;border-left:3px solid #e7500f;border-radius:6px;background:#fafafa">'+esc(m.testo||m.cosa||'')+'</button></li>').join('')
     +'</ol><div style="display:flex;justify-content:flex-end"><button type="button" data-chiudi="1" class="btn-outline">Chiudi</button></div></div>'
+  // titolo e introduzione propri, per gli elenchi che non riguardano la chiusura (es. e-mail doppia, anche in bozza)
+  if(opt.titolo){const _h=velo.querySelector('h3');if(_h)_h.textContent=opt.titolo}
+  if(opt.intro){const _p=velo.querySelector('p');if(_p)_p.textContent=opt.intro}
   velo.addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b)return
     velo.remove()
@@ -4880,6 +4909,17 @@ async function _saveVisitaCorpo(stato){
   if(S.imprese.length===0||!S.imprese[0].impresa_id){toast('Seleziona l\'impresa principale (Tab Imprese)','warn');activateTab(2);return}
   if(!data_v){toast('Inserisci la data della visita','warn');activateTab(0);return}
   if(!tec_id){toast('Seleziona il tecnico (Tab Visita)','warn');activateTab(0);return}
+
+  /* (03/10/2026, sera) LO STESSO INDIRIZZO E-MAIL SU DUE IMPRESE DEL VERBALE: vietato, anche in bozza.
+     Si ferma prima di scrivere qualunque cosa: l'indirizzo finirebbe nella scheda dell'impresa sbagliata. */
+  if(S.imprese.some(im=>im&&String(im.email_verbale||'').trim())&&S.imprese.filter(im=>im&&im.impresa_id).length>1){
+    const _mailDop=mailImpreseDoppie(S.imprese,await _mailAnagImprese())
+    if(_mailDop.length){
+      mostraMancanze(_mailDop,{salvato:false,titolo:'Lo stesso indirizzo e-mail su due imprese',
+        intro:'Non ho salvato niente: i dati sono ancora nella maschera. Tocca la riga per andare al campo da correggere, poi salva di nuovo.'})
+      return
+    }
+  }
 
   // ── CHIUSURA COME DEFINITIVO: ora di fine e ruolo delle imprese (02/10/2026) ──
   // Sta PRIMA del controllo di coerenza, così il controllo vede quello che verrà salvato.
@@ -5216,6 +5256,16 @@ async function _saveVisitaCorpo(stato){
     for(const _im of S.imprese){
       const _ev=String(_im.email_verbale||'').trim(),_id=String(_im.impresa_id||'').trim()
       if(!_ev||!_id||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(_ev))continue
+      /* (03/10/2026, sera) se in anagrafica quell'indirizzo è già di un'ALTRA impresa non lo si scrive nella
+         scheda di questa: vale per questo verbale e basta. Se la lettura non riesce, nel dubbio non si scrive. */
+      {
+        const _q='"'+_ev.replace(/[\\"]/g,'\\$&')+'"'
+        const{data:_gia,error:_eGia}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_email_ref,impresa_email2,impresa_email3')
+          .or(['impresa_email_ref','impresa_email2','impresa_email3'].map(c=>c+'.ilike.'+_q).join(',')).neq('impresa_id',_id).limit(10)
+        if(_eGia){console.warn('indirizzo non controllato in anagrafica, non lo scrivo:',_eGia.message);continue}
+        const _altra=(_gia||[]).find(r=>[r.impresa_email_ref,r.impresa_email2,r.impresa_email3].some(x=>String(x||'').trim().toLowerCase()===_ev.toLowerCase()))
+        if(_altra){toast('L\'indirizzo '+_ev+' in anagrafica è già di «'+(_altra.impresa_nome||_altra.impresa_id)+'»: per «'+(_im.impresa_nome||_id)+'» vale solo per questo verbale, non lo scrivo nella sua scheda. Se è davvero anche il suo, lo aggiunge la segreteria.','warn',10000);continue}
+      }
       const{error:_eEv}=await sb.from('imprese').update({impresa_email_ref:_ev}).eq('impresa_id',_id).or('impresa_email_ref.is.null,impresa_email_ref.eq.')
       if(_eEv)toast('L\'indirizzo dell\'impresa non è entrato in anagrafica: '+_eEv.message,'warn')
     }
@@ -8958,7 +9008,8 @@ async function inviEmailVerbale(){
   }
   S.imprese.forEach((im,idx)=>{
     const ev=(im.email_verbale||vGet(`im-email_verbale-${idx}`)||'').trim()||_anag[String(im.impresa_id||'').trim()]||''
-    if(ev) emails.push({ruolo:'Impresa',nome:im.impresa_nome||`Impresa ${idx+1}`,email:ev,impresa_id:im.impresa_id||null})
+    // (03/10/2026) lo stesso indirizzo fra le imprese si mette una volta sola (il verbale 0003 era partito tre volte allo stesso indirizzo)
+    if(ev&&!emails.some(e=>e.ruolo==='Impresa'&&String(e.email||'').trim().toLowerCase()===ev.toLowerCase())) emails.push({ruolo:'Impresa',nome:im.impresa_nome||`Impresa ${idx+1}`,email:ev,impresa_id:im.impresa_id||null})
   })
   if(_anagErr)toast('Non sono riuscito a leggere le e-mail delle imprese in anagrafica ('+_anagErr+'): controlla i destinatari prima di inviare.','warn',8000)
   emails.push({ruolo:'CPT',nome:'Formedil Padova – Area Sicurezza',email:'cpt@formedilpadova.it'})

@@ -202,6 +202,32 @@ function snapAllineaAlDb(copia,db){
   return{snap:out,diversi:[...new Set(diversi)],avvisi}
 }
 // --- fine snapAllineaAlDb
+/* (03/10/2026, sera) LO STESSO INDIRIZZO E-MAIL NON PUÒ STARE SU DUE IMPRESE DELLO STESSO VERBALE.
+   Dal verbale CPT/26_27/0003: due lavoratori autonomi senza e-mail hanno ricevuto, nel campo
+   «Email invio verbale», l'indirizzo dell'impresa principale; il verbale è partito tre volte allo
+   stesso indirizzo e quell'indirizzo è finito nelle schede dei due autonomi, come se fosse il loro.
+   Vietato: un indirizzo SCRITTO nella riga di un'impresa non può essere quello di un'altra impresa
+   del verbale, né perché l'altra lo ha in anagrafica né perché è già stato scritto in una riga
+   precedente. Chi non ha un suo indirizzo resta senza: il verbale arriva comunque all'altra impresa.
+   imprese = le righe del verbale {impresa_id, impresa_nome, email_verbale};
+   anag = {IMPRESA_ID in maiuscolo: [indirizzi in anagrafica]}, oppure null se non è stata letta
+          (allora si confrontano solo gli indirizzi scritti).
+   Rende le righe da correggere: [{cosa:'email-doppia', tab:2, campo, testo}]. */
+function mailImpreseDoppie(imprese,anag){
+  const n=x=>String(x||'').trim().toLowerCase()
+  const righe=(imprese||[]).map((im,i)=>({i,id:String((im&&im.impresa_id)||'').trim().toUpperCase(),
+    nome:String((im&&(im.impresa_nome||im.impresa_id))||('Impresa '+(i+1))).trim(),scritta:n(im&&im.email_verbale)})).filter(r=>r.id)
+  const out=[]
+  for(const r of righe){
+    if(!r.scritta)continue
+    const altra=righe.find(o=>o.i!==r.i&&o.id!==r.id&&(
+      (anag&&(anag[o.id]||[]).some(e=>n(e)===r.scritta))||(o.scritta===r.scritta&&o.i<r.i)))
+    if(altra)out.push({cosa:'email-doppia',tab:2,campo:'im-email_verbale-'+r.i,
+      testo:'L\'indirizzo '+r.scritta+', scritto per «'+r.nome+'», è già quello di «'+altra.nome+'», un\'altra impresa di questo verbale. Lo stesso indirizzo non può stare su due imprese diverse: cancellalo dal campo «Email invio verbale» di «'+r.nome+'». Se non ha un suo indirizzo il campo resta vuoto: il verbale arriva comunque a «'+altra.nome+'».'})
+  }
+  return out
+}
+// --- fine mailImpreseDoppie
 const CERTIF_OPT={1:'Asseverata',2:'Certificata OHSAS 18001',3:'UNI EN ISO 45001',4:'Sistema Qualità UNI EN ISO 9001',5:'Certificazione ambientale ISO 14001'}
 const CEIV_OPT=['C.E.I.V.','EDILCASSA VENETO','CASSA EDILE BELLUNO','CASSA EDILE VENEZIA','CASSA EDILE VICENZA','ALTRO']
 const IMP_LBL={1:'fino a 250.000 €',2:'250.001 – 500.000 €',3:'500.001 – 1.000.000 €',4:'1.000.001 – 1.500.000 €',5:'1.500.001 – 2.500.000 €',6:'2.500.001 – 3.500.000 €',7:'3.500.001 – 5.000.000 €',8:'5.000.001 – 10.000.000 €',9:'10.000.001 – 15.000.000 €',10:'oltre 15.000.000 €',11:'non disponibile'}
