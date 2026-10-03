@@ -154,4 +154,10 @@ assert.ok(js.includes("p.textContent = '◀ Precedente'") && js.includes("n.text
 assert.ok(/function premiPasso\(n\) \{ const b = document\.querySelector\('#tab-bar \.tab-btn\[data-ti="' \+ n \+ '"\]'\);[^}]*b\.click\(\)/.test(js), 'il cambio di passo deve passare dal pulsante dell’app');
 for (const id of ['btn-bozza', 'btn-final']) assert.ok(html.includes('id="' + id + '"') && !js.includes(id), 'Bozza e Definitivo restano quelli di oggi: la veste non li tocca (' + id + ')');
 
+/* ── «Oggi» per il tecnico: i SUOI rientri e incarichi, non quelli di tutti (corretto dall'utente il 03/10/2026) ── */
+assert.ok(js.includes("if (!eSegreteria()) return Object.assign(mio, { tutti: false });"), 'un tecnico vero vede solo le sue righe');
+assert.ok(js.includes("if (ruolo() === 'segreteria') return Object.assign(mio, { tutti: true });"), 'solo la segreteria, nella sua vista, vede quelle di tutti');
+assert.ok(js.includes("tutti || String(v.tecnico_id) === String(mio)") && js.includes("(tutti || String(x.tecnico_email || '').toLowerCase() === io)"), 'rientri e incarichi si filtrano sul tecnico');
+assert.ok(js.includes("visita && !chi.anteprima && (suo || tutti)"), 'guardando la pagina di un altro tecnico non si avvia una visita a suo nome');
+
 console.log('veste-v2: ok');

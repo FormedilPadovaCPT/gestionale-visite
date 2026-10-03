@@ -86,6 +86,29 @@
 
   const ETICHETTE = { dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti' };
 
+  const CHIAVE_TECNICO = 'gv-v2-tecnico';   // sessionStorage: di quale tecnico si guarda la pagina in «Vedi come: Tecnico»
+  let _tecnici = null;       // l'elenco dei tecnici, letto una volta, per la tendina dell'anteprima
+  /* DI CHI sono le righe di «Oggi» (rientri, incarichi, bozze):
+       · un tecnico vero vede le sue;
+       · la segreteria nella sua vista vede quelle di tutti;
+       · la segreteria che guarda «come Tecnico» o «come Coordinatore» vede quelle del tecnico che sceglie nella barra
+         (chiesto dall'utente: il tecnico deve vedere i suoi rientri, non quelli di tutti). */
+  function diChi() {
+    const mio = { id: (S().tecnico && S().tecnico.tecnico_id) || null, email: email(), nome: '' };
+    if (!eSegreteria()) return Object.assign(mio, { tutti: false });
+    if (ruolo() === 'segreteria') return Object.assign(mio, { tutti: true });
+    const scelto = (_tecnici || []).find((x) => String(x.tecnico_id) === leggi(sessionStorage, CHIAVE_TECNICO)) || (_tecnici || [])[0];
+    if (!scelto) return Object.assign(mio, { tutti: false });
+    return { id: scelto.tecnico_id, email: String(scelto.email || '').toLowerCase(), nome: [scelto.tecnico_nome, scelto.tecnico_cognome].filter(Boolean).join(' '), tutti: false, anteprima: true };
+  }
+  async function tecniciLeggi() {
+    if (_tecnici || !window.sb) return;
+    const { data, error } = await window.sb.from('tecnici').select('tecnico_id,tecnico_nome,tecnico_cognome,email').order('tecnico_cognome');
+    if (error) { console.warn('veste v2, tecnici:', error); return; }
+    _tecnici = (data || []).filter((x) => x.email && String(x.email).toLowerCase() !== SEGRETERIA);
+    barra(); oggiDisegna(); bozze().catch(() => {});
+  }
+
   let _utente = null;      // l'e-mail per cui la veste è stata preparata: se cambia utente si ricomincia
   let _aperta = false;     // la pagina di apertura è già stata scelta per questo accesso
   let _letturaFinta = false;
@@ -285,7 +308,14 @@ body.v2.v2-fase3 #tab-bar .tab-btn:not([data-ti="13"]):not([data-ti="14"]):not([
     const att = ruolo();
     el.innerHTML = '<b>Anteprima della veste nuova · Vedi come:</b>'
       + Object.entries(RUOLI).map(([k, r]) => `<button type="button" data-ruolo="${k}" class="${k === att ? 'on' : ''}">${esc(r.nome)}</button>`).join('')
+      + ((att === 'tecnico' || att === 'coordinatore') && _tecnici && _tecnici.length
+        ? '<select id="v2-quale-tec" style="width:auto;font:600 12px Barlow,sans-serif;padding:3px 8px;border-radius:50px;margin-left:6px" data-aiuto="Di quale tecnico vedere la pagina: rientri, incarichi e bozze sono i suoi.">'
+          + _tecnici.map((x) => `<option value="${esc(x.tecnico_id)}"${String(x.tecnico_id) === String(diChi().id) ? ' selected' : ''}>come ${esc([x.tecnico_nome, x.tecnico_cognome].filter(Boolean).join(' '))}</option>`).join('') + '</select>'
+        : '')
       + (att === 'segreteria' ? '' : '<span class="v2-nota">vedi il menu e le pagine di questo ruolo; i dati restano quelli che il database dà a te</span>');
+    const qt = $('v2-quale-tec');
+    if (qt) qt.addEventListener('change', () => { scrivi(sessionStorage, CHIAVE_TECNICO, qt.value); oggiDisegna(); bozze().catch(() => {}); });
+    if ((att === 'tecnico' || att === 'coordinatore') && !_tecnici) tecniciLeggi().catch((e) => console.warn('veste v2, tecnici:', e));
   }
 
   /* ── «Altre app» nell'intestazione: Asseverazione e Servizi CPT escono dal menu ── */
@@ -450,7 +480,7 @@ body.v2.v2-fase3 #tab-bar .tab-btn:not([data-ti="13"]):not([data-ti="14"]):not([
   /* ── OGGI: le bozze aperte di chi è collegato ── */
   async function bozze() {
     const sb = window.sb; const el = $('v2-bozze'); if (!el || !sb) return;
-    const tid = S().tecnico && S().tecnico.tecnico_id;
+    const tid = diChi().id;
     if (!tid || RUOLI[ruolo()].lettura) { el.innerHTML = ''; return; }
     const { data, error } = await sb.from('visite')
       .select('visita_id,nr_verbale,data_visita,cantieri(cantiere_indirizzo,cantiere_civico,comune_nome)')
@@ -511,16 +541,16 @@ body.v2.v2-fase3 #tab-bar .tab-btn:not([data-ti="13"]):not([data-ti="14"]):not([
   }
 
   function oggiDisegna() {
-    const tutti = eSegreteria();                      // la segreteria vede i rientri e gli incarichi di tutti; il tecnico i suoi
-    const mio = S().tecnico && S().tecnico.tecnico_id;
+    const chi = diChi(), tutti = chi.tutti, mio = chi.id;
+    const dopoTitolo = tutti ? ' · tutti i tecnici' : chi.anteprima && chi.nome ? ' · ' + esc(chi.nome) : '';
     const r = $('v2-rientri');
     if (r) {
       const d = _dati.scadenze;
       if (d === undefined) r.innerHTML = '<div class="v2-card" style="color:#888">⏳ Leggo i rientri scaduti…</div>';
       else if (d === null) r.innerHTML = '<div class="v2-card" style="color:#C0392B">Non sono riuscito a leggere i rientri: apri la pagina Scadenze.</div>';
       else {
-        const urg = (d.urgenti || []).filter((v) => tutti || v.tecnico_id === mio);
-        const pross = (d.prossime || []).filter((v) => tutti || v.tecnico_id === mio);
+        const urg = (d.urgenti || []).filter((v) => tutti || String(v.tecnico_id) === String(mio));
+        const pross = (d.prossime || []).filter((v) => tutti || String(v.tecnico_id) === String(mio));
         const righe = urg.slice(0, 5).map((v) => {
           const c = v.cantieri || {}, ind = [c.cantiere_indirizzo, c.cantiere_civico].filter(Boolean).join(' ') || c.cantiere_etichetta || '—';
           const g = Math.abs(v.diffDays || 0), ipc = String(v.ipc || '').toUpperCase();
@@ -529,7 +559,7 @@ body.v2.v2-fase3 #tab-bar .tab-btn:not([data-ti="13"]):not([data-ti="14"]):not([
             + `<div class="v2-bottoni"><a class="btn-outline btn-sm" style="text-decoration:none;border-color:var(--border);color:#565C66" target="_blank" rel="noopener" href="${esc(mappa(c.lat, c.lng, ind + ' ' + (c.comune_nome || '')))}" data-aiuto="Apre il navigatore verso il cantiere.">🧭</a>`
             + `<button type="button" class="btn-outline btn-sm" data-v2-ritorno="${esc(v.visita_id)}" data-v2-verbale="${esc(v.nr_verbale || '')}" data-aiuto="Apre una nuova visita di ritorno su questo cantiere, con cantiere, imprese e non conformità da rivedere già compilati.">Avvia visita</button></div></div>`;
         }).join('');
-        r.innerHTML = `<div class="v2-card"><div class="v2-testa"><div class="v2-titolo">⚠️ Rientri scaduti${tutti ? ' · tutti i tecnici' : ''}</div><small>IPC più alto prima</small></div>`
+        r.innerHTML = `<div class="v2-card"><div class="v2-testa"><div class="v2-titolo">⚠️ Rientri scaduti${dopoTitolo}</div><small>IPC più alto prima</small></div>`
           + (urg.length ? righe : '<div style="padding:8px 0;color:#5F8A12">Nessun rientro scaduto.</div>')
           + `<div class="v2-piede"><a data-v2-vai="scadenze">Tutte le scadenze › </a><span style="color:#888">${urg.length} ${urg.length === 1 ? 'scaduto' : 'scaduti'} · ${pross.length} nei prossimi 60 giorni</span></div></div>`;
       }
@@ -540,8 +570,9 @@ body.v2.v2-fase3 #tab-bar .tab-btn:not([data-ti="13"]):not([data-ti="14"]):not([
       if (d === undefined) i.innerHTML = '<div class="v2-card" style="color:#888">⏳ Leggo gli incarichi…</div>';
       else if (d === null) i.innerHTML = '<div class="v2-card" style="color:#C0392B">Non sono riuscito a leggere gli incarichi: apri la pagina Incarichi.</div>';
       else {
-        const io = email();
-        const aperti = d.filter((x) => x.stato === 'aperto');
+        const io = chi.email;
+        // la segreteria legge gli incarichi di tutti: per un tecnico (vero o guardato in anteprima) si tengono i suoi
+        const aperti = d.filter((x) => x.stato === 'aperto' && (tutti || String(x.tecnico_email || '').toLowerCase() === io));
         const righe = aperti.slice(0, 5).map((x) => {
           const suo = !!x.tecnico_email && String(x.tecnico_email).toLowerCase() === io;
           const visita = typeof window.incTipoAccesso === 'function' && window.incTipoAccesso(x) != null;
@@ -549,12 +580,12 @@ body.v2.v2-fase3 #tab-bar .tab-btn:not([data-ti="13"]):not([data-ti="14"]):not([
           return `<div class="v2-riga"><div class="v2-t"><div class="v2-sopra">n. ${esc(x.id)} · ${esc(x.tipo_richiesta || 'richiesta')}${x.data_richiesta ? ' · dal ' + gg(x.data_richiesta) : ''}${!x.presa_visione_il ? ' · <b style="color:var(--orange)">nuovo</b>' : ''}</div>`
             + `<b>${esc(x.impresa || x.richiedente || '—')}</b><small>${dove ? '› ' + esc(dove) : ''}${tutti && x.tecnico_nome ? (dove ? ' · ' : '') + esc(x.tecnico_nome) : ''}</small></div>`
             + `<div class="v2-bottoni">${dove ? `<a class="btn-outline btn-sm" style="text-decoration:none;border-color:var(--border);color:#565C66" target="_blank" rel="noopener" href="${esc(mappa(null, null, dove))}" data-aiuto="Apre il navigatore verso l'indirizzo dell'incarico.">🧭</a>` : ''}`
-            + (visita && (suo || tutti)
+            + (visita && !chi.anteprima && (suo || tutti)
               ? `<button type="button" class="btn-outline btn-sm" data-v2-incarico="${esc(x.id)}" data-v2-mio="${suo ? 1 : 0}" data-aiuto="Apre il verbale con impresa e cantiere dell'incarico già compilati. Se l'incarico è tuo, lo accetta.">Avvia visita</button>`
               : `<button type="button" class="btn-outline btn-sm" data-v2-vai="incarichi" data-aiuto="Apre la pagina Incarichi, dove accetti, rifiuti o chiudi l'incarico.">Apri</button>`)
             + '</div></div>';
         }).join('');
-        i.innerHTML = `<div class="v2-card"><div class="v2-testa"><div class="v2-titolo">📥 Incarichi da evadere${tutti ? ' · tutti i tecnici' : ''}</div><small>dalla segreteria</small></div>`
+        i.innerHTML = `<div class="v2-card"><div class="v2-testa"><div class="v2-titolo">📥 Incarichi da evadere${dopoTitolo}</div><small>dalla segreteria</small></div>`
           + (aperti.length ? righe : '<div style="padding:8px 0;color:#5F8A12">Nessun incarico da evadere.</div>')
           + `<div class="v2-piede"><a data-v2-vai="incarichi">Tutti gli incarichi › </a><span style="color:#888">${aperti.length} ${aperti.length === 1 ? 'aperto' : 'aperti'}</span></div></div>`;
       }
