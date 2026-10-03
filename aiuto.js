@@ -73,7 +73,9 @@ window.AIUTO_TESTI = {
 
   /* ── verbale ── */
   'btn-new-cant': 'Crea un cantiere nuovo in anagrafica. Prima cerca: se esiste già, meglio usarlo che crearne un doppione.',
-  'btn-edit-cant': 'Corregge i dati del cantiere selezionato: indirizzo, committente, posizione. Vale per tutte le visite di quel cantiere, anche quelle passate.',
+  'btn-edit-cant': 'Corregge e completa i dati del cantiere selezionato: indirizzo, comune, tipo di intervento e di opera, durata, importo, committente, posizione. Vale per tutte le visite di quel cantiere, anche quelle passate. Con la scheda incompleta il verbale non si chiude.',
+  'btn-ora-inizio': 'Scrive nel campo l\'ora di adesso. L\'ora di inizio non è più già compilata: va indicata, perché quella di apertura della maschera non è detto che sia quella della visita.',
+  'btn-ora-fine': 'Scrive l\'ora di adesso come ora di fine della visita. Se lasci il campo vuoto e chiudi il verbale nel giorno della visita, ci va l\'ora in cui lo chiudi.',
   'btn-new-comm': 'Crea un committente nuovo. Cerca prima per nome: i doppioni poi vanno uniti a mano.',
   'btn-edit-comm': 'Completa o corregge i dati del committente selezionato.',
   'btn-save-comm': 'Salva le modifiche al committente.',
@@ -82,7 +84,7 @@ window.AIUTO_TESTI = {
   'btn-add-imp': 'Aggiunge un\'altra impresa presente in cantiere (subappalto, lavoratori autonomi). La prima è l\'affidataria.',
   'btn-foto-upload-all': 'Carica su Drive tutte le foto del verbale, nella cartella del cantiere. Le foto restano sul telefono finché non sono caricate.',
   'btn-bozza': 'Salva il verbale come bozza: lo ritrovi in «Visite» e lo puoi completare dopo. Non parte niente all\'impresa.',
-  'btn-final': 'Chiude il verbale come definitivo: prende il numero, non si modifica più (solo la segreteria può riaprirlo) e va al coordinatore per il controllo. Da qui parte il PDF e la mail all\'impresa.',
+  'btn-final': 'Salva il verbale e prova a chiuderlo come definitivo. Se manca qualcosa di obbligatorio resta bozza e compare l\'elenco di tutto ciò che manca: tocchi una riga e vai al campo. Chiuso, non si modifica più (solo la segreteria può riaprirlo) e va al coordinatore per il controllo.',
   'btn-pdf': 'Genera il PDF del verbale con la tua firma e il logo dell\'ente. Dalla bozza esce con la scritta «bozza».',
   'f-prot-inc': 'Scegli l\'incarico da cui nasce la visita: lo accetti, e si compilano da soli numero della richiesta, impresa e cantiere (se la segreteria li ha indicati). Se ne avevi già scelti altri, ti chiede prima di sostituirli.',
   'btn-email-verbale': 'Prepara la mail all\'impresa con il verbale allegato. Se la mail torna indietro, lo vedi in Dashboard nel riquadro dei verbali non consegnati.',

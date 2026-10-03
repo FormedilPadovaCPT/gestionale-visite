@@ -222,7 +222,10 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
         xv+=_xel('visitaId',v.visita_id,50)+_xel('cantiereId',v.cantiere_id,50)+_xel('impresaId',v.impresa_id,50)+_xel('tecnicoId',v.tecnico_id,50)
         if(v.tecnico2_id)xv+=_xel('secondoTecnicoId',v.tecnico2_id,50)
         xv+=_xel('visitaImpresaRuolo',ruolo)
-        if(v.comm_email)xv+=_xel('visitaImpresaEmailRefVis',v.comm_email,128)
+        /* (03/10/2026) visitaImpresaEmailRefVis è l'e-mail del referente DELL'IMPRESA in quella visita.
+           Qui ci finiva quella del committente (41 visite nell'invio del 22/07/2026). Un indirizzo
+           legato alla singola visita non lo registriamo: il campo è facoltativo e non si esporta;
+           l'e-mail dell'impresa va già nel file delle imprese (impresaEmailRef). */
         if(v.nr_imp!=null)xv+=_xel('visitaImpreseCantiereNum',v.nr_imp)
         if(v.nr_lavoratori!=null)xv+=_xel('visitaLavoratoriCantiereNum',v.nr_lavoratori)
         if(v.nr_ind!=null)xv+=_xel('visitaLavoratoriCantiereAutNum',v.nr_ind)

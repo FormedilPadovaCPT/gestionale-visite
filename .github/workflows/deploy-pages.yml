@@ -63,6 +63,13 @@ jobs:
       - name: Validazione integrità index.html (gate)
         run: python3 tools/valida_index.py index.html
 
+      # (03/10/2026) i test del repo girano a ogni pubblicazione: se uno fallisce non si pubblica.
+      # Prima si eseguivano solo a mano, e una regola rotta arrivava in produzione.
+      - name: Test delle regole (node test/*.test.cjs)
+        run: |
+          set -e
+          for f in test/*.test.cjs; do echo "== $f"; node "$f"; done
+
       - name: Prepara i soli file pubblici
         run: |
           set -e

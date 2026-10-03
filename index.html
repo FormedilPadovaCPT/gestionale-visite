@@ -616,17 +616,14 @@ tr.row-detail-hover:hover td{background:#fff3ed}
               <label>Data sopralluogo *</label>
               <input type="date" id="f-data">
             </div>
-            <div class="field" style="flex:0 0 110px">
-              <label>Ora inizio</label>
-              <input type="time" id="f-da">
-            </div>
-            <div class="field" style="flex:0 0 110px">
-              <label>Ora fine *</label>
-              <input type="time" id="f-a">
+            <div class="field" style="flex:0 0 200px">
+              <label>Ora inizio *</label>
+              <div style="display:flex;gap:4px;align-items:center"><input type="time" id="f-da"><button type="button" class="btn-outline btn-sm" id="btn-ora-inizio" onclick="oraAdesso('f-da')">Adesso</button></div>
             </div>
             <div class="field" style="flex:1 1 240px;max-width:380px">
-              <label>Tipologia di accesso</label>
+              <label>Tipologia di accesso *</label>
               <select id="f-tipo" style="font-size:13px">
+                <option value="">– Scegli –</option>
                 <option value="5">Programmata</option>
                 <option value="1">Su segnalazione</option>
                 <option value="2">Su richiesta</option>
@@ -759,7 +756,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <div class="tipo-chips" style="margin-top:4px">
               <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-pub" value="1"><span>🏛 Pubblico</span></label>
               <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-priv" value="2"><span>🏠 Privato</span></label>
-              <label class="tipo-chip"><input type="radio" name="comm-tipo" id="comm-tipo-nd" value="3"><span>— N/D</span></label>
             </div>
           </div>
           <!-- Blocco body committente: nascosto quando N/D -->
@@ -821,7 +817,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <input type="hidden" id="f-comm-tipo">
           <div class="sect-title">Figure di coordinamento</div>
           <div class="row">
-            <div class="field"><label><span class="check-inline"><input type="checkbox" id="f-coord" checked> Presenza di coordinamento in cantiere</span></label></div>
+            <div class="field" style="max-width:420px"><label>Coordinamento della sicurezza in cantiere (CSP/CSE) *</label><select id="f-coord"><option value="">– Scegli –</option><option value="1">Sì, c'è</option><option value="0">No, non c'è</option></select></div>
           </div>
           <div class="figura-coord-box">
             <div class="figura-title">Responsabile dei lavori (RL)</div>
@@ -984,6 +980,11 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
           <div class="riepilogo-grid" id="rp-dati"></div>
           <div id="rp-zone"></div>
+          <div class="field" style="max-width:460px;margin:14px 0 6px">
+            <label>Ora di fine della visita *</label>
+            <div style="display:flex;gap:6px;align-items:center"><input type="time" id="f-a" style="max-width:140px"><button type="button" class="btn-outline btn-sm" id="btn-ora-fine" onclick="oraAdesso('f-a')">Adesso</button></div>
+            <p style="font-size:11px;color:#888;margin-top:3px">Se la lasci vuota e chiudi il verbale nel giorno della visita, ci metto l'ora in cui lo chiudi.</p>
+          </div>
           <div class="save-actions">
             <button class="btn-secondary" id="btn-bozza">💾 Salva bozza</button>
             <button class="btn-primary" id="btn-final">✅ Definitivo</button>
@@ -1818,16 +1819,16 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>Cod. ISTAT <span style="font-weight:400;font-size:11px;color:#aaa">(per XML, 6 cifre)</span></label><input type="text" id="mc-comune-cod" maxlength="6" placeholder="es. 028001" style="font-family:monospace"></div>
     </div>
     <div class="row">
-      <div class="field"><label>Tipo intervento</label>
+      <div class="field"><label>Tipo intervento *</label>
         <select id="mc-tip-int"><option value="">–</option><option value="1">Costruzione</option><option value="2">Ristrutturazione</option><option value="3">Demolizione</option><option value="4">Ampliamento</option></select></div>
-      <div class="field"><label>Tipo opera</label>
+      <div class="field"><label>Tipo opera *</label>
         <select id="mc-tip-ope"><option value="">–</option><option value="2">Civile</option><option value="1">Industriale</option><option value="3">Commerciale</option><option value="4">Ospedaliera</option><option value="5">Stradale</option><option value="6">Rurale</option><option value="7">Funeraria</option><option value="8">Scolastica</option><option value="9">Ferroviaria</option><option value="10">Marittima</option><option value="11">Fluviale</option><option value="12">Sportiva</option><option value="13">Carceraria</option><option value="14">Campi eolici</option><option value="15">Fotovoltaica</option><option value="16">Altro</option></select></div>
     </div>
     <div class="field hidden" id="mc-tip-ope-altro-wrap"><label>Specificare tipo opera</label><input type="text" id="mc-tip-ope-altro" maxlength="128" placeholder="Descrivere il tipo di opera..."></div>
     <div class="row">
-      <div class="field"><label>Durata cantiere</label>
+      <div class="field"><label>Durata cantiere *</label>
         <select id="mc-durata"><option value="">–</option><option value="1">Fino a 3 mesi</option><option value="2">Da 3 a 12 mesi</option><option value="3">Da 12 a 24 mesi</option><option value="4">Da 24 a 36 mesi</option><option value="5">Da 36 a 48 mesi</option><option value="6">Oltre 48 mesi</option><option value="7">Non disponibile</option></select></div>
-      <div class="field"><label>Importo lavori (€)</label>
+      <div class="field"><label>Importo lavori (€) *</label>
         <select id="mc-importo"><option value="">–</option><option value="1">fino a 250.000</option><option value="2">da 250.001 a 500.000</option><option value="3">da 500.001 a 1.000.000</option><option value="4">da 1.000.001 a 1.500.000</option><option value="5">da 1.500.001 a 2.500.000</option><option value="6">da 2.500.001 a 3.500.000</option><option value="7">da 3.500.001 a 5.000.000</option><option value="8">da 5.000.001 a 10.000.000</option><option value="9">da 10.000.001 a 15.000.000</option><option value="10">oltre 15.000.000</option><option value="11">non disponibile</option></select></div>
     </div>
     <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma" maxlength="50"></div>
@@ -2164,8 +2165,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     </div>
     <div class="tipo-chips" style="margin-bottom:12px">
       <label class="tipo-chip"><input type="radio" name="mc-tipo" id="mc-tipo-pub" value="1"><span>🏛 Pubblico</span></label>
-      <label class="tipo-chip"><input type="radio" name="mc-tipo" id="mc-tipo-priv" value="2" checked><span>🏠 Privato</span></label>
-      <label class="tipo-chip"><input type="radio" name="mc-tipo" id="mc-tipo-nd" value="3"><span>— N/D</span></label>
+      <label class="tipo-chip"><input type="radio" name="mc-tipo" id="mc-tipo-priv" value="2"><span>🏠 Privato</span></label>
     </div>
     <!-- PF -->
     <div id="mc-pf-fields">
@@ -3272,8 +3272,11 @@ async function initForm(snap=null){
   bloccaNrVerbale()
 
   vSet('f-data',today())
-  vSet('f-da',new Date().toTimeString().slice(0,5))
+  // (03/10/2026) l'ora di inizio e il tipo di accesso non nascono già compilati: un campo
+  // precompilato non è una scelta. L'ora si scrive, o si preme «Adesso».
+  vSet('f-da','')
   vSet('f-a','')
+  vSet('f-tipo','')
   // Pre-seleziona il tecnico loggato
   if(S.tecnico?.email) setTecnicoFromEmail(S.tecnico.email)
   vSet('f-tec-id',S.tecnico?.tecnico_id||'')
@@ -3300,7 +3303,7 @@ async function initForm(snap=null){
   const rlstNo=$('f-rlst-no'); if(rlstNo)rlstNo.checked=true
   const rlstH=$('f-rlst'); if(rlstH)rlstH.value=''
   ;['f-privacy','f-note-for-sn','f-segnalazione'].forEach(id=>cSet(id,false))
-  cSet('f-coord',true) // coordinamento presente di default
+  vSet('f-coord','') // (03/10/2026) il coordinamento si sceglie: non nasce più «presente»
   ;['f-nr-lav','f-nr-lav-str','f-nr-imp','f-nr-ind'].forEach(id=>vSet(id,'0'))
 
   buildLavChecks()
@@ -3918,7 +3921,7 @@ async function proponiCommittenteCantiere(cantId){
 window._commTarget='visita'
 function _apriNuovoComm(target,prefill){
   window._commTarget=target
-  $('mc-sogg-pf').checked=true;$('mc-tipo-priv').checked=true
+  $('mc-sogg-pf').checked=true;document.querySelectorAll('input[name="mc-tipo"]').forEach(r=>{r.checked=false})
   ;['mc-comm-titolo','mc-comm-nome','mc-comm-cog','mc-comm-cf','mc-comm-email','mc-comm-tel',
     'mc-comm-rag-soc','mc-comm-piva','mc-comm-cf-pg','mc-comm-email-pg','mc-comm-tel-pg'].forEach(id=>{const el=$(id);if(el)el.value=''})
   $('mc-pf-fields').classList.remove('hidden')
@@ -3930,7 +3933,7 @@ $('btn-mc-comm-new')?.addEventListener('click',()=>_apriNuovoComm('cantiere',vGe
 $('btn-new-comm').onclick=()=>{
   window._commTarget='visita'
   // reset modal
-  $('mc-sogg-pf').checked=true;$('mc-tipo-priv').checked=true
+  $('mc-sogg-pf').checked=true;document.querySelectorAll('input[name="mc-tipo"]').forEach(r=>{r.checked=false})
   ;['mc-comm-titolo','mc-comm-nome','mc-comm-cog','mc-comm-cf','mc-comm-email','mc-comm-tel',
     'mc-comm-rag-soc','mc-comm-piva','mc-comm-cf-pg','mc-comm-email-pg','mc-comm-tel-pg'].forEach(id=>{
     const el=$(id);if(el)el.value=''
@@ -3987,6 +3990,8 @@ $('btn-mc-comm-save').onclick=async()=>{
     tel=vGet('mc-comm-tel').trim()||null
   }
   const tipoVal=document.querySelector('input[name="mc-tipo"]:checked')?.value||null
+  // (03/10/2026) pubblico o privato va detto: è obbligatorio per l'Osservatorio nazionale
+  if(tipoVal!=='1'&&tipoVal!=='2'){toast('Indica se il committente è pubblico o privato: è obbligatorio per l\'Osservatorio nazionale.','warn',7000);return}
   const comm={
     committente_id:isPG?piva:cf,
     committente_nome:nome,
@@ -4473,6 +4478,21 @@ function _useCommittenteEsistente(c){
 $('btn-mc-save').onclick=async()=>{
   const ind=vGet('mc-ind').trim();const civ=vGet('mc-civ').trim()
   if(!ind||!civ){toast('Indirizzo e civico obbligatori','warn');return}
+  /* (03/10/2026) comune, tipo di intervento, tipo di opera, durata e importo sono obbligatori per
+     l'Osservatorio nazionale: un cantiere nuovo nasce completo, e chi apre la scheda dal verbale
+     la completa. Dalle liste della segreteria, su un cantiere già in archivio, si avvisa soltanto. */
+  {
+    const _mancaC=cantiereMancanze({comune:vGet('mc-com'),tipInt:vGet('mc-tip-int'),tipOpe:vGet('mc-tip-ope'),tipOpeAltro:vGet('mc-tip-ope-altro'),durata:vGet('mc-durata'),importo:vGet('mc-importo')})
+    if(_mancaC.length){
+      const _txt=_mancaC.map(x=>x.testo).join('; ')
+      if(!window._editCantId||window._mcGeoFrom==='visita'){
+        toast('Scheda del cantiere incompleta: '+_txt+'. Sono dati obbligatori per l\'Osservatorio nazionale.','err',10000)
+        const _e=$(_mancaC[0].campo);if(_e)_e.focus()
+        return
+      }
+      toast('Attenzione, scheda incompleta: '+_txt+'. Un verbale su questo cantiere non si chiude finché non è completa.','warn',9000)
+    }
+  }
   const fields={
     cantiere_indirizzo:ind,
     cantiere_civico:civ,
@@ -4645,7 +4665,7 @@ function mancaAllaChiusura(d){
   if(_dop) out.push({cosa:'impresa-doppia',tab:2,campo:'im-search-'+_dop.riga,testo:'L\'impresa «'+_dop.nome+'» compare due volte nel verbale (righe '+(_dop.prima+1)+' e '+(_dop.riga+1)+'). Tienila una volta sola: togli la riga in più con la ✕, nel passo Imprese.'})
   if(d.giaDefinitivo) return out
   if(!String(d.oraA||'').trim())
-    out.push({cosa:'ora-fine',tab:0,campo:'f-a',testo:'Manca l\'ora di fine: è obbligatoria per chiudere il verbale. Non posso metterla io, perché il verbale si chiude in un giorno diverso da quello della visita oppure l\'ora di adesso è prima dell\'ora di inizio: scrivila nel primo passo.'})
+    out.push({cosa:'ora-fine',tab:15,campo:'f-a',testo:'Manca l\'ora di fine: è obbligatoria per chiudere il verbale. Non posso metterla io, perché il verbale si chiude in un giorno diverso da quello della visita oppure l\'ora di adesso è prima dell\'ora di inizio: scrivila nell\'ultimo passo, sopra i pulsanti.'})
   const _imp=+d.importo||0
   if(!(_imp>=1&&_imp<=10))
     out.push({cosa:'importo',tab:1,campo:'f-importo',testo:_imp===11
@@ -4665,6 +4685,81 @@ function mancaAllaChiusura(d){
       out.push({cosa:'email-impresa',tab:2,campo:'im-email_verbale-0',testo:'Nessuna impresa del verbale ha un indirizzo e-mail, né in anagrafica né nel campo «Email invio verbale»: il verbale arriverebbe solo alle figure del cantiere. Chiedi l\'indirizzo in cantiere e scrivilo nella riga dell\'impresa, nel passo Imprese.'})
   }
   return out
+}
+
+/* (03/10/2026) Il committente del verbale è diverso da quello della scheda del cantiere?
+   Funzione pura: maiuscole e spazi non contano; se la scheda non ne ha, non è «diverso». */
+function committenteDiverso(scheda,verbale){
+  const k=x=>String(x||'').replace(/\s+/g,'').toUpperCase()
+  return !!k(scheda)&&!!k(verbale)&&k(scheda)!==k(verbale)
+}
+
+/* (03/10/2026) COORDINAMENTO: scelta esplicita. true / false, oppure null se non è stato scelto. */
+function coordVal(){const v=vGet('f-coord');return v==='1'?true:v==='0'?false:null}
+
+/* (03/10/2026) «ADESSO»: scrive nel campo l'ora di Roma di questo momento. */
+function oraAdesso(id){
+  vSet(id,new Date().toLocaleTimeString('it-IT',{timeZone:'Europe/Rome',hour:'2-digit',minute:'2-digit',hour12:false}))
+}
+window.oraAdesso=oraAdesso
+
+/* (03/10/2026) CHE COSA MANCA ALLA SCHEDA DEL CANTIERE. Funzione pura: gli stessi obblighi che il
+   database applica alla chiusura del verbale (verbale_mancanze), detti prima, mentre si compila.
+   «Non disponibile» non basta per durata e importo: si stimano (deciso dall'utente).
+   d = {comune, tipInt, tipOpe, tipOpeAltro, durata, importo} */
+function cantiereMancanze(d){
+  d=d||{}
+  const out=[]
+  if(!String(d.comune||'').trim())out.push({campo:'mc-com',testo:'manca il comune'})
+  if(!(+d.tipInt>=1&&+d.tipInt<=4))out.push({campo:'mc-tip-int',testo:'manca il tipo di intervento'})
+  if(!(+d.tipOpe>=1&&+d.tipOpe<=16))out.push({campo:'mc-tip-ope',testo:'manca il tipo di opera'})
+  else if(+d.tipOpe===16&&!String(d.tipOpeAltro||'').trim())out.push({campo:'mc-tip-ope-altro',testo:'il tipo di opera è «Altro»: scrivi di che opera si tratta'})
+  if(!(+d.durata>=1&&+d.durata<=6))out.push({campo:'mc-durata',testo:+d.durata===7?'la durata è «Non disponibile»: stimala':'manca la durata dei lavori (se non la conosci, stimala)'})
+  if(!(+d.importo>=1&&+d.importo<=10))out.push({campo:'mc-importo',testo:+d.importo===11?'l\'importo è «Non disponibile»: stimalo':'manca l\'importo dei lavori (se non lo conosci, stimalo)'})
+  return out
+}
+
+/* (03/10/2026) L'ELENCO INTERO DI CIÒ CHE MANCA, non un errore per volta. Le righe vengono dal
+   database (chiudi_verbale → verbale_mancanze) o dal controllo dei doppioni: {cosa, tab, campo, testo}.
+   Toccando una riga si va al campo. «scheda-cantiere» apre la scheda del cantiere scelto. */
+function vaiAlCampoMancante(m){
+  m=m||{}
+  if(m.campo==='scheda-cantiere'){activateTab(1);editCantiereForm();return}
+  const _mi=/^im-[a-z_]+-(\d+)$/.exec(m.campo||'')
+  if(_mi)S._impOpen=+_mi[1]
+  let tab=+m.tab||0
+  const _el0=m.campo?$(m.campo):null
+  const _tc=_el0&&_el0.closest('.tab-content')
+  if(_tc&&_tc.dataset.tab!=null)tab=+_tc.dataset.tab
+  saveTabData()
+  activateTab(tab)
+  renderZoneTab(tab)
+  setTimeout(()=>{
+    const _el=m.campo?$(m.campo):null;if(!_el)return
+    const _acc=_el.closest('.imp-acc-body');if(_acc)_acc.classList.add('open')
+    try{_el.scrollIntoView({block:'center'})}catch(_e){}
+    try{_el.focus()}catch(_e){}
+  },150)
+}
+function mostraMancanze(lista,opt){
+  lista=lista||[];opt=opt||{}
+  const _vecchio=$('velo-mancanze');if(_vecchio)_vecchio.remove()
+  const velo=document.createElement('div')
+  velo.id='velo-mancanze'
+  velo.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px'
+  velo.innerHTML='<div role="dialog" aria-modal="true" style="background:#fff;color:#222;max-width:600px;width:100%;max-height:85vh;overflow:auto;border-radius:10px;padding:18px 18px 14px;box-shadow:0 10px 30px rgba(0,0,0,.3);font-size:14px">'
+    +'<h3 style="margin:0 0 6px;font-size:17px;color:#e7500f">Il verbale non è ancora chiuso</h3>'
+    +'<p style="margin:0 0 10px;color:#565c66">'+(opt.salvato?'L\'ho salvato come <b>bozza</b>: non hai perso niente. ':'Non ho salvato niente: i dati sono ancora nella maschera. ')
+    +(lista.length===1?'Per chiuderlo manca una cosa.':'Per chiuderlo mancano '+lista.length+' cose.')+' Tocca una riga per andare al campo; poi premi di nuovo «Definitivo».</p>'
+    +'<ol style="margin:0 0 14px;padding-left:22px;line-height:1.4">'
+    +lista.map((m,i)=>'<li style="margin-bottom:8px"><button type="button" data-i="'+i+'" style="all:unset;cursor:pointer;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #e3e3e3;border-left:3px solid #e7500f;border-radius:6px;background:#fafafa">'+esc(m.testo||m.cosa||'')+'</button></li>').join('')
+    +'</ol><div style="display:flex;justify-content:flex-end"><button type="button" data-chiudi="1" class="btn-outline">Chiudi</button></div></div>'
+  velo.addEventListener('click',e=>{
+    const b=e.target.closest('button');if(!b)return
+    velo.remove()
+    if(b.dataset.i!=null)vaiAlCampoMancante(lista[+b.dataset.i])
+  })
+  document.body.appendChild(velo)
 }
 
 async function saveVisita(stato){
@@ -4706,13 +4801,11 @@ async function saveVisita(stato){
     }
     // ora di fine, importo, lavorazioni in corso, ruolo dell'impresa e un'impresa con l'e-mail sono obbligatori: senza, il verbale non si chiude
     const _manca=mancaAllaChiusura({giaDefinitivo:_giaDef,oraA:vGet('f-a'),importo:vGet('f-importo'),lavorazioni:(S.lavorazioni||[]).length,imprese:S.imprese,mailAnagrafica:_mailAnag})
-    if(_manca.length){
-      const _m0=_manca[0]
-      toast(_m0.testo+(_manca.length>1?' (e altre '+(_manca.length-1)+' cose da completare)':''),'err',10000)
-      activateTab(_m0.tab)
-      setTimeout(()=>{const _el=$(_m0.campo);if(!_el)return;const _acc=_el.closest('.imp-acc-body');if(_acc)_acc.classList.add('open');_el.scrollIntoView({block:'center'});_el.focus()},150)
-      return
-    }
+    /* (03/10/2026) Qui si ferma solo l'impresa doppia, che non va nemmeno salvata. Tutto il resto lo
+       decide il database dopo aver salvato la bozza (chiudi_verbale), e restituisce l'elenco intero:
+       _manca resta per questo solo controllo. */
+    const _doppie=_manca.filter(x=>x.cosa==='impresa-doppia')
+    if(_doppie.length){mostraMancanze(_doppie,{salvato:false});return}
   }
 
   // controllo di coerenza prima del definitivo (controllo-verbale.js, 17/09/2026):
@@ -4732,12 +4825,36 @@ async function saveVisita(stato){
         cantiereId:cant_id, visitaId:S.fd.visita_id||S.savedId||null,
         impresaId:S.imprese[0].impresa_id, tecnicoId:tec_id,
         // (03/10/2026) committente del verbale e figure: il controllo li confronta con la scheda del cantiere e fra loro
-        commVerbale:vGet('f-comm-id')||vGet('f-comm-cf')||vGet('f-comm-piva')||vGet('f-comm-cf-pg'),
+        // (03/10/2026 sera) il committente diverso da quello della scheda non è più un avviso con
+        // «Salva comunque»: lo chiede il salvataggio, più sotto, con una scelta esplicita
+        commVerbale:'',
         commVerbaleNome:[vGet('f-comm-nome'),vGet('f-comm-cog')].map(x=>(x||'').trim()).filter(Boolean).join(' ')||vGet('f-comm-rag-soc')||'',
         figure:['rl','csp','cse','comm','ppre'].map(k=>({ruolo:k,titolo:vGet('f-'+k+'-titolo'),nome:vGet('f-'+k+'-nome'),cog:vGet('f-'+k+'-cog')}))
       })
     }catch(_cv){console.warn('controllo verbale:',_cv)}
     if(!_cvOk)return
+  }
+
+  /* (03/10/2026) IL COMMITTENTE DEL VERBALE NON SOVRASCRIVE IN SILENZIO QUELLO DELLA SCHEDA DEL CANTIERE.
+     Era la dinamica del verbale CPT/26_27/0002: cantiere di un committente, verbale con un altro,
+     e la scheda del cantiere cambiava committente senza che nessuno l'avesse deciso. */
+  {
+    const _ci=String(vGet('f-comm-id')||'').trim()
+    if(cant_id&&_ci){
+      const{data:_cc,error:_eCc}=await sb.from('cantieri').select('cantiere_committente_id,committenti(committente_nome)').eq('cantiere_id',cant_id).maybeSingle()
+      if(_eCc)toast('Non sono riuscito a leggere il committente della scheda del cantiere ('+_eCc.message+'): controlla tu che il cantiere scelto sia quello giusto.','warn',8000)
+      else{
+        const _att=String(_cc&&_cc.cantiere_committente_id||'').trim()
+        if(committenteDiverso(_att,_ci)){
+          const _nomeS=(_cc.committenti&&_cc.committenti.committente_nome)||_att
+          const _nomeV=vGet('f-comm-search')||[vGet('f-comm-nome'),vGet('f-comm-cog')].map(x=>(x||'').trim()).filter(Boolean).join(' ')||vGet('f-comm-rag-soc')||_ci
+          if(!confirm('COMMITTENTE DIVERSO DA QUELLO DEL CANTIERE\n\nLa scheda del cantiere scelto ha come committente:\n   '+_nomeS+' ('+_att+')\nNel verbale hai indicato:\n   '+_nomeV+' ('+_ci+')\n\nSe è un ALTRO cantiere (un altro lotto, un altro committente) premi Annulla e scegli il cantiere giusto, oppure creane uno nuovo.\n\nOK = è lo stesso cantiere e il committente è cambiato: aggiorno la scheda del cantiere\nAnnulla = torno al verbale, non salvo niente')){
+            activateTab(1);const _cs=$('f-cant-search');if(_cs)_cs.focus()
+            return
+          }
+        }
+      }
+    }
   }
 
   // l'incarico di un altro tecnico non si aggancia (02/10/2026): si ferma qui, con il motivo
@@ -4760,6 +4877,11 @@ async function saveVisita(stato){
     toast('Attenzione: il verbale '+_nrNow+' non e\u2019 dell\u2019esercizio della data indicata. Se la data e\u2019 giusta, il numero lo corregge la segreteria.','warn')
   }
   try{
+    /* (03/10/2026) «Definitivo» non scrive più lo stato da qui: il verbale si salva come BOZZA e a
+       chiuderlo è il database (chiudi_verbale), che controlla che sia completo. Un verbale che era
+       già definitivo resta definitivo. */
+    const _chiudi=stato==='definitivo'
+    let _eraDefinitivo=false,_mancanze=null
     let vid=S.fd.visita_id||S.savedId||null
     if(!vid){vid=uuid();S.fd.visita_id=vid}
     // Calcola IPC prima di salvare
@@ -4818,7 +4940,7 @@ async function saveVisita(stato){
       comm_rag_soc:vGet('f-comm-rag-soc')||null,
       nr_imp:computeImpTotals().nr_imp||null,
       nr_ind:computeImpTotals().nr_ind,
-      coord:cGet('f-coord'),
+      coord:coordVal(),
       costi:vGet('f-costi')||null,
       stato_lav:vGet('f-stato-lav')||null,
       note_lav:vGet('f-note-lav')||null,
@@ -4830,7 +4952,7 @@ async function saveVisita(stato){
       note_for_tipi:_tipiSel(),
       segnalazione:cGet('f-segnalazione'),
       data_ritorno:vGet('f-data-ritorno')||null,
-      stato
+      stato:_chiudi?'bozza':stato
     }
 
     /* 01/10/2026 — L'importo dei lavori e' un dato del CANTIERE (un valore solo, come nell'Osservatorio).
@@ -4870,7 +4992,7 @@ async function saveVisita(stato){
          coincidevano più col modulo. Quindi: un definitivo resta definitivo, e i totali di imprese
          e lavoratori si ricalcolano solo se l'elenco delle imprese è stato cambiato davvero. */
       if(byId.stato==='definitivo'){
-        if(stato==='bozza'){stato='definitivo';vistaRow.stato='definitivo'}
+        _eraDefinitivo=true;stato='definitivo';vistaRow.stato='definitivo'
         const{data:_impDb,error:_eImpDb}=await sb.from('visite_imprese_presenti').select('impresa_id,tipo_imp,nr_lav,nr_lav_str').eq('visita_id',vid)
         if(_eImpDb)throw _eImpDb
         const _tDb=computeImpTotals(_impDb||[]),_tOra=computeImpTotals()
@@ -4888,12 +5010,13 @@ async function saveVisita(stato){
       // con un numero proposto dall'app, trovarlo gia' usato vuol dire che un collega ha
       // salvato per primo — e aggiornare «per numero» sovrascriverebbe il SUO verbale.
       const nrv=vistaRow.nr_verbale
-      const{data:byNr}=(nrv&&!S.nrAuto)?await sb.from('visite').select('visita_id').eq('nr_verbale',nrv).maybeSingle():{data:null}
+      const{data:byNr}=(nrv&&!S.nrAuto)?await sb.from('visite').select('visita_id,stato').eq('nr_verbale',nrv).maybeSingle():{data:null}
       if(byNr?.visita_id){
         // Usa il visita_id esistente e aggiorna
         vid=byNr.visita_id
         vistaRow.visita_id=vid
         S.fd.visita_id=vid
+        if(byNr.stato==='definitivo'){_eraDefinitivo=true;stato='definitivo';vistaRow.stato='definitivo'}
         const{error}=await sb.from('visite').update(vistaRow).eq('visita_id',vid)
         if(error)throw error
       } else {
@@ -4972,6 +5095,16 @@ async function saveVisita(stato){
       if(_eEv)toast('L\'indirizzo dell\'impresa non è entrato in anagrafica: '+_eEv.message,'warn')
     }
 
+    /* (03/10/2026) CHIUSURA. Fin qui il verbale è salvato come bozza, con check-list, lavorazioni e
+       imprese già scritte. Se è completo il database lo chiude; se manca qualcosa resta bozza e
+       torna l'elenco intero di ciò che manca. */
+    if(_chiudi&&!_eraDefinitivo){
+      const{data:_cv,error:_eCv}=await sb.rpc('chiudi_verbale',{p_visita_id:vid})
+      if(_eCv)throw new Error('il verbale è salvato come BOZZA, ma non sono riuscito a chiuderlo ('+_eCv.message+'). Riprova con «Definitivo».')
+      if(_cv&&_cv.ok)stato='definitivo'
+      else{stato='bozza';_mancanze=(_cv&&_cv.mancanze)||[]}
+    }
+
     // Snapshot (non-blocking: se la tabella non esiste non blocca il salvataggio)
     try{
       const snap=buildSnap(vid)
@@ -4993,12 +5126,14 @@ async function saveVisita(stato){
     show('btn-pdf')
     show('btn-email-verbale')
     upsertPersoneVisita().catch(_e=>console.warn('upsertPersone:',_e))
-    toast(`Visita salvata come ${stato==='bozza'?'bozza':'definitivo'}`, 'ok')
+    if(_mancanze)toast('Salvato come bozza: per chiuderlo come definitivo manca ancora qualcosa.','warn',6000)
+    else toast(`Visita salvata come ${stato==='bozza'?'bozza':'definitivo'}`, 'ok')
     incAvvisoDopoSalvataggio().catch(e=>console.warn('incAvviso:',e))
 
     // Rettifica: se il verbale era già stato inviato via email e ci sono
     // modifiche rispetto alla versione trasmessa, proponi il reinvio
     try{await checkRettifica(vid)}catch(_re){console.warn('check rettifica:',_re)}
+    if(_mancanze)mostraMancanze(_mancanze,{salvato:true})
   }catch(e){toast('Errore: '+e.message,'err');console.error(e)}
 }
 
@@ -5054,7 +5189,7 @@ function buildSnap(vid=null){
     comm_tel_pg:vGet('f-comm-tel-pg')||null,
     comm_email_alt:vGet('f-comm-email-alt')||null,
     // Tab 1 – Figure coordinamento
-    coord:cGet('f-coord'),
+    coord:coordVal(),
     rl_titolo:vGet('f-rl-titolo')||null,
     rl_nome:vGet('f-rl-nome')||null,
     rl_cog:vGet('f-rl-cog')||null,
@@ -5199,7 +5334,7 @@ function applySnap(snap){
   }
 
   // ── Tab 1 – Figure coordinamento ─────────────────────────────────────────
-  if(snap.coord!=null)cSet('f-coord',snap.coord)
+  if(snap.coord!=null)vSet('f-coord',(snap.coord===true||snap.coord==='true'||snap.coord===1||snap.coord==='1')?'1':'0')
   if(snap.rl_titolo)vSet('f-rl-titolo',snap.rl_titolo)
   if(snap.rl_nome)vSet('f-rl-nome',snap.rl_nome)
   if(snap.rl_cog)vSet('f-rl-cog',snap.rl_cog)
@@ -14762,7 +14897,7 @@ document.addEventListener('input',function(ev){
 <script src="scheda-impresa.js?v=2"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
-<script src="aiuto.js?v=13"></script>
+<script src="aiuto.js?v=14"></script>
 <script src="mail-respinte-tec.js?v=2"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>

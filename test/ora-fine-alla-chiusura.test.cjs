@@ -76,7 +76,7 @@ assert.deepStrictEqual([r1[0].cosa, r1[0].tab, r1[0].campo], ['ruolo', 2, 'im-ti
 assert.ok(/Bianchi/.test(r1[0].testo) && /obbligatorio/.test(r1[0].testo));
 // manca l'ora di fine
 const r2 = manca({ giaDefinitivo: false, importo: '1', oraA: '  ', lavorazioni: 1, imprese: [IMP[0]] });
-assert.deepStrictEqual([r2.length, r2[0].cosa, r2[0].tab, r2[0].campo], [1, 'ora-fine', 0, 'f-a']);
+assert.deepStrictEqual([r2.length, r2[0].cosa, r2[0].tab, r2[0].campo], [1, 'ora-fine', 15, 'f-a']);
 // mancano tutti e tre: nell'ordine dei passi del verbale (Visita, Cantiere, Imprese)
 assert.deepStrictEqual(manca({ giaDefinitivo: false, importo: '1', oraA: '', lavorazioni: 0, imprese: IMP }).map((x) => x.cosa), ['ora-fine', 'lavorazioni', 'ruolo']);
 // nessuna lavorazione in corso: ne serve almeno una, e si va al passo Cantiere
@@ -111,7 +111,7 @@ assert.deepStrictEqual(manca({ giaDefinitivo: true, oraA: '', imprese: IMP }), [
 /* nel salvataggio: dopo il tentativo di mettere l'ora, e fermandosi */
 assert.ok(/mancaAllaChiusura\(\{giaDefinitivo:_giaDef,oraA:vGet\('f-a'\),importo:vGet\('f-importo'\),lavorazioni:\(S\.lavorazioni\|\|\[\]\)\.length,imprese:S\.imprese,mailAnagrafica:_mailAnag\}\)[\s\S]{0,700}return/.test(save[0]), 'se manca qualcosa il salvataggio si ferma');
 assert.ok(save[0].indexOf('oraFineAllaChiusura({') < save[0].indexOf('mancaAllaChiusura({'), 'prima si prova a mettere l’ora, poi si controlla');
-assert.ok(/<label>Ora fine \*<\/label>/.test(html) && /<label>Tipologia \(ruolo in cantiere\) \*<\/label>/.test(html) && /<label>Lavorazioni in corso \* /.test(html) && /<label>Importo lavori \*<\/label>/.test(html), 'i campi obbligatori portano l’asterisco');
+assert.ok(/<label>Ora di fine della visita \*<\/label>/.test(html) && /<label>Tipologia \(ruolo in cantiere\) \*<\/label>/.test(html) && /<label>Lavorazioni in corso \* /.test(html) && /<label>Importo lavori \*<\/label>/.test(html), 'i campi obbligatori portano l’asterisco');
 
 /* checklist, lavorazioni e imprese si riscrivono con delete + insert: l'esito va letto,
    o un insert rifiutato lascia il verbale senza quelle righe in silenzio (02/10/2026) */
