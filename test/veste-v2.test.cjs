@@ -62,7 +62,11 @@ assert.strictEqual(R.tecnico.apre, 'dashboard'); assert.strictEqual(R.coordinato
 assert.strictEqual(R.direttore.apre, 'direzione', 'il Direttore apre su Direzione');
 assert.strictEqual(R.presidenza.apre, 'direzione', 'la Presidenza apre sulla sua pagina');
 assert.strictEqual(R.consigliere.apre, 'dashboard', 'i consiglieri aprono sulla Mappa (corretto dall’utente il 03/10/2026)');
-assert.deepStrictEqual(R.consigliere.menu, ['dashboard', 'statistiche'], 'il consigliere vede Mappa e Statistiche: niente calendario');
+assert.deepStrictEqual(R.consigliere.menu, ['dashboard', 'statistiche', '|', 'az-segnala', 'az-qr', 'az-servizi'], 'il consigliere vede Mappa e Statistiche, più Segnala, QR e Servizi: niente calendario');
+// Segnala cantiere, QR e Servizi CPT nel menu di chi è di sola lettura, sempre a portata (chiesto dall'utente il 03/10/2026)
+for (const k of ['direttore', 'presidenza', 'consigliere']) for (const a of ['az-segnala', 'az-qr', 'az-servizi']) assert.ok(R[k].menu.includes(a), k + ' deve avere «' + a + '» nel menu');
+for (const k of ['tecnico', 'coordinatore', 'segreteria']) assert.ok(!R[k].menu.some((v) => v.startsWith('az-')), k + ' ha quei pulsanti in «Oggi», non nel menu');
+for (const id of ['btn-segnala-dash', 'btn-qr-servizi', 'btn-servizi-cpt']) assert.ok(html.includes('id="' + id + '"') && js.includes("preme: '" + id + "'"), 'la voce di menu deve premere il pulsante di sempre: ' + id);
 // il calendario «Prossimi appuntamenti» è del solo Direttore (deciso dall'utente il 03/10/2026)
 assert.ok(R.direttore.menu.includes('appuntamenti'), 'il Direttore vede il calendario');
 for (const k of ['presidenza', 'consigliere', 'tecnico', 'coordinatore', 'segreteria']) assert.ok(!R[k].menu.includes('appuntamenti'), k + ' non deve vedere il calendario');

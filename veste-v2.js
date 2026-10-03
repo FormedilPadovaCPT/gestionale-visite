@@ -54,12 +54,32 @@
     segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'segreteria'], apre: 'segreteria' },
     tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche'], apre: 'dashboard' },
     coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', '|', 'admin'], apre: 'dashboard' },
-    direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione',   lettura: true },
+    direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti', '|', 'az-segnala', 'az-qr', 'az-servizi'], apre: 'direzione', lettura: true },
     // il calendario è del solo Direttore (deciso dall'utente il 03/10/2026): la Presidenza vede quello che le compete
-    presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard'],                 apre: 'direzione',   lettura: true },
+    presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard', '|', 'az-segnala', 'az-qr', 'az-servizi'], apre: 'direzione', lettura: true },
     // (03/10/2026, corretto dall'utente dopo aver guardato l'anteprima) il consigliere apre sulla Mappa e non vede il calendario
-    consigliere:  { nome: 'Consigliere',     menu: ['dashboard', 'statistiche'],                              apre: 'dashboard',   lettura: true },
+    consigliere:  { nome: 'Consigliere',     menu: ['dashboard', 'statistiche', '|', 'az-segnala', 'az-qr', 'az-servizi'], apre: 'dashboard', lettura: true },
   };
+  /* (03/10/2026, chiesto dall'utente) Per Direzione, Presidenza e consiglieri «Segnala un cantiere», il QR e i Servizi CPT
+     diventano VOCI DEL MENU, così sono sempre a portata e non solo nella pagina della mappa. Fanno quello che fanno
+     i pulsanti di oggi: la voce preme il pulsante di sempre. */
+  const VOCI_AZIONE = [
+    { k: 'az-segnala', testo: '📍 Segnala cantiere', preme: 'btn-segnala-dash', aiuto: 'Apre il modulo per segnalare all’ufficio un cantiere attivo: indirizzo, comune e due righe. La segnalazione arriva alla segreteria.' },
+    { k: 'az-qr', testo: '📱 QR servizi', preme: 'btn-qr-servizi', aiuto: 'Mostra sullo schermo il codice QR del portale servizi, da far inquadrare a chi hai davanti.' },
+    { k: 'az-servizi', testo: 'Servizi CPT ↗', preme: 'btn-servizi-cpt', aiuto: 'Apre in un’altra scheda il portale servizi pubblico, quello che vedono le imprese.' },
+  ];
+  function vociAzione() {
+    const nav = document.querySelector('nav'); if (!nav) return;
+    VOCI_AZIONE.forEach((a) => {
+      if ($('v2-' + a.k)) return;
+      const b = document.createElement('button');
+      b.type = 'button'; b.id = 'v2-' + a.k; b.dataset.v2Voce = a.k; b.textContent = a.testo; b.style.display = 'none';
+      b.setAttribute('data-aiuto', a.aiuto);
+      b.addEventListener('click', () => { const d = $(a.preme); if (d) d.click(); });
+      nav.appendChild(b);
+    });
+  }
+
   const ETICHETTE = { dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti' };
 
   let _utente = null;      // l'e-mail per cui la veste è stata preparata: se cambia utente si ricomincia
@@ -163,6 +183,8 @@ body.v2[data-v2-vista="dashboard"]:not(.viewer-mode) main{display:flex;flex-dire
 body.v2[data-v2-vista="dashboard"] #v2-bozze{order:0}
 body.v2[data-v2-vista="dashboard"] #view-dashboard{order:2}
 body.v2:not([data-v2-vista="dashboard"]) #v2-bozze{display:none}
+/* chi è di sola lettura ha Segnala, QR e Servizi nel menu: nella pagina della mappa non servono due volte */
+body.v2.viewer-mode #dash-segnala-wrap{display:none!important}
 .v2-sezione{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#565C66;margin:6px 2px 10px}
 #v2-torna{display:inline-flex;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--orange);background:#fff;border:1.5px solid var(--orange);border-radius:50px;padding:5px 14px;min-height:0}
 @media(max-width:720px){#v2-uff-menu{flex:1 1 100%;position:static;display:flex;flex-wrap:wrap;gap:4px}#v2-uff-menu button{width:auto;padding:7px 12px;border:1px solid var(--border)}#v2-uff-menu hr{display:none}body.v2 nav{padding:0 10px}}
@@ -178,7 +200,7 @@ body.v2:not([data-v2-vista="dashboard"]) #v2-bozze{display:none}
     const ordine = {};
     r.menu.forEach((v) => { if (v === '|') { dopoSpazio = true; return; } ordine[v] = { n: n++, primoADestra: dopoSpazio && !Object.values(ordine).some((o) => o.destra), destra: dopoSpazio }; });
     nav.querySelectorAll('button').forEach((b) => {
-      const v = b.dataset.view;
+      const v = b.dataset.view || b.dataset.v2Voce;
       if (b.dataset.v2Etichetta === undefined) { b.dataset.v2Etichetta = b.firstChild && b.firstChild.nodeType === 3 ? b.firstChild.textContent : ''; b.dataset.v2Mostra = b.style.display; }
       const o = v && ordine[v];
       if (!o) { b.style.display = 'none'; return; }
@@ -258,7 +280,7 @@ body.v2:not([data-v2-vista="dashboard"]) #v2-bozze{display:none}
 
   function prepara() {
     document.body.classList.add('v2');
-    stile(); menu(); barra(); altreApp(); tieniEtichette();
+    stile(); vociAzione(); menu(); barra(); altreApp(); tieniEtichette();
     const lettura = !!RUOLI[ruolo()].lettura;
     if (lettura && !document.body.classList.contains('viewer-mode')) { document.body.classList.add('viewer-mode'); _letturaFinta = true; }
     if (!lettura && _letturaFinta) { document.body.classList.remove('viewer-mode'); _letturaFinta = false; }
@@ -267,7 +289,7 @@ body.v2:not([data-v2-vista="dashboard"]) #v2-bozze{display:none}
     if (!document.body.classList.contains('v2')) return;
     document.body.classList.remove('v2');
     if (_letturaFinta) { document.body.classList.remove('viewer-mode'); _letturaFinta = false; }
-    ['v2-barra', 'v2-altre', 'v2-uff-menu', 'v2-scrivania', 'v2-rimandi', 'v2-bozze', 'v2-sintesi', 'v2-torna', 'v2-tit-inc', 'v2-tit-scad'].forEach((id) => { const e = $(id); if (e) e.remove(); });
+    ['v2-barra', 'v2-altre', 'v2-uff-menu', 'v2-scrivania', 'v2-rimandi', 'v2-bozze', 'v2-sintesi', 'v2-torna', 'v2-az-segnala', 'v2-az-qr', 'v2-az-servizi'].forEach((id) => { const e = $(id); if (e) e.remove(); });
     const u = $('view-segreteria'); if (u) { u.classList.remove('v2-uff'); u.querySelectorAll('.adm-section').forEach((s) => { s.style.display = ''; }); }
     menuComEra();
   }
