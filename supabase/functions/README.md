@@ -10,6 +10,7 @@ Supabase e su un disco: qui c'è la copia versionata.
 | `upload-foto` | Carica su Drive le foto del verbale, in una sottocartella per verbale; sa anche rileggerle (`download: true`) quando si rigenera il PDF. | form della visita |
 | `upload-pdf` | Deposita il PDF del verbale nella cartella verbali. | invio verbale |
 | `send-relazione-stage` | Archivia nel vault e invia la relazione di visita allo stagista. | pagina Incarichi |
+| `dati-impresa-ufficiali` | Data una P.IVA o un CF, legge i dati dell'impresa da InfoCamere (dati di elevato valore: solo società, lun-ven 8-18) e da VIES (sempre). Non scrive nella scheda: propone. Token InfoCamere in `s_config.infocamere_hvd_token`, registro in `imprese_dati_ufficiali_log`. Logica di lettura in `parse.js`, provata da `test/dati-ufficiali.test.cjs`. | maschere Nuova / Modifica impresa |
 
 ## Secret da configurare
 

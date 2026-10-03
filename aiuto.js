@@ -130,6 +130,9 @@ window.AIUTO_TESTI = {
   'btn-mc-geo-paste': 'Applica le coordinate incollate dal navigatore o da Maps.',
   'btn-mc-save': 'Salva il cantiere.',
   'btn-mi-save': 'Salva l\'impresa. La partita IVA è la chiave: se esiste già, l\'app ti propone la scheda esistente.',
+  /* ── dati ufficiali dell'impresa (03/10/2026) ── */
+  'btn-mi-ufficiali': 'Cerca la P.IVA o il codice fiscale scritti qui sopra in InfoCamere (società, lun-ven 8-18) e in VIES (sempre). Ti mostra i dati ufficiali accanto ai tuoi: scegli tu che cosa riportare, e poi salvi.',
+  'btn-ei-ufficiali': 'Confronta la scheda con i dati ufficiali di InfoCamere (società, lun-ven 8-18) e VIES (sempre). Riporti solo quello che spunti, e non salva da solo. Il codice fiscale, che è la chiave, da qui non si cambia.',
   'btn-ei-save': 'Salva le modifiche all\'impresa.',
   'btn-ec-save': 'Salva le modifiche al cantiere.',
   'btn-mc-comm-save': 'Salva il committente.',

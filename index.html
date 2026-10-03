@@ -4337,6 +4337,8 @@ $('btn-mi-save').onclick=async()=>{
     contratto_ccnl_altro:ccnlVal==='13'?vGet('mi-ccnl-altro').trim()||null:null,
     elimina:0
   }
+  // (03/10/2026) CAP e provincia riportati dai dati ufficiali (dati-ufficiali.js), se il comune e' ancora quello
+  Object.assign(imp,window.DatiUfficiali?.extra('mi',imp.comune)||{})
   // Avviso se esistono gia imprese simili (evita doppioni)
   const simili=await findSimiliImprese(nome,piva,cf)
   if(simili.length){
@@ -11939,6 +11941,8 @@ async function admSaveEditImpresa() {
     contratto_ccnl: isAltro ? 'ALTRO' : ccnlVal,
     contratto_ccnl_altro: isAltro ? (vGet('ei-ccnl-altro').trim() || null) : null,
   }
+  // (03/10/2026) CAP, provincia e forma giuridica riportati dai dati ufficiali (dati-ufficiali.js)
+  Object.assign(updates, window.DatiUfficiali?.extra('ei', updates.comune) || {})
   // i campi marcati riservati non si sovrascrivono se chi salva non è
   // segreteria: sono disabilitati in form, e qui non si scrive null sopra
   // un valore che non si è nemmeno visto
@@ -15317,9 +15321,10 @@ document.addEventListener('input',function(ev){
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
 <script src="riepilogo-verbali.js?v=2"></script>
 <script src="scheda-impresa.js?v=2"></script>
+<script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
-<script src="aiuto.js?v=17"></script>
+<script src="aiuto.js?v=18"></script>
 <script src="mail-respinte-tec.js?v=2"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
