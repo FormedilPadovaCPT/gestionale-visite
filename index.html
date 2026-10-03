@@ -5173,7 +5173,6 @@ async function _saveVisitaCorpo(stato){
        due passi viene rifiutato e nessuno lo legge, il verbale resta senza quelle righe in silenzio.
        _scritto ferma il salvataggio e lo dice: i dati restano nella maschera, si può riprovare. */
     const _scritto=(r,cosa)=>{if(r&&r.error)throw new Error('non sono riuscito a salvare '+cosa+' ('+r.error.message+'). Il verbale NON è completo: riprova a salvare.')}
-    _scritto(await sb.from('visite_checklist').delete().eq('visita_id',vid),'la checklist')
     const chkMerge={}
     Object.entries(S.checklist).filter(([,v])=>v).forEach(([codice,valore])=>{
       if(!chkMerge[codice])chkMerge[codice]={visita_id:vid,codice,valore,nota:null}
@@ -5184,16 +5183,9 @@ async function _saveVisitaCorpo(stato){
       else chkMerge[codice].nota=nota
     })
     const chkRows=Object.values(chkMerge)
-    if(chkRows.length)_scritto(await sb.from('visite_checklist').insert(chkRows),'la checklist')
-
     // Lavorazioni (genere › fase › lavorazione)
-    _scritto(await sb.from('visite_lavorazioni').delete().eq('visita_id',vid),'le lavorazioni')
-    if(S.lavorazioni.length)_scritto(await sb.from('visite_lavorazioni').insert(
-      S.lavorazioni.map(l=>({visita_id:vid,genere:l.genere,fase:l.fase,lavorazione:l.lavorazione}))
-    ),'le lavorazioni')
-
+    const lavRows=S.lavorazioni.map(l=>({visita_id:vid,genere:l.genere,fase:l.fase,lavorazione:l.lavorazione}))
     // Imprese presenti
-    _scritto(await sb.from('visite_imprese_presenti').delete().eq('visita_id',vid),'le imprese presenti')
     const impRows=S.imprese.filter(im=>im.impresa_id).map((im,i)=>({
       visita_id:vid,impresa_id:im.impresa_id,
       att:im.att||null,nom_prec:[im.capo_nome||'',im.capo_cog||''].map(s=>s.trim()).filter(Boolean).join(' ')||im.nom_prec||null,badge:im.badge||null,
@@ -5202,7 +5194,24 @@ async function _saveVisitaCorpo(stato){
       tipo_imp:+im.tipo_imp||null,ruolo:TIPO_IMP_RUOLO[+im.tipo_imp]||im.ruolo||null,
       is_principale:i===0,ordine:i
     }))
-    if(impRows.length)_scritto(await sb.from('visite_imprese_presenti').insert(impRows),'le imprese presenti')
+    /* (03/10/2026, sera) CHECK-LIST, LAVORAZIONI E IMPRESE IN UN COLPO SOLO. Erano sei chiamate in fila
+       (cancella e riscrivi, per tre tabelle): se la linea cadeva a metà il verbale restava nel database
+       senza check-list o senza imprese finché non lo si risalvava. Ora le riscrive il database in una
+       sola transazione (salva_figli_verbale): o passano tutte, o resta tutto com'era. */
+    const{data:_fg,error:_eFg}=await sb.rpc('salva_figli_verbale',{p_visita_id:vid,p_checklist:chkRows,p_lavorazioni:lavRows,p_imprese:impRows})
+    if(_eFg&&(_eFg.code==='PGRST202'||_eFg.code==='42883')){
+      // la funzione non c'è (o il servizio non la vede ancora): si salva coi sei passi di prima, che leggono ognuno il proprio esito
+      console.warn('salva_figli_verbale non disponibile, salvo coi passi di prima:',_eFg.message)
+      _scritto(await sb.from('visite_checklist').delete().eq('visita_id',vid),'la checklist')
+      if(chkRows.length)_scritto(await sb.from('visite_checklist').insert(chkRows),'la checklist')
+      _scritto(await sb.from('visite_lavorazioni').delete().eq('visita_id',vid),'le lavorazioni')
+      if(lavRows.length)_scritto(await sb.from('visite_lavorazioni').insert(lavRows),'le lavorazioni')
+      _scritto(await sb.from('visite_imprese_presenti').delete().eq('visita_id',vid),'le imprese presenti')
+      if(impRows.length)_scritto(await sb.from('visite_imprese_presenti').insert(impRows),'le imprese presenti')
+    }else{
+      if(_eFg||!_fg||!_fg.ok)throw new Error('non sono riuscito a salvare check-list, lavorazioni e imprese ('+((_eFg&&_eFg.message)||'nessuna risposta dal database')+'). Nel database sono rimaste quelle di prima; i dati nuovi sono ancora nella maschera: riprova a salvare.')
+      if(_fg.checklist!==chkRows.length||_fg.lavorazioni!==lavRows.length)throw new Error('il database ha scritto '+_fg.checklist+' voci di check-list su '+chkRows.length+' e '+_fg.lavorazioni+' lavorazioni su '+lavRows.length+'. I dati sono ancora nella maschera: riprova a salvare.')
+    }
     // (03/10/2026) l'indirizzo scritto in «Email invio verbale» entra in anagrafica, se lì non ce n'è nessuno
     for(const _im of S.imprese){
       const _ev=String(_im.email_verbale||'').trim(),_id=String(_im.impresa_id||'').trim()

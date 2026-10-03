@@ -32,7 +32,10 @@
     scritture: [],
     attivo: true,
     ritardoNumero: 0,                                        // millisecondi: finge un telefono con poca linea
-    finto: { chiudi_verbale: { ok: true, mancanze: [] } }    // risposta finta delle funzioni fermate
+    finto: {                                                 // risposta finta delle funzioni fermate (valore, o funzione del corpo)
+      chiudi_verbale: { ok: true, mancanze: [] },
+      salva_figli_verbale: (c) => ({ ok: true, checklist: (c.p_checklist || []).length, lavorazioni: (c.p_lavorazioni || []).length, imprese: (c.p_imprese || []).length })
+    }
   };
   const avvolgi = (vero) => async (input, init = {}) => {
     const url = typeof input === 'string' ? input : (input.url || String(input));
@@ -46,7 +49,7 @@
     let corpo = init.body; try { corpo = JSON.parse(corpo); } catch (e) { /* non è JSON: resta com'è */ }
     reg.scritture.push({ method: metodo, url: url.replace(/^https:\/\/[^/]+/, ''), body: corpo });
     const J = (o, st = 200) => new Response(JSON.stringify(o), { status: st, headers: { 'Content-Type': 'application/json' } });
-    if (m) return J(m[1] in reg.finto ? reg.finto[m[1]] : null);
+    if (m) { const f = reg.finto[m[1]]; return J(typeof f === 'function' ? f(corpo || {}) : (m[1] in reg.finto ? f : null)); }
     if (url.includes('/functions/v1/')) return J({ ok: true, secco: true });
     let pref = ''; try { const h = init.headers; pref = (h && (h.get ? h.get('Prefer') : (h.Prefer || h.prefer))) || ''; } catch (e) { /* niente */ }
     if (/return=representation/.test(pref)) return J([], metodo === 'POST' ? 201 : 200);

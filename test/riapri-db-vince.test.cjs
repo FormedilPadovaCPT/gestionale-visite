@@ -140,4 +140,13 @@ assert.ok(/S\._formBase=null\s+try\{_formAzzera\(\)\}/.test(html), 'initForm azz
 assert.strictEqual((html.match(/const _pronta=initForm\(\)/g) || []).length, 3, '«+ Visita», «+ Nuova visita» e «Fai la visita» aspettano initForm');
 assert.ok(!/initForm\(\);?\s*navTo\('form'\)\s*setTimeout\(/.test(html), 'niente più dati scritti a tempo dopo initForm: lo svuotamento ci passava sopra');
 
+// check-list, lavorazioni e imprese si riscrivono in una sola transazione; i sei passi di prima restano solo se la funzione non c'è
+const figli = html.slice(html.indexOf("await sb.rpc('salva_figli_verbale'"), html.indexOf('entra in anagrafica, se lì non ce n'));
+assert.ok(html.includes("await sb.rpc('salva_figli_verbale',{p_visita_id:vid,p_checklist:chkRows,p_lavorazioni:lavRows,p_imprese:impRows})"), 'il salvataggio passa da salva_figli_verbale');
+assert.ok(/if\(_eFg&&\(_eFg\.code==='PGRST202'\|\|_eFg\.code==='42883'\)\)\{/.test(figli), 'il ripiego vale solo quando la funzione non esiste, non per un errore qualunque');
+assert.ok(/\}else\{\s+if\(_eFg\|\|!_fg\|\|!_fg\.ok\)throw new Error\(/.test(figli) && figli.includes('_fg.checklist!==chkRows.length'), 'un errore della funzione ferma il salvataggio e lo dice');
+const sql = fs.readFileSync(path.join(dir, 'supabase', 'sql', '2026_10_03_salva_figli_verbale.sql'), 'utf8');
+assert.ok(!/security definer/i.test(sql.replace(/--[^\n]*/g, '')) && /grant execute[^;]+to authenticated/i.test(sql) && /revoke all[^;]+from public, anon/i.test(sql), 'la funzione gira coi permessi di chi la chiama e non è aperta a tutti');
+assert.ok(sql.includes("coalesce(nullif(x->>'valore', ''), 'nota')"), 'anche il database mette «nota» a una nota senza valutazione');
+
 console.log('riapri-db-vince: ok');
