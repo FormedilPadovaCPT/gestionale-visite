@@ -54,6 +54,19 @@ function attributi(tag) {
   return a
 }
 
+// Scadenza scritta dentro la chiave InfoCamere (JWT, campo exp in secondi).
+// La chiave dura 6 ore: saperlo prima evita una chiamata che sarebbe respinta.
+export function scadenzaToken(token) {
+  try {
+    const parte = String(token || '').split('.')[1]
+    if (!parte) return null
+    const b64 = parte.replace(/-/g, '+').replace(/_/g, '/')
+    const testo = typeof atob === 'function' ? atob(b64) : Buffer.from(b64, 'base64').toString('utf8')
+    const exp = JSON.parse(testo).exp
+    return typeof exp === 'number' ? new Date(exp * 1000) : null
+  } catch (_) { return null }
+}
+
 // <imprese><data-erogazione .../><dati-impresa ...>...</dati-impresa></imprese>
 // Nessuna impresa trovata = risposta 200 con la sola data-erogazione.
 export function parseInfocamere(xml) {
@@ -73,7 +86,8 @@ export function parseInfocamere(xml) {
       return {
         ragione_sociale: (testa.denominazione || '').replace(/\s+/g, ' ').trim(),
         cf: testa['c-fiscale'] || '',
-        stato: testa['c-statoimpresa'] || '',
+        // la documentazione scrive c-statoimpresa, la risposta vera (03/10/2026) c-stato-impresa
+        stato: testa['c-stato-impresa'] || testa['c-statoimpresa'] || '',
         data_registrazione: testa['dt-registrazione'] || '',
         nace: testa['c-nace'] || '',
         forma_giuridica: forma,

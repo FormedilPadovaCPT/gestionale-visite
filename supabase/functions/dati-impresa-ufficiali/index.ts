@@ -9,8 +9,8 @@
 //    attività, sede legale, codice NACE. Copre SOLO le società (di capitali,
 //    di persone, cooperative e consortili): le ditte individuali non ci sono.
 //    Risponde dal lunedì al venerdì, 8-18. Il token sta in
-//    s_config.infocamere_hvd_token: è a durata limitata, e quando scade la
-//    segreteria ne chiede uno nuovo sul portale e lo incolla lì, senza deploy.
+//    s_config.infocamere_hvd_token. La chiave dura SEI ORE (campo exp del
+//    JWT, verificato il 03/10/2026): scaduta, non la si manda nemmeno.
 //  · VIES della Commissione europea: P.IVA valida sì/no, ragione sociale e
 //    indirizzo. Sempre acceso, anche la sera e nel fine settimana, e copre
 //    anche le ditte individuali.
@@ -19,7 +19,7 @@
 // richiesta lascia una riga in imprese_dati_ufficiali_log, così la segreteria
 // vede se un canale ha smesso di rispondere (token scaduto, servizio giù).
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { normalizzaCodice, isPiva, isCf, parseVies, parseInfocamere } from './parse.js'
+import { normalizzaCodice, isPiva, isCf, parseVies, parseInfocamere, scadenzaToken } from './parse.js'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -69,6 +69,10 @@ async function vies(piva: string): Promise<Esito> {
 async function infocamere(cf: string, token: string): Promise<Esito> {
   if (!cf) return { esito: 'non_interrogato', messaggio: 'serve un codice fiscale o una partita IVA' }
   if (!token) return { esito: 'non_configurato', messaggio: 'chiave InfoCamere non ancora impostata dalla segreteria', chiave: cf }
+  const scade = scadenzaToken(token)
+  if (scade && scade.getTime() < Date.now() + 60_000) {
+    return { esito: 'token_scaduto', messaggio: 'chiave InfoCamere scaduta: avvisa la segreteria', chiave: cf }
+  }
   try {
     const r = await conAttesa(`${IC_URL}?cf=${encodeURIComponent(cf)}`, {
       headers: { 'Id-Token': token, Accept: 'application/xml' },

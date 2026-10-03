@@ -51,6 +51,26 @@ const assert = require('assert')
   // nessuna impresa: la risposta ha solo la data di erogazione
   assert.strictEqual(parse.parseInfocamere('<imprese><data-erogazione data="06/06/2024"/></imprese>').imprese.length, 0)
 
+  // risposta VERA del 03/10/2026 (ICM S.p.A.): lo stato sta in c-stato-impresa, non c-statoimpresa
+  const vera = parse.parseInfocamere(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<imprese>
+    <data-erogazione data="03/10/2026"/>
+    <dati-impresa denominazione="ICM S.P.A." c-fiscale="00184540276" c-stato-impresa="Registrata" dt-registrazione="20/09/1994" c-nace="42.11">
+        <forma-giuridica codice="SP">SOCIETA' PER AZIONI</forma-giuridica>
+        <indirizzo comune="VICENZA" provincia="VI" toponimo="VIALE" via="DELL'INDUSTRIA" n-civico="42" cap="36100"/>
+        <data-aggiornamento data="21/07/2026"/>
+    </dati-impresa>
+</imprese>`).imprese[0]
+  assert.strictEqual(vera.stato, 'Registrata', "lo stato dell'impresa va letto da c-stato-impresa")
+  assert.strictEqual(vera.indirizzo, "VIALE DELL'INDUSTRIA, 42")
+  assert.strictEqual(vera.forma_app, 'S.p.A.')
+  assert.strictEqual(vera.aggiornato_al, '21/07/2026')
+
+  // scadenza della chiave (JWT): exp 1791073863 = 04/10/2026 00:31 UTC
+  const finto = 'x.' + Buffer.from(JSON.stringify({ sub: 'prova', exp: 1791073863 })).toString('base64').replace(/=+$/, '') + '.y'
+  assert.strictEqual(parse.scadenzaToken(finto).toISOString(), '2026-10-04T00:31:03.000Z')
+  assert.strictEqual(parse.scadenzaToken('non-una-chiave'), null)
+
   // ── forme giuridiche: solo voci della tendina, mai a stima ──
   assert.strictEqual(parse.formaApp("SOCIETA' A RESPONSABILITA' LIMITATA SEMPLIFICATA"), 'S.r.l.s')
   assert.strictEqual(parse.formaApp("SOCIETA' A RESPONSABILITA' LIMITATA CON UNICO SOCIO"), 'S.r.l. Unipersonale')
