@@ -18,9 +18,9 @@
      · pagina di apertura per ruolo (decise dall'utente): segreteria su
        Ufficio › Scrivania, tecnico e coordinatore su Oggi, Direttore su
        Direzione, Presidenza sulla sua pagina, consiglieri sulla Mappa (senza calendario);
-     · «Oggi»: bozze aperte, poi le scadenze e gli incarichi di oggi, che
-       sono le pagine di sempre mostrate una sotto l'altra (nessuna regola
-       riscritta: le disegnano le funzioni di sempre);
+     · «Oggi»: bozze aperte, cruscotto e sotto le scadenze, che sono la
+       pagina di sempre (nessuna regola riscritta). Gli incarichi restano una
+       pagina a sé, con la voce nel menu e il numero che lampeggia;
      · «Ufficio»: gli strumenti della pagina Segreteria raggruppati con un
        menu a lato, più una Scrivania con i numeri di ciò che aspetta;
      · «Vedi come…»: la segreteria vede menu e pagine degli altri ruoli.
@@ -46,10 +46,12 @@
 
   /* (03/10/2026, corretto dall'utente) «Nuova visita» sta subito dopo «Oggi», prima di «Visite», come nell'app di oggi:
      resta arancione, ma non in fondo a destra. */
+  /* (03/10/2026, corretto dall'utente) Per il tecnico gli INCARICHI tornano una pagina a sé, con la voce nel menu e il
+     numero che lampeggia quando ce ne sono di nuovi, come nell'app di oggi: dentro «Oggi» si perdevano. */
   const RUOLI = {
     segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'segreteria'], apre: 'segreteria' },
-    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche'],                    apre: 'dashboard' },
-    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'admin'],      apre: 'dashboard' },
+    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'incarichi', 'statistiche'],       apre: 'dashboard' },
+    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'incarichi', 'statistiche', '|', 'admin'], apre: 'dashboard' },
     direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione',   lettura: true },
     presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione',   lettura: true },
     // (03/10/2026, corretto dall'utente dopo aver guardato l'anteprima) il consigliere apre sulla Mappa e non vede il calendario
@@ -154,11 +156,10 @@ body.v2 #view-admin tr:hover td,body.v2 #view-segreteria tr:hover td{background:
 body.v2 .adm-wrap details summary{color:#6b7078!important}
 /* «Oggi»: la mappa sta in Cantieri; chi è di sola lettura la tiene (per lui la pagina si chiama Mappa) */
 body.v2:not(.viewer-mode) #dash-map-card{display:none}
-/* «Oggi»: prima le bozze aperte, poi GLI INCARICHI (chiesto dall'utente: sotto tutto il resto non li vedrebbe nessuno),
-   poi il cruscotto e in fondo le scadenze. Le pagine sono quelle di sempre: cambia solo l'ordine in cui si vedono. */
+/* «Oggi»: le bozze aperte, il cruscotto e in fondo le scadenze. Gli incarichi NON stanno qui: hanno la loro pagina
+   e la voce nel menu col numero che lampeggia (chiesto dall'utente). */
 body.v2[data-v2-vista="dashboard"]:not(.viewer-mode) main{display:flex;flex-direction:column}
 body.v2[data-v2-vista="dashboard"] #v2-bozze{order:0}
-body.v2[data-v2-vista="dashboard"] #view-incarichi{order:1}
 body.v2[data-v2-vista="dashboard"] #view-dashboard{order:2}
 body.v2[data-v2-vista="dashboard"] #view-scadenze{order:3}
 body.v2:not([data-v2-vista="dashboard"]) #v2-bozze{display:none}
@@ -401,7 +402,7 @@ body.v2:not([data-v2-vista="dashboard"]) #v2-bozze{display:none}
 
   /* in «Oggi» incarichi e scadenze portano un titolo; quando si aprono da sole, no */
   function titoliOggi(si) {
-    [['view-incarichi', 'v2-tit-inc', '📥 I tuoi incarichi'], ['view-scadenze', 'v2-tit-scad', '⏰ Rientri in scadenza']].forEach(([vista, id, testo]) => {
+    [['view-scadenze', 'v2-tit-scad', '⏰ Rientri in scadenza']].forEach(([vista, id, testo]) => {
       const v = $(vista); if (!v) return;
       let t = $(id);
       if (!si) { if (t) t.remove(); return; }
@@ -467,7 +468,7 @@ body.v2:not([data-v2-vista="dashboard"]) #v2-bozze{display:none}
       if (view === 'segreteria') ufficio();
       if (view === 'direzione') sintesi().catch((e) => console.warn('veste v2, sintesi:', e));
       titoliOggi(view === 'dashboard' && !r.lettura);
-      if (view === 'dashboard' && !r.lettura) { bozze().catch((e) => console.warn('veste v2, bozze:', e)); return ['scadenze', 'incarichi']; }
+      if (view === 'dashboard' && !r.lettura) { bozze().catch((e) => console.warn('veste v2, bozze:', e)); return ['scadenze']; }
       return [];
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }

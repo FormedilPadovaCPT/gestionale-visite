@@ -51,7 +51,7 @@ assert.strictEqual(s.v2.accesa(), true);
 assert.strictEqual(s.v2.prima('dashboard'), 'segreteria', 'la segreteria apre su Ufficio');
 assert.ok(s.classi.has('v2'));
 assert.strictEqual(s.v2.prima('dashboard'), null, 'la pagina di apertura si sceglie una volta sola: poi «Oggi» è «Oggi»');
-assert.deepStrictEqual(s.v2.dopo('dashboard'), ['scadenze', 'incarichi'], '«Oggi» mostra sotto scadenze e incarichi');
+assert.deepStrictEqual(s.v2.dopo('dashboard'), ['scadenze'], '«Oggi» mostra sotto le scadenze; gli incarichi hanno la loro pagina');
 assert.deepStrictEqual(s.v2.dopo('lista'), []);
 
 /* ── menu e apertura per ruolo, come decisi dall'utente ── */
@@ -90,7 +90,10 @@ assert.strictEqual(s.v2.esercizi().length, 2);
 
 /* ── «Oggi»: gli incarichi stanno in cima, subito dopo le bozze (chiesto dall'utente: sotto tutto il resto non li vedrebbe nessuno) ── */
 const ordine = (id) => { const k = 'body.v2[data-v2-vista="dashboard"] #' + id + '{order:'; const i = js.indexOf(k); assert.ok(i >= 0, 'manca l’ordine di ' + id); return +js[i + k.length]; };
-assert.ok(ordine('v2-bozze') < ordine('view-incarichi') && ordine('view-incarichi') < ordine('view-dashboard') && ordine('view-dashboard') < ordine('view-scadenze'), 'ordine di «Oggi»: bozze, incarichi, cruscotto, scadenze');
+assert.ok(ordine('v2-bozze') < ordine('view-dashboard') && ordine('view-dashboard') < ordine('view-scadenze'), 'ordine di «Oggi»: bozze, cruscotto, scadenze');
+// gli incarichi del tecnico: pagina a sé e voce nel menu, col numero che lampeggia (corretto dall'utente il 03/10/2026)
+for (const k of ['tecnico', 'coordinatore']) assert.ok(R[k].menu.includes('incarichi'), k + ' deve avere «Incarichi» nel menu');
+assert.ok(!js.includes('#view-incarichi{order'), 'gli incarichi non stanno più dentro «Oggi»');
 
 /* ── «Vedi come: Presidenza»: solo ciò che è della Presidenza (nell'app vera lo fa il database) ── */
 const dir = fs.readFileSync(path.join(radice, 'direzione.js'), 'utf8');
