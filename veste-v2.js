@@ -18,7 +18,7 @@
        «Nuova visita»; Direzione, Presidenza e consiglieri hanno il menu corto;
      · pagina di apertura per ruolo (decise dall'utente): segreteria su
        Ufficio › Scrivania, tecnico e coordinatore su Oggi, Direttore su
-       Direzione, Presidenza sulla sua pagina, consiglieri su Statistiche;
+       Direzione, Presidenza sulla sua pagina, consiglieri sulla Mappa (senza calendario);
      · «Oggi»: bozze aperte, poi le scadenze e gli incarichi di oggi, che
        sono le pagine di sempre mostrate una sotto l'altra (nessuna regola
        riscritta: le disegnano le funzioni di sempre);
@@ -51,7 +51,8 @@
     coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'admin', 'form'],      apre: 'dashboard' },
     direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione',   lettura: true },
     presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione',   lettura: true },
-    consigliere:  { nome: 'Consigliere',     menu: ['statistiche', 'dashboard', 'appuntamenti'],              apre: 'statistiche', lettura: true },
+    // (03/10/2026, corretto dall'utente dopo aver guardato l'anteprima) il consigliere apre sulla Mappa e non vede il calendario
+    consigliere:  { nome: 'Consigliere',     menu: ['dashboard', 'statistiche'],                              apre: 'dashboard',   lettura: true },
   };
   const ETICHETTE = { dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti' };
 

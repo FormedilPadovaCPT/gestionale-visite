@@ -61,8 +61,8 @@ assert.strictEqual(R.segreteria.apre, 'segreteria');
 assert.strictEqual(R.tecnico.apre, 'dashboard'); assert.strictEqual(R.coordinatore.apre, 'dashboard');
 assert.strictEqual(R.direttore.apre, 'direzione', 'il Direttore apre su Direzione');
 assert.strictEqual(R.presidenza.apre, 'direzione', 'la Presidenza apre sulla sua pagina');
-assert.strictEqual(R.consigliere.apre, 'statistiche', 'i consiglieri aprono sulle Statistiche');
-assert.deepStrictEqual(R.consigliere.menu, ['statistiche', 'dashboard', 'appuntamenti']);
+assert.strictEqual(R.consigliere.apre, 'dashboard', 'i consiglieri aprono sulla Mappa (corretto dall’utente il 03/10/2026)');
+assert.deepStrictEqual(R.consigliere.menu, ['dashboard', 'statistiche'], 'il consigliere vede Mappa e Statistiche: niente calendario');
 for (const k of ['direttore', 'presidenza', 'consigliere']) {
   assert.ok(R[k].lettura, k + ' è di sola lettura');
   for (const no of ['form', 'lista', 'cantieri', 'rubrica', 'segreteria', 'admin', 'incarichi', 'scadenze']) assert.ok(!R[k].menu.includes(no), k + ' non deve avere «' + no + '» nel menu');
