@@ -52,7 +52,8 @@ with regole(cosa, dove, blocca, ordine, testo) as (values
   ('durata-nd',           'cantiere', false, 31, 'Durata dei lavori «Non disponibile» (ammesso: se si può, si stima)'),
   ('opera-altro',         'cantiere', false, 32, 'Tipo di opera «Altro» senza descrizione'),
   ('committente-nd',      'cantiere', false, 33, 'Committente con tipo «Non disponibile»'),
-  ('senza-committente',   'cantiere', false, 34, 'Cantiere senza committente (l''Osservatorio non lo chiede)')
+  ('senza-committente',   'cantiere', false, 34, 'Cantiere senza committente (l''Osservatorio non lo chiede)'),
+  ('comune-soppresso',    'cantiere', false, 35, 'Codice del comune diverso da quello valido alla data della visita (comune soppresso o codice sbagliato)')
 ),
 vd as (
   select v.visita_id, v.nr_verbale, v.data_visita, v.cantiere_id, v.impresa_id, v.tecnico_id, v.tipo_accesso_naz
@@ -82,7 +83,7 @@ pv as (
     select 'cantiere' where not exists (select 1 from cantieri c where c.cantiere_id = vd.cantiere_id)
   ) r(cosa)
 ),
-cd as (select cantiere_id, count(*) as n_visite from vd group by cantiere_id),
+cd as (select cantiere_id, count(*) as n_visite, min(data_visita) as d1, max(data_visita) as d2 from vd group by cantiere_id),
 pc as (
   select c.cantiere_id, r.cosa
   from cd
@@ -103,6 +104,9 @@ pc as (
     union all select 'opera-altro' where c.cantiere_tip_ope = 16 and btrim(coalesce(c.cantiere_tip_ope_altro, '')) = ''
     union all select 'committente-nd' where m.committente_tipo = 3
     union all select 'senza-committente' where nullif(btrim(c.cantiere_committente_id), '') is null
+    union all select 'comune-soppresso' where c.cantiere_comune_cod ~ '^[0-9]{6}$'
+      and (c.cantiere_comune_cod is distinct from coalesce(public.calcola_comune_cod_al(c.comune_nome, cd.d1), c.cantiere_comune_cod)
+        or c.cantiere_comune_cod is distinct from coalesce(public.calcola_comune_cod_al(c.comune_nome, cd.d2), c.cantiere_comune_cod))
   ) r(cosa)
 ),
 tutti as (

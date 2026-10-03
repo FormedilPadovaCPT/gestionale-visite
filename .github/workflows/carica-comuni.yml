@@ -1,0 +1,32 @@
+name: Carica comuni ISTAT
+
+# Carica nella tabella comuni_istat l'elenco ISTAT dei comuni (supabase/dati/comuni_istat.csv).
+# Parte da solo quando cambia il file dei comuni o il caricatore, oppure a mano.
+# Scrive SOLO in comuni_istat, con un caricatore che si ferma se trova qualcosa che non torna
+# (codici diversi da quelli in tabella, comuni soppressi ridati per esistenti): vedi
+# supabase/dati/carica_comuni_istat.sql. Usa lo stesso secret del backup e dei test del lunedì.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/dati/comuni_istat.csv'
+      - 'supabase/dati/carica_comuni_istat.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  carica:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Carica l'elenco dei comuni
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -e
+          if [ -z "${DB_URL:-}" ]; then echo "::error::Secret SUPABASE_DB_URL mancante"; exit 1; fi
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/dati/carica_comuni_istat.sql

@@ -5552,7 +5552,11 @@ function populateComuniSelect(){
     if(capEl){capEl.value=cap;capEl.readOnly=!!cap;capEl.style.background=cap?'#f8f8f8':'#fff'}
     const istat=ISTAT_PD[sel.value]||''
     const codEl=$('mc-comune-cod')
-    if(codEl&&!codEl.value){codEl.value=istat}// non sovrascrive se già compilato a mano
+    /* (03/10/2026) cambiando comune il codice è quello del comune scelto: prima restava quello di prima
+       (due cantieri di Carceri portavano il codice di Carmignano di Brenta). Se la pagina non lo conosce
+       — comune fuori provincia o soppresso — il campo resta vuoto e il codice lo mette il database
+       dall'elenco ISTAT; si può sempre scrivere a mano. */
+    if(codEl){codEl.value=istat}
   }
   // Mostra/nascondi campo "Altro tipo opera"
   const tipOpe=$('mc-tip-ope')
