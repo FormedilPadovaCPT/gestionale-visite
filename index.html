@@ -4792,6 +4792,7 @@ function vaiAlCampoMancante(m){
   const _el0=m.campo?$(m.campo):null
   const _tc=_el0&&_el0.closest('.tab-content')
   if(_tc&&_tc.dataset.tab!=null)tab=+_tc.dataset.tab
+  if(window.vesteV2&&window.vesteV2.verso)window.vesteV2.verso(m.campo)   // veste v2: il campo può stare nel secondo momento
   saveTabData()
   activateTab(tab)
   renderZoneTab(tab)
@@ -15104,7 +15105,7 @@ document.addEventListener('input',function(ev){
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=7"></script>
-<script src="veste-v2.js?v=9"></script>
+<script src="veste-v2.js?v=10"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

@@ -28,6 +28,9 @@
        Cambia ciò che si vede, NON i permessi: i dati restano quelli che il
        database dà alla segreteria.
 
+     · il verbale in TRE MOMENTI (prima di entrare, in cantiere, a fine
+       visita): i passi di oggi raggruppati, stessi campi e stessi pulsanti.
+
    CHE COSA NON FA: non salva niente da sola, non cambia Bozza e Definitivo,
    non sposta dati, non tocca le regole di chiusura. Sono paletti dell'utente.
 
@@ -205,6 +208,28 @@ body.v2.viewer-mode #v2-oggi{display:none}
 #v2-azioni button:hover{border-color:var(--orange)}
 #v2-azioni button:active{transform:scale(.97)}
 #v2-azioni button span{font-size:20px;line-height:1}
+/* IL VERBALE IN TRE MOMENTI: i passi di oggi, raggruppati. Nessun campo spostato fra i dati: cambia che cosa si vede insieme. */
+#v2-fasi{display:flex;gap:10px;align-items:stretch;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.12);padding:0 16px;margin-bottom:14px;flex-wrap:wrap}
+#v2-fasi .v2-fasi-sx{padding:10px 14px 10px 0;min-width:150px}
+#v2-fasi .v2-fasi-sx small{display:block;font-size:11px;font-weight:700;color:#888;letter-spacing:.8px}
+#v2-fasi .v2-fasi-sx b{font-size:16px;font-weight:600;color:#565C66}
+#v2-fasi button{flex:1 1 150px;text-align:left;background:none;border-radius:0;border-top:3px solid #E3E4E6;padding:8px 6px 10px;color:#565C66;font-size:14px;white-space:normal;min-height:0}
+#v2-fasi button small{display:block;font-size:11px;font-weight:700;letter-spacing:.8px;color:#888}
+#v2-fasi button.on,#v2-fasi button.fatta{border-top-color:var(--orange)}
+#v2-fasi button.on{font-weight:600}
+#v2-fasi button.on small{color:var(--orange)}
+body.v2 #view-form .form-header h2{display:none}
+body.v2 #view-form .form-header{justify-content:flex-end;margin-bottom:8px}
+body.v2.v2-fase1 #view-form #tab-bar{display:none}
+body.v2.v2-fase1 #view-form .tab-area{display:flex;flex-direction:column}
+body.v2.v2-fase1 #view-form .tab-area>#inc-scelta-box{order:0}
+body.v2.v2-fase1 #view-form .tab-content[data-tab="1"]{display:block;order:1}
+body.v2.v2-fase1 #view-form .tab-content[data-tab="0"]{display:block;order:2}
+body.v2.v2-fase1 #view-form .v2-persona{display:none}
+body.v2.v2-fase2 #view-form .v2-visita{display:none}
+body.v2:not(.v2-fase1) #view-form .tab-area>#inc-scelta-box{display:none!important}
+body.v2.v2-fase2 #tab-bar .tab-btn[data-ti="1"],body.v2.v2-fase2 #tab-bar .tab-btn[data-ti="13"],body.v2.v2-fase2 #tab-bar .tab-btn[data-ti="14"],body.v2.v2-fase2 #tab-bar .tab-btn[data-ti="15"]{display:none}
+body.v2.v2-fase3 #tab-bar .tab-btn:not([data-ti="13"]):not([data-ti="14"]):not([data-ti="15"]){display:none}
 .v2-sezione{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#565C66;margin:6px 2px 10px}
 #v2-torna{display:inline-flex;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--orange);background:#fff;border:1.5px solid var(--orange);border-radius:50px;padding:5px 14px;min-height:0}
 @media(max-width:720px){#v2-uff-menu{flex:1 1 100%;position:static;display:flex;flex-wrap:wrap;gap:4px}#v2-uff-menu button{width:auto;padding:7px 12px;border:1px solid var(--border)}#v2-uff-menu hr{display:none}body.v2 nav{padding:0 10px}}
@@ -300,7 +325,7 @@ body.v2.viewer-mode #v2-oggi{display:none}
 
   function prepara() {
     document.body.classList.add('v2');
-    stile(); vociAzione(); menu(); barra(); altreApp(); tieniEtichette();
+    stile(); vociAzione(); menu(); barra(); altreApp(); tieniEtichette(); verbaleAggancia();
     const lettura = !!RUOLI[ruolo()].lettura;
     if (lettura && !document.body.classList.contains('viewer-mode')) { document.body.classList.add('viewer-mode'); _letturaFinta = true; }
     if (!lettura && _letturaFinta) { document.body.classList.remove('viewer-mode'); _letturaFinta = false; }
@@ -313,6 +338,7 @@ body.v2.viewer-mode #v2-oggi{display:none}
     ['v2-bozze', 'v2-rientri', 'v2-incarichi', 'v2-azioni', 'v2-oggi-data', 'v2-oggi-ciao'].forEach((id) => { const e = $(id); if (e) e.innerHTML = ''; });   // obiettivo e avvisi sono quelli di sempre: restano
     const u = $('view-segreteria'); if (u) { u.classList.remove('v2-uff'); u.querySelectorAll('.adm-section').forEach((s) => { s.style.display = ''; }); }
     menuComEra();
+    verbaleComEra();
   }
 
   /* ── numeri: una lettura fallita si dice, non diventa zero ── */
@@ -539,6 +565,105 @@ body.v2.viewer-mode #v2-oggi{display:none}
     try { _dati[tipo] = dati == null ? null : dati; if (tipo === 'scadenze') _dati.quando = Date.now(); oggiDisegna(); } catch (e) { console.warn('veste v2 (pronto):', e); }
   }
 
+  /* ── IL VERBALE IN TRE MOMENTI (scelta dell'utente: «tre momenti, passi di oggi») ──
+     1 · Prima di entrare: incarico, cantiere, e la parte «Visita» (verbale, tecnici, data, ora, tipologia) in una pagina sola.
+     2 · In cantiere: persona presente, imprese, le dieci aree della check-list.
+     3 · A fine visita: note, foto, riepilogo con l'ora di fine e i pulsanti Bozza e Definitivo di sempre.
+     I passi restano quelli dell'app: per cambiare passo si preme il pulsante del passo di sempre (che salva la
+     check-list e disegna la pagina). Qui si decide solo che cosa si vede insieme. Il passo 0 «Visita» sta in due
+     momenti: la parte alta nel primo, la persona presente nel secondo. */
+  const FASI = [null,
+    { sopra: '1 · PRIMA DI ENTRARE', sotto: 'Dove e perché', tabs: [1, 0] },
+    { sopra: '2 · IN CANTIERE', sotto: 'Cosa trovo', tabs: [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+    { sopra: '3 · A FINE VISITA', sotto: 'Chiudo e invio', tabs: [13, 14, 15] }];
+  let _fase = 1, _mioPasso = false, _daBarra = false, _verso = null, _evAgganciati = false;
+  const tabOra = () => Number(S().tab) || 0;
+  const faseDi = (tab) => (tab === 1 ? 1 : tab >= 2 && tab <= 12 ? 2 : tab >= 13 ? 3 : null);   // il passo 0 sta in due momenti
+  function premiPasso(n) { const b = document.querySelector('#tab-bar .tab-btn[data-ti="' + n + '"]'); if (!b) return; _mioPasso = true; try { b.click(); } finally { _mioPasso = false; } }
+  function vaiFase(f, tab) { _fase = f; premiPasso(tab != null ? tab : FASI[f].tabs[0]); verbaleApplica(); window.scrollTo(0, 0); }
+  /* il campo da raggiungere sta nella persona presente? (lo chiede vaiAlCampoMancante prima di aprire il passo) */
+  function verso(campo) { try { const el = campo && $(campo); _verso = el && el.closest && el.closest('.v2-persona') ? 'persona' : null; } catch (_e) { _verso = null; } }
+  function passoCambiato(n) {
+    if (!document.body.classList.contains('v2')) return;
+    // se il passo l'ha cambiato l'app (un avviso che porta a un campo, una bozza riaperta) il momento si ricava dal passo
+    if (!_mioPasso && !_daBarra) _fase = faseDi(n) || (_verso === 'persona' ? 2 : 1);
+    _verso = null;
+    verbaleApplica();
+  }
+  function avantiIndietro(e, dir) {
+    if (!document.body.classList.contains('v2')) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    const seq = FASI[_fase].tabs, i = seq.indexOf(tabOra());
+    if (dir > 0) {
+      if (_fase === 1) return vaiFase(2, 0);
+      if (i >= 0 && i < seq.length - 1) return vaiFase(_fase, seq[i + 1]);
+      if (_fase === 2) return vaiFase(3, 13);
+    } else {
+      if (_fase === 1) return;
+      if (i > 0) return vaiFase(_fase, seq[i - 1]);
+      if (_fase === 2) return vaiFase(1, 1);
+      if (_fase === 3) return vaiFase(2, 12);
+    }
+  }
+  function verbaleAggancia() {
+    if (_evAgganciati) return; _evAgganciati = true;
+    // activateTab avvisa già la mappa a ogni cambio di passo: si ascolta lo stesso avviso
+    const prima = window.mappaEvento;
+    window.mappaEvento = function (tipo, arg) {
+      try { if (tipo === 'tab') passoCambiato(Number(arg)); else if (tipo === 'form') { _fase = 1; setTimeout(verbaleApplica, 0); } } catch (e) { console.warn('veste v2 (verbale):', e); }
+      return typeof prima === 'function' ? prima.apply(this, arguments) : undefined;
+    };
+    const p = $('btn-prev'), n = $('btn-next'), bar = $('tab-bar');
+    if (p) p.addEventListener('click', (e) => avantiIndietro(e, -1), true);
+    if (n) n.addEventListener('click', (e) => avantiIndietro(e, +1), true);
+    if (bar) bar.addEventListener('click', () => { _daBarra = true; setTimeout(() => { _daBarra = false; }, 0); }, true);
+  }
+  function verbalePrepara() {
+    const vista = $('view-form'); if (!vista) return false;
+    const layout = vista.querySelector('.form-layout'), area = vista.querySelector('.tab-area'); if (!layout || !area) return false;
+    if (!$('v2-fasi')) {
+      const b = document.createElement('div'); b.id = 'v2-fasi';
+      b.innerHTML = '<div class="v2-fasi-sx"><small>VERBALE</small><b id="v2-fasi-nr"></b></div>'
+        + [1, 2, 3].map((f) => `<button type="button" data-fase="${f}"><small>${FASI[f].sopra}</small>${FASI[f].sotto}</button>`).join('');
+      b.addEventListener('click', (e) => { const x = e.target.closest('button[data-fase]'); if (x) vaiFase(Number(x.dataset.fase)); });
+      layout.parentNode.insertBefore(b, layout);
+    }
+    // la parte alta del passo «Visita» e la persona presente: si marcano, non si spostano
+    const card = vista.querySelector('.tab-content[data-tab="0"] > .card');
+    if (card && !card.dataset.v2Marcata) {
+      let persona = false;
+      [...card.children].forEach((el) => {
+        if (el.classList.contains('sect-title') && /Persona presente/i.test(el.textContent)) persona = true;
+        el.classList.add(persona ? 'v2-persona' : 'v2-visita');
+      });
+      card.dataset.v2Marcata = '1';
+    }
+    // «Parti da un tuo incarico» sale in cima al primo momento (torna al suo posto quando la veste si spegne)
+    const inc = $('inc-scelta-box');
+    if (inc && inc.parentNode !== area) { inc.classList.remove('v2-visita'); area.insertBefore(inc, area.firstChild); }
+    return true;
+  }
+  function verbaleApplica() {
+    if (!document.body.classList.contains('v2') || !verbalePrepara()) return;
+    [1, 2, 3].forEach((f) => document.body.classList.toggle('v2-fase' + f, _fase === f));
+    document.querySelectorAll('#v2-fasi button[data-fase]').forEach((b) => { const f = Number(b.dataset.fase); b.classList.toggle('on', f === _fase); b.classList.toggle('fatta', f < _fase); });
+    const nr = $('v2-fasi-nr'); if (nr) nr.textContent = ($('f-verbale') && $('f-verbale').value) || 'nuovo';
+    const b0 = document.querySelector('#tab-bar .tab-btn[data-ti="0"]'); if (b0) b0.textContent = _fase === 2 ? '👤 Persona presente' : '📋 Visita';
+    const p = $('btn-prev'), n = $('btn-next'), t = tabOra();
+    if (p) { p.disabled = _fase === 1; p.textContent = '‹ Indietro'; }
+    if (n) { n.disabled = t === 15; n.textContent = _fase === 1 ? 'In cantiere ›' : (_fase === 2 && t === 12) ? 'A fine visita ›' : 'Successivo ›'; }
+  }
+  function verbaleComEra() {
+    const f = $('v2-fasi'); if (f) f.remove();
+    [1, 2, 3].forEach((x) => document.body.classList.remove('v2-fase' + x));
+    const inc = $('inc-scelta-box'), card = document.querySelector('#view-form .tab-content[data-tab="0"] > .card');
+    if (inc && card && inc.parentNode !== card) card.insertBefore(inc, card.firstChild);
+    const b0 = document.querySelector('#tab-bar .tab-btn[data-ti="0"]'); if (b0) b0.textContent = '📋 Visita';
+    const p = $('btn-prev'), n = $('btn-next');
+    if (p) { p.textContent = '◀ Precedente'; p.disabled = tabOra() === 0; }
+    if (n) { n.textContent = 'Successivo ▶'; n.disabled = tabOra() === 15; }
+  }
+
   /* ── DIREZIONE e PRESIDENZA: una sintesi, così la pagina non è mai vuota ── */
   async function sintesi() {
     const vista = $('view-direzione'); const sb = window.sb; if (!vista || !sb) return;
@@ -592,6 +717,7 @@ body.v2.viewer-mode #v2-oggi{display:none}
       if (ruolo() === 'segreteria' && ['admin', 'committenti', 'incarichi'].includes(view)) { const u = document.querySelector('nav button[data-view="segreteria"]'); if (u) u.classList.add('active'); }
       torna(view);
       const r = RUOLI[ruolo()];
+      if (view === 'form') verbaleApplica();
       if (view === 'segreteria') ufficio();
       if (view === 'direzione') sintesi().catch((e) => console.warn('veste v2, sintesi:', e));
       if (view === 'dashboard' && !r.lettura) {
@@ -604,5 +730,5 @@ body.v2.viewer-mode #v2-oggi{display:none}
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }
 
-  window.vesteV2 = { prima, dopo, pronto, accesa, ruolo, RUOLI, GRUPPI, esercizi, gruppoDi };
+  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi };
 })();

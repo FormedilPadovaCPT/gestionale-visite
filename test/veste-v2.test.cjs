@@ -137,4 +137,21 @@ assert.deepStrictEqual(criticiDemandati(casi, eventi, 'direttore').map((c) => c.
 assert.strictEqual(criticiDemandati(casi, eventi, 'presidenza')[0].dal, '2026-09-28');
 assert.deepStrictEqual(criticiDemandati(casi, [], 'presidenza'), [], 'senza richieste, niente');
 
+/* ── il verbale in tre momenti: i passi di oggi raggruppati (scelta dell'utente), stessi campi e stessi pulsanti ── */
+const F = s.v2.FASI;
+assert.deepStrictEqual(F[1].tabs, [1, 0], 'primo momento: cantiere e parte alta del passo «Visita»');
+assert.deepStrictEqual(F[2].tabs, [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 'secondo momento: persona presente, imprese, le dieci aree');
+assert.deepStrictEqual(F[3].tabs, [13, 14, 15], 'terzo momento: note, foto, riepilogo');
+const tutti = new Set([...F[1].tabs, ...F[2].tabs, ...F[3].tabs]);
+for (let n = 0; n <= 15; n++) assert.ok(tutti.has(n), 'il passo ' + n + ' non sta in nessun momento: sparirebbe');
+assert.strictEqual(s.v2.faseDi(1), 1); assert.strictEqual(s.v2.faseDi(2), 2); assert.strictEqual(s.v2.faseDi(12), 2); assert.strictEqual(s.v2.faseDi(13), 3); assert.strictEqual(s.v2.faseDi(15), 3);
+assert.strictEqual(s.v2.faseDi(0), null, 'il passo «Visita» sta in due momenti: la parte alta nel primo, la persona presente nel secondo');
+assert.ok(html.includes('if(window.vesteV2&&window.vesteV2.verso)window.vesteV2.verso(m.campo)'), 'chi porta a un campo mancante deve dire alla veste dove sta il campo');
+assert.ok(js.includes("body.v2.v2-fase1 #view-form .v2-persona{display:none}") && js.includes("body.v2.v2-fase2 #view-form .v2-visita{display:none}"), 'la persona presente si vede nel secondo momento, il resto del passo nel primo');
+assert.ok(js.includes("if (inc && card && inc.parentNode !== card) card.insertBefore(inc, card.firstChild);"), 'spegnendo la veste «Parti da un tuo incarico» deve tornare al suo posto');
+assert.ok(js.includes("p.textContent = '◀ Precedente'") && js.includes("n.textContent = 'Successivo ▶'"), 'spegnendo la veste i pulsanti avanti e indietro tornano quelli di oggi');
+// i passi si cambiano premendo il pulsante del passo di sempre: è lui che salva la check-list e disegna la pagina
+assert.ok(/function premiPasso\(n\) \{ const b = document\.querySelector\('#tab-bar \.tab-btn\[data-ti="' \+ n \+ '"\]'\);[^}]*b\.click\(\)/.test(js), 'il cambio di passo deve passare dal pulsante dell’app');
+for (const id of ['btn-bozza', 'btn-final']) assert.ok(html.includes('id="' + id + '"') && !js.includes(id), 'Bozza e Definitivo restano quelli di oggi: la veste non li tocca (' + id + ')');
+
 console.log('veste-v2: ok');
