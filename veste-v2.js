@@ -54,10 +54,12 @@
      cantieri in monitoraggio com'era: «Oggi» è il cruscotto di sempre, con in più le bozze aperte in cima. */
   /* (03/10/2026, corretto dall'utente) Per il tecnico gli INCARICHI tornano una pagina a sé, con la voce nel menu e il
      numero che lampeggia quando ce ne sono di nuovi, come nell'app di oggi: dentro «Oggi» si perdevano. */
+  /* (03/10/2026, corretto dall'utente) Asseverazione e Servizi CPT sono VOCI DEL MENU, come oggi: raccolte in una tendina
+     «Altre app» non erano funzionali. «assev» è il pulsante di sempre, che si mostra solo a chi l'aveva già. */
   const RUOLI = {
-    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'segreteria'], apre: 'segreteria' },
-    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche'], apre: 'dashboard' },
-    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', '|', 'admin'], apre: 'dashboard' },
+    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'assev', 'az-servizi', 'segreteria'], apre: 'segreteria' },
+    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', '|', 'assev', 'az-servizi'], apre: 'dashboard' },
+    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', '|', 'assev', 'az-servizi', 'admin'], apre: 'dashboard' },
     direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti', '|', 'az-segnala', 'az-qr', 'az-servizi'], apre: 'direzione', lettura: true },
     // il calendario è del solo Direttore (deciso dall'utente il 03/10/2026): la Presidenza vede quello che le compete
     presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard', '|', 'az-segnala', 'az-qr', 'az-servizi'], apre: 'direzione', lettura: true },
@@ -84,7 +86,7 @@
     });
   }
 
-  const ETICHETTE = { dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti' };
+  const ETICHETTE = { assev: '✅ Asseverazione ↗', dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti' };
 
   const CHIAVE_TECNICO = 'gv-v2-tecnico';   // sessionStorage: di quale tecnico si guarda la pagina in «Vedi come: Tecnico»
   let _tecnici = null;       // l'elenco dei tecnici, letto una volta, per la tendina dell'anteprima
@@ -157,6 +159,9 @@ body.v2 nav{gap:6px;padding:0 20px}
 body.v2 nav button{font-size:14px;border-width:1px;padding:7px 12px}
 body.v2 nav button.v2-cta{background:var(--orange);color:#fff;font-weight:700;border-color:var(--orange)}
 body.v2 nav button.v2-cta:hover{background:#B33B05;border-color:#B33B05}
+/* Asseverazione è una voce come le altre: il blu pieno di oggi accanto alle altre voci stona */
+body.v2 nav #nav-assev{background:none!important;border-color:transparent!important;color:rgba(255,255,255,.7)!important;font-weight:400!important}
+body.v2 nav #nav-assev:hover{color:#fff!important;border-color:rgba(255,255,255,.35)!important}
 body.v2 main h2{font-size:24px;font-weight:600;color:#565C66}
 #v2-barra{background:#2b2f36;color:#fff;font-size:12.5px;padding:7px 20px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 #v2-barra b{margin-right:4px}
@@ -311,6 +316,9 @@ body.v2 #cant-info-card{border:2px solid var(--orange)!important;background:#FFF
 .v2-pillole button{border-radius:50px;border:1.5px solid var(--border);background:#fff;padding:6px 14px;font-size:13px;font-weight:600;color:#565C66;min-height:0}
 .v2-pillole button.on{background:var(--orange);border-color:var(--orange);color:#fff}
 body.v2 .v2-nasc{display:none!important}
+/* un testo chiaro su fondo chiaro (le zone riservate erano scure): lo trova e lo scurisce leggibile() */
+body.v2 .v2-scuro{color:#3d4249!important}
+body.v2 .v2-scuro::placeholder{color:#888!important}
 /* TELEFONO: il menu resta IN ALTO, come oggi, per tutti (provato dall'utente sul telefono il 03/10/2026: in basso
    non gli è piaciuto, sopra è più funzionale). Le tabelle diventano schede. */
 @media(max-width:720px){
@@ -340,10 +348,10 @@ body.v2 .v2-nasc{display:none!important}
     const ordine = {};
     r.menu.forEach((v) => { if (v === '|') { dopoSpazio = true; return; } ordine[v] = { n: n++, primoADestra: dopoSpazio && !Object.values(ordine).some((o) => o.destra), destra: dopoSpazio }; });
     nav.querySelectorAll('button').forEach((b) => {
-      const v = b.dataset.view || b.dataset.v2Voce;
+      const v = b.dataset.view || b.dataset.v2Voce || (b.id === 'nav-assev' ? 'assev' : '');
       if (b.dataset.v2Etichetta === undefined) { b.dataset.v2Etichetta = b.firstChild && b.firstChild.nodeType === 3 ? b.firstChild.textContent : ''; b.dataset.v2Mostra = b.style.display; }
       const o = v && ordine[v];
-      if (!o) { b.style.display = 'none'; return; }
+      if (!o || (v === 'assev' && b.dataset.v2Mostra === 'none')) { b.style.display = 'none'; return; }
       b.style.display = ''; b.style.order = String(o.n); b.style.marginLeft = o.primoADestra ? 'auto' : '';
       b.classList.toggle('v2-cta', v === 'form');
       let et = ETICHETTE[v];
@@ -390,27 +398,6 @@ body.v2 .v2-nasc{display:none!important}
     if ((att === 'tecnico' || att === 'coordinatore') && !_tecnici) tecniciLeggi().catch((e) => console.warn('veste v2, tecnici:', e));
   }
 
-  /* ── «Altre app» nell'intestazione: Asseverazione e Servizi CPT escono dal menu ── */
-  function altreApp() {
-    const area = document.querySelector('.user-area'); if (!area || $('v2-altre')) return;
-    const assev = $('nav-assev');
-    const haAssev = !!assev && assev.dataset.v2Mostra !== 'none';
-    const w = document.createElement('span'); w.id = 'v2-altre'; w.style.cssText = 'position:relative';
-    w.innerHTML = '<button type="button" style="background:transparent;border:1px solid rgba(255,255,255,.6);color:#fff;font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer">Altre app ▾</button>'
-      + '<div style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.2);padding:6px;z-index:400;min-width:190px">'
-      + (haAssev ? '<button type="button" data-app="assev" style="display:block;width:100%;text-align:left;background:none;color:#565C66;font-size:14px;padding:9px 12px">✅ Asseverazione ↗</button>' : '')
-      + '<button type="button" data-app="servizi" style="display:block;width:100%;text-align:left;background:none;color:#565C66;font-size:14px;padding:9px 12px">📱 Servizi CPT ↗</button></div>';
-    const tenda = w.lastChild;
-    w.firstChild.addEventListener('click', (e) => { e.stopPropagation(); tenda.style.display = tenda.style.display === 'none' ? 'block' : 'none'; });
-    document.addEventListener('click', () => { tenda.style.display = 'none'; });
-    tenda.addEventListener('click', (e) => {
-      const b = e.target.closest('button[data-app]'); if (!b) return;
-      const dest = b.dataset.app === 'assev' ? assev : $('btn-servizi-cpt');
-      if (dest) dest.click();
-    });
-    area.insertBefore(w, area.firstChild);
-  }
-
   /* la voce del coordinatore viene riscritta dall'app ogni volta che cambia il numero accanto
      (cantieri-critici-coord.js): la si tiene sull'etichetta nuova, lasciando il numero */
   let _occhio = null;
@@ -427,7 +414,7 @@ body.v2 .v2-nasc{display:none!important}
 
   function prepara() {
     document.body.classList.add('v2');
-    stile(); vociAzione(); menu(); barra(); altreApp(); tieniEtichette(); verbaleAggancia();
+    stile(); vociAzione(); menu(); barra(); tieniEtichette(); verbaleAggancia();
     const lettura = !!RUOLI[ruolo()].lettura;
     if (lettura && !document.body.classList.contains('viewer-mode')) { document.body.classList.add('viewer-mode'); _letturaFinta = true; }
     if (!lettura && _letturaFinta) { document.body.classList.remove('viewer-mode'); _letturaFinta = false; }
@@ -455,6 +442,53 @@ body.v2 .v2-nasc{display:none!important}
     return [es(a), es(a - 1)];
   }
 
+  /* ── TESTI LEGGIBILI nelle zone che erano scure (Ufficio, Coordinamento) ──
+     Quelle pagine sono nate con fondo scuro e testi chiari, scritti riga per riga in cento punti diversi, anche negli
+     elenchi che si disegnano dopo aver premuto un pulsante. Qui non si inseguono i casi: si MISURA. Per ogni elemento
+     che ha del testo si calcola il contrasto fra il colore del testo e il fondo che ha davvero sotto; se il fondo è
+     chiaro e il contrasto è troppo basso, il testo diventa scuro. Un testo bianco su un pulsante arancione o su un
+     riquadro scuro resta com'è. Gli elenchi che arrivano dopo sono osservati. */
+  function luminanza(colore) {
+    const m = String(colore || '').match(/[\d.]+/g); if (!m || m.length < 3) return null;
+    const [r, g, b] = m.map(Number), a = m.length > 3 ? Number(m[3]) : 1;
+    const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return { l: 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b), a };
+  }
+  const contrasto = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  function fondoDi(el) {
+    for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
+      const cs = getComputedStyle(e);
+      if (cs.backgroundImage && cs.backgroundImage !== 'none') return null;   // una sfumatura o un'immagine: non si sa, non si tocca
+      const c = luminanza(cs.backgroundColor);
+      if (c && c.a >= 0.5) return c.l;
+    }
+    return 1;   // nessun fondo dichiarato: la pagina è chiara
+  }
+  function leggibile(radice) {
+    if (!radice || !document.body.classList.contains('v2')) return 0;
+    let n = 0;
+    radice.querySelectorAll('*').forEach((el) => {
+      if (el.classList.contains('v2-scuro') || el.offsetParent === null) return;
+      const campo = el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA';
+      if (!campo && ![...el.childNodes].some((x) => x.nodeType === 3 && x.textContent.trim())) return;
+      const testo = luminanza(getComputedStyle(el).color), fondo = fondoDi(el);
+      if (!testo || fondo == null) return;
+      if (fondo > 0.5 && contrasto(testo.l, fondo) < 3) { el.classList.add('v2-scuro'); n++; }
+    });
+    return n;
+  }
+  const _zoneScure = new Set();
+  function leggibileIn(id) {
+    const vista = $(id), zona = vista && vista.querySelector('.adm-wrap'); if (!zona) return;
+    leggibile(zona);
+    if (_zoneScure.has(id) || typeof MutationObserver !== 'function') return;
+    _zoneScure.add(id);
+    let inCoda = false;
+    const rifai = () => { if (inCoda) return; inCoda = true; setTimeout(() => { inCoda = false; try { leggibile(zona); } catch (_e) { /* si rifà al prossimo cambio */ } }, 120); };
+    new MutationObserver(rifai).observe(zona, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'open'] });
+    zona.addEventListener('toggle', rifai, true);
+  }
+
   /* ── UFFICIO: gli strumenti della pagina Segreteria, raggruppati ── */
   const GRUPPI = [
     { k: 'scrivania', nome: 'Scrivania', titoli: [] },
@@ -480,6 +514,7 @@ body.v2 .v2-nasc{display:none!important}
       const ba = m.querySelector('button[data-g="altro"]'); if (ba) ba.style.display = altro ? '' : 'none';   // ciò che non rientra in un gruppo non sparisce: va in «Altro»
     }
     const scr = $('v2-scrivania'); if (scr) scr.style.display = _gruppo === 'scrivania' ? '' : 'none';
+    try { leggibileIn('view-segreteria'); } catch (e) { console.warn('veste v2 (leggibile):', e); }
     const rim = $('v2-rimandi');
     if (rim) {
       const g = GRUPPI.find((x) => x.k === _gruppo);
@@ -1069,6 +1104,7 @@ body.v2 .v2-nasc{display:none!important}
     ['v2-requisiti', 'v2-pill-lista', 'v2-pill-rub', 'v2-pill-stat'].forEach((id) => { const e = $(id); if (e) e.remove(); });
     document.querySelectorAll('.v2-schede').forEach((e) => e.classList.remove('v2-schede'));
     document.querySelectorAll('.v2-nasc').forEach((e) => e.classList.remove('v2-nasc'));
+    document.querySelectorAll('.v2-scuro').forEach((e) => e.classList.remove('v2-scuro'));
   }
 
   function momentoUno() { try { incarichiSchede(); cantieriVicini(); tipoPulsanti(); } catch (e) { console.warn('veste v2 (primo momento):', e); } }
@@ -1133,6 +1169,7 @@ body.v2 .v2-nasc{display:none!important}
       if (view === 'form') verbaleApplica();
       pagine(view);
       if (view === 'segreteria') ufficio();
+      if (view === 'admin') { try { const ha = document.querySelector('#view-admin .adm-header h2'); if (ha) ha.textContent = 'Coordinamento'; leggibileIn('view-admin'); setTimeout(() => leggibileIn('view-admin'), 800); } catch (e) { console.warn('veste v2 (leggibile):', e); } }
       if (view === 'direzione') sintesi().catch((e) => console.warn('veste v2, sintesi:', e));
       if (view === 'dashboard' && !r.lettura) {
         oggiPagina();
@@ -1144,5 +1181,5 @@ body.v2 .v2-nasc{display:none!important}
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }
 
-  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat };
+  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat, luminanza, contrasto, leggibile };
 })();

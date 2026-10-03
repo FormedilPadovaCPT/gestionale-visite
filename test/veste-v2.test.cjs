@@ -67,7 +67,11 @@ assert.strictEqual(R.consigliere.apre, 'dashboard', 'i consiglieri aprono sulla 
 assert.deepStrictEqual(R.consigliere.menu, ['dashboard', 'statistiche', '|', 'az-segnala', 'az-qr', 'az-servizi'], 'il consigliere vede Mappa e Statistiche, più Segnala, QR e Servizi: niente calendario');
 // Segnala cantiere, QR e Servizi CPT nel menu di chi è di sola lettura, sempre a portata (chiesto dall'utente il 03/10/2026)
 for (const k of ['direttore', 'presidenza', 'consigliere']) for (const a of ['az-segnala', 'az-qr', 'az-servizi']) assert.ok(R[k].menu.includes(a), k + ' deve avere «' + a + '» nel menu');
-for (const k of ['tecnico', 'coordinatore', 'segreteria']) assert.ok(!R[k].menu.some((v) => v.startsWith('az-')), k + ' ha quei pulsanti in «Oggi», non nel menu');
+// Asseverazione e Servizi CPT sono voci del menu, come oggi: la tendina «Altre app» non era funzionale (utente, 03/10/2026)
+for (const k of ['tecnico', 'coordinatore', 'segreteria']) assert.ok(R[k].menu.includes('assev') && R[k].menu.includes('az-servizi') && !R[k].menu.includes('az-segnala'), k + ' deve avere Asseverazione e Servizi CPT nel menu');
+for (const k of ['direttore', 'presidenza', 'consigliere']) assert.ok(!R[k].menu.includes('assev'), k + ' non ha l’Asseverazione');
+assert.ok(!js.includes('Altre app ▾') && !js.includes('function altreApp'), 'la tendina «Altre app» non deve tornare');
+assert.ok(js.includes("(v === 'assev' && b.dataset.v2Mostra === 'none')"), 'l’Asseverazione si mostra solo a chi l’aveva già nell’app di oggi');
 for (const id of ['btn-segnala-dash', 'btn-qr-servizi', 'btn-servizi-cpt']) assert.ok(html.includes('id="' + id + '"') && js.includes("preme: '" + id + "'"), 'la voce di menu deve premere il pulsante di sempre: ' + id);
 // il calendario «Prossimi appuntamenti» è del solo Direttore (deciso dall'utente il 03/10/2026)
 assert.ok(R.direttore.menu.includes('appuntamenti'), 'il Direttore vede il calendario');
@@ -210,5 +214,18 @@ assert.ok(grafici.length >= 16, 'mi aspetto almeno 16 grafici nelle Statistiche'
 const senzaGruppo = grafici.filter((g) => !s.v2.gruppoStat(g));
 assert.deepStrictEqual(senzaGruppo, [], 'grafici senza gruppo (resterebbero sempre in vista): ' + senzaGruppo.join(' | '));
 assert.ok(js.includes("sel.value = v; const c = $('btn-cerca'); if (c) c.click();") && js.includes("sel.dispatchEvent(new Event('change')); pilloleRubrica();"), 'le pillole di Visite e Rubrica devono premere i filtri di sempre');
+
+/* ── testi leggibili in Ufficio e Coordinamento, che nascevano su fondo scuro (chiesto dall'utente) ── */
+const L = s.v2.luminanza, C = s.v2.contrasto;
+assert.ok(Math.abs(L('rgb(255, 255, 255)').l - 1) < 1e-9 && L('rgb(0, 0, 0)').l === 0);
+assert.strictEqual(L('rgba(255, 255, 255, 0.05)').a, 0.05, 'un fondo quasi trasparente non conta: si guarda quello sotto');
+assert.strictEqual(L('transparent'), null);
+assert.ok(C(L('rgb(255,255,255)').l, 1) < 3, 'bianco su bianco non si legge');
+assert.ok(C(L('rgba(255, 255, 255, 0.7)').l, 1) < 3, 'un testo chiaro su fondo chiaro non si legge');
+assert.ok(C(L('rgb(61, 66, 73)').l, 1) > 7, 'il colore con cui si scurisce si legge bene sul bianco');
+assert.ok(C(L('rgb(255,255,255)').l, L('rgb(231, 80, 15)').l) >= 3, 'il bianco sui pulsanti arancioni si legge: non va toccato');
+assert.ok(js.includes("if (fondo > 0.5 && contrasto(testo.l, fondo) < 3) { el.classList.add('v2-scuro'); n++; }"), 'si scurisce solo ciò che sta su fondo chiaro e non si legge');
+assert.ok(js.includes("new MutationObserver(rifai).observe(zona, { childList: true, subtree: true"), 'gli elenchi che arrivano dopo aver premuto un pulsante vanno controllati anche loro');
+assert.ok(js.includes("leggibileIn('view-segreteria')") && js.includes("leggibileIn('view-admin')"), 'il controllo vale per Ufficio e per Coordinamento');
 
 console.log('veste-v2: ok');
