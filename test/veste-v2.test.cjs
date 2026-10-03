@@ -175,4 +175,15 @@ assert.ok(js.includes("if (!e.target.closest('#v2-vicini-btn')) return;") && js.
 assert.ok(html.includes('window.__app={vSet,vGet,initForm,autoAccCant,renderCantCard,_useCantiereEsistente,'), 'la scheda di un cantiere vicino deve sceglierlo con la funzione di sempre');
 assert.ok(js.includes("['v2-inc-schede', 'v2-vicini', 'v2-tipo-chips'].forEach((id) => { const e = $(id); if (e) e.remove(); });"), 'spegnendo la veste i tre aiuti spariscono e restano i campi di sempre');
 
+/* ── secondo momento: righe che si aprono, col riepilogo dell'area ── */
+const ar = s.v2.areaRiepilogo;
+assert.deepStrictEqual(ar({ voci: 3, fatte: 0, ncp: 0, ncm: 0, oss: 0 }), { testo: 'da compilare', classe: '', stato: '' });
+assert.deepStrictEqual(ar({ voci: 3, fatte: 3, ncp: 0, ncm: 0, oss: 0 }), { testo: '3 di 3', classe: '', stato: 'completa' });
+assert.deepStrictEqual(ar({ voci: 5, fatte: 2, ncp: 0, ncm: 1, oss: 1 }), { testo: '2 di 5 · 1 NC− · 1 OSS', classe: 'ncm', stato: 'parziale' });
+assert.strictEqual(ar({ voci: 5, fatte: 5, ncp: 1, ncm: 2, oss: 0 }).classe, 'ncp', 'con una NC+ il riepilogo è rosso');
+assert.strictEqual(ar({ voci: 0, fatte: 0, ncp: 0, ncm: 0, oss: 0 }).testo, '', 'un’area senza voci non dice «da compilare»');
+assert.ok(js.includes('const RIGHE2 = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];'), 'le righe del secondo momento: persona presente, imprese, le dieci aree');
+assert.ok(js.includes("vaiFase(2, n);") && js.includes("function vaiFase(f, tab) { _fase = f; document.body.classList.remove('v2-area-chiusa'); premiPasso("), 'la riga apre la pagina di sempre premendo il pulsante del passo, e andando avanti una riga chiusa si riapre');
+assert.ok(js.includes("function areeComEra() { document.querySelectorAll('#view-form .v2-area').forEach((r) => r.remove());"), 'spegnendo la veste le righe spariscono');
+
 console.log('veste-v2: ok');

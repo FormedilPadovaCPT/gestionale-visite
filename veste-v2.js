@@ -272,6 +272,23 @@ body.v2 #view-form .tab-area>#inc-scelta-box>.field{display:none}
 #v2-tipo-chips button.on{background:#565C66;border-color:#565C66;color:#fff}
 #v2-tipo-chips button.v2-tratt{border-style:dashed;color:#888;font-weight:400}
 body.v2 #view-form .v2-tipo-nascosta{display:none}
+/* secondo momento: righe che si aprono, una alla volta (persona presente, imprese, le dieci aree) */
+.v2-area{display:none}
+body.v2.v2-fase2 #view-form #tab-bar{display:none}
+body.v2.v2-fase2 #view-form .v2-area{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.12);padding:12px 16px;margin-bottom:8px;color:#565C66;font-size:15px;white-space:normal;min-height:0;border-left:3px solid transparent}
+.v2-area .v2-pallino{flex:0 0 26px;height:26px;border-radius:50%;background:#E3E4E6;color:#565C66;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.v2-area.parziale .v2-pallino{background:#FDE8DC;color:var(--orange)}
+.v2-area.completa .v2-pallino{background:#95C22F;color:#fff}
+.v2-area .v2-nome{flex:1;font-weight:600;min-width:0}
+.v2-area .v2-riep{font-size:13px;color:#888;white-space:nowrap}
+.v2-area .v2-riep.ncp{color:#C0392B;font-weight:600}
+.v2-area .v2-riep.ncm{color:#E67E22;font-weight:600}
+.v2-area .v2-freccia{color:#888;flex:0 0 14px;text-align:center}
+.v2-area.aperta{border-left-color:var(--orange)!important}
+body.v2.v2-fase2.v2-area-chiusa #view-form .tab-content.active{display:none}
+body.v2.v2-fase2 #view-form .tab-content{margin-bottom:10px}
+body.v2.v2-fase2 #view-form .tab-content>.card>h3:first-child{display:none}
+@media(max-width:600px){.v2-area .v2-riep{white-space:normal;text-align:right;font-size:12px}}
 .v2-sezione{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#565C66;margin:6px 2px 10px}
 #v2-torna{display:inline-flex;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--orange);background:#fff;border:1.5px solid var(--orange);border-radius:50px;padding:5px 14px;min-height:0}
 @media(max-width:720px){#v2-uff-menu{flex:1 1 100%;position:static;display:flex;flex-wrap:wrap;gap:4px}#v2-uff-menu button{width:auto;padding:7px 12px;border:1px solid var(--border)}#v2-uff-menu hr{display:none}body.v2 nav{padding:0 10px}}
@@ -630,13 +647,13 @@ body.v2 #view-form .v2-tipo-nascosta{display:none}
   const tabOra = () => Number(S().tab) || 0;
   const faseDi = (tab) => (tab === 1 ? 1 : tab >= 2 && tab <= 12 ? 2 : tab >= 13 ? 3 : null);   // il passo 0 sta in due momenti
   function premiPasso(n) { const b = document.querySelector('#tab-bar .tab-btn[data-ti="' + n + '"]'); if (!b) return; _mioPasso = true; try { b.click(); } finally { _mioPasso = false; } }
-  function vaiFase(f, tab) { _fase = f; premiPasso(tab != null ? tab : FASI[f].tabs[0]); verbaleApplica(); window.scrollTo(0, 0); }
+  function vaiFase(f, tab) { _fase = f; document.body.classList.remove('v2-area-chiusa'); premiPasso(tab != null ? tab : FASI[f].tabs[0]); verbaleApplica(); window.scrollTo(0, 0); }
   /* il campo da raggiungere sta nella persona presente? (lo chiede vaiAlCampoMancante prima di aprire il passo) */
   function verso(campo) { try { const el = campo && $(campo); _verso = el && el.closest && el.closest('.v2-persona') ? 'persona' : null; } catch (_e) { _verso = null; } }
   function passoCambiato(n) {
     if (!document.body.classList.contains('v2')) return;
     // se il passo l'ha cambiato l'app (un avviso che porta a un campo, una bozza riaperta) il momento si ricava dal passo
-    if (!_mioPasso && !_daBarra) _fase = faseDi(n) || (_verso === 'persona' ? 2 : 1);
+    if (!_mioPasso && !_daBarra) { _fase = faseDi(n) || (_verso === 'persona' ? 2 : 1); document.body.classList.remove('v2-area-chiusa'); }   // l'app porta a un passo: la sua riga si apre
     _verso = null;
     verbaleApplica();
   }
@@ -667,6 +684,8 @@ body.v2 #view-form .v2-tipo-nascosta{display:none}
     if (p) p.addEventListener('click', (e) => avantiIndietro(e, -1), true);
     if (n) n.addEventListener('click', (e) => avantiIndietro(e, +1), true);
     if (bar) bar.addEventListener('click', () => { _daBarra = true; setTimeout(() => { _daBarra = false; }, 0); }, true);
+    const vf = $('view-form');
+    if (vf) ['change', 'input'].forEach((ev) => vf.addEventListener(ev, () => { if (document.body.classList.contains('v2') && _fase === 2) setTimeout(() => { try { areeRighe(); } catch (_e) { /* il riepilogo è un di più */ } }, 0); }));
   }
   function verbalePrepara() {
     const vista = $('view-form'); if (!vista) return false;
@@ -699,13 +718,14 @@ body.v2 #view-form .v2-tipo-nascosta{display:none}
     document.querySelectorAll('#v2-fasi button[data-fase]').forEach((b) => { const f = Number(b.dataset.fase); b.classList.toggle('on', f === _fase); b.classList.toggle('fatta', f < _fase); });
     const nr = $('v2-fasi-nr'); if (nr) nr.textContent = ($('f-verbale') && $('f-verbale').value) || 'nuovo';
     momentoUno();
+    try { if (_fase !== 2) document.body.classList.remove('v2-area-chiusa'); areeRighe(); } catch (e) { console.warn('veste v2 (righe):', e); }
     const b0 = document.querySelector('#tab-bar .tab-btn[data-ti="0"]'); if (b0) b0.textContent = _fase === 2 ? '👤 Persona presente' : '📋 Visita';
     const p = $('btn-prev'), n = $('btn-next'), t = tabOra();
     if (p) { p.disabled = _fase === 1; p.textContent = '‹ Indietro'; }
     if (n) { n.disabled = t === 15; n.textContent = _fase === 1 ? 'In cantiere ›' : (_fase === 2 && t === 12) ? 'A fine visita ›' : 'Successivo ›'; }
   }
   function verbaleComEra() {
-    momentoUnoComEra();
+    momentoUnoComEra(); areeComEra();
     const f = $('v2-fasi'); if (f) f.remove();
     [1, 2, 3].forEach((x) => document.body.classList.remove('v2-fase' + x));
     const inc = $('inc-scelta-box'), card = document.querySelector('#view-form .tab-content[data-tab="0"] > .card');
@@ -813,6 +833,74 @@ body.v2 #view-form .v2-tipo-nascosta{display:none}
     // la tendina si vede solo se si è chiesto «Altre»
     sel.classList.toggle('v2-tipo-nascosta', el.dataset.altre !== '1');
   }
+  /* ── SECONDO MOMENTO: righe che si aprono ──
+     Una riga per la persona presente, una per le imprese, una per ognuna delle dieci aree. La riga sta sopra la
+     pagina di sempre di quel passo e la apre premendo il pulsante del passo (che salva la check-list e disegna la
+     pagina). Il riepilogo si calcola da ciò che l'app ha già in memoria, e dalle scelte sullo schermo per l'area aperta. */
+  const RIGHE2 = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  function areaConta(z) {
+    const voci = ((S().byZona || {})[z] || []).filter((v) => !v.is_nota);
+    const con = $('zi-' + z), chk = S().checklist || {};
+    let fatte = 0, ncp = 0, ncm = 0, oss = 0;
+    const disegnata = !!(con && con.querySelector('input[type=radio][data-c]'));   // l'area è già stata aperta: vale ciò che è sullo schermo
+    voci.forEach((v) => {
+      let val = '';
+      if (disegnata) { const r = [...con.querySelectorAll('input[type=radio][data-c]:checked')].find((x) => x.dataset.c === String(v.codice)); val = r ? r.value : ''; }
+      else val = chk[v.codice] || '';
+      if (val) fatte++;
+      if (val === 'NC+') ncp++; else if (val === 'NC-') ncm++; else if (val === 'OSS') oss++;
+    });
+    return { voci: voci.length, fatte, ncp, ncm, oss };
+  }
+  function areaRiepilogo(c) {
+    if (!c.voci) return { testo: '', classe: '', stato: '' };
+    if (!c.fatte) return { testo: 'da compilare', classe: '', stato: '' };
+    const p = [c.fatte + ' di ' + c.voci];
+    if (c.ncp) p.push(c.ncp + ' NC+'); if (c.ncm) p.push(c.ncm + ' NC−'); if (c.oss) p.push(c.oss + ' OSS');
+    return { testo: p.join(' · '), classe: c.ncp ? 'ncp' : c.ncm ? 'ncm' : '', stato: c.fatte >= c.voci ? 'completa' : 'parziale' };
+  }
+  function areeRighe() {
+    const area = document.querySelector('#view-form .tab-area'); if (!area) return;
+    RIGHE2.forEach((n) => {
+      const pagina = area.querySelector('.tab-content[data-tab="' + n + '"]'); if (!pagina) return;
+      let riga = area.querySelector('.v2-area[data-ti="' + n + '"]');
+      if (!riga) {
+        riga = document.createElement('button'); riga.type = 'button'; riga.className = 'v2-area'; riga.dataset.ti = String(n);
+        riga.innerHTML = '<span class="v2-pallino"></span><span class="v2-nome"></span><span class="v2-riep"></span><span class="v2-freccia"></span>';
+        riga.addEventListener('click', () => {
+          if (_fase !== 2) return;
+          if (tabOra() === n && !document.body.classList.contains('v2-area-chiusa')) { document.body.classList.add('v2-area-chiusa'); areeRighe(); return; }
+          document.body.classList.remove('v2-area-chiusa');
+          vaiFase(2, n);
+          const r = area.querySelector('.v2-area[data-ti="' + n + '"]'); if (r && r.scrollIntoView) r.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        });
+        area.insertBefore(riga, pagina);
+      }
+      const aperta = _fase === 2 && tabOra() === n && !document.body.classList.contains('v2-area-chiusa');
+      let nome, pallino, riep = { testo: '', classe: '', stato: '' };
+      if (n === 0) {
+        nome = 'Persona presente'; pallino = '👤';
+        const chi = [($('f-ppre-nome') || {}).value, ($('f-ppre-cog') || {}).value].filter(Boolean).join(' ');
+        const q = $('f-qual-ppre'), qual = q && q.selectedOptions && q.selectedOptions[0] && q.value ? q.selectedOptions[0].textContent : '';
+        riep = chi ? { testo: chi + (qual ? ' · ' + qual : ''), classe: '', stato: qual ? 'completa' : 'parziale' } : { testo: 'da compilare', classe: '', stato: '' };
+      } else if (n === 2) {
+        nome = 'Imprese in cantiere'; pallino = '🏢';
+        const imp = (S().imprese || []).filter((x) => x.impresa_id || x.impresa_nome);
+        const lav = imp.reduce((a, x) => a + (Number(x.nr_lav) || 0), 0);
+        riep = imp.length ? { testo: imp.length + (imp.length === 1 ? ' impresa' : ' imprese') + ' · ' + lav + (lav === 1 ? ' lavoratore' : ' lavoratori'), classe: '', stato: 'completa' } : { testo: 'da compilare', classe: '', stato: '' };
+      } else {
+        const b = document.querySelector('#tab-bar .tab-btn[data-ti="' + n + '"]');
+        nome = b ? b.textContent.replace(/^\s*\d+\.\s*/, '') : 'Area ' + (n - 2); pallino = String(n - 2);
+        riep = areaRiepilogo(areaConta(n - 2));
+      }
+      riga.className = 'v2-area' + (riep.stato ? ' ' + riep.stato : '') + (aperta ? ' aperta' : '');
+      riga.children[0].textContent = pallino; riga.children[1].textContent = nome;
+      riga.children[2].textContent = riep.testo; riga.children[2].className = 'v2-riep' + (riep.classe ? ' ' + riep.classe : '');
+      riga.children[3].textContent = aperta ? '▾' : '›';
+    });
+  }
+  function areeComEra() { document.querySelectorAll('#view-form .v2-area').forEach((r) => r.remove()); document.body.classList.remove('v2-area-chiusa'); }
+
   function momentoUno() { try { incarichiSchede(); cantieriVicini(); tipoPulsanti(); } catch (e) { console.warn('veste v2 (primo momento):', e); } }
   function momentoUnoComEra() {
     ['v2-inc-schede', 'v2-vicini', 'v2-tipo-chips'].forEach((id) => { const e = $(id); if (e) e.remove(); });
@@ -885,5 +973,5 @@ body.v2 #view-form .v2-tipo-nascosta{display:none}
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }
 
-  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI };
+  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo };
 })();
