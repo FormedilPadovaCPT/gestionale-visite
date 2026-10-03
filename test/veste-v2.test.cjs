@@ -160,4 +160,19 @@ assert.ok(js.includes("if (ruolo() === 'segreteria') return Object.assign(mio, {
 assert.ok(js.includes("tutti || String(v.tecnico_id) === String(mio)") && js.includes("(tutti || String(x.tecnico_email || '').toLowerCase() === io)"), 'rientri e incarichi si filtrano sul tecnico');
 assert.ok(js.includes("visita && !chi.anteprima && (suo || tutti)"), 'guardando la pagina di un altro tecnico non si avvia una visita a suo nome');
 
+/* ── primo momento come nel prototipo: incarichi a schede, cantieri vicini, tipologia a pulsanti ── */
+// la tipologia di accesso: le quattro più usate, e NESSUNA già scelta (la tipologia nasce vuota, o proposta dall'incarico)
+assert.deepStrictEqual(s.v2.TIPI_FREQUENTI, ['5', '7', '8', '12'], 'pulsanti: Programmata, Indicata dal CPT, Visite in serie, Progetto SPISAL');
+for (const v of s.v2.TIPI_FREQUENTI) assert.ok(new RegExp('<select id="f-tipo"[\\s\\S]*?<option value="' + v + '">').test(html), 'la tipologia ' + v + ' deve esistere nella tendina di sempre');
+assert.ok(js.includes("class=\"${scelta === v ? 'on' : ''}\"") && !/data-tipo="5" class="on"/.test(js), 'un pulsante è acceso solo se la tendina ha quel valore: niente «Programmata» già scelta');
+assert.ok(js.includes("sel.dispatchEvent(new Event('change', { bubbles: true }));"), 'schede e pulsanti devono riempire il campo di sempre e avvisare l’app');
+// i cantieri più vicini: funzione pura
+const vicini = s.v2.piuVicini([{ cantiere_id: 'A', lat: 45.40, lng: 11.88 }, { cantiere_id: 'B', lat: 45.50, lng: 11.90 }, { cantiere_id: 'C', lat: null, lng: null }, { cantiere_id: 'D', lat: 45.41, lng: 11.87 }, { cantiere_id: 'E', lat: 45.90, lng: 12.2 }], 45.407, 11.876, 3);
+assert.deepStrictEqual(vicini.map((c) => c.cantiere_id), ['D', 'A', 'B'], 'i tre più vicini, dal più vicino; chi non ha la posizione resta fuori');
+assert.ok(vicini[0].km < 1 && vicini[2].km > 9 && vicini[2].km < 12, 'le distanze sono in chilometri');
+assert.deepStrictEqual(s.v2.piuVicini([], 45, 11, 3), []);
+assert.ok(js.includes("if (!e.target.closest('#v2-vicini-btn')) return;") && js.includes('navigator.geolocation.getCurrentPosition('), 'la posizione si chiede solo se si preme «Cantieri vicini a me»');
+assert.ok(html.includes('window.__app={vSet,vGet,initForm,autoAccCant,renderCantCard,_useCantiereEsistente,'), 'la scheda di un cantiere vicino deve sceglierlo con la funzione di sempre');
+assert.ok(js.includes("['v2-inc-schede', 'v2-vicini', 'v2-tipo-chips'].forEach((id) => { const e = $(id); if (e) e.remove(); });"), 'spegnendo la veste i tre aiuti spariscono e restano i campi di sempre');
+
 console.log('veste-v2: ok');

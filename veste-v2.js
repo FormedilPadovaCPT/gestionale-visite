@@ -253,6 +253,25 @@ body.v2.v2-fase2 #view-form .v2-visita{display:none}
 body.v2:not(.v2-fase1) #view-form .tab-area>#inc-scelta-box{display:none!important}
 body.v2.v2-fase2 #tab-bar .tab-btn[data-ti="1"],body.v2.v2-fase2 #tab-bar .tab-btn[data-ti="13"],body.v2.v2-fase2 #tab-bar .tab-btn[data-ti="14"],body.v2.v2-fase2 #tab-bar .tab-btn[data-ti="15"]{display:none}
 body.v2.v2-fase3 #tab-bar .tab-btn:not([data-ti="13"]):not([data-ti="14"]):not([data-ti="15"]){display:none}
+/* primo momento, come nel prototipo: incarichi a schede, cantieri vicini, tipologia a pulsanti */
+body.v2 #view-form .tab-area>#inc-scelta-box{background:#fff!important;border-left:0!important;border-radius:8px!important;box-shadow:0 2px 8px rgba(0,0,0,.12);padding:16px 20px!important;margin-bottom:14px!important}
+body.v2 #view-form .tab-area>#inc-scelta-box>.field{display:none}
+.v2-griglia{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.v2-scheda{text-align:left;background:#fff;border:2px solid var(--border);border-radius:8px;padding:12px 14px;color:#565C66;white-space:normal;min-height:0;display:block;font-size:13px;line-height:1.35}
+.v2-scheda:hover{border-color:var(--orange)}
+.v2-scheda:active{transform:scale(.97)}
+.v2-scheda.on{border-color:var(--orange);background:#FFF8F4}
+.v2-scheda.v2-tratt{border-style:dashed}
+.v2-scheda small{display:block;font-size:12px;color:#888}
+.v2-scheda b{display:block;font-size:15px;font-weight:600;color:#3d4249;margin:2px 0}
+.v2-scheda .v2-km{color:var(--orange);font-weight:600;font-size:12px}
+#v2-vicini{margin:0 0 12px}
+#v2-vicini .v2-nota{font-size:12.5px;color:#888;margin-top:6px}
+#v2-tipo-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+#v2-tipo-chips button{background:#fff;border:1.5px solid var(--border);border-radius:50px;padding:7px 14px;font-size:13px;font-weight:600;color:#565C66;min-height:0}
+#v2-tipo-chips button.on{background:#565C66;border-color:#565C66;color:#fff}
+#v2-tipo-chips button.v2-tratt{border-style:dashed;color:#888;font-weight:400}
+body.v2 #view-form .v2-tipo-nascosta{display:none}
 .v2-sezione{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#565C66;margin:6px 2px 10px}
 #v2-torna{display:inline-flex;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--orange);background:#fff;border:1.5px solid var(--orange);border-radius:50px;padding:5px 14px;min-height:0}
 @media(max-width:720px){#v2-uff-menu{flex:1 1 100%;position:static;display:flex;flex-wrap:wrap;gap:4px}#v2-uff-menu button{width:auto;padding:7px 12px;border:1px solid var(--border)}#v2-uff-menu hr{display:none}body.v2 nav{padding:0 10px}}
@@ -593,7 +612,7 @@ body.v2.v2-fase3 #tab-bar .tab-btn:not([data-ti="13"]):not([data-ti="14"]):not([
   }
   /* chiamata da navTo quando loadScadenze / loadIncarichi hanno finito: dati = null se la lettura è fallita */
   function pronto(tipo, dati) {
-    try { _dati[tipo] = dati == null ? null : dati; if (tipo === 'scadenze') _dati.quando = Date.now(); oggiDisegna(); } catch (e) { console.warn('veste v2 (pronto):', e); }
+    try { _dati[tipo] = dati == null ? null : dati; if (tipo === 'scadenze') _dati.quando = Date.now(); oggiDisegna(); if (tipo === 'incarichi' && $('v2-inc-schede')) incarichiSchede(); } catch (e) { console.warn('veste v2 (pronto):', e); }
   }
 
   /* ── IL VERBALE IN TRE MOMENTI (scelta dell'utente: «tre momenti, passi di oggi») ──
@@ -679,12 +698,14 @@ body.v2.v2-fase3 #tab-bar .tab-btn:not([data-ti="13"]):not([data-ti="14"]):not([
     [1, 2, 3].forEach((f) => document.body.classList.toggle('v2-fase' + f, _fase === f));
     document.querySelectorAll('#v2-fasi button[data-fase]').forEach((b) => { const f = Number(b.dataset.fase); b.classList.toggle('on', f === _fase); b.classList.toggle('fatta', f < _fase); });
     const nr = $('v2-fasi-nr'); if (nr) nr.textContent = ($('f-verbale') && $('f-verbale').value) || 'nuovo';
+    momentoUno();
     const b0 = document.querySelector('#tab-bar .tab-btn[data-ti="0"]'); if (b0) b0.textContent = _fase === 2 ? '👤 Persona presente' : '📋 Visita';
     const p = $('btn-prev'), n = $('btn-next'), t = tabOra();
     if (p) { p.disabled = _fase === 1; p.textContent = '‹ Indietro'; }
     if (n) { n.disabled = t === 15; n.textContent = _fase === 1 ? 'In cantiere ›' : (_fase === 2 && t === 12) ? 'A fine visita ›' : 'Successivo ›'; }
   }
   function verbaleComEra() {
+    momentoUnoComEra();
     const f = $('v2-fasi'); if (f) f.remove();
     [1, 2, 3].forEach((x) => document.body.classList.remove('v2-fase' + x));
     const inc = $('inc-scelta-box'), card = document.querySelector('#view-form .tab-content[data-tab="0"] > .card');
@@ -693,6 +714,109 @@ body.v2.v2-fase3 #tab-bar .tab-btn:not([data-ti="13"]):not([data-ti="14"]):not([
     const p = $('btn-prev'), n = $('btn-next');
     if (p) { p.textContent = '◀ Precedente'; p.disabled = tabOra() === 0; }
     if (n) { n.textContent = 'Successivo ▶'; n.disabled = tabOra() === 15; }
+  }
+
+  /* ── PRIMO MOMENTO DEL VERBALE, come nel prototipo ──
+     Tre aiuti sopra i campi di sempre. Nessuno scrive dati per conto suo: ognuno preme o riempie il campo che
+     c'è già (la tendina dell'incarico, la scelta del cantiere, la tendina della tipologia). */
+
+  /* 1 · «Perché sei qui»: gli incarichi aperti come schede. La scheda preme la tendina «Parti da un tuo incarico»,
+     che fa tutto quello che fa oggi (accetta l'incarico se è tuo, compila impresa e cantiere). */
+  function incarichiSchede() {
+    const box = $('inc-scelta-box'), sel = $('f-prot-inc'); if (!box || !sel) return;
+    let el = $('v2-inc-schede');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'v2-inc-schede'; box.appendChild(el);
+      el.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-inc]'); if (!b) return;
+        if (sel.value === b.dataset.inc) return;
+        sel.value = b.dataset.inc;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        incarichiSchede(); setTimeout(tipoPulsanti, 500);
+      });
+      if (typeof MutationObserver === 'function') new MutationObserver(() => incarichiSchede()).observe(sel, { childList: true });
+    }
+    const noti = {}; (Array.isArray(_dati.incarichi) ? _dati.incarichi : []).forEach((x) => { noti[String(x.id)] = x; });
+    const schede = [...sel.options].filter((o) => o.value).map((o) => {
+      const x = noti[o.value], et = String(o.textContent || '');
+      const nome = et.replace(/^\s*\d+\s*·\s*/, '');
+      const dove = x ? [x.indirizzo, x.comune].filter(Boolean).join(', ') : '';
+      return `<button type="button" class="v2-scheda${sel.value === o.value ? ' on' : ''}" data-inc="${esc(o.value)}"><small>n. ${esc(o.value)}${x && x.tipo_richiesta ? ' · ' + esc(x.tipo_richiesta) : ''}</small><b>${esc(x && x.impresa ? x.impresa : nome)}</b>${dove ? '<small>› ' + esc(dove) + '</small>' : ''}</button>`;
+    });
+    el.innerHTML = '<div class="v2-titolo" style="margin-bottom:10px">Perché sei qui</div><div class="v2-griglia">' + schede.join('')
+      + `<button type="button" class="v2-scheda v2-tratt${sel.value ? '' : ' on'}" data-inc=""><b>Visita d'iniziativa</b><small>Nessun incarico collegato</small></button></div>`;
+  }
+
+  /* 2 · «Cantieri vicini a me»: su richiesta (la posizione si chiede solo se si preme), i tre cantieri aperti più
+     vicini. La scheda sceglie il cantiere con la funzione di sempre. */
+  const km = (a, b, c, d) => { const R = 6371, r = Math.PI / 180, x = (c - a) * r, y = (d - b) * r, h = Math.sin(x / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin(y / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+  function piuVicini(cantieri, lat, lng, quanti) {
+    return (cantieri || []).filter((c) => c.lat != null && c.lng != null).map((c) => Object.assign({}, c, { km: km(lat, lng, Number(c.lat), Number(c.lng)) })).sort((a, b) => a.km - b.km).slice(0, quanti || 3);
+  }
+  function cantieriVicini() {
+    const campo = $('f-cant-comune'); const riga = campo && campo.closest('.row'); if (!riga || $('v2-vicini')) return;
+    const el = document.createElement('div'); el.id = 'v2-vicini';
+    el.innerHTML = '<button type="button" class="btn-outline btn-sm" id="v2-vicini-btn" data-aiuto="Chiede al telefono dove sei e mostra i tre cantieri aperti più vicini. Non salva la posizione.">📍 Cantieri vicini a me</button><div id="v2-vicini-esito"></div>';
+    riga.parentNode.insertBefore(el, riga);
+    const esito = $('v2-vicini-esito');
+    el.addEventListener('click', async (e) => {
+      const scheda = e.target.closest('button[data-cant]');
+      if (scheda) {
+        const usa = window.__app && window.__app._useCantiereEsistente;
+        const { data, error } = await window.sb.from('cantieri').select('*').eq('cantiere_id', scheda.dataset.cant).maybeSingle();
+        if (error || !data || typeof usa !== 'function') { esito.innerHTML = '<div class="v2-nota" style="color:#C0392B">Non sono riuscito ad aprire il cantiere: cercalo dal campo qui sotto.</div>'; return; }
+        await usa(data);
+        esito.querySelectorAll('button[data-cant]').forEach((b) => b.classList.toggle('on', b === scheda));
+        return;
+      }
+      if (!e.target.closest('#v2-vicini-btn')) return;
+      if (!navigator.geolocation) { esito.innerHTML = '<div class="v2-nota">Questo dispositivo non dà la posizione: cerca il cantiere dal campo qui sotto.</div>'; return; }
+      esito.innerHTML = '<div class="v2-nota">⏳ Chiedo la posizione…</div>';
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude, lng = pos.coords.longitude, d = 0.2;   // circa 20 km
+        const { data, error } = await window.sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,cantiere_etichetta,comune_nome,lat,lng')
+          .eq('elimina', 0).or('cantiere_chiuso.is.null,cantiere_chiuso.eq.false')
+          .gte('lat', lat - d).lte('lat', lat + d).gte('lng', lng - d * 1.4).lte('lng', lng + d * 1.4).limit(600);
+        if (error) { esito.innerHTML = '<div class="v2-nota" style="color:#C0392B">Non sono riuscito a leggere i cantieri (' + esc(error.message) + '): cerca dal campo qui sotto.</div>'; return; }
+        const v = piuVicini(data, lat, lng, 3);
+        esito.innerHTML = v.length
+          ? '<div class="v2-griglia" style="margin-top:10px">' + v.map((c) => `<button type="button" class="v2-scheda" data-cant="${esc(c.cantiere_id)}"><span class="v2-km">${c.km < 10 ? c.km.toFixed(1).replace('.', ',') : Math.round(c.km)} km</span><b>${esc([c.cantiere_indirizzo, c.cantiere_civico].filter(Boolean).join(' ') || c.cantiere_etichetta || '—')}</b><small>${esc(c.comune_nome || '')}</small></button>`).join('') + '</div><div class="v2-nota">Ordinati dalla tua posizione. Se il cantiere non è fra questi, cercalo qui sotto.</div>'
+          : '<div class="v2-nota">Nessun cantiere aperto con la posizione nota entro 20 km: cercalo dal campo qui sotto.</div>';
+      }, (err) => { esito.innerHTML = '<div class="v2-nota">Posizione non disponibile (' + esc(err && err.message || 'permesso negato') + '): cerca il cantiere dal campo qui sotto.</div>'; }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+    });
+  }
+
+  /* 3 · Tipologia di accesso a pulsanti: le quattro più usate (contate sulle visite dal 01/10/2024: Programmata 609,
+     Indicata dal CPT 533, Visite in serie 324, Progetto SPISAL 174) e «Altre». Il campo vero resta la tendina di sempre:
+     i pulsanti la riempiono. NESSUNA è già scelta: la tipologia nasce vuota, o proposta dall'incarico. */
+  const TIPI_FREQUENTI = ['5', '7', '8', '12'];
+  function tipoPulsanti() {
+    const sel = $('f-tipo'); if (!sel) return;
+    let el = $('v2-tipo-chips');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'v2-tipo-chips';
+      sel.parentNode.insertBefore(el, sel);
+      el.addEventListener('click', (e) => {
+        const b = e.target.closest('button'); if (!b) return;
+        if (b.dataset.altre) { el.dataset.altre = el.dataset.altre === '1' ? '' : '1'; tipoPulsanti(); if (el.dataset.altre === '1') sel.focus(); return; }
+        sel.value = sel.value === b.dataset.tipo ? '' : b.dataset.tipo;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        tipoPulsanti();
+      });
+      sel.addEventListener('change', () => tipoPulsanti());
+    }
+    const scelta = sel.value, fuori = !!scelta && !TIPI_FREQUENTI.includes(scelta);
+    const etichetta = (v) => { const o = [...sel.options].find((x) => x.value === v); return o ? o.textContent : v; };
+    const altre = [...sel.options].filter((o) => o.value && !TIPI_FREQUENTI.includes(o.value)).length;
+    el.innerHTML = TIPI_FREQUENTI.map((v) => `<button type="button" data-tipo="${v}" class="${scelta === v ? 'on' : ''}">${esc(etichetta(v))}</button>`).join('')
+      + `<button type="button" data-altre="1" class="v2-tratt${fuori ? ' on' : ''}">${fuori ? esc(etichetta(scelta)) + ' ›' : 'Altre ' + altre + ' ›'}</button>`;
+    // la tendina si vede solo se si è chiesto «Altre»
+    sel.classList.toggle('v2-tipo-nascosta', el.dataset.altre !== '1');
+  }
+  function momentoUno() { try { incarichiSchede(); cantieriVicini(); tipoPulsanti(); } catch (e) { console.warn('veste v2 (primo momento):', e); } }
+  function momentoUnoComEra() {
+    ['v2-inc-schede', 'v2-vicini', 'v2-tipo-chips'].forEach((id) => { const e = $(id); if (e) e.remove(); });
+    const sel = $('f-tipo'); if (sel) sel.classList.remove('v2-tipo-nascosta');
   }
 
   /* ── DIREZIONE e PRESIDENZA: una sintesi, così la pagina non è mai vuota ── */
@@ -761,5 +885,5 @@ body.v2.v2-fase3 #tab-bar .tab-btn:not([data-ti="13"]):not([data-ti="14"]):not([
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }
 
-  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi };
+  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI };
 })();
