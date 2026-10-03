@@ -644,7 +644,20 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
   const AZIONI = [['btn-segnala-dash', '📍', 'Segnala cantiere'], ['btn-diniego-dash', '🚫', 'Accesso negato'], ['btn-qr-servizi', '📱', 'QR servizi CPT'],
     ['btn-servizi-cpt', '↗', 'Servizi CPT', 'v2-verde'], ['nav-assev', '✅', 'Asseverazione', 'v2-blu'],
     ['btn-dove-sono', '📡', 'Dove sono?'], ['btn-appunti', '📝', 'Appunti cantiere']];
-  const azioneVisibile = (id) => { const o = $(id); if (!o) return false; return (id === 'nav-assev' && o.dataset.v2Mostra !== undefined ? o.dataset.v2Mostra : o.style.display) !== 'none'; };
+  const azioneVisibile = (id) => {
+    const o = $(id); if (!o) return false;
+    if (id === 'nav-assev') {
+      // «Vedi come…»: conta il tecnico GUARDATO, non la segreteria che guarda (l'elenco degli asseveratori è quello dell'app)
+      if (simula() && Array.isArray(window.__assevEmails)) return ruolo() !== 'tecnico' && ruolo() !== 'coordinatore' ? false : window.__assevEmails.includes(diChi().email);
+      if (o.dataset.v2Mostra !== undefined) return o.dataset.v2Mostra !== 'none';
+    }
+    return o.style.display !== 'none';
+  };
+  function azioniDisegna() {
+    const el = $('v2-azioni'); if (!el) return;
+    el.innerHTML = AZIONI.filter(([id]) => azioneVisibile(id))
+      .map(([id, icona, testo, classe]) => `<button type="button" data-v2-preme="${id}"${classe ? ' class="' + classe + '"' : ''}><span>${icona}</span>${esc(testo)}</button>`).join('');
+  }
   const _dati = { scadenze: undefined, incarichi: undefined, quando: 0 };
   const gg = (d) => { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] : ''; };
   const mappa = (lat, lng, testo) => 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(lat != null && lng != null && lat !== '' && lng !== '' ? lat + ',' + lng : testo);
@@ -678,12 +691,11 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     $('v2-oggi-data').textContent = data.charAt(0).toUpperCase() + data.slice(1);
     const nome = (S().tecnico && S().tecnico.tecnico_nome) || '';
     $('v2-oggi-ciao').textContent = (h < 13 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera') + (nome ? ', ' + nome : '');
-    $('v2-azioni').innerHTML = AZIONI.filter(([id]) => azioneVisibile(id))
-      .map(([id, icona, testo, classe]) => `<button type="button" data-v2-preme="${id}"${classe ? ' class="' + classe + '"' : ''}><span>${icona}</span>${esc(testo)}</button>`).join('');
     oggiDisegna();
   }
 
   function oggiDisegna() {
+    azioniDisegna();   // anche quando in «Vedi come…» si cambia il tecnico guardato
     const chi = diChi(), tutti = chi.tutti, mio = chi.id;
     const dopoTitolo = tutti ? ' · tutti i tecnici' : chi.anteprima && chi.nome ? ' · ' + esc(chi.nome) : '';
     const r = $('v2-rientri');

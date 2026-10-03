@@ -9596,7 +9596,7 @@ initAuth()
 const ADMIN_EMAIL = 'cptpd@did.formedilpadova.it'
 const COORD_EMAIL = 'nicola.demarco@did.formedilpadova.it'
 const COORD_PAGE_EMAILS = [ADMIN_EMAIL, COORD_EMAIL]
-const ASSEV_EMAILS = ['cptpd@did.formedilpadova.it','tommaso.visentini@did.formedilpadova.it','nicola.demarco@did.formedilpadova.it','paolo.balladore@did.formedilpadova.it']
+const ASSEV_EMAILS = ['cptpd@did.formedilpadova.it','tommaso.visentini@did.formedilpadova.it','nicola.demarco@did.formedilpadova.it','paolo.balladore@did.formedilpadova.it'];window.__assevEmails=ASSEV_EMAILS
 const isCoordPageUser = () => !!(S.user && COORD_PAGE_EMAILS.includes((S.user.email||'').toLowerCase()))
 
 function admInit(){
@@ -15105,7 +15105,7 @@ document.addEventListener('input',function(ev){
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=8"></script>
-<script src="veste-v2.js?v=19"></script>
+<script src="veste-v2.js?v=20"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
