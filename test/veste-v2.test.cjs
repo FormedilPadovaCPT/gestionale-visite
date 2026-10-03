@@ -268,4 +268,9 @@ assert.ok(js.includes("if (fondo > 0.5 && contrasto(testo.l, fondo) < 3) { el.cl
 assert.ok(js.includes("new MutationObserver(rifai).observe(zona, { childList: true, subtree: true"), 'gli elenchi che arrivano dopo aver premuto un pulsante vanno controllati anche loro');
 assert.ok(js.includes("leggibileIn('view-segreteria')") && js.includes("leggibileIn('view-admin')"), 'il controllo vale per Ufficio e per Coordinamento');
 
+/* ── persona fisica / giuridica: due pulsanti come pubblico / privato (solo aspetto) ── */
+assert.ok(js.includes('body.v2 .sogg-toggle label span{display:block;padding:5px 13px;border-radius:20px;border:2px solid var(--border)') && js.includes('body.v2 .sogg-toggle input[type=radio]:checked+span{border-color:var(--grey);background:var(--grey);color:#fff}'), 'i due pulsanti devono avere la stessa forma di «Pubblico / Privato»');
+assert.ok(html.includes('.tipo-chip span{display:block;padding:5px 13px;border-radius:20px;border:2px solid var(--border)'), 'se cambia la forma di «Pubblico / Privato» va cambiata anche questa');
+assert.ok(html.includes('name="comm-sogg" id="comm-radio-pf" value="PF" checked') && html.includes('name="mc-sogg" id="mc-sogg-pf" value="PF" checked'), 'i campi restano quelli di sempre, nel verbale e nella scheda del cantiere');
+
 console.log('veste-v2: ok');

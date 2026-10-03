@@ -332,6 +332,11 @@ body.v2.v2-fase3 #view-form .tab-content[data-tab="15"]{display:block;grid-colum
 #v2-requisiti a{color:var(--orange);font-weight:600;cursor:pointer;white-space:nowrap}
 #v2-requisiti small{display:block;color:#888;font-size:12px;margin-top:6px;line-height:1.4}
 /* il cantiere scelto, in evidenza */
+/* persona fisica / giuridica: due pulsanti come pubblico / privato, così si capisce che se ne sceglie uno */
+body.v2 .sogg-toggle{gap:6px;border:0;border-radius:0;overflow:visible;flex-wrap:wrap}
+body.v2 .sogg-toggle label{flex:0 0 auto;padding:0;background:none;text-transform:uppercase;letter-spacing:.4px}
+body.v2 .sogg-toggle label span{display:block;padding:5px 13px;border-radius:20px;border:2px solid var(--border);background:#fff;color:var(--grey);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+body.v2 .sogg-toggle input[type=radio]:checked+span{border-color:var(--grey);background:var(--grey);color:#fff}
 body.v2 #cant-info-card{border:2px solid var(--orange)!important;background:#FFF8F4!important;border-radius:8px!important}
 /* pillole di Visite, Rubrica e Statistiche */
 .v2-pillole{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
