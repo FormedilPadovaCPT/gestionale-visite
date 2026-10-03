@@ -3317,9 +3317,28 @@ document.addEventListener('change',async e=>{
 })
 
 // ── INIT FORM ──
+/* (03/10/2026) UNA MASCHERA NUOVA NASCE VUOTA DAVVERO. initForm svuotava un elenco di campi scritto a
+   mano, e quelli che nell'elenco non c'erano restavano dal verbale aperto prima: il titolo di
+   responsabile dei lavori, CSP e CSE («Arch.» finiva davanti al nome di un altro, o da solo nel
+   campo), l'importo dei lavori (che al salvataggio veniva scritto nella scheda di un altro
+   cantiere) e il tipo di committente. Qui ogni campo fisso della maschera torna com'è nella
+   pagina appena caricata, senza elenco: un campo aggiunto domani è già coperto. */
+function _formAzzera(){
+  document.querySelectorAll('#view-form input[id^="f-"],#view-form select[id^="f-"],#view-form textarea[id^="f-"],#view-form input[name="comm-tipo"],#view-form input[name="comm-sogg"]').forEach(el=>{
+    if(el.type==='file')return
+    if(el.type==='checkbox'||el.type==='radio'){el.checked=el.defaultChecked;return}
+    if(el.tagName==='SELECT'){const d=[...el.options].findIndex(o=>o.defaultSelected);el.selectedIndex=d>=0?d:0;return}
+    el.value=el.defaultValue
+  })
+  clearCommittente()            // toglie anche la scheda e il «sola lettura» del committente di prima
+  onCommTipoChange('')          // nessun tipo scelto
+  toggleCommSogg('PF')
+  proponiImportoCantiere(null)  // importo vuoto, senza il colore «dalla scheda»
+}
 async function initForm(snap=null){
   S.fd={}; S.checklist={}; S.noteChk={}; S.imprese=[]; S.lavorazioni=[]; S.savedId=null; S.foto={}; S._impOpen=0
   S._formBase=null
+  try{_formAzzera()}catch(_e){console.warn('azzeramento della maschera:',_e)}
   hide('btn-pdf')
   hide('btn-email-verbale')
 
@@ -7332,9 +7351,12 @@ function _clRender(){
     btn.onclick=async e=>{
       e.stopPropagation()
       if(formDaNonPerdere())return
-      initForm()
+      /* (03/10/2026) si aspetta che la maschera sia pronta. Prima i dati si scrivevano dopo 100 ms: se il
+         numero del verbale arrivava dal server più tardi (sul telefono è la norma), lo svuotamento della
+         maschera passava sopra il cantiere appena scritto e la visita si apriva senza cantiere. */
+      const _pronta=initForm()
       navTo('form')
-      setTimeout(async()=>{
+      _pronta.then(async()=>{
         vSet('f-cant-id',btn.dataset.cantId)
         vSet('f-cant-search',btn.dataset.cantLabel)
         const det=$('cant-detail');if(det)det.textContent=btn.dataset.cantDetail
@@ -7353,7 +7375,7 @@ function _clRender(){
         }
         await autoAccCant(btn.dataset.cantId)
         await proponiCommittenteCantiere(btn.dataset.cantId)
-      },100)
+      }).catch(e=>{console.warn('+ Visita:',e);toast('Non sono riuscito a preparare la visita sul cantiere ('+(e&&e.message||e)+'): scegli il cantiere a mano.','warn',8000)})
     }
   })
   // Pulsante 👁 e doppio clic riga: apre dettaglio cantiere
@@ -13124,8 +13146,9 @@ async function showCantiereDetail(cantId){
     btnNuova.textContent='+ Nuova visita'
     btnNuova.onclick=()=>{
       if(formDaNonPerdere())return
-      hide('modal-qd');initForm();navTo('form')
-      setTimeout(async()=>{
+      // (03/10/2026) si aspetta che la maschera sia pronta: vedi «+ Visita» nell'elenco dei cantieri
+      hide('modal-qd');const _pronta=initForm();navTo('form')
+      _pronta.then(async()=>{
         const cid=cantId
         vSet('f-cant-id',cid)
         vSet('f-cant-search',label)
@@ -13143,7 +13166,7 @@ async function showCantiereDetail(cantId){
         }
         await autoAccCant(cid)
         await proponiCommittenteCantiere(cid)
-      },100)
+      }).catch(e=>{console.warn('+ Nuova visita:',e);toast('Non sono riuscito a preparare la visita sul cantiere ('+(e&&e.message||e)+'): scegli il cantiere a mano.','warn',8000)})
     }
     $('qd-actions').innerHTML=''
     $('qd-actions').appendChild(btnNuova)
@@ -14744,8 +14767,9 @@ async function incNuovaVisita(id,accetta){
     Object.assign(r,patch)
     if(typeof incAggiornaNavBadge==='function') incAggiornaNavBadge()
   }
-  initForm();navTo('form')
-  setTimeout(()=>{ incApplicaAllaVisita(r).catch(e=>console.warn('incarico → visita:',e)) },120)
+  // (03/10/2026) si aspetta che la maschera sia pronta: scritto dopo 120 ms, l'incarico poteva essere cancellato dallo svuotamento
+  const _pronta=initForm();navTo('form')
+  _pronta.then(()=>incApplicaAllaVisita(r)).catch(e=>{console.warn('incarico → visita:',e);toast('Non sono riuscito ad agganciare l\'incarico alla visita ('+(e&&e.message||e)+'): sceglilo da «Parti da un tuo incarico».','warn',8000)})
 }
 
 /* (02/10/2026) CHE COSA PORTA UN INCARICO NELLA VISITA.

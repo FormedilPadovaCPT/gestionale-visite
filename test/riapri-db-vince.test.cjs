@@ -132,4 +132,12 @@ assert.ok(!/sb\.|localStorage|sessionStorage/.test(g), 'la guardia non salva nie
 assert.strictEqual((html.match(/if\(formDaNonPerdere\(\)\)/g) || []).length, 6, 'i sei punti che aprono una maschera nuova chiedono prima di buttare quella non salvata');
 assert.strictEqual((html.match(/S\._formBase=null/g) || []).length, 2, 'la maschera torna «pulita» all’apertura e dopo un salvataggio riuscito');
 
+// una maschera nuova nasce vuota davvero: niente elenco di campi scritto a mano (restavano titolo di RL/CSP/CSE, importo, tipo del committente)
+const az = html.slice(html.indexOf('function _formAzzera(){'), html.indexOf('async function initForm(snap=null){'));
+assert.ok(az.includes('#view-form input[id^="f-"]') && az.includes('el.defaultValue') && az.includes('el.defaultChecked') && az.includes('defaultSelected') && az.includes('proponiImportoCantiere(null)') && az.includes('clearCommittente()'), 'la maschera si azzera per intero, non per elenco');
+assert.ok(/S\._formBase=null\s+try\{_formAzzera\(\)\}/.test(html), 'initForm azzera la maschera per prima cosa, prima di aspettare il numero dal server');
+// i dati pronti (cantiere, incarico) si scrivono DOPO che la maschera è pronta, non dopo un tempo fisso
+assert.strictEqual((html.match(/const _pronta=initForm\(\)/g) || []).length, 3, '«+ Visita», «+ Nuova visita» e «Fai la visita» aspettano initForm');
+assert.ok(!/initForm\(\);?\s*navTo\('form'\)\s*setTimeout\(/.test(html), 'niente più dati scritti a tempo dopo initForm: lo svuotamento ci passava sopra');
+
 console.log('riapri-db-vince: ok');
