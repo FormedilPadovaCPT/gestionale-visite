@@ -100,6 +100,108 @@ function impDaRigaDb(im,i){
     tipo_imp:tipoImpDaRiga(im),ruolo:im.ruolo||'',is_principale:i===0
   }
 }
+/* (03/10/2026, sera) RIAPRIRE UN VERBALE: QUELLO CHE È NEL DATABASE VINCE SULLA COPIA DELLA MASCHERA.
+   Un verbale si riapre dalla copia salvata insieme a lui (visite_snapshot), che ha anche i campi
+   che il database non tiene. Ma la copia resta indietro ogni volta che il verbale viene corretto
+   fuori dalla maschera (dalla segreteria, da un'unione di anagrafiche, da una correzione in
+   archivio) o quando la copia non si è salvata: riaprire e risalvare rimetteva i dati vecchi, in
+   silenzio. Caso vero: i verbali CPT/26_27/0001 e 0002, corretti il 03/10, riaperti avrebbero
+   perso l'ora di fine, il cantiere giusto e il codice fiscale del committente.
+   Regola: campo per campo, se copia e database dicono cose diverse vale il database.
+   Un'eccezione: check-list, lavorazioni o imprese che nel database sono VUOTE mentre la copia le
+   ha restano quelle della copia, e lo si dice — è il segno di un salvataggio rimasto a metà.
+   copia = visite_snapshot.snapshot; db = lo stesso verbale ricostruito dal database.
+   Rende {snap, diversi:[nomi dei campi presi dal database], avvisi:[che cosa non risulta salvato]}. */
+function snapAllineaAlDb(copia,db){
+  if(!db)return{snap:copia||null,diversi:[],avvisi:[]}
+  if(!copia)return{snap:db,diversi:[],avvisi:[]}
+  const out={...copia,visita_id:db.visita_id||copia.visita_id},diversi=[],avvisi=[]
+  const t=x=>x==null?'':String(x).trim()
+  const ora=x=>t(x).slice(0,5)
+  const si=x=>(x===true||x===1||x==='1'||x==='true'||x==='si')?'1':'0'
+  const tre=x=>(x==null||x==='')?'':si(x)
+  const lista=x=>JSON.stringify((Array.isArray(x)?x:[]).map(String).sort())
+  const CAMPI=[
+    ['nr_verbale_origine','numero del verbale',t],['data_visita','data della visita',t],['ora_visita','ora di inizio',ora],['ora_fine','ora di fine',ora],
+    ['tipo_accesso','tipologia di accesso',t],['acc_cant','accesso al cantiere',t],['rlst_sn','RLST',si],['stage_vis','stage',si],['nom_stage','stage',t],
+    ['ppre_titolo','persona presente',t],['ppre_nome','persona presente',t],['ppre_cog','persona presente',t],['nom_ppre','persona presente',t],['qual_ppre','persona presente',t],['tel_ppre','persona presente',t],
+    ['prot_int','incarico',t],
+    ['comm_tipo_sogg','committente',t],['comm_tipo','committente',t],['comm_titolo','committente',t],['comm_nome','committente',t],['comm_cog','committente',t],['comm_rag_soc','committente',t],['comm_piva','committente',t],
+    ['coord','coordinamento',tre],
+    ['rl_titolo','responsabile dei lavori',t],['rl_nome','responsabile dei lavori',t],['rl_cog','responsabile dei lavori',t],['rl_email','responsabile dei lavori',t],['rl_tel','responsabile dei lavori',t],
+    ['csp_titolo','CSP',t],['csp_nome','CSP',t],['csp_cog','CSP',t],['csp_email','CSP',t],['csp_tel','CSP',t],
+    ['cse_titolo','CSE',t],['cse_nome','CSE',t],['cse_cog','CSE',t],['cse_email','CSE',t],['cse_tel','CSE',t],
+    ['importo','importo dei lavori',t],['costi','costi della sicurezza',t],['stato_lav','stato dei lavori',t],['note_lav','note sui lavori',t],
+    ['oss_tec','osservazioni',t],['oss_int','note interne',t],['note_for_sn','formazione',si],['note_for_m','formazione',t],['note_for_tipi','formazione',lista],
+    ['segnalazione','segnalazione',si],['data_ritorno','data di ritorno',t]
+  ]
+  for(const[k,nome,norm]of CAMPI){
+    if(!(k in db))continue
+    if(norm(copia[k])!==norm(db[k])){out[k]=db[k];diversi.push(nome)}
+  }
+  // tecnici: con l'identificativo cambiano anche nome e indirizzo mostrati
+  if('tecnico_id' in db&&t(copia.tecnico_id)!==t(db.tecnico_id)){
+    out.tecnico_id=db.tecnico_id;out.tecnico_email=db.tecnico_email||null;out.tec_display=db.tec_display||null;diversi.push('tecnico')
+  }
+  if('tecnico2_id' in db&&t(copia.tecnico2_id)!==t(db.tecnico2_id)){
+    out.tecnico2_id=db.tecnico2_id;out.tecnico2_email=db.tecnico2_email||null;out.tec2_display=db.tec2_display||null;diversi.push('secondo tecnico')
+  }
+  // codice fiscale, e-mail e telefono del committente: la maschera ha due campi (persona fisica e
+  // giuridica), il database uno solo
+  const PG=t(db.comm_tipo_sogg)==='PG'
+  for(const[k,ci]of[['comm_cf',true],['comm_email',true],['comm_tel',false]]){
+    if(!(k in db))continue
+    const c=t(copia[k])||t(copia[k+'_pg']),d=t(db[k])
+    if((ci?c.toLowerCase():c)!==(ci?d.toLowerCase():d)){
+      out[k]=PG?null:(db[k]||null);out[k+'_pg']=PG?(db[k]||null):null;diversi.push('committente')
+    }
+  }
+  // cantiere: con lui cambiano etichetta, codici e committente della scheda
+  if('cantiere_id' in db&&t(copia.cantiere_id)!==t(db.cantiere_id)){
+    Object.assign(out,{cantiere_id:db.cantiere_id,cantiere_label:db.cantiere_label||'',cantiere_detail:'',cnce:db.cnce||null,cod_uni:db.cod_uni||null,data_ult:null})
+    if('committente_id' in db)out.committente_id=db.committente_id
+    diversi.push('cantiere')
+  }
+  // check-list (valutazioni e note)
+  const chk=(val,note)=>{
+    const m={}
+    for(const[c,v]of Object.entries(val||{})){if(v&&v!=='nota')m[c]=[v,'']}
+    for(const[c,n]of Object.entries(note||{})){if(t(n)){if(!m[c])m[c]=['',''];m[c][1]=t(n)}}
+    return JSON.stringify(Object.keys(m).sort().map(c=>[c,m[c][0],m[c][1]]))
+  }
+  const cC=chk(copia.checklist,copia.note_checklist),cD=chk(db.checklist,db.note_checklist)
+  if(cC!==cD){
+    if(cD==='[]')avvisi.push('la check-list')
+    else{out.checklist={...(db.checklist||{})};out.note_checklist={...(db.note_checklist||{})};diversi.push('check-list')}
+  }
+  // lavorazioni
+  const lv=a=>JSON.stringify((a||[]).map(l=>[t(l.genere),t(l.fase),t(l.lavorazione)].join(' › ')).sort())
+  if(lv(copia.lavorazioni)!==lv(db.lavorazioni)){
+    if(!(db.lavorazioni||[]).length)avvisi.push('le lavorazioni')
+    else{out.lavorazioni=(db.lavorazioni||[]).map(l=>({...l}));diversi.push('lavorazioni')}
+  }
+  // imprese: dal database le colonne che il database tiene, dalla copia il resto
+  const capo=im=>[im.capo_nome,im.capo_cog].map(t).filter(Boolean).join(' ')||t(im.nom_prec)
+  const riga=im=>[t(im.impresa_id),t(im.att),capo(im).toLowerCase(),t(im.badge),t(im.pat),t(im.note_fasilav),+im.nr_lav||0,+im.nr_lav_str||0,+im.tipo_imp||0].join('|')
+  const iC=(copia.imprese||[]).filter(im=>t(im.impresa_id)),iD=(db.imprese||[]).filter(im=>t(im.impresa_id))
+  if(JSON.stringify(iC.map(riga))!==JSON.stringify(iD.map(riga))){
+    if(!iD.length)avvisi.push('le imprese')
+    else{
+      const per={};iC.forEach(im=>{per[t(im.impresa_id)]=im})
+      out.imprese=iD.map((d,i)=>{
+        const c=per[t(d.impresa_id)]
+        if(!c)return{...d,is_principale:i===0}
+        const stesso=capo(c).toLowerCase()===t(d.nom_prec).toLowerCase()
+        return{...c,impresa_id:d.impresa_id,att:d.att,nom_prec:d.nom_prec,badge:d.badge,pat:d.pat,note_fasilav:d.note_fasilav,
+          nr_lav:d.nr_lav,nr_lav_str:d.nr_lav_str,tipo_imp:d.tipo_imp,ruolo:d.ruolo,
+          capo_nome:stesso?(c.capo_nome||''):'',capo_cog:stesso?(c.capo_cog||''):'',is_principale:i===0}
+      })
+      diversi.push('imprese')
+    }
+  }
+  return{snap:out,diversi:[...new Set(diversi)],avvisi}
+}
+// --- fine snapAllineaAlDb
 const CERTIF_OPT={1:'Asseverata',2:'Certificata OHSAS 18001',3:'UNI EN ISO 45001',4:'Sistema Qualità UNI EN ISO 9001',5:'Certificazione ambientale ISO 14001'}
 const CEIV_OPT=['C.E.I.V.','EDILCASSA VENETO','CASSA EDILE BELLUNO','CASSA EDILE VENEZIA','CASSA EDILE VICENZA','ALTRO']
 const IMP_LBL={1:'fino a 250.000 €',2:'250.001 – 500.000 €',3:'500.001 – 1.000.000 €',4:'1.000.001 – 1.500.000 €',5:'1.500.001 – 2.500.000 €',6:'2.500.001 – 3.500.000 €',7:'3.500.001 – 5.000.000 €',8:'5.000.001 – 10.000.000 €',9:'10.000.001 – 15.000.000 €',10:'oltre 15.000.000 €',11:'non disponibile'}

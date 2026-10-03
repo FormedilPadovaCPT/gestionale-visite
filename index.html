@@ -2368,7 +2368,7 @@ window.onunhandledrejection = function(e) {
 };
 </script>
 
-<script src="app-data.js?v=9"></script>
+<script src="app-data.js?v=10"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -2793,7 +2793,7 @@ function navTo(view){
 }
 window.navTo=navTo
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
-  b.onclick=()=>{if(b.dataset.view==='form')initForm();navTo(b.dataset.view)}
+  b.onclick=()=>{if(b.dataset.view==='form'){if(formDaNonPerdere()){navTo('form');return}initForm()}navTo(b.dataset.view)}
 })
 
 // ── AUTORIZZAZIONI SERVIZI CPT (dall'app segreteria) ──
@@ -3319,6 +3319,7 @@ document.addEventListener('change',async e=>{
 // ── INIT FORM ──
 async function initForm(snap=null){
   S.fd={}; S.checklist={}; S.noteChk={}; S.imprese=[]; S.lavorazioni=[]; S.savedId=null; S.foto={}; S._impOpen=0
+  S._formBase=null
   hide('btn-pdf')
   hide('btn-email-verbale')
 
@@ -4841,7 +4842,16 @@ function mostraMancanze(lista,opt){
   document.body.appendChild(velo)
 }
 
+/* (03/10/2026) UN SALVATAGGIO PER VOLTA. Due tocchi ravvicinati su «Bozza» o «Definitivo» facevano
+   partire due salvataggi insieme: il secondo poteva chiedere un altro numero di verbale e lasciare
+   nella maschera un numero diverso da quello scritto nel database. */
+let _salvando=false
 async function saveVisita(stato){
+  if(_salvando){toast('Sto già salvando: aspetta un momento.','warn');return}
+  _salvando=true
+  try{return await _saveVisitaCorpo(stato)}finally{_salvando=false}
+}
+async function _saveVisitaCorpo(stato){
   saveTabData()
   const cant_id=vGet('f-cant-id')
   const tec_id=vGet('f-tec-id')
@@ -5151,7 +5161,7 @@ async function saveVisita(stato){
       else chkMerge[codice].valore=valore
     })
     Object.entries(S.noteChk).filter(([,n])=>n?.trim()).forEach(([codice,nota])=>{
-      if(!chkMerge[codice])chkMerge[codice]={visita_id:vid,codice,valore:null,nota}
+      if(!chkMerge[codice])chkMerge[codice]={visita_id:vid,codice,valore:'nota',nota}   // (03/10/2026) «valore» è obbligatorio nel database: una nota su una voce senza valutazione vale «nota», come nelle righe storiche; con null il salvataggio falliva
       else chkMerge[codice].nota=nota
     })
     const chkRows=Object.values(chkMerge)
@@ -5193,10 +5203,16 @@ async function saveVisita(stato){
     }
 
     // Snapshot (non-blocking: se la tabella non esiste non blocca il salvataggio)
+    /* (03/10/2026) la copia si riprova una volta. Se non si salva il verbale non perde niente:
+       alla riapertura vale quello che è nel database (snapAllineaAlDb). */
     try{
       const snap=buildSnap(vid)
-      const{error:snapErr}=await sb.from('visite_snapshot').upsert({visita_id:vid,snapshot:snap},{onConflict:'visita_id'})
-      if(snapErr)console.warn('Snapshot non salvato (tabella mancante o constraint):',snapErr.message)
+      let snapErr=null
+      for(let _g=0;_g<2;_g++){
+        ;({error:snapErr}=await sb.from('visite_snapshot').upsert({visita_id:vid,snapshot:snap},{onConflict:'visita_id'}))
+        if(!snapErr)break
+      }
+      if(snapErr)console.warn('Copia della maschera non salvata:',snapErr.message)
     }catch(snapEx){console.warn('Snapshot skip:',snapEx.message)}
 
     // Carica su Drive le foto aggiunte PRIMA del primo salvataggio: senza questo
@@ -5220,6 +5236,7 @@ async function saveVisita(stato){
     // Rettifica: se il verbale era già stato inviato via email e ci sono
     // modifiche rispetto alla versione trasmessa, proponi il reinvio
     try{await checkRettifica(vid)}catch(_re){console.warn('check rettifica:',_re)}
+    S._formBase=null   // tutto quello che c'è nella maschera è nel database
     if(_mancanze)mostraMancanze(_mancanze,{salvato:true})
   }catch(e){toast('Errore: '+e.message,'err');console.error(e)}
 }
@@ -5467,6 +5484,30 @@ function applySnap(snap){
 
 $('btn-bozza').onclick=()=>saveVisita('bozza')
 $('btn-final').onclick=()=>saveVisita('definitivo')
+
+/* (03/10/2026) UN VERBALE NON SALVATO NON SI PERDE PER UN TOCCO SBAGLIATO. Toccare «Nuova visita»
+   a metà verbale svuotava la maschera senza chiedere niente, e così ricaricare la pagina.
+   Non è un salvataggio automatico: niente viene scritto. Si fotografa la maschera al primo tocco
+   (dopo l'apertura o dopo un salvataggio) e si confronta con quella di adesso: se è cambiata,
+   prima di buttarla si chiede. Un errore qui non deve mai fermare il lavoro: nel dubbio non chiede. */
+function _formImpronta(){
+  const s=buildSnap(S.fd.visita_id||null);delete s.exported_at
+  return JSON.stringify(s)+'|'+FOTO_SLOTS.filter(sl=>S.foto[sl.tipo]&&S.foto[sl.tipo].base64&&!S.foto[sl.tipo].url).length
+}
+function formSporco(){
+  if(S._formBase==null)return false
+  try{saveTabData();return _formImpronta()!==S._formBase}catch(_e){console.warn('formSporco:',_e);return false}
+}
+function formDaNonPerdere(){
+  if(!formSporco())return false
+  return !confirm('HAI UN VERBALE NON SALVATO\n\nNella maschera ci sono dati che non hai ancora salvato.\n\nOK = li abbandono e vado avanti (quello che non è salvato va perso)\nAnnulla = torno al verbale: lo salvo con «Bozza» e poi riprovo')
+}
+window.formSporco=formSporco
+;['pointerdown','focusin','keydown'].forEach(_t=>document.addEventListener(_t,e=>{
+  if(S._formBase!=null||!e.isTrusted||!e.target||!e.target.closest||!e.target.closest('#view-form'))return
+  try{S._formBase=_formImpronta()}catch(_e){console.warn('impronta della maschera:',_e)}
+},true))
+window.addEventListener('beforeunload',e=>{if(formSporco()){e.preventDefault();e.returnValue=''}})
 
 // ── TECNICI ───────────────────────────────────────────────────────────────────
 // Recupera o crea il record tecnico nel DB per una voce di TECNICI_LIST
@@ -5837,7 +5878,8 @@ async function uploadSingolaFoto(tipo){
       nome_file:fo.nome,
       dimensione_kb:fo.sizeKb||null
     },{onConflict:'visita_id,tipo'})
-    if(uErr) console.warn('visite_foto upsert:',uErr.message)
+    // (03/10/2026) prima finiva solo in console e la foto risultava «caricata»: nel PDF rigenerato sarebbe mancata
+    if(uErr) throw new Error('la foto è arrivata su Drive ma non è stata registrata nel verbale ('+uErr.message+'). Riprova a caricarla.')
     // Aggiorna stato locale — mantieni base64 in memoria per la sessione corrente
     S.foto[tipo]={...fo, url:data.drive_url, thumb:data.thumb_url, fileId:data.drive_file_id}
     if(bar)bar.style.width='100%'
@@ -5875,7 +5917,8 @@ async function deleteFoto(tipo){
   // Rimuovi da Supabase
   if(S.savedId||S.fd.visita_id){
     const vid=S.savedId||S.fd.visita_id
-    await sb.from('visite_foto').delete().eq('visita_id',vid).eq('tipo',tipo)
+    const{error:_eDelFoto}=await sb.from('visite_foto').delete().eq('visita_id',vid).eq('tipo',tipo)
+    if(_eDelFoto){toast('Foto non eliminata: '+_eDelFoto.message,'err');return}
   }
   delete S.foto[tipo]
   refreshSlotUI(tipo)
@@ -7288,6 +7331,7 @@ function _clRender(){
   tbody.querySelectorAll('[data-cant-id]').forEach(btn=>{
     btn.onclick=async e=>{
       e.stopPropagation()
+      if(formDaNonPerdere())return
       initForm()
       navTo('form')
       setTimeout(async()=>{
@@ -9118,68 +9162,28 @@ $('btn-ev-invia').onclick=async()=>{
 
 // ── RIAPRI BOZZA ──
 async function riapriBozza(vid){
+  if(formDaNonPerdere())return
   toast('Caricamento bozza…')
   bloccaNrVerbale()   // il numero resta bloccato: lo sblocca solo "Modifica" della segreteria
   try{
-    let snap=null
-    // 1) Prova prima lo snapshot salvato in visite_snapshot
+    // 1) la copia della maschera salvata col verbale (ha anche i campi che il database non tiene)
     const{data:snapRow,error:eSnap}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).maybeSingle()
     /* lettura fallita ≠ bozza senza copia salvata: ricostruirla in silenzio dai dati
        attuali perderebbe ciò che c'è solo nella copia */
     if(eSnap){toast('Non sono riuscito a leggere la bozza salvata ('+eSnap.message+'): non la ricostruisco dai dati attuali. Riprova tra poco.','err',8000);return}
-    if(snapRow?.snapshot){
-      snap=snapRow.snapshot
-    }else{
-      // 2) Ricostruisce lo snapshot dai dati del DB (stessa logica di rebuildSnapFromDB)
-      const{data:v}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*)`).eq('visita_id',vid).single()
-      if(!v){toast('Visita non trovata','err');return}
-      const{data:chkRows}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
-      const{data:lavRows}=await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid)
-      const{data:impRows}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva)').eq('visita_id',vid).order('ordine')
-      const checklist={},note_checklist={}
-      ;(chkRows||[]).forEach(r=>{
-        if(r.valore)checklist[r.codice]=r.valore
-        if(r.nota)note_checklist[r.codice]=r.nota
-      })
-      const imprese=(impRows||[]).map(impDaRigaDb)
-      const cant=v.cantieri||{}
-      snap={
-        visita_id:vid,
-        nr_verbale_origine:v.nr_verbale||'',
-        data_visita:v.data_visita||null,ora_visita:v.ora_visita||null,ora_fine:v.ora_fine||null,
-        tipo_accesso:v.tipo_accesso||null,acc_cant:v.acc_cant||null,
-        rlst_sn:v.rlst_sn,stage_vis:v.stage_vis,nom_stage:v.nom_stage||null,
-        ..._figSnap('ppre',v.ppre_titolo,v.ppre_nome,v.ppre_cog,v.nom_ppre),nom_ppre:v.nom_ppre||null,qual_ppre:v.qual_ppre||null,tel_ppre:v.tel_ppre||null,
-        tecnico_id:v.tecnico_id||null,
-        tecnico_email:v.tecnici?.email||null,
-        tec_display:v.tecnici?`${v.tecnici.tecnico_nome||''} ${v.tecnici.tecnico_cognome||''}`.trim():null,
-        cantiere_id:v.cantiere_id||null,
-        cantiere_label:cant.cantiere_etichetta||`${cant.cantiere_indirizzo||''} ${cant.cantiere_civico||''}`.trim(),
-        cantiere_detail:'',prot_int:cant.prot_int||null,cnce:cant.cantiere_cnce||null,
-        comm_tipo_sogg:v.comm_tipo_sogg||'PF',comm_tipo:v.comm_tipo||null,
-        comm_titolo:v.comm_titolo||null,comm_nome:v.comm_nome||null,comm_cog:v.comm_cog||null,
-        comm_cf:v.comm_cf||null,comm_email:v.comm_email||null,comm_tel:v.comm_tel||null,
-        comm_rag_soc:v.comm_rag_soc||null,comm_piva:v.comm_piva||null,
-        coord:v.coord||false,
-        ..._figSnap('rl',v.rl_titolo,v.rl_nome,v.rl_cog,v.resp_lav),rl_email:v.rl_email||null,rl_tel:v.rl_tel||null,
-        ..._figSnap('csp',v.csp_titolo,v.csp_nome,v.csp_cog,v.csp),csp_email:v.csp_email||null,csp_tel:v.csp_tel||null,
-        ..._figSnap('cse',v.cse_titolo,v.cse_nome,v.cse_cog,v.cse),cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
-        nr_imp:v.nr_imp||0,nr_ind:v.nr_ind||0,
-        nr_lavoratori:v.nr_lavoratori||0,nr_lavoratori_stranieri:v.nr_lavoratori_stranieri||0,
-        importo:v.importo||null,costi:v.costi||null,stato_lav:v.stato_lav||null,
-        imprese,checklist,note_checklist,
-        lavorazioni:(lavRows||[]).map(l=>({genere:l.genere,fase:l.fase,lavorazione:l.lavorazione})),
-        oss_tec:v.oss_tec||null,oss_int:v.oss_tec_int||null,
-        note_for_sn:v.note_for_sn||false,note_for_m:v.note_for_m||null,note_for_tipi:v.note_for_tipi||null,
-        segnalazione:v.segnalazione||false,data_ritorno:v.data_ritorno||null,
-        exported_at:new Date().toISOString(),_rebuilt_from_db:true
-      }
-    }
+    // 2) lo stesso verbale com'è ADESSO nel database: dove i due non coincidono vale il database
+    //    (03/10/2026: la copia resta indietro quando il verbale viene corretto fuori dalla maschera)
+    const dalDb=await rebuildSnapFromDB(vid,{riapri:true})
+    if(!dalDb){toast('Visita non trovata','err');return}
+    const al=snapAllineaAlDb(snapRow&&snapRow.snapshot,dalDb)
+    const snap=al.snap
     // 3) Carica nel form — il visita_id nel snap garantisce UPDATE invece di INSERT
     await initForm(snap)
     navTo('form')
     if(S.savedId)show('btn-pdf')   // il PDF della bozza si puo' fare subito (23/09/2026)
     toast(`Bozza ${snap.nr_verbale_origine||''} riaperta — completa e salva come Definitivo`,'ok')
+    if(al.diversi.length)toast('Questo verbale è stato corretto dopo l\'ultimo salvataggio dalla maschera ('+al.diversi.slice(0,6).join(', ')+(al.diversi.length>6?'…':'')+'): lo apro con i dati di adesso.','warn',10000)
+    if(al.avvisi.length)toast('Nel database non risultano salvate '+al.avvisi.join(', ')+': tengo quelle dell\'ultima copia. Controlla e salva di nuovo.','warn',12000)
   }catch(e){toast('Errore apertura bozza: '+e.message,'err');console.error(e)}
 }
 
@@ -12688,17 +12692,21 @@ $('rub-search')?.addEventListener('keydown',e=>{if(e.key==='Enter')loadRubrica()
 // Ricostruisce lo snapshot completo di una visita dal DB: serve a
 // precompilare la nuova visita di ritorno. (Export e import dello snapshot
 // come file sono stati tolti il 10/09/2026: il meccanismo interno resta.)
-async function rebuildSnapFromDB(vid){
-  const{data:v}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*)`).eq('visita_id',vid).single()
+async function rebuildSnapFromDB(vid,opt){
+  opt=opt||{}
+  /* (03/10/2026) una lettura fallita non è «nessuna riga»: con la check-list letta vuota per un
+     errore, riaprire e salvare l'avrebbe cancellata. Qui un errore ferma tutto, e lo dice. */
+  const letto=(r,cosa)=>{if(r.error)throw new Error('non sono riuscito a leggere '+cosa+' ('+r.error.message+'). Riprova tra poco.');return r.data}
+  const v=letto(await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),tec2:tecnici!visite_tecnico2_id_fkey(email,tecnico_nome,tecnico_cognome),cantieri(*)`).eq('visita_id',vid).maybeSingle(),'il verbale')
   if(!v)return null
-  const{data:chkRows}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
-  const{data:lavRows}=await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid)
-  const{data:impRows}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva)').eq('visita_id',vid).order('ordine')
+  const chkRows=letto(await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid),'la check-list')
+  const lavRows=letto(await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid).order('id'),'le lavorazioni')
+  const impRows=letto(await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva)').eq('visita_id',vid).order('ordine'),'le imprese')
   const checklist={},note_checklist={}
   ;(chkRows||[]).forEach(r=>{ if(r.valore)checklist[r.codice]=r.valore; if(r.nota)note_checklist[r.codice]=r.nota })
   const imprese=(impRows||[]).map(impDaRigaDb)
   const cant=v.cantieri||{}
-  return{
+  const snap={
     visita_id:vid,
     nr_verbale_origine:v.nr_verbale||'',
     data_visita:v.data_visita||null,ora_visita:v.ora_visita||null,ora_fine:v.ora_fine||null,
@@ -12728,6 +12736,22 @@ async function rebuildSnapFromDB(vid){
     segnalazione:v.segnalazione||false,data_ritorno:v.data_ritorno||null,
     _rebuilt_from_db:true
   }
+  /* per riaprire LO STESSO verbale serve tutto quello che il database tiene: senza, riaprire e
+     salvare perdeva note sui lavori e secondo tecnico, e agganciava l'incarico del cantiere invece
+     di quello del verbale. (La «nuova visita di ritorno» resta com'era.) */
+  if(opt.riapri){
+    const o5=x=>x?String(x).slice(0,5):null
+    Object.assign(snap,{
+      ora_visita:o5(v.ora_visita),ora_fine:o5(v.ora_fine),
+      prot_int:v.prot_int||null,coord:v.coord==null?null:!!v.coord,
+      tecnico2_id:v.tecnico2_id||null,tecnico2_email:(v.tec2&&v.tec2.email)||null,
+      tec2_display:v.tec2?`${v.tec2.tecnico_nome||''} ${v.tec2.tecnico_cognome||''}`.trim():null,
+      committente_id:cant.cantiere_committente_id||null,
+      importo:cant.cantiere_importo||null,
+      note_lav:v.note_lav||null
+    })
+  }
+  return snap
 }
 
 // Mostra nel modal-qd la scelta su come precompilare la nuova visita
@@ -12753,6 +12777,7 @@ function chiediNuovaVisitaRitorno(vid, nrVerb){
 // mode='full'     -> tutti i dati (imprese/committente/coordinatori/rilievi)
 // mode='cantiere' -> solo i dati del cantiere
 async function nuovaVisitaDaVerbale(vid, mode){
+  if(formDaNonPerdere())return
   hide('modal-qd')
   toast('Preparazione nuova visita…')
   try{
@@ -13098,6 +13123,7 @@ async function showCantiereDetail(cantId){
     btnNuova.className='btn-primary btn-sm'
     btnNuova.textContent='+ Nuova visita'
     btnNuova.onclick=()=>{
+      if(formDaNonPerdere())return
       hide('modal-qd');initForm();navTo('form')
       setTimeout(async()=>{
         const cid=cantId
@@ -14706,6 +14732,7 @@ window.incRiassegna=incRiassegna
 async function incNuovaVisita(id,accetta){
   const r=_incCache.find(x=>x.id===id)
   if(!r)return
+  if(formDaNonPerdere())return
   /* «Fai la visita» sugli stage accetta da se', come «Accetto» mette da se'
      la presa visione: il gesto dice gia' che la visita la fa lui. */
   if(accetta&&!r.accettato_il){
