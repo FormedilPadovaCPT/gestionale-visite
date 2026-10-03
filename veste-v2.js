@@ -54,39 +54,40 @@
      cantieri in monitoraggio com'era: «Oggi» è il cruscotto di sempre, con in più le bozze aperte in cima. */
   /* (03/10/2026, corretto dall'utente) Per il tecnico gli INCARICHI tornano una pagina a sé, con la voce nel menu e il
      numero che lampeggia quando ce ne sono di nuovi, come nell'app di oggi: dentro «Oggi» si perdevano. */
-  /* (03/10/2026, corretto dall'utente) Asseverazione e Servizi CPT sono VOCI DEL MENU, come oggi: raccolte in una tendina
-     «Altre app» non erano funzionali. «assev» è il pulsante di sempre, che si mostra solo a chi l'aveva già. */
+  /* (03/10/2026 sera, deciso dall'utente dopo due prove) NEL MENU STANNO SOLO LE PAGINE. Asseverazione e Servizi CPT sono
+     riquadri di «Oggi» (blu e verde, come i pulsanti di sempre); per chi è di sola lettura Segnala, QR e Servizi sono
+     pulsanti sulla pagina che vede per prima. Né tendina «Altre app», né voci-azione nel menu: provate, scartate. */
   const RUOLI = {
-    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'assev', 'az-servizi', 'segreteria'], apre: 'segreteria' },
-    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', '|', 'assev', 'az-servizi'], apre: 'dashboard' },
-    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', '|', 'assev', 'az-servizi', 'admin'], apre: 'dashboard' },
-    direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti', '|', 'az-segnala', 'az-qr', 'az-servizi'], apre: 'direzione', lettura: true },
+    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'segreteria'], apre: 'segreteria' },
+    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche'], apre: 'dashboard' },
+    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', '|', 'admin'], apre: 'dashboard' },
+    direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione', lettura: true },
     // il calendario è del solo Direttore (deciso dall'utente il 03/10/2026): la Presidenza vede quello che le compete
-    presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard', '|', 'az-segnala', 'az-qr', 'az-servizi'], apre: 'direzione', lettura: true },
+    presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard'], apre: 'direzione', lettura: true },
     // (03/10/2026, corretto dall'utente dopo aver guardato l'anteprima) il consigliere apre sulla Mappa e non vede il calendario
-    consigliere:  { nome: 'Consigliere',     menu: ['dashboard', 'statistiche', '|', 'az-segnala', 'az-qr', 'az-servizi'], apre: 'dashboard', lettura: true },
+    consigliere:  { nome: 'Consigliere',     menu: ['dashboard', 'statistiche'], apre: 'dashboard', lettura: true },
   };
-  /* (03/10/2026, chiesto dall'utente) Per Direzione, Presidenza e consiglieri «Segnala un cantiere», il QR e i Servizi CPT
-     diventano VOCI DEL MENU, così sono sempre a portata e non solo nella pagina della mappa. Fanno quello che fanno
-     i pulsanti di oggi: la voce preme il pulsante di sempre. */
-  const VOCI_AZIONE = [
-    { k: 'az-segnala', testo: '📍 Segnala cantiere', preme: 'btn-segnala-dash', aiuto: 'Apre il modulo per segnalare all’ufficio un cantiere attivo: indirizzo, comune e due righe. La segnalazione arriva alla segreteria.' },
-    { k: 'az-qr', testo: '📱 QR servizi', preme: 'btn-qr-servizi', aiuto: 'Mostra sullo schermo il codice QR del portale servizi, da far inquadrare a chi hai davanti.' },
-    { k: 'az-servizi', testo: 'Servizi CPT ↗', preme: 'btn-servizi-cpt', aiuto: 'Apre in un’altra scheda il portale servizi pubblico, quello che vedono le imprese.' },
+  /* Per chi è di sola lettura «Segnala un cantiere», il QR e i Servizi CPT sono PULSANTI SULLA PAGINA che vede per prima:
+     sulla Mappa restano quelli di sempre, sopra i cantieri in monitoraggio; sulla pagina Direzione/Presidenza la veste ne
+     mette tre uguali, che premono quelli di sempre. */
+  const PULSANTI_LETTURA = [
+    { preme: 'btn-segnala-dash', testo: '📍 Segnala un cantiere attivo', stile: 'flex:2;min-width:220px;background:#e7500f;border:1px solid #e7500f;color:#fff', aiuto: 'Apre il modulo per segnalare all’ufficio un cantiere attivo: indirizzo, comune e due righe. La segnalazione arriva alla segreteria.' },
+    { preme: 'btn-qr-servizi', testo: '📱 QR servizi CPT', stile: 'flex:1;min-width:160px;background:#fff;border:2px solid #e7500f;color:#e7500f', aiuto: 'Mostra sullo schermo il codice QR del portale servizi, da far inquadrare a chi hai davanti.' },
+    { preme: 'btn-servizi-cpt', testo: 'Vai ai servizi CPT ↗', stile: 'flex:1;min-width:180px;background:#95C22F;border:1px solid #7aa527;color:#fff', aiuto: 'Apre in un’altra scheda il portale servizi pubblico, quello che vedono le imprese.' },
   ];
-  function vociAzione() {
-    const nav = document.querySelector('nav'); if (!nav) return;
-    VOCI_AZIONE.forEach((a) => {
-      if ($('v2-' + a.k)) return;
-      const b = document.createElement('button');
-      b.type = 'button'; b.id = 'v2-' + a.k; b.dataset.v2Voce = a.k; b.textContent = a.testo; b.style.display = 'none';
-      b.setAttribute('data-aiuto', a.aiuto);
-      b.addEventListener('click', () => { const d = $(a.preme); if (d) d.click(); });
-      nav.appendChild(b);
-    });
+  function pulsantiDirezione() {
+    const vista = $('view-direzione'); if (!vista) return;
+    let el = $('v2-dir-pulsanti');
+    if (!RUOLI[ruolo()].lettura) { if (el) el.remove(); return; }
+    if (el) return;
+    el = document.createElement('div'); el.id = 'v2-dir-pulsanti';
+    el.innerHTML = PULSANTI_LETTURA.map((p) => `<button type="button" data-v2-preme="${p.preme}" style="${p.stile}" data-aiuto="${esc(p.aiuto)}">${p.testo}</button>`).join('');
+    el.addEventListener('click', (e) => { const b = e.target.closest('[data-v2-preme]'); const d = b && $(b.dataset.v2Preme); if (d) d.click(); });
+    const intro = $('dir-intro');
+    vista.insertBefore(el, intro && intro.parentNode === vista ? intro.nextSibling : vista.firstChild);
   }
 
-  const ETICHETTE = { assev: '✅ Asseverazione ↗', dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti' };
+  const ETICHETTE = { dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti' };
 
   const CHIAVE_TECNICO = 'gv-v2-tecnico';   // sessionStorage: di quale tecnico si guarda la pagina in «Vedi come: Tecnico»
   let _tecnici = null;       // l'elenco dei tecnici, letto una volta, per la tendina dell'anteprima
@@ -159,9 +160,6 @@ body.v2 nav{gap:6px;padding:0 20px}
 body.v2 nav button{font-size:14px;border-width:1px;padding:7px 12px}
 body.v2 nav button.v2-cta{background:var(--orange);color:#fff;font-weight:700;border-color:var(--orange)}
 body.v2 nav button.v2-cta:hover{background:#B33B05;border-color:#B33B05}
-/* Asseverazione è una voce come le altre: il blu pieno di oggi accanto alle altre voci stona */
-body.v2 nav #nav-assev{background:none!important;border-color:transparent!important;color:rgba(255,255,255,.7)!important;font-weight:400!important}
-body.v2 nav #nav-assev:hover{color:#fff!important;border-color:rgba(255,255,255,.35)!important}
 body.v2 main h2{font-size:24px;font-weight:600;color:#565C66}
 #v2-barra{background:#2b2f36;color:#fff;font-size:12.5px;padding:7px 20px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 #v2-barra b{margin-right:4px}
@@ -213,7 +211,7 @@ body.v2 .adm-wrap details summary{color:#6b7078!important}
    Scadenze e incarichi NON stanno qui: hanno la loro pagina e la voce nel menu, come oggi (chiesto dall'utente). */
 /* «Oggi»: il riepilogo a due colonne del prototipo. I pulsanti di sempre diventano tasselli (premono gli stessi
    pulsanti, che restano nascosti); chi è di sola lettura li ha nel menu. Sotto resta il cruscotto, con la mappa. */
-body.v2 #dash-segnala-wrap,body.v2:not(.viewer-mode) #btn-dove-sono,body.v2:not(.viewer-mode) #btn-appunti{display:none!important}
+body.v2:not(.viewer-mode) #dash-segnala-wrap,body.v2:not(.viewer-mode) #btn-dove-sono,body.v2:not(.viewer-mode) #btn-appunti{display:none!important}
 body.v2.viewer-mode #v2-oggi{display:none}
 #v2-oggi{margin-bottom:18px}
 #v2-oggi .v2-data{font-size:13px;color:#888}
@@ -236,6 +234,12 @@ body.v2.viewer-mode #v2-oggi{display:none}
 #v2-azioni button:hover{border-color:var(--orange)}
 #v2-azioni button:active{transform:scale(.97)}
 #v2-azioni button span{font-size:20px;line-height:1}
+/* Servizi CPT in verde e Asseverazione in blu, come i pulsanti di sempre (chiesto dall'utente) */
+#v2-azioni button.v2-verde{background:#95C22F;border-color:#7aa527;color:#fff;font-weight:600}
+#v2-azioni button.v2-blu{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
+#v2-azioni button.v2-verde:hover{border-color:#5f8a1a}#v2-azioni button.v2-blu:hover{border-color:#1e40af}
+#v2-dir-pulsanti{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+#v2-dir-pulsanti button{padding:12px;font-size:15px;border-radius:10px;font-weight:600;cursor:pointer;min-height:0}
 /* IL VERBALE IN TRE MOMENTI: i passi di oggi, raggruppati. Nessun campo spostato fra i dati: cambia che cosa si vede insieme. */
 #v2-fasi{display:flex;gap:10px;align-items:stretch;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.12);padding:0 16px;margin-bottom:14px;flex-wrap:wrap}
 #v2-fasi .v2-fasi-sx{padding:10px 14px 10px 0;min-width:150px}
@@ -348,10 +352,10 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     const ordine = {};
     r.menu.forEach((v) => { if (v === '|') { dopoSpazio = true; return; } ordine[v] = { n: n++, primoADestra: dopoSpazio && !Object.values(ordine).some((o) => o.destra), destra: dopoSpazio }; });
     nav.querySelectorAll('button').forEach((b) => {
-      const v = b.dataset.view || b.dataset.v2Voce || (b.id === 'nav-assev' ? 'assev' : '');
+      const v = b.dataset.view;
       if (b.dataset.v2Etichetta === undefined) { b.dataset.v2Etichetta = b.firstChild && b.firstChild.nodeType === 3 ? b.firstChild.textContent : ''; b.dataset.v2Mostra = b.style.display; }
       const o = v && ordine[v];
-      if (!o || (v === 'assev' && b.dataset.v2Mostra === 'none')) { b.style.display = 'none'; return; }
+      if (!o) { b.style.display = 'none'; return; }
       b.style.display = ''; b.style.order = String(o.n); b.style.marginLeft = o.primoADestra ? 'auto' : '';
       b.classList.toggle('v2-cta', v === 'form');
       let et = ETICHETTE[v];
@@ -414,7 +418,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
 
   function prepara() {
     document.body.classList.add('v2');
-    stile(); vociAzione(); menu(); barra(); tieniEtichette(); verbaleAggancia();
+    stile(); menu(); barra(); tieniEtichette(); verbaleAggancia();
     const lettura = !!RUOLI[ruolo()].lettura;
     if (lettura && !document.body.classList.contains('viewer-mode')) { document.body.classList.add('viewer-mode'); _letturaFinta = true; }
     if (!lettura && _letturaFinta) { document.body.classList.remove('viewer-mode'); _letturaFinta = false; }
@@ -423,7 +427,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     if (!document.body.classList.contains('v2')) return;
     document.body.classList.remove('v2');
     if (_letturaFinta) { document.body.classList.remove('viewer-mode'); _letturaFinta = false; }
-    ['v2-barra', 'v2-altre', 'v2-uff-menu', 'v2-scrivania', 'v2-rimandi', 'v2-sintesi', 'v2-torna', 'v2-az-segnala', 'v2-az-qr', 'v2-az-servizi'].forEach((id) => { const e = $(id); if (e) e.remove(); });
+    ['v2-barra', 'v2-altre', 'v2-uff-menu', 'v2-scrivania', 'v2-rimandi', 'v2-sintesi', 'v2-torna', 'v2-dir-pulsanti', 'v2-az-segnala', 'v2-az-qr', 'v2-az-servizi'].forEach((id) => { const e = $(id); if (e) e.remove(); });
     ['v2-bozze', 'v2-rientri', 'v2-incarichi', 'v2-azioni', 'v2-oggi-data', 'v2-oggi-ciao'].forEach((id) => { const e = $(id); if (e) e.innerHTML = ''; });   // obiettivo e avvisi sono quelli di sempre: restano
     const u = $('view-segreteria'); if (u) { u.classList.remove('v2-uff'); u.querySelectorAll('.adm-section').forEach((s) => { s.style.display = ''; }); }
     menuComEra();
@@ -607,8 +611,12 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
   /* ── OGGI: il riepilogo del prototipo, sui dati veri ──
      Rientri e incarichi li calcolano loadScadenze e loadIncarichi (index.html), che poi chiamano pronto(): qui si
      disegnano soltanto. Le pagine Scadenze e Incarichi restano a sé, col loro numero nel menu. */
+  /* quarto elemento: la classe del riquadro. L'Asseverazione preme il pulsante di sempre (nav-assev), che la veste tiene
+     nascosto nel menu: compare solo a chi è asseveratore, cioè a chi quel pulsante l'aveva già (dataset.v2Mostra). */
   const AZIONI = [['btn-segnala-dash', '📍', 'Segnala cantiere'], ['btn-diniego-dash', '🚫', 'Accesso negato'], ['btn-qr-servizi', '📱', 'QR servizi CPT'],
-    ['btn-servizi-cpt', '↗', 'Servizi CPT'], ['btn-dove-sono', '📡', 'Dove sono?'], ['btn-appunti', '📝', 'Appunti cantiere']];
+    ['btn-servizi-cpt', '↗', 'Servizi CPT', 'v2-verde'], ['nav-assev', '✅', 'Asseverazione', 'v2-blu'],
+    ['btn-dove-sono', '📡', 'Dove sono?'], ['btn-appunti', '📝', 'Appunti cantiere']];
+  const azioneVisibile = (id) => { const o = $(id); if (!o) return false; return (id === 'nav-assev' && o.dataset.v2Mostra !== undefined ? o.dataset.v2Mostra : o.style.display) !== 'none'; };
   const _dati = { scadenze: undefined, incarichi: undefined, quando: 0 };
   const gg = (d) => { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] : ''; };
   const mappa = (lat, lng, testo) => 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(lat != null && lng != null && lat !== '' && lng !== '' ? lat + ',' + lng : testo);
@@ -642,8 +650,8 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     $('v2-oggi-data').textContent = data.charAt(0).toUpperCase() + data.slice(1);
     const nome = (S().tecnico && S().tecnico.tecnico_nome) || '';
     $('v2-oggi-ciao').textContent = (h < 13 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera') + (nome ? ', ' + nome : '');
-    $('v2-azioni').innerHTML = AZIONI.filter(([id]) => { const o = $(id); return o && o.style.display !== 'none'; })
-      .map(([id, icona, testo]) => `<button type="button" data-v2-preme="${id}"><span>${icona}</span>${esc(testo)}</button>`).join('');
+    $('v2-azioni').innerHTML = AZIONI.filter(([id]) => azioneVisibile(id))
+      .map(([id, icona, testo, classe]) => `<button type="button" data-v2-preme="${id}"${classe ? ' class="' + classe + '"' : ''}><span>${icona}</span>${esc(testo)}</button>`).join('');
     oggiDisegna();
   }
 
@@ -1170,7 +1178,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       pagine(view);
       if (view === 'segreteria') ufficio();
       if (view === 'admin') { try { const ha = document.querySelector('#view-admin .adm-header h2'); if (ha) ha.textContent = 'Coordinamento'; leggibileIn('view-admin'); setTimeout(() => leggibileIn('view-admin'), 800); } catch (e) { console.warn('veste v2 (leggibile):', e); } }
-      if (view === 'direzione') sintesi().catch((e) => console.warn('veste v2, sintesi:', e));
+      if (view === 'direzione') { pulsantiDirezione(); } if (view === 'direzione') sintesi().catch((e) => console.warn('veste v2, sintesi:', e));
       if (view === 'dashboard' && !r.lettura) {
         oggiPagina();
         bozze().catch((e) => console.warn('veste v2, bozze:', e));

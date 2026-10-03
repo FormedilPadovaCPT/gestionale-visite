@@ -64,15 +64,19 @@ assert.strictEqual(R.tecnico.apre, 'dashboard'); assert.strictEqual(R.coordinato
 assert.strictEqual(R.direttore.apre, 'direzione', 'il Direttore apre su Direzione');
 assert.strictEqual(R.presidenza.apre, 'direzione', 'la Presidenza apre sulla sua pagina');
 assert.strictEqual(R.consigliere.apre, 'dashboard', 'i consiglieri aprono sulla Mappa (corretto dall’utente il 03/10/2026)');
-assert.deepStrictEqual(R.consigliere.menu, ['dashboard', 'statistiche', '|', 'az-segnala', 'az-qr', 'az-servizi'], 'il consigliere vede Mappa e Statistiche, più Segnala, QR e Servizi: niente calendario');
-// Segnala cantiere, QR e Servizi CPT nel menu di chi è di sola lettura, sempre a portata (chiesto dall'utente il 03/10/2026)
-for (const k of ['direttore', 'presidenza', 'consigliere']) for (const a of ['az-segnala', 'az-qr', 'az-servizi']) assert.ok(R[k].menu.includes(a), k + ' deve avere «' + a + '» nel menu');
-// Asseverazione e Servizi CPT sono voci del menu, come oggi: la tendina «Altre app» non era funzionale (utente, 03/10/2026)
-for (const k of ['tecnico', 'coordinatore', 'segreteria']) assert.ok(R[k].menu.includes('assev') && R[k].menu.includes('az-servizi') && !R[k].menu.includes('az-segnala'), k + ' deve avere Asseverazione e Servizi CPT nel menu');
-for (const k of ['direttore', 'presidenza', 'consigliere']) assert.ok(!R[k].menu.includes('assev'), k + ' non ha l’Asseverazione');
-assert.ok(!js.includes('Altre app ▾') && !js.includes('function altreApp'), 'la tendina «Altre app» non deve tornare');
-assert.ok(js.includes("(v === 'assev' && b.dataset.v2Mostra === 'none')"), 'l’Asseverazione si mostra solo a chi l’aveva già nell’app di oggi');
-for (const id of ['btn-segnala-dash', 'btn-qr-servizi', 'btn-servizi-cpt']) assert.ok(html.includes('id="' + id + '"') && js.includes("preme: '" + id + "'"), 'la voce di menu deve premere il pulsante di sempre: ' + id);
+assert.deepStrictEqual(R.consigliere.menu, ['dashboard', 'statistiche'], 'il consigliere vede Mappa e Statistiche: niente calendario');
+// NEL MENU STANNO SOLO LE PAGINE (deciso dall'utente la sera del 03/10/2026, dopo aver provato la tendina e le voci-azione)
+for (const k of Object.keys(R)) assert.ok(R[k].menu.every((v) => v === '|' || html.includes('data-view="' + v + '"')), k + ': nel menu solo voci che sono pagine');
+assert.ok(!js.includes('Altre app ▾') && !js.includes('function altreApp') && !js.includes('function vociAzione'), 'né tendina «Altre app» né voci-azione nel menu');
+// Asseverazione (blu, solo per chi l'aveva) e Servizi CPT (verde) sono riquadri di «Oggi»
+assert.ok(js.includes("['btn-servizi-cpt', '↗', 'Servizi CPT', 'v2-verde'], ['nav-assev', '✅', 'Asseverazione', 'v2-blu']"), 'Servizi CPT verde e Asseverazione blu fra i riquadri di «Oggi»');
+assert.ok(js.includes("#v2-azioni button.v2-verde{background:#95C22F") && js.includes("#v2-azioni button.v2-blu{background:#2563eb"), 'i colori sono quelli dei pulsanti di sempre');
+assert.ok(js.includes("id === 'nav-assev' && o.dataset.v2Mostra !== undefined ? o.dataset.v2Mostra : o.style.display"), 'l’Asseverazione compare solo a chi è asseveratore: si guarda com’era il pulsante prima della veste');
+assert.ok(html.includes('id="nav-assev"'), 'il riquadro preme il pulsante di sempre');
+// per chi è di sola lettura i tre pulsanti stanno sulla pagina: sulla Mappa quelli di sempre, in Direzione/Presidenza tre uguali
+assert.ok(js.includes('body.v2:not(.viewer-mode) #dash-segnala-wrap,') && !js.includes('body.v2 #dash-segnala-wrap'), 'sulla Mappa di chi è di sola lettura la riga di pulsanti di sempre resta');
+for (const id of ['btn-segnala-dash', 'btn-qr-servizi', 'btn-servizi-cpt']) assert.ok(html.includes('id="' + id + '"') && js.includes("preme: '" + id + "'"), 'il pulsante della pagina Direzione deve premere quello di sempre: ' + id);
+assert.ok(js.includes("if (!RUOLI[ruolo()].lettura) { if (el) el.remove(); return; }") && js.includes("if (view === 'direzione') { pulsantiDirezione(); }"), 'i tre pulsanti compaiono sulla pagina Direzione/Presidenza, solo per chi è di sola lettura');
 // il calendario «Prossimi appuntamenti» è del solo Direttore (deciso dall'utente il 03/10/2026)
 assert.ok(R.direttore.menu.includes('appuntamenti'), 'il Direttore vede il calendario');
 for (const k of ['presidenza', 'consigliere', 'tecnico', 'coordinatore', 'segreteria']) assert.ok(!R[k].menu.includes('appuntamenti'), k + ' non deve vedere il calendario');
