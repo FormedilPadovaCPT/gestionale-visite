@@ -1028,7 +1028,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button><label id="q-elim-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer"><input type="checkbox" id="q-elim"> Mostra eliminate</label><button type="button" id="q-dainviare" class="inv-da" style="display:none"></button>
         </div>
         <div class="tbl-wrap">
-          <table><thead><tr><th id="th-nr" style="cursor:pointer;user-select:none" title="Ordina per numero verbale">Verbale <span class="sort-ind" id="si-nr"></span></th><th id="th-data" style="cursor:pointer;user-select:none" title="Ordina per data visita">Data <span class="sort-ind" id="si-data"></span></th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th style="font-size:11px;white-space:nowrap">NC+ / NC&minus; / OSS / VER</th><th>Stato</th><th title="Il verbale è stato mandato all'impresa?">Invio</th><th></th></tr></thead>
+          <table><thead><tr><th id="th-nr" style="cursor:pointer;user-select:none" title="Ordina per numero verbale">Verbale <span class="sort-ind" id="si-nr"></span></th><th id="th-data" style="cursor:pointer;user-select:none" title="Ordina per data visita">Data <span class="sort-ind" id="si-data"></span></th><th style="white-space:nowrap" title="Accesso al cantiere: 1° = prima visita, 2° = primo ritorno…">N° accesso</th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th style="font-size:11px;white-space:nowrap">NC+ / NC&minus; / OSS / VER</th><th>Stato</th><th title="Il verbale è stato mandato all'impresa?">Invio</th><th></th></tr></thead>
           <tbody id="tbody-lista"></tbody></table>
         </div>
         <div id="lista-empty" class="hidden" style="text-align:center;padding:24px;color:#aaa">Nessuna visita trovata</div>
@@ -6992,7 +6992,7 @@ async function loadLista(){
     for(let y=_cur;y>=2023;y--)_oh+='<option value="'+y+'">'+y+'-'+(y+1)+'</option>'
     _qy.innerHTML=_oh;_qy.value=String(_cur);_qy.onchange=loadLista
   }
-  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,created_at,ipc,stato,elimina,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
+  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,created_at,ipc,stato,elimina,ipc_nc_plus,ipc_nc_minus,ipc_oss,acc_cant,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
   if(!_showElim)qb=qb.eq('elimina',0)
   if(fi)qb=qb.eq('ipc',fi)
   if(fs)qb=qb.eq('stato',fs)
@@ -7098,6 +7098,7 @@ function vtRow(v){
   }
   return`<tr class="row-detail-hover" data-act="detail-visita" data-id="${v.visita_id}"${isElim?' style="opacity:.55"':''}>
     <td>${v.nr_verbale||'-'}${isElim?' <span class="badge" style="background:#c0392b;color:#fff">eliminata</span>':''}</td><td>${fmtDate(v.data_visita)}</td>
+    <td style="text-align:center;font-weight:600">${v.acc_cant?v.acc_cant+'°':'–'}</td>
     <td>${cant}</td><td>${v.imprese?.impresa_nome||'-'}</td>
     <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
     ${_lcCell(v)}
