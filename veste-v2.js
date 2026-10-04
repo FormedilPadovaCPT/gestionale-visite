@@ -581,6 +581,17 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     if (_gruppo === 'scrivania') scrivania().catch((e) => console.warn('scrivania:', e));
   }
 
+  /* 04/10/2026: i conteggi partono due alla volta, non tutti insieme. Otto letture in parallelo, sommate a
+     scadenzario, app asseverazione e funzioni automatiche, alle 20:40 hanno saturato il database: anche le
+     letture da pochi millisecondi sono andate oltre gli 8 secondi e sono state interrotte. Ogni elemento è
+     una funzione che parte solo quando c'è posto; l'ordine dei risultati resta quello dell'elenco. */
+  async function aScaglioni(lavori, quanti) {
+    const esiti = new Array(lavori.length); let prossimo = 0;
+    const operaio = async () => { while (prossimo < lavori.length) { const i = prossimo++; esiti[i] = await lavori[i](); } };
+    await Promise.all(Array.from({ length: Math.min(quanti, lavori.length) }, operaio));
+    return esiti;
+  }
+
   async function scrivania() {
     const el = $('v2-scrivania'); if (!el) return;
     const sb = window.sb; if (!sb) return;
@@ -588,16 +599,16 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     const [esOra, esPrima] = esercizi();
     const rpc = async (f, a) => { const { data, error } = await sb.rpc(f, a); if (error) throw new Error(error.message); return data; };
     const righe = async (q) => { const { count, error } = await q; if (error) throw new Error(error.message); return count || 0; };
-    const [ossPrima, ossOra, senzaCf, mailAltri, proposte, incarichi, bozze, questioni] = await Promise.all([
-      conta(async () => (await rpc('osservatorio_controllo', { p_dal: esPrima.dal, p_al: esPrima.al, p_dettaglio: false })).ferme, 'Osservatorio esercizio precedente'),
-      conta(async () => (await rpc('osservatorio_controllo', { p_dal: esOra.dal, p_al: esOra.al, p_dettaglio: false })).ferme, 'Osservatorio esercizio in corso'),
-      conta(async () => ((await rpc('imprese_senza_cf')) || []).length, 'Imprese senza codice fiscale'),
-      conta(async () => ((await rpc('imprese_mail_di_altri')) || []).filter((r) => !r.stessa_della_cassa).length, 'Imprese con l\'indirizzo di un\'altra impresa'),
-      conta(async () => { if (!window.propChius || !window.propChius.aperte) throw new Error('funzione non disponibile'); return (await window.propChius.aperte()).size; }, 'Cantieri proposti per la chiusura'),
-      conta(() => righe(sb.from('incarichi').select('id', { count: 'exact', head: true }).eq('stato', 'aperto')), 'Incarichi aperti'),
-      conta(() => righe(sb.from('visite').select('visita_id', { count: 'exact', head: true }).eq('elimina', 0).eq('stato', 'bozza')), 'Verbali in bozza'),
-      conta(() => righe(sb.from('s_decisioni').select('id', { count: 'exact', head: true }).in('stato', ['aperta', 'rinviata'])), 'Questioni in attesa'),
-    ]);
+    const [ossPrima, ossOra, senzaCf, mailAltri, proposte, incarichi, bozze, questioni] = await aScaglioni([
+      () => conta(async () => (await rpc('osservatorio_controllo', { p_dal: esPrima.dal, p_al: esPrima.al, p_dettaglio: false })).ferme, 'Osservatorio esercizio precedente'),
+      () => conta(async () => (await rpc('osservatorio_controllo', { p_dal: esOra.dal, p_al: esOra.al, p_dettaglio: false })).ferme, 'Osservatorio esercizio in corso'),
+      () => conta(async () => ((await rpc('imprese_senza_cf')) || []).length, 'Imprese senza codice fiscale'),
+      () => conta(async () => ((await rpc('imprese_mail_di_altri')) || []).filter((r) => !r.stessa_della_cassa).length, 'Imprese con l\'indirizzo di un\'altra impresa'),
+      () => conta(async () => { if (!window.propChius || !window.propChius.aperte) throw new Error('funzione non disponibile'); return (await window.propChius.aperte()).size; }, 'Cantieri proposti per la chiusura'),
+      () => conta(() => righe(sb.from('incarichi').select('id', { count: 'exact', head: true }).eq('stato', 'aperto')), 'Incarichi aperti'),
+      () => conta(() => righe(sb.from('visite').select('visita_id', { count: 'exact', head: true }).eq('elimina', 0).eq('stato', 'bozza')), 'Verbali in bozza'),
+      () => conta(() => righe(sb.from('s_decisioni').select('id', { count: 'exact', head: true }).in('stato', ['aperta', 'rinviata'])), 'Questioni in attesa'),
+    ], 2);
     el.innerHTML = '<div class="v2-titolo" style="margin:4px 2px 10px">Scrivania — quello che aspetta</div>'
       + rigaScr(ossPrima, 'Visite ferme per l\'Osservatorio · esercizio ' + esPrima.nome, 'non entrano nei file finché manca un dato obbligatorio: vanno sistemate prima dell\'invio annuale', 'gruppo:report', 'Apri')
       + rigaScr(ossOra, 'Visite ferme per l\'Osservatorio · esercizio ' + esOra.nome, 'l\'esercizio in corso', 'gruppo:report', 'Apri')

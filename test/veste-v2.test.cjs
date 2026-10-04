@@ -288,4 +288,21 @@ assert.ok(mappaJs.includes("'(max-width: 1024px), (pointer: coarse)'"), 'la rego
 // il riquadro degli incarichi tiene il nome che i tecnici conoscono e che sta nel manuale
 assert.ok(js.includes('>Parti da un tuo incarico</div>') && !js.includes('>Perché sei qui</div>'), 'il titolo delle schede degli incarichi è «Parti da un tuo incarico»');
 
-console.log('veste-v2: ok');
+/* ── (04/10/2026) la Scrivania non lancia gli otto conteggi tutti insieme ──
+   Alle 20:40 otto letture in parallelo, insieme al resto, hanno saturato il database e sono andate in timeout.
+   Si prova la funzione vera, non solo il testo: al massimo due lavori aperti, risultati nell'ordine dell'elenco. */
+{
+  const corpo = js.match(/async function aScaglioni\(lavori, quanti\) \{[\s\S]*?\n  \}/);
+  assert.ok(corpo, 'manca aScaglioni in veste-v2.js');
+  const aScaglioni = new Function('return (' + corpo[0] + ')')();
+  const scr = js.match(/async function scrivania\(\) \{[\s\S]*?\n  \}/)[0];
+  assert.ok(/= await aScaglioni\(\[[\s\S]*\], 2\);/.test(scr) && !/Promise\.all/.test(scr), 'i conteggi della Scrivania partono a scaglioni di due, non con Promise.all');
+  assert.strictEqual((scr.match(/^\s+\(\) => conta\(/gm) || []).length, 8, 'ogni conteggio è una funzione che parte quando c’è posto');
+  let aperti = 0, massimo = 0;
+  const lavoro = (v, ms) => async () => { aperti++; massimo = Math.max(massimo, aperti); await new Promise((r) => setTimeout(r, ms)); aperti--; return v; };
+  aScaglioni([lavoro('a', 30), lavoro('b', 5), lavoro('c', 10), lavoro('d', 1), lavoro('e', 20)], 2).then((esiti) => {
+    assert.deepStrictEqual(esiti, ['a', 'b', 'c', 'd', 'e'], 'i risultati restano nell’ordine dell’elenco');
+    assert.strictEqual(massimo, 2, 'mai più di due letture aperte insieme');
+    console.log('veste-v2: ok');
+  }).catch((e) => { console.error(e); process.exit(1); });
+}
