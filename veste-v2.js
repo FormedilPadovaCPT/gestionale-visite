@@ -452,8 +452,10 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
   }
 
   /* ── numeri: una lettura fallita si dice, non diventa zero ── */
-  async function conta(leggiFn) {
-    try { const n = await leggiFn(); return { n: Number(n) || 0 }; } catch (e) { console.warn('veste v2, conteggio:', e); return { errore: e.message || String(e) }; }
+  /* 04/10/2026: il nome del riquadro e il messaggio vanno nella console come testo — l'oggetto errore da solo
+     si leggeva «{}», e non si capiva quale numero non era stato letto */
+  async function conta(leggiFn, nome) {
+    try { const n = await leggiFn(); return { n: Number(n) || 0 }; } catch (e) { const msg = (e && e.message) || String(e); console.warn('veste v2, conteggio «' + (nome || '?') + '» non letto: ' + msg); return { errore: msg }; }
   }
   const quadro = (c) => c.errore ? '<div class="v2-num v2-err" title="' + esc(c.errore) + '">non letto</div>' : '<div class="v2-num' + (c.n ? '' : ' v2-zero') + '">' + c.n + '</div>';
   const rigaScr = (c, titolo, sotto, azione, etichetta) => `<div class="v2-card" style="padding:10px 16px"><div class="v2-riga">${quadro(c)}<div class="v2-t"><b>${titolo}</b><small>${sotto}</small></div><button type="button" class="btn-outline btn-sm" data-v2-az="${azione}">${etichetta}</button></div></div>`;
@@ -587,14 +589,14 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     const rpc = async (f, a) => { const { data, error } = await sb.rpc(f, a); if (error) throw new Error(error.message); return data; };
     const righe = async (q) => { const { count, error } = await q; if (error) throw new Error(error.message); return count || 0; };
     const [ossPrima, ossOra, senzaCf, mailAltri, proposte, incarichi, bozze, questioni] = await Promise.all([
-      conta(async () => (await rpc('osservatorio_controllo', { p_dal: esPrima.dal, p_al: esPrima.al, p_dettaglio: false })).ferme),
-      conta(async () => (await rpc('osservatorio_controllo', { p_dal: esOra.dal, p_al: esOra.al, p_dettaglio: false })).ferme),
-      conta(async () => ((await rpc('imprese_senza_cf')) || []).length),
-      conta(async () => ((await rpc('imprese_mail_di_altri')) || []).filter((r) => !r.stessa_della_cassa).length),
-      conta(async () => { if (!window.propChius || !window.propChius.aperte) throw new Error('funzione non disponibile'); return (await window.propChius.aperte()).size; }),
-      conta(() => righe(sb.from('incarichi').select('id', { count: 'exact', head: true }).eq('stato', 'aperto'))),
-      conta(() => righe(sb.from('visite').select('visita_id', { count: 'exact', head: true }).eq('elimina', 0).eq('stato', 'bozza'))),
-      conta(() => righe(sb.from('s_decisioni').select('id', { count: 'exact', head: true }).in('stato', ['aperta', 'rinviata']))),
+      conta(async () => (await rpc('osservatorio_controllo', { p_dal: esPrima.dal, p_al: esPrima.al, p_dettaglio: false })).ferme, 'Osservatorio esercizio precedente'),
+      conta(async () => (await rpc('osservatorio_controllo', { p_dal: esOra.dal, p_al: esOra.al, p_dettaglio: false })).ferme, 'Osservatorio esercizio in corso'),
+      conta(async () => ((await rpc('imprese_senza_cf')) || []).length, 'Imprese senza codice fiscale'),
+      conta(async () => ((await rpc('imprese_mail_di_altri')) || []).filter((r) => !r.stessa_della_cassa).length, 'Imprese con l\'indirizzo di un\'altra impresa'),
+      conta(async () => { if (!window.propChius || !window.propChius.aperte) throw new Error('funzione non disponibile'); return (await window.propChius.aperte()).size; }, 'Cantieri proposti per la chiusura'),
+      conta(() => righe(sb.from('incarichi').select('id', { count: 'exact', head: true }).eq('stato', 'aperto')), 'Incarichi aperti'),
+      conta(() => righe(sb.from('visite').select('visita_id', { count: 'exact', head: true }).eq('elimina', 0).eq('stato', 'bozza')), 'Verbali in bozza'),
+      conta(() => righe(sb.from('s_decisioni').select('id', { count: 'exact', head: true }).in('stato', ['aperta', 'rinviata'])), 'Questioni in attesa'),
     ]);
     el.innerHTML = '<div class="v2-titolo" style="margin:4px 2px 10px">Scrivania — quello che aspetta</div>'
       + rigaScr(ossPrima, 'Visite ferme per l\'Osservatorio · esercizio ' + esPrima.nome, 'non entrano nei file finché manca un dato obbligatorio: vanno sistemate prima dell\'invio annuale', 'gruppo:report', 'Apri')
@@ -1142,8 +1144,8 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     if (!el) { el = document.createElement('div'); el.id = 'v2-sintesi'; vista.appendChild(el); }
     const es = esercizi()[0];
     const [fatte, minime] = await Promise.all([
-      conta(async () => { const { count, error } = await sb.from('visite').select('visita_id', { count: 'exact', head: true }).eq('elimina', 0).eq('stato', 'definitivo').gte('data_visita', es.dal).lte('data_visita', es.al); if (error) throw new Error(error.message); return count || 0; }),
-      conta(async () => { const { data, error } = await sb.from('visite_obiettivo_esercizio').select('visite_minime,visite_minime_manuali').eq('esercizio', es.etichetta).maybeSingle(); if (error) throw new Error(error.message); return data ? (data.visite_minime_manuali != null ? data.visite_minime_manuali : data.visite_minime) : 0; }),
+      conta(async () => { const { count, error } = await sb.from('visite').select('visita_id', { count: 'exact', head: true }).eq('elimina', 0).eq('stato', 'definitivo').gte('data_visita', es.dal).lte('data_visita', es.al); if (error) throw new Error(error.message); return count || 0; }, 'Visite definitive dell\'esercizio'),
+      conta(async () => { const { data, error } = await sb.from('visite_obiettivo_esercizio').select('visite_minime,visite_minime_manuali').eq('esercizio', es.etichetta).maybeSingle(); if (error) throw new Error(error.message); return data ? (data.visite_minime_manuali != null ? data.visite_minime_manuali : data.visite_minime) : 0; }, 'Obiettivo visite'),
     ]);
     let corpo;
     if (fatte.errore || minime.errore) corpo = '<div style="color:#C0392B">Non sono riuscito a leggere l\'obiettivo dell\'esercizio (' + esc(fatte.errore || minime.errore) + ').</div>';
