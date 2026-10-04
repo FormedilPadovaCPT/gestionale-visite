@@ -683,13 +683,15 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     let box = $('v2-oggi');
     if (!box) {
       box = document.createElement('div'); box.id = 'v2-oggi';
-      box.innerHTML = '<div class="v2-data" id="v2-oggi-data"></div><h2 id="v2-oggi-ciao"></h2><div class="v2-colonne">'
+      box.innerHTML = '<div class="v2-data" id="v2-oggi-data"></div><h2 id="v2-oggi-ciao"></h2><div id="v2-posto-notifiche"></div><div class="v2-colonne">'
         + '<div class="v2-c1"><div id="v2-bozze"></div><div id="v2-rientri"></div><div id="v2-incarichi"></div></div>'
         + '<div class="v2-c2"><div id="v2-azioni"></div><div id="v2-posto-obiettivo"></div><div id="v2-posto-avvisi"></div></div></div>';
       vista.insertBefore(box, vista.firstChild);
       // obiettivo del mese e bacheca avvisi sono quelli di sempre: si spostano nella colonna, non si rifanno
       const ob = $('card-target-mese'); if (ob) $('v2-posto-obiettivo').appendChild(ob);
       const av = $('avvisi-banner'); if (av) $('v2-posto-avvisi').appendChild(av);
+      // (04/10/2026, chiesto dall'utente) le notifiche sul telefono in cima, sotto il saluto: in fondo alla pagina non si vedevano
+      const nt = $('dash-notifiche'); if (nt) $('v2-posto-notifiche').appendChild(nt);
       box.addEventListener('click', (e) => {
         const b = e.target.closest('[data-v2-preme],[data-v2-ritorno],[data-v2-incarico],[data-v2-vai]'); if (!b) return;
         if (b.dataset.v2Preme) { const d = $(b.dataset.v2Preme); if (d) d.click(); return; }
