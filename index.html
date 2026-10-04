@@ -7590,8 +7590,13 @@ window._giroClear=function(){_giroSel.clear();document.querySelectorAll('.giro-c
 function _riepUnione(res){
   const t=(res&&res.toccate)||{}
   const voci=Object.entries(t).map(([k,v])=>v+' in '+k.split('.')[0])
+  /* 04/10/2026: le unioni sommano (s_unisci_anagrafica_*): si dice quanti campi sono passati
+     dalle schede unite e se qualcosa è finito nelle note perché non aveva un posto libero */
+  const an=((res&&res.note)||[]).map(n=>n.anagrafica).filter(Boolean)[0]
+  const nC=an&&an.campi_riempiti?an.campi_riempiti.length:0
+  const somma=an?(nC?nC+' campi/recapiti passati sulla principale':'nessun campo da passare')+(an.annotati?', il resto scritto nelle note d’ufficio':'')+((an.differenze||[]).length?', '+an.differenze.length+' differenze nel registro delle unioni':''):''
   const note=((res&&res.note)||[]).map(n=>n.lasciata_sul_doppione?('ATTENZIONE: '+n.lasciata_sul_doppione+' e\u2019 rimasta sulla scheda unita ('+n.perche+')'):n.da_guardare?('da guardare: '+n.da_guardare):n.ereditato?('ereditato '+n.ereditato+' '+(n.valore||'')):'').filter(Boolean)
-  return (voci.length?voci.join(', '):'nessuna riga collegata')+(note.length?' — '+note.join('; '):'')
+  return (voci.length?voci.join(', '):'nessuna riga collegata')+(somma?' — '+somma:'')+(note.length?' — '+note.join('; '):'')
 }
 // ── FUSIONE CANTIERI SELEZIONATI (solo segreteria) ──
 window.fondiSelezionati=async function(){
@@ -12506,7 +12511,8 @@ async function admFondiCommittenti(){
   try{
     const{data,error}=await sb.rpc('fondi_committenti',{p_master_id:masterId,p_dupe_ids:dupeIds})
     if(error)throw error
-    toast('Unione completata: '+((data&&data.committenti_archiviati)||dupeIds.length)+' archiviato/i · '+((data&&data.cantieri_spostati)||0)+' cantieri spostati','ok')
+    const _rne=(data&&data.recapiti_non_entrati)||[]
+    toast('Unione completata: '+((data&&data.committenti_archiviati)||dupeIds.length)+' archiviato/i · '+((data&&data.cantieri_spostati)||0)+' cantieri spostati'+(_rne.length?' · ATTENZIONE: il committente ha un posto solo per email e telefono, non sono entrati: '+_rne.map(r=>r.valore).join(', '):''),_rne.length?'warn':'ok',_rne.length?12000:3500)
     _commSelClear();admLoadCommittenti();_commDupReload()
   }catch(e){toast('Errore unione: '+(e.message||e),'err')}
 }
