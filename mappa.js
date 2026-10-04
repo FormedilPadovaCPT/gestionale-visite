@@ -289,7 +289,7 @@
         var p = ev.popup._mcPunto
         if (!p) return
         var g = root.querySelector('[data-mc="giro"]'), v = root.querySelector('[data-mc="visita"]')
-        if (g) g.onclick = function () { p.chk.click(); g.textContent = p.chk.checked ? '✓ Nel giro' : 'Aggiungi al giro' }
+        if (g) g.onclick = function () { p.chk.click(); g.textContent = p.chk.checked ? '✓ Nel giro' : 'Aggiungi al giro'; if (window.RientriGiorni) window.RientriGiorni.seleziona('scad-giorni', p.id, p.chk.checked) }   // (04/10/2026) sul telefono il giro parte dalla barra della lista per giorni
         if (v) v.onclick = function () { nuovaVisitaQui(p.id) }
       })
     }

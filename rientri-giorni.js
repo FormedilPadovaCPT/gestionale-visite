@@ -303,5 +303,14 @@
     if (st.ultimo.dopo) await st.ultimo.dopo(); else render(box, st.ultimo);
   }
 
-  window.RientriGiorni = { render };
+  /* dall'esterno (la mappa dei rientri, mappa.js): spunta o toglie un cantiere nella lista, così finisce nella barra «Giro» */
+  function seleziona(idBox, cantiereId, on) {
+    const st = _stato.get(idBox); if (!st || !st.ultimo) return false;
+    const v = st.ultimo.righe.get(cantiereId); if (!v) return false;
+    if (on) st.sel.set(cantiereId, v); else st.sel.delete(cantiereId);
+    const box = document.getElementById(idBox); if (box) render(box, st.ultimo);
+    return true;
+  }
+
+  window.RientriGiorni = { render, seleziona };
 })();
