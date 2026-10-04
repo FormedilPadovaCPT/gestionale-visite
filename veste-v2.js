@@ -78,6 +78,24 @@
     { preme: 'btn-qr-servizi', testo: '📱 QR servizi CPT', stile: 'flex:1;min-width:160px;background:#fff;border:2px solid #e7500f;color:#e7500f', aiuto: 'Mostra sullo schermo il codice QR del portale servizi, da far inquadrare a chi hai davanti.' },
     { preme: 'btn-servizi-cpt', testo: 'Vai ai servizi CPT ↗', stile: 'flex:1;min-width:180px;background:#95C22F;border:1px solid #7aa527;color:#fff', aiuto: 'Apre in un’altra scheda il portale servizi pubblico, quello che vedono le imprese.' },
   ];
+  /* (04/10/2026, segnalato dall'utente) IL RIQUADRO 🔔 DELLE NOTIFICHE sta in cima alla pagina con cui ciascuno apre:
+     «Oggi» sotto il saluto; per Direttore e Presidenza la pagina Direzione, sotto i pulsanti; per chi è di sola lettura
+     sulla Mappa, sotto Segnala/QR/Servizi. È un elemento solo (#dash-notifiche): si sposta dove serve.
+     Dal 25/09 era nascosto a chi è di sola lettura, e la Presidenza non poteva attivare l'unica notifica che la riguarda
+     (cantiere critico che coinvolge la Presidenza, s_critico_coinvolgi_presidenza). */
+  function postoNotifiche(view) {
+    const nt = $('dash-notifiche'); if (!nt) return;
+    let dove = null, dopoDi = null;
+    if (view === 'direzione') { dove = $('view-direzione'); dopoDi = $('v2-dir-pulsanti') || $('dir-intro'); }
+    else if (view === 'dashboard') {
+      if (RUOLI[ruolo()].lettura) { dove = $('view-dashboard'); dopoDi = $('dash-segnala-wrap'); }
+      else { const posto = $('v2-posto-notifiche'); if (posto) { if (nt.parentNode !== posto) posto.appendChild(nt); return; } }
+    }
+    if (!dove) return;
+    const prima = dopoDi && dopoDi.parentNode === dove ? dopoDi.nextSibling : dove.firstChild;
+    if (nt !== prima && nt.nextSibling !== prima) dove.insertBefore(nt, prima);
+    if (view === 'direzione' && typeof window.notificheBox === 'function') window.notificheBox().catch((e) => console.warn('notifiche:', e));
+  }
   function pulsantiDirezione() {
     const vista = $('view-direzione'); if (!vista) return;
     let el = $('v2-dir-pulsanti');
@@ -1178,9 +1196,11 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       pagine(view);
       if (view === 'segreteria') ufficio();
       if (view === 'admin') { try { const ha = document.querySelector('#view-admin .adm-header h2'); if (ha) ha.textContent = 'Coordinamento'; leggibileIn('view-admin'); setTimeout(() => leggibileIn('view-admin'), 800); } catch (e) { console.warn('veste v2 (leggibile):', e); } }
-      if (view === 'direzione') { pulsantiDirezione(); } if (view === 'direzione') sintesi().catch((e) => console.warn('veste v2, sintesi:', e));
+      if (view === 'direzione') { pulsantiDirezione(); postoNotifiche(view); } if (view === 'direzione') sintesi().catch((e) => console.warn('veste v2, sintesi:', e));
+      if (view === 'dashboard' && r.lettura) postoNotifiche(view);
       if (view === 'dashboard' && !r.lettura) {
         oggiPagina();
+        postoNotifiche(view);
         bozze().catch((e) => console.warn('veste v2, bozze:', e));
         // lo scadenzario legge tutte le visite: si rifà al più ogni due minuti
         return Date.now() - _dati.quando > 120000 ? ['dati:scadenze', 'dati:incarichi'] : ['dati:incarichi'];
