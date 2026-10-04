@@ -12,3 +12,9 @@ _vis_*
 desktop.ini
 **/desktop.ini
 supabase/.temp/
+
+# Playwright (04/10/2026): i pacchetti e i rapporti non si versionano
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+e2e/package-lock.json

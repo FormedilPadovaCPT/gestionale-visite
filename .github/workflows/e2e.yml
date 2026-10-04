@@ -1,0 +1,46 @@
+name: Prove nel browser (Playwright)
+
+# Apre il gestionale PUBBLICATO come farebbe un tecnico, da telefono (Pixel 7) e
+# da computer, e controlla che si apra senza errori JavaScript e mostri
+# l'accesso (04/10/2026). Parte dopo ogni pubblicazione e ogni mattina feriale.
+# Le prove che entrano nell'app aspettano un database di prova: sul database
+# vero le prove finiscono nell'XML nazionale (vedi e2e/playwright.config.mjs).
+#
+# Se fallisce il job diventa rosso e GitHub manda l'email; il rapporto con la
+# traccia si scarica dagli artifact del run (tenuto 7 giorni, solo se fallisce).
+
+on:
+  workflow_run:
+    workflows: ["Deploy sito (Pages) con validazione"]
+    types: [completed]
+  schedule:
+    - cron: '30 5 * * 1-5'     # feriali, 07:30 ora legale / 06:30 ora solare
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prove:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - uses: actions/checkout@v6
+      # il Node già presente sul runner basta (Playwright 1.63 chiede Node 20 o più)
+      - name: Installa Playwright e Chromium
+        run: |
+          npm install --no-fund --no-audit
+          npx playwright install --with-deps chromium
+      - name: Prove
+        run: npx playwright test
+      - name: Rapporto (solo se qualcosa non va)
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: rapporto-playwright
+          path: e2e/playwright-report
+          retention-days: 7

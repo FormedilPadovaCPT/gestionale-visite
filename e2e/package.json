@@ -1,0 +1,12 @@
+{
+  "name": "gestionale-visite-e2e",
+  "private": true,
+  "description": "Prove nel browser del gestionale visite (Playwright). Si installano su GitHub Actions o in una cartella FUORI da Drive: node_modules non va mai nel Drive.",
+  "scripts": {
+    "test": "playwright test",
+    "registra": "playwright codegen --device=\"Pixel 7\" https://formedilpadovacpt.github.io/gestionale-visite/"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
