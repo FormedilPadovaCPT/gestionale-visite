@@ -2546,6 +2546,9 @@ window.show=show;window.hide=hide;
 document.addEventListener('click',e=>{
   if(!e.target.classList.contains('modal-overlay'))return
   const id=e.target.id
+  // (04/10/2026) le finestre create al momento (elenchi delle statistiche, unione cantieri…) non hanno id: si tolgono.
+  // Prima finiva in hide('') → «Cannot read properties of null (reading 'classList')» e la finestra restava aperta.
+  if(!id){if(!e.target.dataset.scelta)e.target.remove();return}
   if(MODAL_NO_DISMISS.includes(id))return
   hide(id)
   // reset stato modale cantiere se chiuso cliccando fuori
@@ -2554,7 +2557,9 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return
   const open=document.querySelector('.modal-overlay:not(.hidden)')
-  if(!open||MODAL_NO_DISMISS.includes(open.id))return
+  if(!open)return
+  if(!open.id){if(!open.dataset.scelta)open.remove();return}   // finestra creata al momento, senza id (04/10/2026)
+  if(MODAL_NO_DISMISS.includes(open.id))return
   hide(open.id)
   if(open.id==='modal-cant'){window._editCantId=null;const t=$('modal-cant-title');if(t)t.textContent='Nuovo cantiere'}
 })
@@ -4423,6 +4428,7 @@ function _confirmSimiliCantieri(simili){
   return new Promise(resolve=>{
     const ov=document.createElement('div')
     ov.className='modal-overlay'
+    ov.dataset.scelta='1'   // aspetta una scelta: non si chiude toccando fuori
     ov.style.zIndex='9999'
     const rows=simili.map((s,i)=>{
       const a=`${s.cantiere_indirizzo||''} ${s.cantiere_civico||''}`.trim()
@@ -4502,7 +4508,7 @@ async function findSimiliCommittenti(nome,cf,piva){
 function _confirmSimiliAnag(simili,cfg){
   return new Promise(resolve=>{
     const ov=document.createElement('div')
-    ov.className='modal-overlay';ov.style.zIndex='9999'
+    ov.className='modal-overlay';ov.dataset.scelta='1';ov.style.zIndex='9999'   // aspetta una scelta: non si chiude toccando fuori
     const rows=simili.map((s,i)=>{
       const r=cfg.rowFn(s)
       return `<div style="border:1px solid #e5e5e5;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:12px">`
