@@ -11,6 +11,9 @@ on:
   push:
     branches: [main]
     paths:
+      # (04/10/2026) anche i test e questo file: un test corretto deve poter sbloccare la pubblicazione
+      - 'test/**'
+      - '.github/workflows/deploy-pages.yml'
       - 'index.html'
       - 'app-data.js'
       - 'stage-relazione.js'
