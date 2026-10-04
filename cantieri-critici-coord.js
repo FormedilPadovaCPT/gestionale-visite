@@ -180,7 +180,9 @@
       const testo = $('ccc-risposta').value.trim();
       if (!testo) return avviso('Scrivi la risposta.', 'err');
       const { error: e } = await window.sb.from('s_cantieri_critici')
-        .update({ gestione_note: testo, stato: d.stato === 'nuovo' ? 'in_gestione' : d.stato }).eq('id', d.id);
+        /* 04/10/2026: lo stato si tocca solo se era «nuovo»; prima si riscriveva quello letto
+           all'apertura, e un cambio fatto nel frattempo dalla segreteria tornava indietro */
+        .update(d.stato === 'nuovo' ? { gestione_note: testo, stato: 'in_gestione' } : { gestione_note: testo }).eq('id', d.id);
       if (e) throw e;
       avviso('Risposta salvata: il tecnico la vede nel suo elenco.', 'ok');
       dopo();
@@ -195,14 +197,14 @@
         testo: `Coordinatore: ${tipo === 'altro' ? testo : DECISIONI[tipo] + (testo ? '. ' + testo : '.')}`, dati: { decisione: tipo, da: 'gestionale' },
       });
       if (e) throw e;
-      if (d.stato === 'nuovo') await window.sb.from('s_cantieri_critici').update({ stato: 'in_gestione', gestione_note: d.gestione_note || null }).eq('id', d.id);
+      if (d.stato === 'nuovo') await window.sb.from('s_cantieri_critici').update({ stato: 'in_gestione' }).eq('id', d.id).eq('stato', 'nuovo');
       avviso('Decisione registrata: la segreteria la trova nel caso.', 'ok');
       dopo();
     });
 
     $('ccc-salva-merito').onclick = (ev) => con(ev.currentTarget, async () => {
       const { error: e } = await window.sb.from('s_cantieri_critici')
-        .update({ testo_merito: $('ccc-merito').value.trim() || null, gestione_note: d.gestione_note || null }).eq('id', d.id);
+        .update({ testo_merito: $('ccc-merito').value.trim() || null }).eq('id', d.id);   // 04/10/2026: senza riscrivere le note lette all'apertura
       if (e) throw e;
       avviso('Testo di merito salvato: la segreteria lo ritrova nella segnalazione.', 'ok');
       dopo();

@@ -97,9 +97,14 @@
     $('srel-dest').innerHTML = '<option value="">— scegli chi ha chiesto la visita —</option>'
       + rr.map((r) => '<option value="' + esc_(r.email) + '" data-nome="' + esc_(r.nome) + '"'
         + (v?.richiedente_email === r.email ? ' selected' : '') + '>'
-        + esc_(r.sede || '') + (r.sede ? ' — ' : '') + esc_(r.nome) + ' (' + esc_(r.email) + ')</option>').join('');
+        + esc_(r.sede || '') + (r.sede ? ' — ' : '') + esc_(r.nome) + ' (' + esc_(r.email) + ')</option>').join('')
+      /* 04/10/2026: un destinatario non più fra i referenti resta scritto, invece di svuotare la scelta */
+      + (v?.richiedente_email && !rr.some((r) => r.email === v.richiedente_email)
+        ? '<option value="' + esc_(v.richiedente_email) + '" data-nome="' + esc_(v.richiedente || '') + '" selected>'
+          + esc_(v.richiedente || '') + ' (' + esc_(v.richiedente_email) + ") — com'è scritto</option>" : '');
 
     $('srel-salva').dataset.vid = v?.id || '';
+    $('srel-salva').dataset.tec = v?.tecnico_id || '';   // chi l'ha scritta resta l'autore
     $('modal-stage-rel').classList.remove('hidden');
   }
 
@@ -268,7 +273,7 @@
     try {
       const vid = $('srel-salva').dataset.vid;
       const riga = {
-        ...d, tecnico_id: S.tecnico.tecnico_id, incarico_id: corrente.id,
+        ...d, tecnico_id: $('srel-salva').dataset.tec || S.tecnico.tecnico_id, incarico_id: corrente.id,
         relazione_il: new Date().toISOString(),
         aggiornato_da: S.user?.email || null,
       };

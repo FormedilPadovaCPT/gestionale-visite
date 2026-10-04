@@ -1,0 +1,1447 @@
+{
+  "nota": "Registro delle tendine (04/10/2026). Le voci le scrive tools/tendine.cjs --scrivi leggendo il codice: non si toccano a mano. classe: dato = scrive un valore di elenco in tabella.colonna; filtro, dinamica, compone, trasformata, interna = non serve confrontarla coi dati.",
+  "tendine": [
+    {
+      "id": "gest.f-tipo",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "f-tipo"
+      },
+      "tabella": "visite",
+      "colonna": "tipo_accesso",
+      "voci": [
+        "5",
+        "1",
+        "2",
+        "3",
+        "4",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ]
+    },
+    {
+      "id": "gest.f-ppre-titolo",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "f-ppre-titolo"
+      },
+      "tabella": "visite",
+      "colonna": "ppre_titolo",
+      "voci": [
+        "Sig.",
+        "Sig.ra",
+        "Dott.",
+        "Dott.ssa",
+        "Geom.",
+        "P.I.",
+        "Ing.",
+        "Arch.",
+        "Avv.",
+        "Prof."
+      ]
+    },
+    {
+      "id": "gest.f-qual-ppre",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "f-qual-ppre"
+      },
+      "tabella": "visite",
+      "colonna": "qual_ppre",
+      "voci": [
+        "Addetto alla documentazione",
+        "Autonomo",
+        "Capo cantiere",
+        "Collaboratore esterno",
+        "Committente",
+        "Coordinatore",
+        "Dipendente",
+        "Dipendente ditta affidataria",
+        "Dipendente ditta in subappalto",
+        "Direttore tecnico di cantiere",
+        "Direttore tecnico impresa",
+        "Geometra di cantiere",
+        "Impiegato tecnico",
+        "Lavoratore",
+        "Lavoratore autonomo",
+        "Operaio",
+        "Operaio del committente",
+        "Preposto",
+        "Responsabile del Modello di Organizzazione e Gestione",
+        "Responsabile di cantiere",
+        "RLS",
+        "RSGSL",
+        "RSPP",
+        "RSPP aziendale",
+        "Socio dipendente",
+        "Socio titolare",
+        "Subappaltatore",
+        "Tecnico",
+        "Tecnico di cantiere",
+        "Tecnico impresa",
+        "Tecnico incaricato dal committente",
+        "Titolare",
+        "Tutor aziendale",
+        "Altro"
+      ]
+    },
+    {
+      "id": "gest.f-comm-titolo",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "f-comm-titolo"
+      },
+      "tabella": "visite",
+      "colonna": "comm_titolo",
+      "voci": [
+        "Sig.",
+        "Sig.ra",
+        "Dott.",
+        "Dott.ssa",
+        "Geom.",
+        "P.I.",
+        "Ing.",
+        "Arch.",
+        "Avv.",
+        "Prof."
+      ]
+    },
+    {
+      "id": "gest.f-rl-titolo",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "f-rl-titolo"
+      },
+      "tabella": "visite",
+      "colonna": "rl_titolo",
+      "voci": [
+        "Sig.",
+        "Sig.ra",
+        "Dott.",
+        "Dott.ssa",
+        "Geom.",
+        "P.I.",
+        "Ing.",
+        "Arch.",
+        "Avv."
+      ]
+    },
+    {
+      "id": "gest.f-csp-titolo",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "f-csp-titolo"
+      },
+      "tabella": "visite",
+      "colonna": "csp_titolo",
+      "voci": [
+        "Sig.",
+        "Sig.ra",
+        "Dott.",
+        "Dott.ssa",
+        "Geom.",
+        "P.I.",
+        "Ing.",
+        "Arch.",
+        "Avv."
+      ]
+    },
+    {
+      "id": "gest.f-cse-titolo",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "f-cse-titolo"
+      },
+      "tabella": "visite",
+      "colonna": "cse_titolo",
+      "voci": [
+        "Sig.",
+        "Sig.ra",
+        "Dott.",
+        "Dott.ssa",
+        "Geom.",
+        "P.I.",
+        "Ing.",
+        "Arch.",
+        "Avv."
+      ]
+    },
+    {
+      "id": "gest.f-importo",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "f-importo"
+      },
+      "tabella": "cantieri",
+      "colonna": "cantiere_importo",
+      "voci": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11"
+      ]
+    },
+    {
+      "id": "gest.mc-importo",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "mc-importo"
+      },
+      "tabella": "cantieri",
+      "colonna": "cantiere_importo",
+      "voci": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11"
+      ]
+    },
+    {
+      "id": "gest.mc-tip-int",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "mc-tip-int"
+      },
+      "tabella": "cantieri",
+      "colonna": "cantiere_tip_int",
+      "voci": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ]
+    },
+    {
+      "id": "gest.mc-tip-ope",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "mc-tip-ope"
+      },
+      "tabella": "cantieri",
+      "colonna": "cantiere_tip_ope",
+      "voci": [
+        "2",
+        "1",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16"
+      ]
+    },
+    {
+      "id": "gest.mc-durata",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "mc-durata"
+      },
+      "tabella": "cantieri",
+      "colonna": "cantiere_durata",
+      "voci": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7"
+      ]
+    },
+    {
+      "id": "gest.mp-titolo",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "mp-titolo"
+      },
+      "tabella": "persone",
+      "colonna": "titolo",
+      "voci": [
+        "Sig.",
+        "Sig.ra",
+        "Dott.",
+        "Dott.ssa",
+        "Geom.",
+        "P.I.",
+        "Ing.",
+        "Arch.",
+        "Avv.",
+        "Prof.",
+        "Rag."
+      ]
+    },
+    {
+      "id": "gest.mp-sesso",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "mp-sesso"
+      },
+      "tabella": "persone",
+      "colonna": "sesso",
+      "voci": [
+        "M",
+        "F"
+      ]
+    },
+    {
+      "id": "gest.mi-forma",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "mi-forma"
+      },
+      "tabella": "imprese",
+      "colonna": "tipo_impresa",
+      "voci": [
+        "S.r.l.",
+        "S.r.l.s",
+        "S.r.l. Unipersonale",
+        "S.n.c.",
+        "S.A.S.",
+        "S.p.A.",
+        "S.coop.",
+        "Consorzio",
+        "Ditta Individuale",
+        "Lavoratore autonomo",
+        "Altro"
+      ]
+    },
+    {
+      "id": "gest.mi-tipo-ccia",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "mi-tipo-ccia"
+      },
+      "tabella": "imprese",
+      "colonna": "tipo_iscrizione_ccia",
+      "voci": [
+        "Industriale",
+        "Artigiana",
+        "Cooperativa",
+        "Commerciale",
+        "Lavoratore autonomo",
+        "Altro"
+      ]
+    },
+    {
+      "id": "gest.ei-tipo-ccia",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "ei-tipo-ccia"
+      },
+      "tabella": "imprese",
+      "colonna": "tipo_iscrizione_ccia",
+      "voci": [
+        "Industriale",
+        "Artigiana",
+        "Cooperativa",
+        "Commerciale",
+        "Lavoratore autonomo",
+        "Altro"
+      ]
+    },
+    {
+      "id": "gest.mi-ccnl",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "mi-ccnl"
+      },
+      "tabella": "imprese",
+      "colonna": "contratto_ccnl",
+      "voci": [
+        "Edilizia Industria",
+        "Edilizia Artigianato",
+        "Edilizia Piccola industria",
+        "Edilizia Cooperative",
+        "Metalmeccanico Industria",
+        "Metalmeccanico Artigianato",
+        "Installatori Impianti",
+        "Legno",
+        "Altro"
+      ]
+    },
+    {
+      "id": "gest.ei-ccnl",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "ei-ccnl"
+      },
+      "tabella": "imprese",
+      "colonna": "contratto_ccnl",
+      "voci": [
+        "Edilizia Industria",
+        "Edilizia Artigianato",
+        "Edilizia Piccola industria",
+        "Edilizia Cooperative",
+        "Metalmeccanico Industria",
+        "Metalmeccanico Artigianato",
+        "Installatori Impianti",
+        "Legno",
+        "Altro"
+      ]
+    },
+    {
+      "id": "gest.mi-ceiv",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "mi-ceiv"
+      },
+      "tabella": "imprese",
+      "colonna": "cassa_edile",
+      "voci": [
+        "C.E.I.V.",
+        "EDILCASSA VENETO",
+        "CASSA EDILE BELLUNO",
+        "CASSA EDILE VENEZIA",
+        "CASSA EDILE VICENZA",
+        "ALTRO"
+      ]
+    },
+    {
+      "id": "gest.ei-ceiv",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "ei-ceiv"
+      },
+      "tabella": "imprese",
+      "colonna": "cassa_edile",
+      "voci": [
+        "C.E.I.V.",
+        "EDILCASSA VENETO",
+        "CASSA EDILE BELLUNO",
+        "CASSA EDILE VENEZIA",
+        "CASSA EDILE VICENZA",
+        "ALTRO"
+      ]
+    },
+    {
+      "id": "gest.ec-sogg",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "ec-sogg"
+      },
+      "tabella": "committenti",
+      "colonna": "tipo_sogg",
+      "voci": [
+        "PF",
+        "PG"
+      ]
+    },
+    {
+      "id": "gest.ec-tipo",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "ec-tipo"
+      },
+      "tabella": "committenti",
+      "colonna": "committente_tipo",
+      "voci": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    {
+      "id": "gest.im-tipo-${idx}",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "app-data.js",
+        "nome": "TIPO_IMP_OPT"
+      },
+      "tabella": "visite_imprese_presenti",
+      "colonna": "tipo_imp",
+      "voci": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "select": "im-tipo-${idx}"
+    },
+    {
+      "id": "gest.avv-prio",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "avv-prio"
+      },
+      "tabella": "avvisi",
+      "colonna": "priorita",
+      "voci": [
+        "info",
+        "importante",
+        "urgente"
+      ]
+    },
+    {
+      "id": "gest.cmp-pos",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "cmp-pos"
+      },
+      "tabella": "campagne",
+      "colonna": "posizione",
+      "voci": [
+        "verbale",
+        "email",
+        "entrambi"
+      ]
+    },
+    {
+      "id": "gest.f-coord",
+      "app": "gestionale",
+      "classe": "trasformata",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "f-coord"
+      },
+      "motivo": "diventa vero/falso (visite.coord)"
+    },
+    {
+      "id": "gest.mc-comm-titolo",
+      "app": "gestionale",
+      "classe": "compone",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "mc-comm-titolo"
+      },
+      "motivo": "entra nel nome del committente, non in una colonna"
+    },
+    {
+      "id": "gest.f-prot-inc",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "f-prot-inc"
+      },
+      "motivo": "elenco degli incarichi"
+    },
+    {
+      "id": "gest.f-tec-select",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "f-tec-select"
+      },
+      "motivo": "elenco dei tecnici"
+    },
+    {
+      "id": "gest.f-tec2-select",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "f-tec2-select"
+      },
+      "motivo": "elenco dei tecnici"
+    },
+    {
+      "id": "gest.lav-sel-genere",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "lav-sel-genere"
+      },
+      "motivo": "catalogo lavorazioni"
+    },
+    {
+      "id": "gest.lav-sel-fase",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "lav-sel-fase"
+      },
+      "motivo": "catalogo lavorazioni"
+    },
+    {
+      "id": "gest.lav-sel-lavorazione",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "lav-sel-lavorazione"
+      },
+      "motivo": "catalogo lavorazioni"
+    },
+    {
+      "id": "gest.srel-dest",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "srel-dest"
+      },
+      "motivo": "referenti stage da s_config (valore fuori elenco tenuto: stage-relazione.js)"
+    },
+    {
+      "id": "gest.mc-com",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "mc-com"
+      },
+      "motivo": "comuni ISTAT"
+    },
+    {
+      "id": "gest.ssr-inc",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "ssr-inc"
+      },
+      "motivo": "incarichi"
+    },
+    {
+      "id": "gest.q-ipc",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "q-ipc"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.q-stato",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "q-stato"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.q-tec",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "q-tec"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.q-eserc",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "q-eserc"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.rub-cat",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "rub-cat"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.scad-tec-filter",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "scad-tec-filter"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.inc-f-tec",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "inc-f-tec"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.inc-f-stato",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "inc-f-stato"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.inc-f-tipo",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "inc-f-tipo"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.fd-eserc",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "fd-eserc"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.fd-tec",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "fd-tec"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.fd-tipo",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "fd-tipo"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.fd-ipc",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "index.html",
+        "id": "fd-ipc"
+      },
+      "motivo": "filtro di un elenco: non scrive"
+    },
+    {
+      "id": "gest.ccc-dec-tipo",
+      "app": "gestionale",
+      "classe": "interna",
+      "fonte": {
+        "tipo": "html",
+        "file": "cantieri-critici-coord.js",
+        "id": "ccc-dec-tipo"
+      },
+      "motivo": "tipo di decisione, scritto nel testo dell'evento"
+    },
+    {
+      "id": "gest.din-pp-titolo",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "diniego-accesso.js",
+        "id": "din-pp-titolo"
+      },
+      "motivo": "copia le voci di f-ppre-titolo"
+    },
+    {
+      "id": "gest.din-pp-qual",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "diniego-accesso.js",
+        "id": "din-pp-qual"
+      },
+      "motivo": "copia le voci di f-qual-ppre"
+    },
+    {
+      "id": "gest.dn-dec",
+      "app": "gestionale",
+      "classe": "interna",
+      "fonte": {
+        "tipo": "html",
+        "file": "direzione.js",
+        "id": "dn-dec"
+      },
+      "motivo": "decisione del Direttore"
+    },
+    {
+      "id": "gest.dn-p",
+      "app": "gestionale",
+      "classe": "interna",
+      "fonte": {
+        "tipo": "html",
+        "file": "direzione.js",
+        "id": "dn-p"
+      },
+      "motivo": "decisione del Direttore"
+    },
+    {
+      "id": "gest.rv-mese",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "riepilogo-verbali.js",
+        "id": "rv-mese"
+      },
+      "motivo": "mese del riepilogo"
+    },
+    {
+      "id": "gest.v2-quale-tec",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "veste-v2.js",
+        "id": "v2-quale-tec"
+      },
+      "motivo": "scelta del tecnico da vedere"
+    },
+    {
+      "id": "segr.corsi.RUOLI_AZ",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/corsi.js",
+        "nome": "RUOLI_AZ"
+      },
+      "tabella": "s_corsi_iscritti",
+      "colonna": "ruolo",
+      "voci": [
+        "DIPENDENTE",
+        "TITOLARE",
+        "SOCIO",
+        "PREPOSTO",
+        "RLS",
+        "RSPP",
+        "DATORE DI LAVORO",
+        "COLLABORATORE",
+        "ALTRO"
+      ]
+    },
+    {
+      "id": "segr.corsi.QUALITA",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/corsi.js",
+        "nome": "QUALITA"
+      },
+      "tabella": "s_corsi_interventi",
+      "colonna": "qualita",
+      "voci": [
+        "docente",
+        "codocente",
+        "relatore",
+        "ospite",
+        "moderatore",
+        "uditore"
+      ]
+    },
+    {
+      "id": "segr.lookups.UFFICI",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/lookups.js",
+        "nome": "UFFICI"
+      },
+      "tabella": "s_protocollo",
+      "colonna": "ufficio",
+      "voci": [
+        "Segreteria Area Sicurezza e Salute",
+        "Segreteria",
+        "Direzione",
+        "Presidenza",
+        "Amministrazione",
+        "Ufficio Formazione Continua",
+        "Consiglio"
+      ]
+    },
+    {
+      "id": "segr.lookups.MEZZI",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/lookups.js",
+        "nome": "MEZZI"
+      },
+      "tabella": "s_protocollo",
+      "colonna": "mezzo",
+      "voci": [
+        "e-mail",
+        "PEC",
+        "Consegna a mano",
+        "Lettera",
+        "Raccomandata",
+        "Pony Express",
+        "Fax",
+        "Altro"
+      ]
+    },
+    {
+      "id": "segr.imprese.tipo_impresa",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/imprese.js",
+        "nome": "OPZIONI",
+        "chiave": "tipo_impresa"
+      },
+      "tabella": "imprese",
+      "colonna": "tipo_impresa",
+      "voci": [
+        "S.r.l.",
+        "S.r.l.s",
+        "S.r.l. Unipersonale",
+        "S.n.c.",
+        "S.A.S.",
+        "S.p.A.",
+        "S.coop.",
+        "Consorzio",
+        "Ditta Individuale",
+        "Lavoratore autonomo",
+        "Altro"
+      ]
+    },
+    {
+      "id": "segr.imprese.ruolo",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/imprese.js",
+        "nome": "OPZIONI",
+        "chiave": "ruolo"
+      },
+      "tabella": "imprese",
+      "colonna": "ruolo",
+      "voci": [
+        "IMPRESA Edile",
+        "IMPRESA NON EDILE",
+        "IMPRESA IMPIANTI",
+        "LAVORATORE AUTONOMO",
+        "CONSORZIO",
+        "ENTE",
+        "STUDIO",
+        "LIBERO PROFESSIONISTA",
+        "CONSULENTE DEL LAVORO",
+        "FORNITORE",
+        "COMMITTENTE PERS. GIU.",
+        "COMMITTENTE PERS. FIS. Privato",
+        "COMMITTENTE PERS. FIS. Pubblico",
+        "SINDACATO",
+        "STAMPA",
+        "MEDICO",
+        "SPISAL",
+        "IMPRENDITORE",
+        "DIPENDENTE",
+        "SCUOLA EDILE CPT Padova",
+        "Studente SCUOLA EDILE CPT Padova"
+      ]
+    },
+    {
+      "id": "segr.imprese.tipologia_impresa",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/imprese.js",
+        "nome": "OPZIONI",
+        "chiave": "tipologia_impresa"
+      },
+      "tabella": "imprese",
+      "colonna": "tipologia_impresa",
+      "voci": [
+        "Industriale",
+        "Artigiana",
+        "Cooperativa",
+        "Commerciale",
+        "Lavoratore autonomo"
+      ]
+    },
+    {
+      "id": "segr.imprese.tipo_iscrizione_ccia",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/imprese.js",
+        "nome": "OPZIONI",
+        "chiave": "tipo_iscrizione_ccia"
+      },
+      "tabella": "imprese",
+      "colonna": "tipo_iscrizione_ccia",
+      "voci": [
+        "Industriale",
+        "Artigiana",
+        "Cooperativa",
+        "Commerciale",
+        "Lavoratore autonomo",
+        "Altro"
+      ]
+    },
+    {
+      "id": "segr.imprese.contratto_ccnl",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/imprese.js",
+        "nome": "OPZIONI",
+        "chiave": "contratto_ccnl"
+      },
+      "tabella": "imprese",
+      "colonna": "contratto_ccnl",
+      "voci": [
+        "Edilizia Industria",
+        "Edilizia Artigianato",
+        "Edilizia Piccola industria",
+        "Edilizia Cooperative",
+        "Metalmeccanico Industria",
+        "Metalmeccanico Artigianato",
+        "Installatori Impianti",
+        "Legno",
+        "Altro"
+      ]
+    },
+    {
+      "id": "segr.imprese.ccnl",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/imprese.js",
+        "nome": "OPZIONI",
+        "chiave": "ccnl"
+      },
+      "tabella": "imprese",
+      "colonna": "ccnl",
+      "voci": [
+        "Edilizia Industria",
+        "Edilizia Artigianato",
+        "Edilizia Piccola industria",
+        "Edilizia Cooperative",
+        "Metalmeccanico Industria",
+        "Metalmeccanico Artigianato",
+        "Installatori Impianti",
+        "Legno",
+        "Altro"
+      ]
+    },
+    {
+      "id": "segr.imprese.cassa_edile",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/imprese.js",
+        "nome": "OPZIONI",
+        "chiave": "cassa_edile"
+      },
+      "tabella": "imprese",
+      "colonna": "cassa_edile",
+      "voci": [
+        "C.E.I.V.",
+        "EDILCASSA VENETO",
+        "CASSA EDILE BELLUNO",
+        "CASSA EDILE VENEZIA",
+        "CASSA EDILE VICENZA",
+        "ALTRO"
+      ]
+    },
+    {
+      "id": "segr.imprese.stato_cassa",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/imprese.js",
+        "nome": "OPZIONI",
+        "chiave": "stato_cassa"
+      },
+      "tabella": "imprese",
+      "colonna": "stato_cassa",
+      "voci": [
+        "Attiva",
+        "Sospesa",
+        "Cessata",
+        "Non iscritta"
+      ]
+    },
+    {
+      "id": "segr.imprese.rspp",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/imprese.js",
+        "nome": "OPZIONI",
+        "chiave": "rspp"
+      },
+      "tabella": "imprese",
+      "colonna": "rspp",
+      "voci": [
+        "il responsabile del servizio di prevenzione e protezione è il datore di lavoro",
+        "il responsabile del servizio di prevenzione e protezione è un dipendente dell'impresa",
+        "il responsabile del servizio di prevenzione e protezione è un soggetto esterno all'impresa"
+      ]
+    },
+    {
+      "id": "segr.visite.STATI",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/visite.js",
+        "nome": "STATI"
+      },
+      "tabella": "s_visite_richieste",
+      "colonna": "stato",
+      "voci": [
+        "ricevuta",
+        "autorizzata",
+        "assegnata",
+        "in_corso",
+        "eseguita",
+        "chiusa",
+        "scartata"
+      ]
+    },
+    {
+      "id": "segr.segnalazioni.STATI",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/segnalazioni.js",
+        "nome": "STATI"
+      },
+      "tabella": "s_segnalazioni",
+      "colonna": "stato",
+      "voci": [
+        "ricevuta",
+        "istruita",
+        "autorizzata",
+        "assegnata",
+        "eseguita",
+        "riscontrata",
+        "chiusa",
+        "scartata"
+      ]
+    },
+    {
+      "id": "segr.notifiche.STATI",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/notifiche.js",
+        "nome": "STATI"
+      },
+      "tabella": "s_notifiche_cantiere",
+      "colonna": "stato",
+      "voci": [
+        "ricevuta",
+        "programmata",
+        "visitata",
+        "chiusa",
+        "scartata"
+      ]
+    },
+    {
+      "id": "segr.conferenze.STATI",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/conferenze.js",
+        "nome": "STATI"
+      },
+      "tabella": "s_conferenze_cantiere",
+      "colonna": "stato",
+      "voci": [
+        "ricevuta",
+        "autorizzata",
+        "programmata",
+        "svolta",
+        "chiusa",
+        "scartata"
+      ]
+    },
+    {
+      "id": "segr.consulenze.STATI",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/consulenze.js",
+        "nome": "STATI"
+      },
+      "tabella": "s_consulenze",
+      "colonna": "stato",
+      "voci": [
+        "ricevuta",
+        "girata",
+        "risposta_pronta",
+        "autorizzata",
+        "eseguita",
+        "chiusa",
+        "scartata"
+      ]
+    }
+  ],
+  "segreteria_gia_presenti": [
+    "ac-esito",
+    "ant-originale",
+    "ap-qualifica",
+    "ap-tipo",
+    "at-esito1",
+    "at-esito2",
+    "at-reg",
+    "at-stato",
+    "at-tecnico",
+    "bu-mese",
+    "c-gruppo",
+    "c-mezzo",
+    "c-tipo",
+    "c-ufficio",
+    "ca-esito",
+    "cc-esito",
+    "cc-ev-tipo",
+    "cc-priorita",
+    "cc-stato",
+    "cf-esitoceiv",
+    "cf-spesa",
+    "cf-stato",
+    "cf-tecnico",
+    "cfc-esito",
+    "cn-esitoceiv",
+    "cn-gira-a",
+    "cn-luogo",
+    "cn-motivo",
+    "cn-origine",
+    "cn-spesa",
+    "cn-stato",
+    "cn-tecnico",
+    "co-stato",
+    "ec-esito",
+    "f-anno",
+    "f-invio",
+    "f-tipo",
+    "f-ufficio",
+    "fc-progetto",
+    "ff-inc",
+    "ff-t",
+    "ff-tec",
+    "fi-giornata",
+    "fi-qualita",
+    "fi-stato",
+    "fk-qualita",
+    "fn-ruolo",
+    "fp-esito",
+    "fp-ruolo",
+    "fr-dip",
+    "fr-monte",
+    "fr-tipo",
+    "im-conto",
+    "mk-chi",
+    "mk-cosa",
+    "mv-causale-sel",
+    "na-fonte",
+    "nc-fonte",
+    "nc-luogo",
+    "nc-tipo",
+    "ncf-fonte",
+    "nm-ruolo",
+    "nn-fonte",
+    "np-pilastro",
+    "ns-fonte",
+    "ns-tipo",
+    "nt-stato",
+    "nt-tecnico",
+    "nv-fonte",
+    "nv-spesa",
+    "nv-tipo",
+    "nv-tipologia",
+    "pd-pilastro",
+    "pg-stato",
+    "pp-f",
+    "pp-inc",
+    "pp-t",
+    "pp-tipo",
+    "pr-tec",
+    "pz-dip",
+    "qd-tipo",
+    "qs-stato",
+    "qz-modello",
+    "rc-stato",
+    "rl-esito",
+    "rl-stato",
+    "rp-qualifica",
+    "rp-tipo",
+    "sg-dest",
+    "sg-stato",
+    "sg-tecnico",
+    "sg-tiposeg",
+    "st-anno",
+    "st-classe",
+    "st-r-anno",
+    "st-r-sede",
+    "st-sede",
+    "tc-esito",
+    "td-tipo",
+    "ti-parte",
+    "ti-scelta",
+    "tp-giornata",
+    "vc-esito",
+    "veste-sel",
+    "vs-esitoceiv",
+    "vs-spesa",
+    "vs-stato",
+    "vs-tecnico",
+    "zt-dest",
+    "zt-nuovo-q",
+    "zt-nuovo-tec"
+  ]
+}

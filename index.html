@@ -12391,21 +12391,21 @@ async function admEditCommittente(id){
   _editCommId=id
   const _idf=$('ec-id');if(_idf){_idf.readOnly=true;_idf.style.background='#f4f4f4';_idf.style.color='#888';_idf.style.cursor='not-allowed'}
   const _mh=document.querySelector('#modal-edit-comm h3');if(_mh)_mh.textContent='👤 Scheda committente'
-  let k=(_commRows||[]).find(x=>x.committente_id===id)
-  if(!k){
-    /* scheda non letta: la maschera vuota, salvata, cancellerebbe i dati del committente */
-    const{data,error}=await sb.from('committenti').select('*').eq('committente_id',id).single()
-    if(error){toast('Non sono riuscito a leggere la scheda del committente ('+error.message+'): riprova.','err');return}
-    k=data||{}
-  }
+  /* 04/10/2026: la scheda si rilegge sempre dal database (prima si prendeva dall'elenco già in
+     memoria, che poteva essere vecchio), e salvando si scrive solo ciò che è cambiato (_ecOrig) */
+  const ri=(_commRows||[]).find(x=>x.committente_id===id)||{}
+  const{data,error}=await sb.from('committenti').select('*').eq('committente_id',id).single()
+  if(error){toast('Non sono riuscito a leggere la scheda del committente ('+error.message+'): riprova.','err');return}
+  const k=Object.assign({n_cantieri:ri.n_cantieri,n_visite:ri.n_visite},data||{})
+  _ecOrig=data||{}
   vSet('ec-id',k.committente_id||id)
   vSet('ec-nome',k.committente_nome||'')
   vSet('ec-cfpiva',k.cf_piva||'')
   vSet('ec-piva',k.piva||'')
   vSet('ec-email',k.email||'')
   vSet('ec-tel',k.telefono||'')
-  const sog=$('ec-sogg');if(sog)sog.value=k.tipo_sogg||''
-  const tp=$('ec-tipo');if(tp)tp.value=(k.committente_tipo!=null?String(k.committente_tipo):'')
+  selComEScritto($('ec-sogg'),k.tipo_sogg||'')
+  selComEScritto($('ec-tipo'),k.committente_tipo!=null?String(k.committente_tipo):'')
   const info=$('ec-info');if(info)info.textContent=(k.n_cantieri!=null?('· '+k.n_cantieri+' cantieri · '+(k.n_visite||0)+' visite'):'')
   const box=$('ec-cantieri-list');if(box)box.innerHTML='<div style="color:#aaa;font-size:12px">Caricamento cantieri…</div>'
   show('modal-edit-comm')
@@ -12456,6 +12456,7 @@ function admNuovoCommittente(){
   show('modal-edit-comm')
   if(f)f.focus()
 }
+let _ecOrig=null
 async function admSaveEditComm(){
   const nome=vGet('ec-nome').trim()
   if(nome.length<2){toast('Ragione sociale / nome obbligatorio','warn');return}
@@ -12471,7 +12472,9 @@ async function admSaveEditComm(){
   }
   try{
     if(_editCommId){
-      const{error}=await sb.from('committenti').update(upd).eq('committente_id',_editCommId);if(error)throw error
+      const o=_ecOrig||{},diff={}
+      Object.entries(upd).forEach(([c,v])=>{if(String(o[c]??'')!==String(v??''))diff[c]=v})
+      if(Object.keys(diff).length){const{error}=await sb.from('committenti').update(diff).eq('committente_id',_editCommId);if(error)throw error}
       hide('modal-edit-comm');toast('Committente aggiornato','ok');admLoadCommittenti();_commDupReload()
     }else{
       const nid=vGet('ec-id').trim().toUpperCase().replace(/\s+/g,'')
@@ -15450,10 +15453,10 @@ document.addEventListener('input',function(ev){
 
 </script>
 <!-- relazione di visita allo stagista: apre dalla pagina Incarichi -->
-<script src="stage-relazione.js?v=2"></script>
+<script src="stage-relazione.js?v=3"></script>
 <!-- accesso negato al cantiere: il tecnico segnala, la segreteria gestisce -->
 <script src="diniego-accesso.js?v=4"></script>
-<script src="cantieri-critici-coord.js?v=3"></script>
+<script src="cantieri-critici-coord.js?v=4"></script>
 <script src="controllo-verbale.js?v=2"></script>
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
 <script src="riepilogo-verbali.js?v=2"></script>
