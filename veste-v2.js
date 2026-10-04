@@ -686,7 +686,9 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       const ob = $('card-target-mese'); if (ob) $('v2-posto-obiettivo').appendChild(ob);
       const av = $('avvisi-banner'); if (av) $('v2-posto-avvisi').appendChild(av);
       box.addEventListener('click', (e) => {
-        const b = e.target.closest('[data-v2-preme],[data-v2-ritorno],[data-v2-incarico],[data-v2-vai]'); if (!b) return;
+        const b = e.target.closest('[data-v2-preme],[data-v2-ritorno],[data-v2-vedi],[data-v2-incarico],[data-v2-vai]'); if (!b) return;
+        // (04/10/2026, chiesto dall'utente) l'occhio accanto alla bussola: la scheda dell'ultimo verbale, come nell'elenco visite
+        if (b.dataset.v2Vedi) { if (typeof window.showVisitaDetail === 'function') window.showVisitaDetail(b.dataset.v2Vedi); return; }
         if (b.dataset.v2Preme) { const d = $(b.dataset.v2Preme); if (d) d.click(); return; }
         if (b.dataset.v2Vai && typeof window.navTo === 'function') { window.navTo(b.dataset.v2Vai); return; }
         if (b.dataset.v2Ritorno) {
@@ -723,7 +725,8 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
           return `<div class="v2-riga"><div class="v2-t"><div class="v2-sopra">${['ALTO', 'MEDIO', 'BASSO'].includes(ipc) ? `<span class="v2-ipc ${ipc}">${ipc}</span>` : ''}<span class="v2-rosso">${g ? 'Rientro scaduto da ' + g + (g === 1 ? ' giorno' : ' giorni') : 'Rientro previsto oggi'}</span></div>`
             + `<b>${esc(ind)}${c.comune_nome ? ', ' + esc(c.comune_nome) : ''}</b><small>ultima ${esc(v.nr_verbale || '—')} del ${gg(v.data_visita)}${tutti && d.tecMap && d.tecMap[v.tecnico_id] ? ' · ' + esc(d.tecMap[v.tecnico_id]) : ''}</small></div>`
             + `<div class="v2-bottoni"><a class="btn-outline btn-sm" style="text-decoration:none;border-color:var(--border);color:#565C66" target="_blank" rel="noopener" href="${esc(mappa(c.lat, c.lng, ind + ' ' + (c.comune_nome || '')))}" data-aiuto="Apre il navigatore verso il cantiere.">🧭</a>`
-            + `<button type="button" class="btn-outline btn-sm" data-v2-ritorno="${esc(v.visita_id)}" data-v2-verbale="${esc(v.nr_verbale || '')}" data-aiuto="Apre una nuova visita di ritorno su questo cantiere, con cantiere, imprese e non conformità da rivedere già compilati.">Avvia visita</button></div></div>`;
+            + `<button type="button" class="btn-outline btn-sm" style="border-color:var(--border);color:#565C66" data-v2-vedi="${esc(v.visita_id)}" data-aiuto="Mostra l'ultimo verbale di questo cantiere: rilievi, imprese, note. Non cambia niente.">👁</button>`
+            + `<button type="button" class="btn-outline btn-sm" data-v2-ritorno="${esc(v.visita_id)}" data-v2-verbale="${esc(v.nr_verbale || '')}" data-aiuto="Apre una nuova visita di ritorno su questo cantiere, con cantiere, imprese e non conformità da rivedere già compilati." aria-label="Avvia visita di ritorno">➕</button></div></div>`;
         }).join('');
         r.innerHTML = `<div class="v2-card"><div class="v2-testa"><div class="v2-titolo">⚠️ Rientri scaduti${dopoTitolo}</div><small>IPC più alto prima</small></div>`
           + (urg.length ? righe : '<div style="padding:8px 0;color:#5F8A12">Nessun rientro scaduto.</div>')
@@ -747,7 +750,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
             + `<b>${esc(x.impresa || x.richiedente || '—')}</b><small>${dove ? '› ' + esc(dove) : ''}${tutti && x.tecnico_nome ? (dove ? ' · ' : '') + esc(x.tecnico_nome) : ''}</small></div>`
             + `<div class="v2-bottoni">${dove ? `<a class="btn-outline btn-sm" style="text-decoration:none;border-color:var(--border);color:#565C66" target="_blank" rel="noopener" href="${esc(mappa(null, null, dove))}" data-aiuto="Apre il navigatore verso l'indirizzo dell'incarico.">🧭</a>` : ''}`
             + (visita && !chi.anteprima && (suo || tutti)
-              ? `<button type="button" class="btn-outline btn-sm" data-v2-incarico="${esc(x.id)}" data-v2-mio="${suo ? 1 : 0}" data-aiuto="Apre il verbale con impresa e cantiere dell'incarico già compilati. Se l'incarico è tuo, lo accetta.">Avvia visita</button>`
+              ? `<button type="button" class="btn-outline btn-sm" data-v2-incarico="${esc(x.id)}" data-v2-mio="${suo ? 1 : 0}" data-aiuto="Apre il verbale con impresa e cantiere dell'incarico già compilati. Se l'incarico è tuo, lo accetta." aria-label="Avvia visita">➕</button>`
               : `<button type="button" class="btn-outline btn-sm" data-v2-vai="incarichi" data-aiuto="Apre la pagina Incarichi, dove accetti, rifiuti o chiudi l'incarico.">Apri</button>`)
             + '</div></div>';
         }).join('');
