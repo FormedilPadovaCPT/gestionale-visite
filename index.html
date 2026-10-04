@@ -2016,23 +2016,26 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>Tipo iscrizione CCIA</label>
         <select id="mi-tipo-ccia">
           <option value="">– Seleziona –</option>
-          <option value="1">Artigiana</option>
-          <option value="2">Industriale</option>
-          <option value="3">Cooperativa</option>
-          <option value="4">Commerciale</option>
-          <option value="5">Altro</option>
+          <option>Industriale</option>
+          <option>Artigiana</option>
+          <option>Cooperativa</option>
+          <option>Commerciale</option>
+          <option>Lavoratore autonomo</option>
+          <option>Altro</option>
         </select>
       </div>
       <div class="field"><label>Contratto CCNL</label>
         <select id="mi-ccnl">
           <option value="">– Seleziona –</option>
-          <option value="1">Edilizia Industria</option>
-          <option value="2">Edilizia Artigianato</option>
-          <option value="3">Metalmeccanico Industria</option>
-          <option value="4">Metalmeccanico Artigianato</option>
-          <option value="5">Installatori Impianti</option>
-          <option value="6">Legno</option>
-          <option value="13">Altro</option>
+          <option>Edilizia Industria</option>
+          <option>Edilizia Artigianato</option>
+          <option>Edilizia Piccola industria</option>
+          <option>Edilizia Cooperative</option>
+          <option>Metalmeccanico Industria</option>
+          <option>Metalmeccanico Artigianato</option>
+          <option>Installatori Impianti</option>
+          <option>Legno</option>
+          <option>Altro</option>
         </select>
       </div>
     </div>
@@ -2083,6 +2086,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 <div class="modal-overlay hidden" id="modal-edit-imp">
   <div class="modal-box" style="max-width:580px">
     <h3>✏️ Modifica impresa</h3>
+    <div id="ei-cessata" class="hidden" style="background:#fdecea;border-left:4px solid #c0392b;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:13px;color:#922b21"></div>
     <div class="sect-title">Dati anagrafici</div>
     <div class="field">
       <label>Ragione sociale *</label>
@@ -2090,13 +2094,17 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     </div>
     <div class="row">
       <div class="field">
-        <label>Partita IVA <span style="font-size:11px;color:#aaa;font-weight:400">(non modificabile)</span></label>
+        <label>Codice fiscale (chiave) <span style="font-size:11px;color:#aaa;font-weight:400">(non modificabile)</span></label>
         <input type="text" id="ei-piva" readonly style="background:#f4f4f4;color:#888;cursor:not-allowed">
       </div>
       <div class="field">
-        <label>Codice fiscale</label>
-        <input type="text" id="ei-cf" placeholder="CF…">
+        <label>Partita IVA</label>
+        <input type="text" id="ei-piva2" placeholder="P.IVA…">
       </div>
+    </div>
+    <div class="field">
+      <label>Codice fiscale del titolare <span style="font-size:11px;color:#aaa;font-weight:400">(ditte individuali)</span></label>
+      <input type="text" id="ei-cf" placeholder="CF…">
     </div>
     <div class="row">
       <div class="field">
@@ -2139,24 +2147,27 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <label>Tipo iscrizione CCIA</label>
         <select id="ei-tipo-ccia">
           <option value="">– Seleziona –</option>
-          <option value="1">Artigiana</option>
-          <option value="2">Industriale</option>
-          <option value="3">Cooperativa</option>
-          <option value="4">Commerciale</option>
-          <option value="5">Altro</option>
+          <option>Industriale</option>
+          <option>Artigiana</option>
+          <option>Cooperativa</option>
+          <option>Commerciale</option>
+          <option>Lavoratore autonomo</option>
+          <option>Altro</option>
         </select>
       </div>
       <div class="field">
         <label>Contratto CCNL</label>
         <select id="ei-ccnl">
           <option value="">– Seleziona –</option>
-          <option value="1">Edilizia Industria</option>
-          <option value="2">Edilizia Artigianato</option>
-          <option value="3">Metalmeccanico Industria</option>
-          <option value="4">Metalmeccanico Artigianato</option>
-          <option value="5">Installatori Impianti</option>
-          <option value="6">Legno</option>
-          <option value="13">Altro</option>
+          <option>Edilizia Industria</option>
+          <option>Edilizia Artigianato</option>
+          <option>Edilizia Piccola industria</option>
+          <option>Edilizia Cooperative</option>
+          <option>Metalmeccanico Industria</option>
+          <option>Metalmeccanico Artigianato</option>
+          <option>Installatori Impianti</option>
+          <option>Legno</option>
+          <option>Altro</option>
         </select>
       </div>
     </div>
@@ -4324,7 +4335,7 @@ $('btn-mi-cancel').onclick=()=>hide('modal-imp')
 // Mostra campo testo CCNL solo se selezionato "Altro"
 $('mi-ccnl')?.addEventListener('change',function(){
   const wrap=$('mi-ccnl-altro-wrap')
-  if(wrap)this.value==='13'?wrap.classList.remove('hidden'):wrap.classList.add('hidden')
+  if(wrap)this.value==='Altro'?wrap.classList.remove('hidden'):wrap.classList.add('hidden')
 })
 $('btn-mi-save').onclick=async()=>{
   const nome=vGet('mi-nome').trim()
@@ -4355,8 +4366,8 @@ $('btn-mi-save').onclick=async()=>{
     cassa_edile:vGet('mi-ceiv')||null,
     tipo_iscrizione_ccia:vGet('mi-tipo-ccia')||null,
     tipo_impresa:vGet('mi-forma')||null,   // vuoto = la ricava il trigger dalla ragione sociale
-    contratto_ccnl:ccnlVal==='13'?'13':ccnlVal,
-    contratto_ccnl_altro:ccnlVal==='13'?vGet('mi-ccnl-altro').trim()||null:null,
+    contratto_ccnl:ccnlVal,
+    contratto_ccnl_altro:ccnlVal==='Altro'?vGet('mi-ccnl-altro').trim()||null:null,
     elimina:0
   }
   // (03/10/2026) CAP e provincia riportati dai dati ufficiali (dati-ufficiali.js), se il comune e' ancora quello
@@ -11877,7 +11888,7 @@ async function admLoadImprese() {
     tbody.innerHTML = data.map(imp => {
       const id = imp.impresa_id||imp.piva||''
       return `
-      <tr style="border-bottom:1px solid rgba(255,255,255,.08);transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">
+      <tr data-imp="${esc(id)}" ondblclick="apriImpresaInSegreteria(this.dataset.imp,event)" title="Doppio clic: apre la scheda dell'impresa nell'app segreteria" style="border-bottom:1px solid rgba(255,255,255,.08);transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">
         <td style="padding:8px 4px;text-align:center"><input type="checkbox" class="imp-sel-chk" data-id="${esc(id)}" data-nome="${esc(imp.impresa_nome||'')}" ${_impSel.has(id)?'checked':''} onchange="_impSelToggle(this)" style="width:16px;height:16px;cursor:pointer"></td>
         <td style="padding:8px 10px;font-weight:500">${esc(imp.impresa_nome||'')}</td>
         <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:rgba(255,255,255,.6)">${esc(imp.piva||imp.impresa_id||'')}</td>
@@ -11897,10 +11908,29 @@ async function admLoadImprese() {
 
 // Apre il modal di modifica pre-popolato con i dati dell'impresa
 let _eiRiservati=[]
+let _eiOrig = null, _eiCert = new Set()
+/* «Altro» del CCNL: il testo nuovo e i due codici vecchi che lo volevano dire */
+function ccnlAltro(v){ return v === 'Altro' || v === 'ALTRO' || v === '13' }
+/* Imposta una tendina sul valore del database; se non è fra le voci (un codice di Access,
+   una grafia diversa) aggiunge la voce «com'è scritto», così il valore si vede e non si perde. */
+function selComEScritto(sel, val, legenda){
+  if(!sel)return
+  ;[...sel.querySelectorAll('option[data-com-e-scritto]')].forEach(o=>o.remove())
+  const v = val==null ? '' : String(val)
+  if (v && ![...sel.options].some(o => o.value === v)) {
+    const o = document.createElement('option')
+    o.value = v; o.dataset.comEScritto = '1'
+    o.textContent = v + (legenda && legenda[v] ? ' = ' + legenda[v] : '') + " (com'è scritto)"
+    sel.appendChild(o)
+  }
+  sel.value = v
+}
 async function admEditImpresa(impresaId) {
   _editImpId = impresaId
   // Reset modal
-  ;['ei-nome','ei-piva','ei-cf','ei-ind','ei-com','ei-email','ei-tel','ei-email2','ei-email3','ei-tel2','ei-pec','ei-ccnl-altro'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  ;['ei-nome','ei-piva','ei-piva2','ei-cf','ei-ind','ei-com','ei-email','ei-tel','ei-email2','ei-email3','ei-tel2','ei-pec','ei-ccnl-altro'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  _eiOrig = null; _eiCert = new Set()
+  const _cess=$('ei-cessata');if(_cess){_cess.classList.add('hidden');_cess.innerHTML=''}
   ;['ei-ceiv','ei-tipo-ccia','ei-ccnl'].forEach(id=>{const el=$(id);if(el)el.value=''})
   ;[1,2,3,4,5].forEach(c=>{const el=$(`ei-cert-${c}`);if(el)el.checked=false})
   const ccnlWrap=$('ei-ccnl-altro-wrap');if(ccnlWrap)ccnlWrap.classList.add('hidden')
@@ -11912,9 +11942,11 @@ async function admEditImpresa(impresaId) {
     const imp = (rows||[])[0]
     if (error || !imp) { toast('Impresa non trovata','err'); return }
     _eiRiservati = imp.contatti_riservati||[]
+    _eiOrig = imp
 
     // Popola campi
-    vSet('ei-piva', imp.impresa_id || imp.piva || '')
+    vSet('ei-piva', imp.impresa_id || '')
+    vSet('ei-piva2', imp.piva || '')
     vSet('ei-nome', imp.impresa_nome || '')
     vSet('ei-cf',   imp.impresa_cf || '')
     vSet('ei-ind',  imp.indirizzo || '')
@@ -11940,30 +11972,24 @@ async function admEditImpresa(impresaId) {
       el.placeholder=nascosto?'🔒 riservato: solo la segreteria':''
     })
 
-    // CEIV
-    const ceivSel = $('ei-ceiv')
-    if (ceivSel && imp.cassa_edile) {
-      const opt = [...ceivSel.options].find(o => o.value === imp.cassa_edile || o.text === imp.cassa_edile)
-      if (opt) ceivSel.value = opt.value; else ceivSel.value = ''
-    }
-    // Tipo CCIA
-    const cciaSel = $('ei-tipo-ccia')
-    if (cciaSel && imp.tipo_iscrizione_ccia) cciaSel.value = imp.tipo_iscrizione_ccia
-    // CCNL
-    const ccnlSel = $('ei-ccnl')
-    const CCNL_VALS = ['1','2','3','4','5','6']
-    if (ccnlSel && imp.contratto_ccnl) {
-      if (CCNL_VALS.includes(imp.contratto_ccnl)) {
-        ccnlSel.value = imp.contratto_ccnl
-      } else {
-        ccnlSel.value = '13'
-        vSet('ei-ccnl-altro', imp.contratto_ccnl_altro || '')
-        if (ccnlWrap) ccnlWrap.classList.remove('hidden')
-      }
-    }
-    // Certificazioni
+    // Cassa, iscrizione CCIA, CCNL (04/10/2026): le tendine portano gli stessi testi della
+    // segreteria. Prima avevano codici (1 = Artigiana, 13 = Altro): «Edilizia Industria» scritto
+    // dalla segreteria compariva qui come «Altro», «Industriale» come vuoto, e salvando li si
+    // perdeva. Un valore fuori lista (i codici di Access) si mostra «com'è scritto» e resta.
+    selComEScritto($('ei-ceiv'), imp.cassa_edile)
+    selComEScritto($('ei-tipo-ccia'), imp.tipo_iscrizione_ccia)
+    selComEScritto($('ei-ccnl'), imp.contratto_ccnl, _CCNL_FULL)
+    vSet('ei-ccnl-altro', imp.contratto_ccnl_altro || '')
+    if (ccnlWrap && (ccnlAltro(imp.contratto_ccnl) || imp.contratto_ccnl_altro)) ccnlWrap.classList.remove('hidden')
+    // Certificazioni: qui solo le cinque storiche; quelle con date ed ente si tengono nella segreteria
     const { data: certs } = await sb.from('imprese_certificazioni').select('certificazione').eq('impresa_id', impresaId)
-    ;(certs || []).forEach(row => { const el = $(`ei-cert-${row.certificazione}`); if (el) el.checked = true })
+    ;(certs || []).forEach(row => { _eiCert.add(+row.certificazione); const el = $(`ei-cert-${row.certificazione}`); if (el) el.checked = true })
+    // Cessata nel Registro Imprese (04/10/2026): la segna la segreteria, qui si avvisa
+    const { data: cs } = await sb.from('imprese').select('cessata_il,cessata_fonte').eq('impresa_id', impresaId).maybeSingle()
+    if (cs?.cessata_il && _cess) {
+      _cess.innerHTML = '⚠️ <b>Impresa cessata</b> nel Registro Imprese dal ' + esc(fmtDate(cs.cessata_il)) + (cs.cessata_fonte ? ' <span style="color:#888">(' + esc(cs.cessata_fonte) + ')</span>' : '') + '. Non è lo stato in Cassa Edile.'
+      _cess.classList.remove('hidden')
+    }
     show('modal-edit-imp')
   } catch(e) {
     console.error('admEditImpresa:', e)
@@ -11974,40 +12000,53 @@ async function admEditImpresa(impresaId) {
 async function admSaveEditImpresa() {
   const nome = vGet('ei-nome').trim()
   if (!nome) { toast('Ragione sociale obbligatoria','warn'); $('ei-nome').focus(); return }
+  if (!_eiOrig) { toast('Scheda non caricata: riapri l\'impresa','err'); return }
   const ccnlVal = vGet('ei-ccnl') || null
-  const isAltro = ccnlVal === '13'
   const isSeg = !!window.__isSegreteria
-  const updates = {
+  /* 04/10/2026: si scrive solo quello che è cambiato rispetto a quando la finestra si è aperta.
+     Prima si riscrivevano tutti i campi, e quelli che la finestra non sapeva mostrare
+     (CCNL e iscrizione scritti dalla segreteria) tornavano indietro vuoti o «Altro». */
+  const nuovi = {
     impresa_nome: nome,
+    piva:         vGet('ei-piva2').trim() || null,
     impresa_cf:   vGet('ei-cf').trim() || null,
     indirizzo:    vGet('ei-ind').trim() || null,
     comune:       vGet('ei-com').trim() || null,
     cassa_edile:  vGet('ei-ceiv') || null,
     tipo_iscrizione_ccia: vGet('ei-tipo-ccia') || null,
-    contratto_ccnl: isAltro ? 'ALTRO' : ccnlVal,
-    contratto_ccnl_altro: isAltro ? (vGet('ei-ccnl-altro').trim() || null) : null,
+    contratto_ccnl: ccnlVal,
+    contratto_ccnl_altro: ccnlAltro(ccnlVal) || !$('ei-ccnl-altro-wrap')?.classList.contains('hidden') ? (vGet('ei-ccnl-altro').trim() || null) : (_eiOrig.contratto_ccnl_altro || null),
   }
+  const updates = {}
+  const cambiato = (k, v) => String(_eiOrig[k] ?? '') !== String(v ?? '')
+  Object.entries(nuovi).forEach(([k, v]) => { if (cambiato(k, v)) updates[k] = v })
   // (03/10/2026) CAP, provincia e forma giuridica riportati dai dati ufficiali (dati-ufficiali.js)
   Object.assign(updates, window.DatiUfficiali?.extra('ei', updates.comune) || {})
   // i campi marcati riservati non si sovrascrivono se chi salva non è
   // segreteria: sono disabilitati in form, e qui non si scrive null sopra
   // un valore che non si è nemmeno visto
   ;[['impresa_email_ref','ei-email'],['impresa_email2','ei-email2'],['impresa_email3','ei-email3'],['impresa_telefono','ei-tel'],['impresa_telefono2','ei-tel2'],['pec','ei-pec']].forEach(([campo,elId])=>{
-    if(isSeg||!_eiRiservati.includes(campo))updates[campo]=vGet(elId).trim()||null
+    if(isSeg||!_eiRiservati.includes(campo)){const v=vGet(elId).trim()||null;if(cambiato(campo,v))updates[campo]=v}
   })
   if(isSeg){
-    updates.contatti_riservati=[['ei-ris-email','impresa_email_ref'],['ei-ris-email2','impresa_email2'],['ei-ris-email3','impresa_email3'],['ei-ris-tel','impresa_telefono'],['ei-ris-tel2','impresa_telefono2'],['ei-ris-pec','pec']]
+    const ris=[['ei-ris-email','impresa_email_ref'],['ei-ris-email2','impresa_email2'],['ei-ris-email3','impresa_email3'],['ei-ris-tel','impresa_telefono'],['ei-ris-tel2','impresa_telefono2'],['ei-ris-pec','pec']]
       .filter(([elId])=>$(elId)?.checked).map(([,campo])=>campo)
+    if(ris.join(',')!==(_eiOrig.contatti_riservati||[]).join(','))updates.contatti_riservati=ris
   }
-  const { error } = await sb.from('imprese').update(updates).eq('impresa_id', _editImpId)
-  if (error) { toast('Errore aggiornamento impresa: ' + error.message, 'err'); return }
-  await sb.from('imprese_certificazioni').delete().eq('impresa_id', _editImpId)
-  const certif = [1,2,3,4,5].filter(c => $(`ei-cert-${c}`)?.checked)
-  if (certif.length) {
-    const certRows = certif.map(c => ({ impresa_id: _editImpId, certificazione: c }))
-    const { error: errCert } = await sb.from('imprese_certificazioni').insert(certRows)
-    if (errCert) toast('Avviso: certificazioni non aggiornate – ' + errCert.message, 'warn')
+  if (Object.keys(updates).length) {
+    const { error } = await sb.from('imprese').update(updates).eq('impresa_id', _editImpId)
+    if (error) { toast('Errore aggiornamento impresa: ' + error.message, 'err'); return }
   }
+  /* certificazioni: si tocca solo quella spuntata o tolta (04/10/2026). Prima si cancellavano
+     tutte e si riscrivevano le cinque spuntate: andavano perse le altre (codici 6-12) e le
+     date ed enti scritti dalla segreteria. */
+  let errCert = null
+  for (const c of [1,2,3,4,5]) {
+    const si = !!$(`ei-cert-${c}`)?.checked
+    if (si && !_eiCert.has(c)) { const { error: e } = await sb.from('imprese_certificazioni').insert({ impresa_id: _editImpId, certificazione: c }); errCert = errCert || e }
+    if (!si && _eiCert.has(c)) { const { error: e } = await sb.from('imprese_certificazioni').delete().eq('impresa_id', _editImpId).eq('certificazione', c); errCert = errCert || e }
+  }
+  if (errCert) toast('Avviso: certificazioni non aggiornate – ' + errCert.message, 'warn')
   hide('modal-edit-imp')
   toast('Impresa "' + nome + '" aggiornata', 'ok')
   admLoadImprese()
@@ -12019,7 +12058,7 @@ $('btn-ei-cancel').onclick = () => hide('modal-edit-imp')
 $('btn-ei-save').onclick = admSaveEditImpresa
 $('ei-ccnl')?.addEventListener('change', function(){
   const wrap = $('ei-ccnl-altro-wrap')
-  if (wrap) this.value === '13' ? wrap.classList.remove('hidden') : wrap.classList.add('hidden')
+  if (wrap) ccnlAltro(this.value) ? wrap.classList.remove('hidden') : wrap.classList.add('hidden')
 })
 $('adm-imp-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadImprese() })
 
@@ -12124,7 +12163,7 @@ function _impSenzaCfDisegna(){
   tb.innerHTML=_impSenzaCf.map((r,i)=>{
     const piva=String(r.piva||'').replace(/\s+/g,'')
     const societa=FORME_SOCIETA.includes(r.tipo_impresa)&&pivaValida(piva)
-    return '<tr>'
+    return '<tr data-imp="'+esc(r.impresa_id||'')+'" ondblclick="apriImpresaInSegreteria(this.dataset.imp,event)" title="Doppio clic: apre la scheda dell\'impresa nell\'app segreteria" style="cursor:pointer">'
       +'<td style="'+cella+'">'+esc(r.impresa_nome||'')+'</td>'
       +'<td style="'+cella+'">'+esc(r.comune||'')+'</td>'
       +'<td style="'+cella+';font-family:monospace">'+esc(piva)+(piva&&!pivaValida(piva)?' <span title="La partita IVA non supera il controllo delle cifre" style="color:#f39c12">⚠</span>':'')+'</td>'
@@ -12173,6 +12212,15 @@ function mailSembraPec(m){
   return /(^|\.)pec(\.|imprese)|pec\.[a-z.]+$|legalmail|postecert|sicurezzapostale|(^|\.)cert\./.test(d)
 }
 let _impMail=[],_impMailTutteLeRighe=false
+/* Doppio clic su una riga impresa (04/10/2026, chiesto dall'utente): la scheda completa
+   nell'app segreteria, in una scheda nuova. L'accesso è lo stesso (stesso indirizzo).
+   Il doppio clic su un pulsante o una casella della riga non conta. */
+function apriImpresaInSegreteria(id,ev){
+  if(!id)return
+  if(ev&&ev.target&&ev.target.closest&&ev.target.closest('button,a,input,select,textarea'))return
+  window.open('https://formedilpadovacpt.github.io/segreteria/#impresa-'+encodeURIComponent(id),'_blank','noopener')
+}
+window.apriImpresaInSegreteria=apriImpresaInSegreteria
 async function admImpMailAltri(){
   const tb=$('tbody-imp-mail'),conto=$('imp-mail-conto')
   if(!tb)return
@@ -12201,7 +12249,7 @@ function _impMailDisegna(){
       :r.mail_cassa?('<span style="font-family:monospace">'+esc(r.mail_cassa)+'</span>'+pec(r.mail_cassa))
       :r.in_cassa?'<span style="color:rgba(255,255,255,.45)">nella lista, senza e-mail</span>'
       :'<span style="color:rgba(255,255,255,.45)">non è nella lista</span>'
-    return '<tr>'
+    return '<tr data-imp="'+esc(r.impresa_id||'')+'" ondblclick="apriImpresaInSegreteria(this.dataset.imp,event)" title="Doppio clic: apre la scheda dell\'impresa nell\'app segreteria" style="cursor:pointer">'
       +'<td style="'+cella+'"><strong>'+esc(r.impresa_nome||r.impresa_id)+'</strong><div style="font-size:11px;color:rgba(255,255,255,.45)">'+esc([r.comune,r.piva?('P.IVA '+r.piva):'',(+r.n_visite?(r.n_visite+(+r.n_visite===1?' verbale':' verbali')):'nessun verbale')].filter(Boolean).join(' · '))+'</div></td>'
       +'<td style="'+cella+'"><span style="font-family:monospace">'+esc(r.mail)+'</span>'+pec(r.mail)+'</td>'
       +'<td style="'+cella+'">'+esc(r.titolare_nome||'')+(+r.condivisa_con>1?'<div style="font-size:11px;color:rgba(255,255,255,.45)">lo hanno anche altre '+(r.condivisa_con-1)+'</div>':'')+'</td>'
@@ -12830,8 +12878,8 @@ async function loadRubrica(){
       const extra=[
         r.impresa_email_ref?`<a href="mailto:${esc(r.impresa_email_ref)}" style="color:var(--orange)">${esc(r.impresa_email_ref)}</a>`:(ris.includes('impresa_email_ref')?'🔒 email riservata':''),
         r.impresa_telefono?`<a href="tel:${esc(r.impresa_telefono)}" style="color:var(--orange)">${esc(r.impresa_telefono)}</a>`:(ris.includes('impresa_telefono')?'🔒 telefono riservato':''),
-        _CCNL_LBL[r.contratto_ccnl]?`CCNL: ${_CCNL_LBL[r.contratto_ccnl]}`:'',
-        _CCIA_LBL[r.tipo_iscrizione_ccia]?`CCIA: ${_CCIA_LBL[r.tipo_iscrizione_ccia]}`:'',
+        r.contratto_ccnl?`CCNL: ${esc(_CCNL_LBL[r.contratto_ccnl]||r.contratto_ccnl)}`:'',
+        r.tipo_iscrizione_ccia?`CCIA: ${esc(_CCIA_LBL[r.tipo_iscrizione_ccia]||r.tipo_iscrizione_ccia)}`:'',
         r.cassa_edile?`Cassa edile: ${esc(r.cassa_edile)}`:'',
       ].filter(Boolean)
       const _isCeiv=(r.cassa_edile||'').replace(/\./g,'').toUpperCase()==='CEIV'||!!r.cod_ceiv
