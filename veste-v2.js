@@ -257,6 +257,11 @@ body.v2.viewer-mode #v2-oggi{display:none}
 #v2-azioni button.v2-blu{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
 #v2-azioni button.v2-verde:hover{border-color:#5f8a1a}#v2-azioni button.v2-blu:hover{border-color:#1e40af}
 #v2-dir-pulsanti{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+/* i rientri per giorno nella scheda di «Oggi»: intestazioni da bordo a bordo, ricerca e filtri col margine della scheda */
+#v2-rientri-lista .rg-cerca{padding:0 18px 10px}
+#v2-rientri-lista .rg-pannello{margin:0 18px 10px}
+#v2-rientri-lista .rg-vuoto{padding:12px 18px}
+#v2-rientri-lista + .v2-piede{margin-top:0}
 #v2-dir-pulsanti button{padding:12px;font-size:15px;border-radius:10px;font-weight:600;cursor:pointer;min-height:0}
 /* IL VERBALE IN TRE MOMENTI: i passi di oggi, raggruppati. Nessun campo spostato fra i dati: cambia che cosa si vede insieme. */
 #v2-fasi{display:flex;gap:10px;align-items:stretch;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.12);padding:0 16px;margin-bottom:14px;flex-wrap:wrap}
@@ -686,9 +691,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       const ob = $('card-target-mese'); if (ob) $('v2-posto-obiettivo').appendChild(ob);
       const av = $('avvisi-banner'); if (av) $('v2-posto-avvisi').appendChild(av);
       box.addEventListener('click', (e) => {
-        const b = e.target.closest('[data-v2-preme],[data-v2-ritorno],[data-v2-vedi],[data-v2-incarico],[data-v2-vai]'); if (!b) return;
-        // (04/10/2026, chiesto dall'utente) l'occhio accanto alla bussola: la scheda dell'ultimo verbale, come nell'elenco visite
-        if (b.dataset.v2Vedi) { if (typeof window.showVisitaDetail === 'function') window.showVisitaDetail(b.dataset.v2Vedi); return; }
+        const b = e.target.closest('[data-v2-preme],[data-v2-ritorno],[data-v2-incarico],[data-v2-vai]'); if (!b) return;
         if (b.dataset.v2Preme) { const d = $(b.dataset.v2Preme); if (d) d.click(); return; }
         if (b.dataset.v2Vai && typeof window.navTo === 'function') { window.navTo(b.dataset.v2Vai); return; }
         if (b.dataset.v2Ritorno) {
@@ -719,18 +722,19 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       else {
         const urg = (d.urgenti || []).filter((v) => tutti || String(v.tecnico_id) === String(mio));
         const pross = (d.prossime || []).filter((v) => tutti || String(v.tecnico_id) === String(mio));
-        const righe = urg.slice(0, 5).map((v) => {
-          const c = v.cantieri || {}, ind = [c.cantiere_indirizzo, c.cantiere_civico].filter(Boolean).join(' ') || c.cantiere_etichetta || '—';
-          const g = Math.abs(v.diffDays || 0), ipc = String(v.ipc || '').toUpperCase();
-          return `<div class="v2-riga"><div class="v2-t"><div class="v2-sopra">${['ALTO', 'MEDIO', 'BASSO'].includes(ipc) ? `<span class="v2-ipc ${ipc}">${ipc}</span>` : ''}<span class="v2-rosso">${g ? 'Rientro scaduto da ' + g + (g === 1 ? ' giorno' : ' giorni') : 'Rientro previsto oggi'}</span></div>`
-            + `<b>${esc(ind)}${c.comune_nome ? ', ' + esc(c.comune_nome) : ''}</b><small>ultima ${esc(v.nr_verbale || '—')} del ${gg(v.data_visita)}${tutti && d.tecMap && d.tecMap[v.tecnico_id] ? ' · ' + esc(d.tecMap[v.tecnico_id]) : ''}</small></div>`
-            + `<div class="v2-bottoni"><a class="btn-outline btn-sm" style="text-decoration:none;border-color:var(--border);color:#565C66" target="_blank" rel="noopener" href="${esc(mappa(c.lat, c.lng, ind + ' ' + (c.comune_nome || '')))}" data-aiuto="Apre il navigatore verso il cantiere.">🧭</a>`
-            + `<button type="button" class="btn-outline btn-sm" style="border-color:var(--border);color:#565C66" data-v2-vedi="${esc(v.visita_id)}" data-aiuto="Mostra l'ultimo verbale di questo cantiere: rilievi, imprese, note. Non cambia niente.">👁</button>`
-            + `<button type="button" class="btn-outline btn-sm" data-v2-ritorno="${esc(v.visita_id)}" data-v2-verbale="${esc(v.nr_verbale || '')}" data-aiuto="Apre una nuova visita di ritorno su questo cantiere, con cantiere, imprese e non conformità da rivedere già compilati." aria-label="Avvia visita di ritorno">➕</button></div></div>`;
-        }).join('');
-        r.innerHTML = `<div class="v2-card"><div class="v2-testa"><div class="v2-titolo">⚠️ Rientri scaduti${dopoTitolo}</div><small>IPC più alto prima</small></div>`
-          + (urg.length ? righe : '<div style="padding:8px 0;color:#5F8A12">Nessun rientro scaduto.</div>')
+        /* (04/10/2026, design scelto dall'utente) i rientri raggruppati per giorno: scaduti in arancione, poi i prossimi
+           7 giorni, una riga compatta per cantiere; il tocco sulla riga apre il verbale (rientri-giorni.js) */
+        r.innerHTML = `<div class="v2-card"><div class="v2-testa"><div class="v2-titolo">📅 Rientri${dopoTitolo}</div><small>scaduti e prossimi 7 giorni</small></div>`
+          + '<div id="v2-rientri-lista" style="margin:0 -18px"></div>'
           + `<div class="v2-piede"><a data-v2-vai="scadenze">Tutte le scadenze › </a><span style="color:#888">${urg.length} ${urg.length === 1 ? 'scaduto' : 'scaduti'} · ${pross.length} nei prossimi 60 giorni</span></div></div>`;
+        const lista = $('v2-rientri-lista');
+        if (lista && window.RientriGiorni) {
+          try {
+            window.RientriGiorni.render(lista, { urgenti: urg, prossime: pross, tecMap: d.tecMap, maxScaduti: 5, entroGiorni: 7,
+              segreteria: ruolo() === 'segreteria', puoVisitare: !RUOLI[ruolo()].lettura,
+              dopo: () => (typeof window.ricaricaScadenze === 'function' ? window.ricaricaScadenze() : null) });
+          } catch (e) { console.warn('veste v2 (rientri per giorno):', e); lista.innerHTML = '<div style="padding:8px 18px;color:#C0392B">Non sono riuscito a disegnare i rientri: apri la pagina Scadenze.</div>'; }
+        }
       }
     }
     const i = $('v2-incarichi');
