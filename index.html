@@ -12658,10 +12658,84 @@ function _riaggFiltra(v){
   clearTimeout(_riaggT)
   _riaggT=setTimeout(()=>{admDisegnaRiaggancio();const i=$('adm-riagg-filtro');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)
 }
+/* 04/10/2026, chiesto dall'utente: il riaggancio deve sommare i dati, con una spunta per ognuno.
+   Si apre una finestra coi due cantieri affiancati: sono già spuntati i dati del provvisorio che
+   riempiono un vuoto del codificato (o un codice non valido, o «SNC»); quelli diversi si decidono
+   uno per uno. Quelli non presi restano scritti nel registro delle unioni (s_riaggancia_cantiere). */
+const _riaggCampi=()=>[
+  ['cantiere_indirizzo','Indirizzo'],['cantiere_civico','Civico'],['cantiere_cap','CAP'],['cantiere_etichetta','Etichetta'],
+  ['cantiere_tip_int','Tipo intervento',TIP_INT_LABELS,1,4],['cantiere_tip_ope','Tipo opera',TIP_OPE_LABELS,1,16],
+  ['cantiere_tip_ope_altro','Tipo opera (altro)'],['cantiere_durata','Durata',DURATA_LABELS,1,6],['cantiere_importo','Importo',_IMPORTO,1,10],
+  ['cantiere_committente_id','Committente'],['data_inizio_lavori','Inizio lavori'],['data_ult','Ultimazione lavori'],
+  ['prot_int','Prot. int.'],['nodo_id','Codice univoco'],['cantiere_descrizione','Descrizione lavori'],['lotto','Lotto'],
+]
+const _riaggSnc=v=>/^\s*(s\.?\s*n\.?\s*c\.?|snc|s\/n|sn)?\s*$/i.test(String(v??''))
+function _riaggScegli(m,d,comm){
+  return new Promise(resolve=>{
+    const vuoto=v=>v===null||v===undefined||String(v).trim()===''
+    const righe=[]
+    for(const[k,lbl,mappa,lo,hi]of _riaggCampi()){
+      let dv=d[k],mv=m[k]
+      if(vuoto(dv)||(k==='cantiere_civico'&&_riaggSnc(dv)))continue
+      if(!vuoto(mv)&&String(mv).trim().toLowerCase()===String(dv).trim().toLowerCase())continue
+      const valido=x=>!mappa||(+x>=lo&&+x<=hi)
+      const mVuoto=vuoto(mv)||(k==='cantiere_civico'&&_riaggSnc(mv))||(mappa&&!valido(mv))
+      const fmt=x=>{
+        if(vuoto(x))return '<span style="color:#aaa">vuoto</span>'
+        if(mappa)return esc((mappa[x]||('codice '+x))+(valido(x)?'':' (non valido)'))
+        if(k==='cantiere_committente_id')return esc(comm[String(x).trim().toUpperCase()]||x)
+        if(k==='data_ult'||k==='data_inizio_lavori')return esc(fmtDate(x))
+        return esc(x)
+      }
+      const nota=k==='cantiere_descrizione'&&!vuoto(mv)?' <span style="color:#888;font-size:11px">(si aggiunge)</span>':''
+      righe.push({k,lbl:lbl+nota,m:fmt(mv),d:fmt(dv),on:mVuoto&&valido(dv)})
+    }
+    if(d.lat!=null&&d.lng!=null&&(d.lat!==m.lat||d.lng!==m.lng)){
+      const pos=c=>c.lat==null?'<span style="color:#aaa">nessuna</span>':(c.geocode_status==='ok'?'precisa':'approssimativa ('+esc(c.geocode_status||'?')+')')
+      righe.push({k:'posizione',lbl:'Posizione sulla mappa',m:pos(m),d:pos(d),on:d.geocode_status==='ok'&&(m.geocode_status!=='ok'||m.lat==null)})
+    }
+    const ov=document.createElement('div')
+    ov.className='modal-overlay'
+    ov.dataset.scelta='1'
+    ov.style.zIndex='9999'
+    const tab=righe.length
+      ?`<table style="width:100%;border-collapse:collapse;font-size:12px">`
+        +`<tr style="text-align:left;color:#666"><th style="padding:4px"></th><th style="padding:4px">Dato</th><th style="padding:4px">Codificato (resta)</th><th style="padding:4px">Provvisorio</th></tr>`
+        +righe.map((r,i)=>`<tr style="border-top:1px solid #eee"><td style="padding:5px 4px;vertical-align:top"><input type="checkbox" data-k="${esc(r.k)}"${r.on?' checked':''} id="riagg-k${i}"></td>`
+          +`<td style="padding:5px 4px;vertical-align:top"><label for="riagg-k${i}" style="cursor:pointer">${r.lbl}</label></td>`
+          +`<td style="padding:5px 4px;vertical-align:top;color:#333">${r.m}</td><td style="padding:5px 4px;vertical-align:top;color:#333;font-weight:600">${r.d}</td></tr>`).join('')
+        +`</table>`
+      :'<p style="font-size:13px;color:#555">Il cantiere provvisorio non ha dati diversi da portare sul codificato.</p>'
+    ov.innerHTML=`<div class="modal-box" style="max-width:720px;max-height:90vh;overflow:auto">`
+      +`<h3>Riaggancio: quali dati tenere</h3>`
+      +`<p style="font-size:13px;color:#555;margin:4px 0 10px">Cantiere codificato <b>CNCE ${esc(m.cantiere_cnce||'')}</b> · ${esc([m.cantiere_indirizzo,m.cantiere_civico].filter(Boolean).join(' '))} — ${esc(m.comune_nome||'')}<br>`
+      +`Spunta i dati del provvisorio da portare sul codificato. Sono già spuntati quelli che <b>riempiono un campo vuoto</b>; quelli <b>diversi</b> li decidi tu. Quelli non spuntati restano scritti nel registro delle unioni.</p>`
+      +tab
+      +`<p style="font-size:12px;color:#a33;margin:10px 0 0">Le visite (e segnalazioni GPS, incarichi, cantieri critici) passano sul codificato e il provvisorio viene archiviato. Dal gestionale <b>non si torna indietro</b>: riaggancia solo se sei sicuro che sia lo stesso cantiere.</p>`
+      +`<div class="modal-actions" style="margin-top:14px">`
+      +`<button class="btn-outline" data-act="cancel">Annulla</button>`
+      +`<button class="btn-primary" data-act="ok">Riaggancia con i dati spuntati</button>`
+      +`</div></div>`
+    document.body.appendChild(ov)
+    const done=r=>{ov.remove();resolve(r)}
+    ov.querySelector('[data-act=cancel]').onclick=()=>done(null)
+    ov.querySelector('[data-act=ok]').onclick=()=>done([...ov.querySelectorAll('input[data-k]:checked')].map(x=>x.dataset.k))
+  })
+}
 async function admRiaggancia(sourceId,targetId,nv){
   if(!window.__isCoord){toast('Azione riservata alla segreteria','err');return}
-  if(!confirm('Spostare '+nv+' visita/e (e le eventuali segnalazioni GPS) sul cantiere CNCE e archiviare il cantiere provvisorio senza codice?\n\nIl cantiere provvisorio resta nel database, ma dal gestionale NON si torna indietro: fallo solo se sei sicuro che sia lo stesso cantiere.'))return
-  const{data:_ru,error:e1}=await sb.rpc('fondi_cantieri',{p_master_id:targetId,p_dupe_ids:[sourceId],p_origine:'riaggancio'})
+  const{data:due,error:e0}=await sb.from('cantieri').select('*').in('cantiere_id',[sourceId,targetId])
+  if(e0||!due||due.length!==2){toast('Non sono riuscito a leggere i due cantieri'+(e0?': '+e0.message:''),'err');return}
+  const m=due.find(x=>x.cantiere_id===targetId),d=due.find(x=>x.cantiere_id===sourceId)
+  const ids=[...new Set([m.cantiere_committente_id,d.cantiere_committente_id].filter(Boolean).map(x=>String(x).trim()))]
+  const comm={}
+  if(ids.length){
+    const{data:co}=await sb.from('committenti').select('committente_id,committente_nome').in('committente_id',ids)
+    for(const c of co||[])comm[String(c.committente_id).trim().toUpperCase()]=c.committente_nome+' ('+c.committente_id+')'
+  }
+  const campi=await _riaggScegli(m,d,comm)
+  if(!campi)return
+  const{data:_ru,error:e1}=await sb.rpc('s_riaggancia_cantiere',{p_master:targetId,p_dupe:sourceId,p_campi:campi})
   if(e1){toast('Riaggancio non riuscito: '+e1.message,'err');return}
   toast('Riaggancio completato ('+_riepUnione(_ru)+')','ok')
   // il cantiere riagganciato esce dall'elenco senza rileggere tutto
