@@ -51,6 +51,9 @@ body.viewer-mode #btn-dove-sono,body.viewer-mode #btn-appunti,body.viewer-mode #
 #scad-giorni{display:none}
 #scad-giorni .rg-cerca{padding:0 12px 10px}
 @media(max-width:720px){#scad-giorni{display:block}#view-scadenze .scad-tab{display:none!important}#view-scadenze:not(.filtri-aperti) #scad-filtri{display:none!important}#giro-bar-scad{display:none!important}}
+/* 04/10/2026: anche l'elenco Visite sul telefono a righe compatte (chiesto dall'utente); i filtri si aprono col pulsante */
+#lista-tel,#btn-lista-filtri{display:none}
+@media(max-width:720px){#lista-tel{display:block}#btn-lista-filtri{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:40px}#view-lista .tbl-wrap{display:none!important}#view-lista:not(.filtri-aperti) :is(#q-ipc,#q-stato,#q-tec,#q-eserc){display:none!important}}
 /* 26/09/2026: chi è di sola lettura non carica firme (la sua è già caricata) */
 body.viewer-mode #btn-firme{display:none!important}
 /* sul telefono l'intestazione non deve schiacciare il logo (26/09/2026: usciva una targhetta bianca illeggibile) */
@@ -1030,12 +1033,14 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <select id="q-ipc"><option value="">Tutti IPC</option><option value="ALTO">Alto</option><option value="MEDIO">Medio</option><option value="BASSO">Basso</option><option value="NR">Nessun Rilievo</option></select>
           <select id="q-stato"><option value="">Tutti stati</option><option value="bozza">Bozza</option><option value="definitivo">Definitivo</option></select>
           <select id="q-tec"><option value="">Tutti i tecnici</option></select><select id="q-eserc" title="Esercizio (anno edile ott–set)"></select>
-          <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button><label id="q-elim-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer"><input type="checkbox" id="q-elim"> Mostra eliminate</label><button type="button" id="q-dainviare" class="inv-da" style="display:none"></button>
+          <button class="btn-primary btn-sm" id="btn-cerca">Cerca</button><button type="button" id="btn-lista-filtri" class="btn-outline btn-sm" aria-label="Filtri" title="Filtri: IPC, stato, tecnico, esercizio" onclick="document.getElementById('view-lista').classList.toggle('filtri-aperti')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"></path></svg></button><label id="q-elim-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:var(--grey);cursor:pointer"><input type="checkbox" id="q-elim"> Mostra eliminate</label><button type="button" id="q-dainviare" class="inv-da" style="display:none"></button>
         </div>
         <div class="tbl-wrap">
           <table><thead><tr><th id="th-nr" style="cursor:pointer;user-select:none" title="Ordina per numero verbale">Verbale <span class="sort-ind" id="si-nr"></span></th><th id="th-data" style="cursor:pointer;user-select:none" title="Ordina per data visita">Data <span class="sort-ind" id="si-data"></span></th><th style="white-space:nowrap" title="Accesso al cantiere: 1° = prima visita, 2° = primo ritorno…">N° accesso</th><th>Cantiere</th><th>Impresa</th><th>IPC</th><th style="font-size:11px;white-space:nowrap">NC+ / NC&minus; / OSS / VER</th><th>Stato</th><th title="Il verbale è stato mandato all'impresa?">Invio</th><th></th></tr></thead>
           <tbody id="tbody-lista"></tbody></table>
         </div>
+        <!-- sul telefono: righe compatte (rientri-giorni.js, renderVisite, 04/10/2026); sul PC la tabella qui sopra -->
+        <div id="lista-tel" style="margin:0 -16px"></div>
         <div id="lista-empty" class="hidden" style="text-align:center;padding:24px;color:#aaa">Nessuna visita trovata</div>
       </div>
     </section>
@@ -7058,6 +7063,13 @@ async function loadLista(){
   const tbody=$('tbody-lista')
   if(!vs.length){tbody.innerHTML='';show('lista-empty')}
   else{hide('lista-empty');tbody.innerHTML=vs.map(v=>vtRow(v)).join('');bindRowActions()}
+  // sul telefono le stesse righe, compatte (04/10/2026): le azioni sono quelle di sempre dell'elenco
+  if(window.RientriGiorni&&$('lista-tel')){
+    try{window.RientriGiorni.renderVisite($('lista-tel'),vs,{perData:_listaSort.key==='data',segreteria:!!window.__isCoord,
+      invio:v=>{const st=_invStato(v);return{st:st===''||st==='app'||st==='vecchia'||st==='?'?st:'da',quando:_invMap[v.visita_id]}},
+      azioni:{apri:id=>showVisitaDetail(id),pdf:id=>genPDF(id),email:id=>inviEmailVerbaleFromList(id),riapri:id=>riapriBozza(id),ripristina:(id,nr)=>restoreVisita(id,nr)}})}
+    catch(e){console.warn('elenco visite sul telefono:',e)}
+  }
   _listaLoadVer()
 }
 // rilievi NC+/NC-/OSS/VER per singola visita nell'elenco
@@ -7159,6 +7171,7 @@ async function softDeleteVisita(id,nr){
   if(error){toast('Errore: '+error.message,'err');return}
   toast('Visita messa in eliminata','ok');loadLista()
 }
+window.softDeleteVisita=softDeleteVisita
 async function restoreVisita(id,nr){
   if(!window.__isCoord){toast('Azione riservata alla segreteria','err');return}
   if(!confirm('Ripristinare la visita '+(nr||'')+'? Tornera visibile e conteggiata nelle statistiche.'))return
@@ -13066,7 +13079,7 @@ async function showVisitaDetail(vid){
   try{
     const[{data:v,error}, {data:chkRows}]=await Promise.all([
       sb.from('visite').select(`
-        visita_id,nr_verbale,data_visita,ora_visita,ora_fine,ipc,ipc_nc_plus,ipc_nc_minus,ipc_oss,stato,
+        visita_id,nr_verbale,data_visita,ora_visita,ora_fine,ipc,ipc_nc_plus,ipc_nc_minus,ipc_oss,stato,elimina,
         tipo_accesso,acc_cant,nr_lavoratori,nr_lavoratori_stranieri,prescrizioni,oss_tec,
         oss_tec_int,note_for_sn,note_for_m,note_for_tipi,segnalazione,data_ritorno,
         comm_tipo_sogg,comm_titolo,comm_nome,comm_cog,comm_cf,comm_piva,comm_rag_soc,comm_email,comm_tel,
@@ -13174,6 +13187,8 @@ async function showVisitaDetail(vid){
     ]
     if(isBozza) acts.push(`<button class="btn-warn btn-sm" onclick="riapriBozza('${vid}');hide('modal-qd')">✏️ Riapri</button>`)
     else if(window.__isCoord) acts.push(`<button class="btn-warn btn-sm" onclick="modificaVisitaCoord('${vid}');hide('modal-qd')">✏️ Modifica</button>`)
+    // (04/10/2026) sul telefono l'elenco non ha più il cestino: «Elimina» sta qui, per la segreteria
+    if(window.__isCoord&&+v.elimina!==1) acts.push(`<button class="btn-outline btn-sm" style="color:#c0392b" onclick="hide('modal-qd');softDeleteVisita('${vid}','${(v.nr_verbale||'').replace(/'/g,'')}')">🗑 Elimina</button>`)
     $('qd-actions').innerHTML=acts.join('')
   }catch(e){ console.error('showVisitaDetail:',e); $('qd-body').innerHTML=`<div style="color:#c0392b;padding:12px">Errore: ${e.message}</div>` }
 }
@@ -15367,7 +15382,7 @@ document.addEventListener('input',function(ev){
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=8"></script>
-<script src="rientri-giorni.js?v=4"></script>
+<script src="rientri-giorni.js?v=5"></script>
 <script src="veste-v2.js?v=28"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>

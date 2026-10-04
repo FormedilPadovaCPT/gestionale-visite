@@ -317,5 +317,77 @@
     return true;
   }
 
-  window.RientriGiorni = { render, seleziona };
+  /* ── ELENCO VISITE SUL TELEFONO (04/10/2026, chiesto dall'utente: «più comoda anche per la pagina con lista») ──
+     Stesse righe compatte dei rientri, senza casella (nell'elenco visite non ci sono azioni su più righe).
+     Riga: verbale (ultime 4 cifre) e cantiere · data, impresa, IPC a tre barre, bozza/definitivo, invio · PDF ·
+     Riapri (bozza) o Email (definitivo) o Ripristina (eliminata, solo segreteria). Il tocco apre la scheda del
+     verbale, che ha anche visita di ritorno, Modifica ed Elimina. Raggruppate per giorno quando l'ordine è per data.
+     I dati e le azioni li passa loadLista (index.html): qui non si legge e non si scrive niente. */
+  const ICONA_PDF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M9 13h6M9 17h4"></path></svg>';
+  const ICONA_MAIL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 7l9 6 9-6"></path></svg>';
+  const ICONA_MATITA = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>';
+  const ICONA_RIPRISTINA = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path></svg>';
+  const dataBreve = (s) => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] : ''; };
+
+  function rigaVisita(v, o) {
+    const ipc = String(v.ipc || 'NR').toUpperCase();
+    const elim = +v.elimina === 1, bozza = (v.stato || 'bozza') === 'bozza';
+    const c = v.cantieri || {};
+    const cant = c.cantiere_etichetta || c.cantiere_indirizzo || '—';
+    const inv = o.invio ? o.invio(v) : { st: '' };
+    const invTxt = bozza ? '' : inv.st === 'app' ? '<span style="color:' + GRIGIO + '">✓ ' + esc(dataBreve(inv.quando)) + '</span>'
+      : inv.st === 'vecchia' ? '<span style="color:' + GRIGIO + '">✓</span>'
+      : inv.st === '?' ? '<span style="color:' + GRIGIO + '">invio ?</span>'
+      : inv.st === 'da' ? '<b style="color:' + ARANCIO + '">da inviare</b>' : '';
+    const stato = elim ? '<b style="color:' + ARANCIO + '">eliminata</b>' : bozza ? '<b style="color:' + ARANCIO + '">bozza</b>' : '<span>definitivo</span>';
+    // l'impresa va in coda e si taglia: IPC, stato e «da inviare» devono restare sempre visibili
+    const impresa = v.imprese && v.imprese.impresa_nome ? esc(v.imprese.impresa_nome) : '';
+    const b1 = elim ? '' : `<button type="button" class="rg-btn rg-btn-grigio" data-rv="pdf" data-vid="${esc(v.visita_id)}" aria-label="PDF del verbale" data-aiuto="Apre il PDF del verbale.">${ICONA_PDF}</button>`;
+    let b2 = '';
+    if (elim) { if (o.segreteria) b2 = `<button type="button" class="rg-btn rg-btn-arancio" data-rv="ripristina" data-vid="${esc(v.visita_id)}" data-nr="${esc(v.nr_verbale || '')}" aria-label="Ripristina la visita" data-aiuto="Toglie la visita dalle eliminate: torna nelle statistiche e nei conteggi.">${ICONA_RIPRISTINA}</button>`; }
+    else if (bozza) b2 = `<button type="button" class="rg-btn rg-btn-arancio" data-rv="riapri" data-vid="${esc(v.visita_id)}" aria-label="Riapri la bozza" data-aiuto="Riapre la bozza nel verbale, per completarla e chiuderla.">${ICONA_MATITA}</button>`;
+    else b2 = `<button type="button" class="rg-btn rg-btn-arancio" data-rv="email" data-vid="${esc(v.visita_id)}" aria-label="Invia il verbale per mail" data-aiuto="Prepara l'invio del verbale all'impresa e agli altri destinatari.">${ICONA_MAIL}</button>`;
+    const col = (b1 ? ' 44px' : '') + (b2 ? ' 44px' : '');
+    return `<div class="rg-riga" style="grid-template-columns:minmax(0,1fr)${col};padding-left:14px${elim ? ';opacity:.55' : ''}">
+      <button type="button" class="rg-apri" data-rv="apri" data-vid="${esc(v.visita_id)}" data-aiuto="Apre la scheda del verbale: rilievi, imprese, note, e i pulsanti PDF, Email, visita di ritorno.">
+        <span class="rg-r1"><span class="rg-nr" title="${esc(v.nr_verbale || '')}">${esc(ultime4(v.nr_verbale))}</span><span class="rg-cant">${esc(cant)}</span></span>
+        <span class="rg-r2"><span>${esc(dataBreve(v.data_visita))}</span><span>·</span>${barre(ipc)}<span class="rg-ipc">${IPC_NOME[ipc] || 'Nessun rilievo'}</span><span style="flex:0 0 auto">· ${stato}${invTxt ? ' · ' + invTxt : ''}</span>${impresa ? '<span class="rg-coda">· ' + impresa + '</span>' : ''}</span>
+      </button>${b1}${b2}
+    </div>`;
+  }
+
+  /* renderVisite(contenitore, visite, opzioni)
+       perData    — l'elenco è in ordine di data: si raggruppa per giorno
+       segreteria — mostra Ripristina sulle eliminate
+       invio(v)   — {st:'' | 'app' | 'vecchia' | '?' | 'da', quando} (lo stato d'invio che la tabella mostra già)
+       azioni     — { apri, pdf, email, riapri, ripristina } (le funzioni di sempre dell'elenco) */
+  function renderVisite(box, visite, o) {
+    if (!box) return;
+    stile();
+    const righe = visite || [];
+    let h = '<div class="rg">';
+    if (o.perData) {
+      let k = null;
+      const gruppi = [];
+      righe.forEach((v) => { const g = String(v.data_visita || '').slice(0, 10); if (g !== k) { gruppi.push({ g, r: [] }); k = g; } gruppi[gruppi.length - 1].r.push(v); });
+      gruppi.forEach((x) => {
+        const d = x.g ? new Date(x.g + 'T00:00:00') : null;
+        h += `<section><div class="rg-testa lontano"><b>${d ? dataGruppo(d) + ' ' + d.getFullYear() : 'SENZA DATA'}</b><span>${x.r.length} ${x.r.length === 1 ? 'visita' : 'visite'}</span></div>`
+          + x.r.map((v) => rigaVisita(v, o)).join('') + '</section>';
+      });
+    } else h += righe.map((v) => rigaVisita(v, o)).join('');
+    h += '</div>';
+    box.innerHTML = h;
+    box._rvAzioni = o.azioni || {};
+    box._rvRighe = new Map(righe.map((v) => [String(v.visita_id), v]));
+    if (box.dataset.rvAgganciato) return;
+    box.dataset.rvAgganciato = '1';
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-rv]'); if (!b) return;
+      const f = box._rvAzioni[b.dataset.rv];
+      if (typeof f === 'function') f(b.dataset.vid, b.dataset.nr || '');
+    });
+  }
+
+  window.RientriGiorni = { render, seleziona, renderVisite };
 })();
