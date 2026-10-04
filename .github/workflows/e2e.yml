@@ -36,7 +36,42 @@ jobs:
           npm install --no-fund --no-audit
           npx playwright install --with-deps chromium
       - name: Prove
-        run: npx playwright test
+        id: prove
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: risultati.json
+        run: npx playwright test --reporter=list,html,json
+
+      # Il verdetto va in s_test_automatici e il cruscotto della segreteria lo
+      # mostra (04/10/2026): un'email di GitHub da sola non basta, vedi test-db.yml.
+      - name: Registra il verdetto in s_test_automatici
+        if: always()
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          ESITO_PROVE: ${{ steps.prove.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "${DB_URL:-}" ] || { echo "SUPABASE_DB_URL assente: non posso registrare"; exit 0; }
+          case "$ESITO_PROVE" in success) esito=riuscita;; failure) esito=fallita;; *) esito=errore;; esac
+          if [ -f risultati.json ]; then
+            eval "$(node -e '
+              const r = require("./risultati.json"); const ko = [];
+              const giro = (s, t) => { for (const x of s.suites || []) giro(x, t.concat(x.title || []));
+                for (const sp of s.specs || []) for (const tt of sp.tests || [])
+                  if (!["expected", "skipped", "flaky"].includes(tt.status)) ko.push(`[${tt.projectName}] ${sp.title}`); };
+              giro(r, []);
+              const st = r.stats || {};
+              console.log(`passati=${(st.expected || 0) + (st.flaky || 0)}; n_falliti=${ko.length}; falliti=${JSON.stringify(ko.join("|"))}`);
+            ')"
+          else
+            esito=errore; passati=""; n_falliti=0; falliti=""
+          fi
+          psql "$DB_URL" -q -v ON_ERROR_STOP=1 -v esito="$esito" -v passati="${passati:-}" \
+            -v n_falliti="${n_falliti:-0}" -v falliti="${falliti:-}" -v run="$RUN_URL" <<'SQL'
+          insert into public.s_test_automatici (suite, esito, passati, falliti, elenco_falliti, run_url)
+          values ('browser', :'esito', nullif(:'passati', '')::int, :'n_falliti'::int,
+                  nullif(string_to_array(:'falliti', '|'), '{}'), :'run');
+          SQL
+          echo "Verdetto registrato: $esito"
       - name: Rapporto (solo se qualcosa non va)
         if: failure()
         uses: actions/upload-artifact@v6

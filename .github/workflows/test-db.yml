@@ -30,18 +30,46 @@ jobs:
           path: segreteria
 
       - name: "Esegui i test SQL (ogni file comincia con begin e finisce con rollback)"
+        id: test
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -e
           if [ -z "${DB_URL:-}" ]; then echo "::error::Secret SUPABASE_DB_URL mancante"; exit 1; fi
-          esito=0
+          esito=0; passati=0; : > falliti.txt
           for f in segreteria/tests-db/*.sql; do
             echo "=== $f"
             if psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$f"; then
-              echo "OK  $f"
+              echo "OK  $f"; passati=$((passati + 1))
             else
-              echo "::error::Test fallito: $f"; esito=1
+              echo "::error::Test fallito: $f"; esito=1; basename "$f" >> falliti.txt
             fi
           done
+          echo "passati=$passati" >> "$GITHUB_OUTPUT"
           exit $esito
+
+      # (04/10/2026) Il verdetto va nel database, e il cruscotto della segreteria
+      # lo mostra: il test e' rimasto rosso dal 21/09 al 04/10 perche' l'unico
+      # avviso era un'email di GitHub. Una riga anche se il giro si e' fermato
+      # prima della fine (esito «errore»): il silenzio non e' un esito.
+      - name: Registra il verdetto in s_test_automatici
+        if: always()
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          ESITO_TEST: ${{ steps.test.outcome }}
+          PASSATI: ${{ steps.test.outputs.passati }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "${DB_URL:-}" ] || { echo "SUPABASE_DB_URL assente: non posso registrare"; exit 0; }
+          case "$ESITO_TEST" in success) esito=riuscita;; failure) esito=fallita;; *) esito=errore;; esac
+          [ "$esito" = fallita ] && [ -z "${PASSATI}" ] && esito=errore
+          falliti=$(paste -sd, falliti.txt 2>/dev/null || true)
+          n_falliti=$( (grep -c . falliti.txt 2>/dev/null) || true ); n_falliti=${n_falliti:-0}
+          # le variabili :'x' psql le sostituisce nel testo letto da stdin (con -c no)
+          psql "$DB_URL" -q -v ON_ERROR_STOP=1 -v esito="$esito" -v passati="${PASSATI:-}" \
+            -v n_falliti="$n_falliti" -v falliti="$falliti" -v run="$RUN_URL" <<'SQL'
+          insert into public.s_test_automatici (suite, esito, passati, falliti, elenco_falliti, run_url)
+          values ('database', :'esito', nullif(:'passati', '')::int, :'n_falliti'::int,
+                  nullif(string_to_array(:'falliti', ','), '{}'), :'run');
+          SQL
+          echo "Verdetto registrato: $esito"
