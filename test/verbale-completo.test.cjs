@@ -95,7 +95,9 @@ assert.strictEqual(coordVal(() => '0')(), false);
 assert.strictEqual(coordVal(() => '')(), null, 'non scelto è null, non «no»');
 assert.ok(!/cGet\('f-coord'\)|cSet\('f-coord'/.test(html));
 const init = prendi(/async function initForm\(snap=null\)\{[\s\S]*?\r?\n\}/, 'initForm');
-assert.ok(/vSet\('f-da',''\)/.test(init) && /vSet\('f-tipo',''\)/.test(init) && /vSet\('f-coord',''\)/.test(init), 'una visita nuova non ha ora di inizio, tipo e coordinamento già scritti');
+// (04/10/2026, deciso dall'utente) l'ora di inizio torna compilata all'apertura del verbale nuovo; tipo e coordinamento restano da scegliere
+assert.ok(/oraAdesso\('f-da'\)/.test(init) && /vSet\('f-tipo',''\)/.test(init) && /vSet\('f-coord',''\)/.test(init), 'una visita nuova ha l’ora di inizio d’apertura, ma tipo e coordinamento non già scritti');
+assert.ok(html.includes("if(snap.ora_visita||snap.visita_id)vSet('f-da',snap.ora_visita||'')"), 'una bozza riaperta tiene la sua ora (o resta vuota), mai l’ora della riapertura');
 assert.ok(!/toTimeString\(\)/.test(init), 'l’ora di inizio non è più l’ora di apertura della maschera');
 assert.ok(!/<input type="radio" name="mc-tipo"[^>]*checked/.test(html) && !/<input type="radio" name="comm-tipo"[^>]*checked/.test(html), 'pubblico/privato non nasce già scelto');
 assert.ok(!/(mc|comm)-tipo-nd/.test(html), '«N/D» non è più una scelta per il tipo del committente');

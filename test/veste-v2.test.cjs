@@ -2,7 +2,8 @@
 // (03/10/2026) La veste v2, nata come anteprima della sola segreteria, dalla sera dello stesso giorno è la veste di TUTTI.
 // Quello che questi controlli tengono fermo:
 //   · ognuno la vede col menu del SUO ruolo vero; solo la segreteria può guardare la pagina di un altro («Vedi come…»);
-//   · dove qualcuno ha scelto «↩ Veste di prima», o senza nessuno collegato, non cambia niente dell'app di prima;
+//   · (04/10/2026, deciso dall'utente) è l'UNICA veste: la vecchia scelta «classica» nel browser non conta più e si cancella;
+//     senza nessuno collegato non cambia niente;
 //   · gli agganci in index.html sono due righe in navTo, e non rompono niente se il file manca;
 //   · menu e pagina di apertura per ruolo sono quelli decisi dall'utente;
 //   · niente salvataggio automatico e niente chiusura del verbale da qui (paletti dell'utente).
@@ -28,15 +29,13 @@ function ambiente({ email, viewer, veste, direttore, presidenza, coord, come }) 
   const document = { body: { classList: { add: (c) => classi.add(c), remove: (c) => classi.delete(c), contains: (c) => classi.has(c) }, dataset: {} },
     head: finto(), getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], createElement: finto, addEventListener() {} };
   const window = { S: { user: email ? { email } : null, viewer: !!viewer, direttore: !!direttore, presidenza: !!presidenza }, __isCoordPage: !!coord };
-  new Function('window', 'document', 'localStorage', 'sessionStorage', 'location', 'MutationObserver', js)(window, document, archivio(veste === false ? { 'gv-veste': 'classica' } : veste ? { 'gv-veste': 'v2' } : {}), archivio(come ? { 'gv-v2-ruolo': come } : {}), { reload() {} }, undefined);
-  return { v2: window.vesteV2, classi };
+  const localStorage_ = archivio(veste === false ? { 'gv-veste': 'classica' } : veste ? { 'gv-veste': 'v2' } : {});
+  new Function('window', 'document', 'localStorage', 'sessionStorage', 'location', 'MutationObserver', js)(window, document, localStorage_, archivio(come ? { 'gv-v2-ruolo': come } : {}), { reload() {} }, undefined);
+  return { v2: window.vesteV2, classi, ls: localStorage_ };
 }
 
-/* ── spenta: dove si è scelta la veste di prima, o senza nessuno collegato, non cambia niente ── */
+/* ── spenta solo senza nessuno collegato ── */
 for (const caso of [
-  { email: 'cptpd@did.formedilpadova.it', veste: false, che: 'segreteria che ha scelto la veste di prima' },
-  { email: 'franco.caon@did.formedilpadova.it', veste: false, che: 'un tecnico che ha scelto la veste di prima' },
-  { email: 'direttore@example.it', veste: false, viewer: true, direttore: true, che: 'il Direttore che ha scelto la veste di prima' },
   { email: null, che: 'nessuno collegato' },
 ]) {
   const a = ambiente(caso);
@@ -50,6 +49,10 @@ for (const caso of [
 for (const caso of [
   { email: 'franco.caon@did.formedilpadova.it', ruolo: 'tecnico', apre: 'dashboard', che: 'un tecnico' },
   { email: 'franco.caon@did.formedilpadova.it', veste: true, ruolo: 'tecnico', apre: 'dashboard', che: 'un tecnico col vecchio valore nel browser' },
+  // (04/10/2026) chi aveva scelto la veste di prima la trova comunque accesa
+  { email: 'cptpd@did.formedilpadova.it', veste: false, ruolo: 'segreteria', apre: 'segreteria', che: 'la segreteria che aveva scelto la veste di prima' },
+  { email: 'franco.caon@did.formedilpadova.it', veste: false, ruolo: 'tecnico', apre: 'dashboard', che: 'un tecnico che aveva scelto la veste di prima' },
+  { email: 'direttore@example.it', veste: false, viewer: true, direttore: true, ruolo: 'direttore', apre: 'direzione', che: 'il Direttore che aveva scelto la veste di prima' },
   { email: 'nicola.demarco@did.formedilpadova.it', coord: true, ruolo: 'coordinatore', apre: 'dashboard', che: 'il coordinatore' },
   { email: 'direttore@example.it', viewer: true, direttore: true, ruolo: 'direttore', apre: 'direzione', che: 'il Direttore' },
   { email: 'presidente@example.it', viewer: true, presidenza: true, ruolo: 'presidenza', apre: 'direzione', che: 'la Presidenza' },
@@ -66,13 +69,15 @@ for (const caso of [
   assert.strictEqual(a.v2.simula(), false, caso.che + ': non sta guardando la pagina di un altro');
   assert.strictEqual(a.v2.prima('dashboard'), caso.apre, caso.che + ': pagina di apertura');
   assert.ok(a.classi.has('v2'), caso.che + ': la pagina prende la veste');
+  assert.strictEqual(a.ls.getItem('gv-veste'), null, caso.che + ': la vecchia scelta nel browser si cancella');
 }
 // la segreteria che guarda «come Direttore»: vede quel menu, e la pagina Direzione sa che è un'anteprima (niente pulsanti)
 const sim = ambiente({ email: 'cptpd@did.formedilpadova.it', come: 'direttore' });
 assert.strictEqual(sim.v2.ruolo(), 'direttore'); assert.strictEqual(sim.v2.ruoloVero(), 'segreteria'); assert.strictEqual(sim.v2.simula(), true);
 assert.ok(js.includes("if (!eSegreteria()) { if (el) el.remove(); return; }   // la barra è della sola segreteria"), '«Vedi come…» è della sola segreteria');
 assert.ok(html.includes('window.__isCoordPage=isCoordPage'), 'all’accesso l’app deve dire alla veste chi è coordinatore');
-assert.ok(js.includes("scrivi(localStorage, CHIAVE, accesa() ? 'classica' : 'v2');") && js.includes("'↩ Veste di prima'"), 'il pulsante per tornare alla veste di prima deve restare, per tutti: è la rete di sicurezza');
+// (04/10/2026, deciso dall'utente) una veste sola: niente pulsante per tornare indietro e niente codice per farlo
+assert.ok(!js.includes("'↩ Veste di prima'") && !js.includes("'classica' : 'v2'") && !/function (spegni|menuComEra|verbaleComEra|pulsante)\(/.test(js), 'la veste di prima non deve tornare: né pulsante né codice di ritorno');
 // telefono, solo tecnico: i riquadri delle azioni sopra i rientri
 assert.ok(js.includes('body.v2[data-v2-ruolo="tecnico"] #v2-azioni{order:2}') && js.includes('body.v2[data-v2-ruolo="tecnico"] #v2-rientri{order:3}') && js.includes('body.v2[data-v2-ruolo="tecnico"] #v2-bozze{order:1}'), 'sul telefono del tecnico: bozze, azioni, rientri');
 assert.ok(js.indexOf('body.v2[data-v2-ruolo="tecnico"] #v2-azioni{order:2}') > js.indexOf('@media(max-width:720px){'), 'lo spostamento vale solo sul telefono');
@@ -112,7 +117,9 @@ assert.ok(html.includes('id="nav-assev"'), 'il riquadro preme il pulsante di sem
 // per chi è di sola lettura i tre pulsanti stanno sulla pagina: sulla Mappa quelli di sempre, in Direzione/Presidenza tre uguali
 assert.ok(js.includes('body.v2:not(.viewer-mode) #dash-segnala-wrap,') && !js.includes('body.v2 #dash-segnala-wrap'), 'sulla Mappa di chi è di sola lettura la riga di pulsanti di sempre resta');
 for (const id of ['btn-segnala-dash', 'btn-qr-servizi', 'btn-servizi-cpt']) assert.ok(html.includes('id="' + id + '"') && js.includes("preme: '" + id + "'"), 'il pulsante della pagina Direzione deve premere quello di sempre: ' + id);
-assert.ok(js.includes("if (!RUOLI[ruolo()].lettura) { if (el) el.remove(); return; }") && js.includes("if (view === 'direzione') { pulsantiDirezione(); }"), 'i tre pulsanti compaiono sulla pagina Direzione/Presidenza, solo per chi è di sola lettura');
+assert.ok(js.includes("if (!RUOLI[ruolo()].lettura) { if (el) el.remove(); return; }") && js.includes("if (view === 'direzione') { pulsantiDirezione(); postoNotifiche(view); }"), 'i tre pulsanti compaiono sulla pagina Direzione/Presidenza, solo per chi è di sola lettura');
+// (04/10/2026) il riquadro 🔔 delle notifiche anche per Direttore, Presidenza e consiglieri, in cima alla pagina con cui aprono
+assert.ok(/function postoNotifiche\(view\)/.test(js) && js.includes("if (view === 'dashboard' && r.lettura) postoNotifiche(view);") && !html.includes('body.viewer-mode #dash-notifiche'), 'le notifiche non devono sparire a chi è di sola lettura');
 // il calendario «Prossimi appuntamenti» è del solo Direttore (deciso dall'utente il 03/10/2026)
 assert.ok(R.direttore.menu.includes('appuntamenti'), 'il Direttore vede il calendario');
 for (const k of ['presidenza', 'consigliere', 'tecnico', 'coordinatore', 'segreteria']) assert.ok(!R[k].menu.includes('appuntamenti'), k + ' non deve vedere il calendario');
@@ -192,8 +199,8 @@ assert.strictEqual(s.v2.faseDi(1), 1); assert.strictEqual(s.v2.faseDi(2), 2); as
 assert.strictEqual(s.v2.faseDi(0), null, 'il passo «Visita» sta in due momenti: la parte alta nel primo, la persona presente nel secondo');
 assert.ok(html.includes('if(window.vesteV2&&window.vesteV2.verso)window.vesteV2.verso(m.campo)'), 'chi porta a un campo mancante deve dire alla veste dove sta il campo');
 assert.ok(js.includes("body.v2.v2-fase1 #view-form .v2-persona{display:none}") && js.includes("body.v2.v2-fase2 #view-form .v2-visita{display:none}"), 'la persona presente si vede nel secondo momento, il resto del passo nel primo');
-assert.ok(js.includes("if (inc && card && inc.parentNode !== card) card.insertBefore(inc, card.firstChild);"), 'spegnendo la veste «Parti da un tuo incarico» deve tornare al suo posto');
-assert.ok(js.includes("p.textContent = '◀ Precedente'") && js.includes("n.textContent = 'Successivo ▶'"), 'spegnendo la veste i pulsanti avanti e indietro tornano quelli di oggi');
+// (04/10/2026) tolto: controllava il ritorno alla veste di prima, che non esiste più (una veste sola, deciso dall'utente)
+// (04/10/2026) tolto: controllava il ritorno alla veste di prima, che non esiste più (una veste sola, deciso dall'utente)
 // i passi si cambiano premendo il pulsante del passo di sempre: è lui che salva la check-list e disegna la pagina
 assert.ok(/function premiPasso\(n\) \{ const b = document\.querySelector\('#tab-bar \.tab-btn\[data-ti="' \+ n \+ '"\]'\);[^}]*b\.click\(\)/.test(js), 'il cambio di passo deve passare dal pulsante dell’app');
 for (const id of ['btn-bozza', 'btn-final']) assert.ok(html.includes('id="' + id + '"') && !js.includes(id), 'Bozza e Definitivo restano quelli di oggi: la veste non li tocca (' + id + ')');
@@ -217,7 +224,7 @@ assert.ok(vicini[0].km < 1 && vicini[2].km > 9 && vicini[2].km < 12, 'le distanz
 assert.deepStrictEqual(s.v2.piuVicini([], 45, 11, 3), []);
 assert.ok(js.includes("if (!e.target.closest('#v2-vicini-btn')) return;") && js.includes('navigator.geolocation.getCurrentPosition('), 'la posizione si chiede solo se si preme «Cantieri vicini a me»');
 assert.ok(html.includes('window.__app={vSet,vGet,initForm,autoAccCant,renderCantCard,_useCantiereEsistente,'), 'la scheda di un cantiere vicino deve sceglierlo con la funzione di sempre');
-assert.ok(js.includes("['v2-inc-schede', 'v2-vicini', 'v2-tipo-chips'].forEach((id) => { const e = $(id); if (e) e.remove(); });"), 'spegnendo la veste i tre aiuti spariscono e restano i campi di sempre');
+// (04/10/2026) tolto: controllava il ritorno alla veste di prima, che non esiste più (una veste sola, deciso dall'utente)
 
 /* ── secondo momento: righe che si aprono, col riepilogo dell'area ── */
 const ar = s.v2.areaRiepilogo;
@@ -228,7 +235,7 @@ assert.strictEqual(ar({ voci: 5, fatte: 5, ncp: 1, ncm: 2, oss: 0 }).classe, 'nc
 assert.strictEqual(ar({ voci: 0, fatte: 0, ncp: 0, ncm: 0, oss: 0 }).testo, '', 'un’area senza voci non dice «da compilare»');
 assert.ok(js.includes('const RIGHE2 = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];'), 'le righe del secondo momento: persona presente, imprese, le dieci aree');
 assert.ok(js.includes("vaiFase(2, n);") && js.includes("function vaiFase(f, tab) { _fase = f; document.body.classList.remove('v2-area-chiusa'); premiPasso("), 'la riga apre la pagina di sempre premendo il pulsante del passo, e andando avanti una riga chiusa si riapre');
-assert.ok(js.includes("function areeComEra() { document.querySelectorAll('#view-form .v2-area').forEach((r) => r.remove());"), 'spegnendo la veste le righe spariscono');
+// (04/10/2026) tolto: controllava il ritorno alla veste di prima, che non esiste più (una veste sola, deciso dall'utente)
 
 /* ── terzo momento: una pagina sola, con «Prima di chiudere» ── */
 assert.ok(js.includes('body.v2.v2-fase3 #view-form .tab-content[data-tab="13"]{display:block') && js.includes('body.v2.v2-fase3 #view-form .tab-content[data-tab="15"]{display:block'), 'note, foto e riepilogo stanno insieme sullo schermo');
