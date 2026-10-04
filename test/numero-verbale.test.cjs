@@ -23,7 +23,7 @@ assert.ok(!/nextVerbale\(\)/.test(html), 'nextVerbale() chiamata senza la data d
 assert.ok(/nextVerbale\(data_v\)/.test(html), 'al salvataggio il numero va preso sulla data della visita');
 
 // l'aggiornamento «per numero» e' ammesso solo se il numero non l'ha proposto l'app
-assert.ok(/\(nrv&&!S\.nrAuto\)\?await sb\.from\('visite'\)\.select\('visita_id,stato'\)\.eq\('nr_verbale',nrv\)/.test(html),
+assert.ok(/\(nrv&&!S\.nrAuto\)\?await sb\.from\('visite'\)\.select\('visita_id,stato,elimina'\)\.eq\('nr_verbale',nrv\)/.test(html),
   'il ramo che aggiorna per numero deve essere escluso quando S.nrAuto e\' vero');
 
 // una visita «ripartita da tutti i dati» non deve ereditare il numero del verbale di partenza

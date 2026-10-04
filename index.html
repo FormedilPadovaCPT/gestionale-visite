@@ -2879,8 +2879,19 @@ async function formTipiInit(){
     :'<span style="font-size:12px;color:#c0392b">Non sono riuscito a leggere l\'elenco dei corsi: scrivi la formazione mancante nelle note.</span>'
   box.addEventListener('change',()=>{const sn=$('f-note-for-sn');if(sn&&_tipiSel()&&!sn.checked)sn.checked=true})   // spuntare un corso vuol dire contattare l'ufficio corsi
 }
-const _tipiSel=()=>{const v=[...document.querySelectorAll('#f-note-for-tipi input:checked')].map(i=>i.value);return v.length?v:null}
-const _tipiSet=arr=>{document.querySelectorAll('#f-note-for-tipi input').forEach(i=>{i.checked=!!(arr||[]).includes(i.value)})}
+/* 04/10/2026: un corso spuntato che la segreteria ha poi tolto dall'elenco attivo resta spuntato
+   («non più in elenco»), e se l'elenco non si è potuto leggere si tiene quello del verbale:
+   prima, salvando, sparivano. */
+let _tipiOrig=null
+const _tipiSel=()=>{const box=$('f-note-for-tipi');if(box&&!box.querySelector('input'))return _tipiOrig
+  const v=[...document.querySelectorAll('#f-note-for-tipi input:checked')].map(i=>i.value);return v.length?v:null}
+const _tipiSet=arr=>{
+  _tipiOrig=(arr&&arr.length)?[...arr]:null
+  const box=$('f-note-for-tipi');if(!box)return
+  box.querySelectorAll('input[data-fuori]').forEach(i=>i.closest('label')?.remove())
+  const presenti=new Set([...box.querySelectorAll('input')].map(i=>i.value))
+  if(presenti.size)(arr||[]).filter(c=>!presenti.has(c)).forEach(c=>box.insertAdjacentHTML('beforeend',`<label><input type="checkbox" value="${esc(c)}" data-fuori="1"> ${esc(c)} (non più in elenco)</label>`))
+  box.querySelectorAll('input').forEach(i=>{i.checked=!!(arr||[]).includes(i.value)})}
 /* il pacchetto per send-verbale: chi è l'impresa, chi c'era in cantiere, che cosa manca */
 function _evFormazioneCalc(o){
   if(!o||!o.sn)return null
@@ -3394,6 +3405,7 @@ function _formAzzera(){
   proponiImportoCantiere(null)  // importo vuoto, senza il colore «dalla scheda»
 }
 async function initForm(snap=null){
+  _tipiOrig=null
   S.fd={}; S.checklist={}; S.noteChk={}; S.imprese=[]; S.lavorazioni=[]; S.savedId=null; S.foto={}; S._impOpen=0
   S._formBase=null
   try{_formAzzera()}catch(_e){console.warn('azzeramento della maschera:',_e)}
@@ -4239,8 +4251,20 @@ function clearCommittente(){
 {const btnClear=$('btn-clear-comm');if(btnClear)btnClear.onclick=()=>{clearCommittente()}}
 
 // ── MODIFICA COMMITTENTE SELEZIONATO (completa i dati mancanti) ──
+/* 04/10/2026: i campi del committente nel verbale riaperto vengono dalla COPIA nel verbale,
+   non dalla scheda attuale del committente. Salvando si scrivevano tutti, e un'email aggiunta
+   dalla segreteria tornava vuota; il nome perdeva il titolo. Ora si scrive solo quello che il
+   tecnico ha cambiato dopo «✏️ Modifica» (fotografia dei campi in _commFoto). */
+let _commFoto=null
+function _commValori(){
+  const isPG=!!($('comm-radio-pg')&&$('comm-radio-pg').checked)
+  return isPG
+    ?{isPG,nome:vGet('f-comm-rag-soc').trim(),piva:vGet('f-comm-piva').replace(/\D/g,''),email:vGet('f-comm-email-pg').trim(),tel:vGet('f-comm-tel-pg').trim(),tipo:vGet('f-comm-tipo')}
+    :{isPG,nome:[vGet('f-comm-nome').trim(),vGet('f-comm-cog').trim()].filter(Boolean).join(' '),piva:'',email:vGet('f-comm-email').trim(),tel:vGet('f-comm-tel').trim(),tipo:vGet('f-comm-tipo')}
+}
 function editCommittente(){
   if(!vGet('f-comm-id')){toast('Nessun committente selezionato','err');return}
+  _commFoto=_commValori()
   setCommFieldsReadonly(false)
   const btnNew=$('btn-new-comm'); if(btnNew)btnNew.style.display='none'
   const btnEdit=$('btn-edit-comm'); if(btnEdit)btnEdit.style.display='none'
@@ -4265,12 +4289,21 @@ async function salvaCommittente(){
   }
   if(!nome){toast(isPG?'Ragione sociale obbligatoria':'Nome e cognome obbligatori','err');return}
   // NB: committente_id e cf_piva NON si toccano (sono la chiave del committente)
-  const upd={committente_nome:nome,email:email||null,telefono:tel||null,tipo_sogg:isPG?'PG':'PF',updated_at:new Date().toISOString()}
-  if(piva&&piva.length===11)upd.piva=piva
+  const f=_commFoto||{}
+  const upd={}
+  if(!_commFoto||nome!==f.nome)upd.committente_nome=nome
+  if(!_commFoto||email!==f.email)upd.email=email||null
+  if(!_commFoto||tel!==f.tel)upd.telefono=tel||null
+  if(!_commFoto||isPG!==f.isPG)upd.tipo_sogg=isPG?'PG':'PF'
+  if(piva&&piva.length===11&&(!_commFoto||piva!==f.piva))upd.piva=piva
   const tipoNum=parseInt(vGet('f-comm-tipo'),10)
-  if(tipoNum===1||tipoNum===2)upd.committente_tipo=tipoNum
-  const{error}=await sb.from('committenti').update(upd).eq('committente_id',cid)
-  if(error){toast('Errore salvataggio: '+error.message,'err');return}
+  if((tipoNum===1||tipoNum===2)&&(!_commFoto||vGet('f-comm-tipo')!==f.tipo))upd.committente_tipo=tipoNum
+  if(Object.keys(upd).length){
+    upd.updated_at=new Date().toISOString()
+    const{error}=await sb.from('committenti').update(upd).eq('committente_id',cid)
+    if(error){toast('Errore salvataggio: '+error.message,'err');return}
+  }
+  _commFoto=null
   const{data:c}=await sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,piva,email,telefono,tipo_sogg').eq('committente_id',cid).maybeSingle()
   if(c){renderCommCard(c);vSet('f-comm-search',c.committente_nome||'')}
   setCommFieldsReadonly(true)
@@ -5201,9 +5234,14 @@ async function _saveVisitaCorpo(stato){
     }
 
     // 1) Esiste già una riga con questo visita_id?
-    const{data:byId,error:eById}=await sb.from('visite').select('visita_id,stato').eq('visita_id',vid).maybeSingle()
+    const{data:byId,error:eById}=await sb.from('visite').select('visita_id,stato,elimina').eq('visita_id',vid).maybeSingle()
     if(eById)throw eById
+    /* 04/10/2026: la riga già esistente tiene i suoi «elimina» e «stage_sn». Prima ogni salvataggio
+       scriveva elimina=0 e stage_sn=false: un verbale eliminato dalla segreteria mentre il tecnico
+       lo aveva aperto tornava visibile, e i 171 verbali storici segnati stage perdevano il segno. */
+    if(byId&&+byId.elimina===1)throw new Error('Questo verbale è stato eliminato dalla segreteria mentre era aperto: non lo risalvo. Chiedi alla segreteria se va ripristinato.')
     if(byId){
+      delete vistaRow.elimina;delete vistaRow.stage_sn
       /* 01/10/2026 — Risalvare un verbale già definitivo non riscrive quello che nessuno ha toccato.
          A luglio, riassegnando i cantieri, 48 verbali importati dal modulo sono stati risalvati: uno
          è tornato in bozza, e in otto il numero di imprese dichiarato dal tecnico è diventato il
@@ -5229,8 +5267,10 @@ async function _saveVisitaCorpo(stato){
       // con un numero proposto dall'app, trovarlo gia' usato vuol dire che un collega ha
       // salvato per primo — e aggiornare «per numero» sovrascriverebbe il SUO verbale.
       const nrv=vistaRow.nr_verbale
-      const{data:byNr}=(nrv&&!S.nrAuto)?await sb.from('visite').select('visita_id,stato').eq('nr_verbale',nrv).maybeSingle():{data:null}
+      const{data:byNr}=(nrv&&!S.nrAuto)?await sb.from('visite').select('visita_id,stato,elimina').eq('nr_verbale',nrv).maybeSingle():{data:null}
       if(byNr?.visita_id){
+        if(+byNr.elimina===1)throw new Error('Il verbale n. '+nrv+' risulta eliminato: non lo risalvo. Chiedi alla segreteria se va ripristinato.')
+        delete vistaRow.elimina;delete vistaRow.stage_sn
         // Usa il visita_id esistente e aggiorna
         vid=byNr.visita_id
         vistaRow.visita_id=vid
@@ -5248,7 +5288,7 @@ async function _saveVisitaCorpo(stato){
             vistaRow.nr_verbale=await nextVerbale(data_v)
             if(vistaRow.nr_verbale!==nrPrima){vSet('f-verbale',vistaRow.nr_verbale);S.fd.nr_verbale=vistaRow.nr_verbale}
           }
-          ;({error}=await sb.from('visite').insert(vistaRow))
+          ;({error}=await sb.from('visite').insert({...vistaRow,elimina:0,stage_sn:false}))
           const doppio=error&&(error.code==='23505')&&/nr_verbale/.test((error.message||'')+(error.details||''))
           if(!doppio||!S.nrAuto)break
         }
@@ -5524,7 +5564,7 @@ function applySnap(snap){
     _stageDaInc=null; stageMostra(v?(snap.nom_stage||''):'', v)
   }
   // Persona presente
-  if(snap.ppre_titolo)vSet('f-ppre-titolo',snap.ppre_titolo)
+  if(snap.ppre_titolo)selComEScritto($('f-ppre-titolo'),snap.ppre_titolo)
   if(snap.ppre_nome){
     vSet('f-ppre-nome',snap.ppre_nome)
   }else if(snap.nom_ppre){
@@ -5534,7 +5574,7 @@ function applySnap(snap){
     vSet('f-ppre-nome',parts[0]||'');vSet('f-ppre-cog',parts.slice(1).join(' ')||'')
   }
   if(snap.ppre_cog)vSet('f-ppre-cog',snap.ppre_cog)
-  if(snap.qual_ppre){const sel=$('f-qual-ppre');if(sel){for(let o of sel.options)if(o.value===snap.qual_ppre){sel.value=snap.qual_ppre;break}}}
+  if(snap.qual_ppre)selComEScritto($('f-qual-ppre'),snap.qual_ppre)   // 04/10/2026: prima un valore fuori elenco (120 verbali: «Rls», «dipendente ditta»…) lasciava la tendina vuota e salvando si perdeva
   if(snap.tel_ppre)vSet('f-tel-ppre',snap.tel_ppre)
   // Tecnico principale
   if(snap.tecnico_email)setTecnicoFromEmail(snap.tecnico_email)
@@ -5561,7 +5601,7 @@ function applySnap(snap){
     const r=document.querySelector(`input[name="comm-sogg"][value="${snap.comm_tipo_sogg}"]`)
     if(r){r.checked=true;r.dispatchEvent(new Event('change',{bubbles:true}))}
   }
-  if(snap.comm_titolo)vSet('f-comm-titolo',snap.comm_titolo)
+  if(snap.comm_titolo)selComEScritto($('f-comm-titolo'),snap.comm_titolo)
   if(snap.comm_nome)vSet('f-comm-nome',snap.comm_nome)
   if(snap.comm_cog)vSet('f-comm-cog',snap.comm_cog)
   if(snap.comm_cf)vSet('f-comm-cf',snap.comm_cf)
@@ -5582,17 +5622,17 @@ function applySnap(snap){
 
   // ── Tab 1 – Figure coordinamento ─────────────────────────────────────────
   if(snap.coord!=null)vSet('f-coord',(snap.coord===true||snap.coord==='true'||snap.coord===1||snap.coord==='1')?'1':'0')
-  if(snap.rl_titolo)vSet('f-rl-titolo',snap.rl_titolo)
+  if(snap.rl_titolo)selComEScritto($('f-rl-titolo'),snap.rl_titolo)
   if(snap.rl_nome)vSet('f-rl-nome',snap.rl_nome)
   if(snap.rl_cog)vSet('f-rl-cog',snap.rl_cog)
   if(snap.rl_email)vSet('f-rl-email',snap.rl_email)
   if(snap.rl_tel)vSet('f-rl-tel',snap.rl_tel)
-  if(snap.csp_titolo)vSet('f-csp-titolo',snap.csp_titolo)
+  if(snap.csp_titolo)selComEScritto($('f-csp-titolo'),snap.csp_titolo)
   if(snap.csp_nome)vSet('f-csp-nome',snap.csp_nome)
   if(snap.csp_cog)vSet('f-csp-cog',snap.csp_cog)
   if(snap.csp_email)vSet('f-csp-email',snap.csp_email)
   if(snap.csp_tel)vSet('f-csp-tel',snap.csp_tel)
-  if(snap.cse_titolo)vSet('f-cse-titolo',snap.cse_titolo)
+  if(snap.cse_titolo)selComEScritto($('f-cse-titolo'),snap.cse_titolo)
   if(snap.cse_nome)vSet('f-cse-nome',snap.cse_nome)
   if(snap.cse_cog)vSet('f-cse-cog',snap.cse_cog)
   if(snap.cse_email)vSet('f-cse-email',snap.cse_email)
@@ -7955,11 +7995,12 @@ async function editPersona(id){
   if(error||!r){toast('Persona non trovata','err');return}
   _mpId=id
   _mpRiservati=r.contatti_riservati||[]
-  vSet('mp-titolo',r.titolo||'');vSet('mp-nome',r.nome||'');vSet('mp-cognome',r.cognome||'')
+  // 04/10/2026: 1.074 persone hanno un titolo fuori elenco («geom.», «Dott. Ing.»): prima salvando diventava vuoto
+  selComEScritto($('mp-titolo'),r.titolo||'');vSet('mp-nome',r.nome||'');vSet('mp-cognome',r.cognome||'')
   vSet('mp-cf',r.cf||'');vSet('mp-qualifica',r.qualifica||'');vSet('mp-email',r.email||'');vSet('mp-telefono',r.telefono||'')
   vSet('mp-email2',r.email2||'');vSet('mp-email3',r.email3||'');vSet('mp-telefono2',r.telefono2||'')
   vSet('mp-nascita',r.data_nascita||'');vSet('mp-comune-nascita',r.comune_nascita||'')
-  vSet('mp-sesso',r.sesso||'');vSet('mp-note',r.note||'')
+  selComEScritto($('mp-sesso'),r.sesso||'');vSet('mp-note',r.note||'')
   vSet('mp-ruoli-edit',(r.ruoli||[]).join(', '))
   _mpNewRuolo=null
   const t=$('mp-title')
@@ -12815,13 +12856,13 @@ async function admEditCantiere(cantId) {
       }
     }
   }
-  if ($('mc-tip-int') && c.cantiere_tip_int) $('mc-tip-int').value = c.cantiere_tip_int
+  if ($('mc-tip-int') && c.cantiere_tip_int) selComEScritto($('mc-tip-int'), c.cantiere_tip_int)   // 04/10/2026: il 5 («Altro», 169 cantieri) resta visibile invece di diventare vuoto
   if ($('mc-tip-ope') && c.cantiere_tip_ope) {
     $('mc-tip-ope').value = c.cantiere_tip_ope
     if (c.cantiere_tip_ope == 16 && c.cantiere_tip_ope_altro) $('mc-tip-ope-altro-wrap')?.classList.remove('hidden')
   }
-  if ($('mc-durata') && c.cantiere_durata) $('mc-durata').value = c.cantiere_durata
-  if ($('mc-importo') && c.cantiere_importo) $('mc-importo').value = c.cantiere_importo
+  if ($('mc-durata') && c.cantiere_durata) selComEScritto($('mc-durata'), c.cantiere_durata)
+  if ($('mc-importo') && c.cantiere_importo) selComEScritto($('mc-importo'), c.cantiere_importo)
   // Committente collegato
   const _cid = String(c.cantiere_committente_id || '').trim()
   vSet('mc-comm-id', _cid)

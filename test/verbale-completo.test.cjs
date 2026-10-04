@@ -69,7 +69,12 @@ assert.ok(/if\(_mancanze\)mostraMancanze\(_mancanze,\{salvato:true\}\)/.test(sav
 assert.ok(/_eraDefinitivo=true;stato='definitivo';vistaRow\.stato='definitivo'/.test(save), 'un definitivo resta definitivo');
 // il committente non si sovrascrive in silenzio: la domanda viene prima di ogni scrittura
 const iGuardia = save.indexOf('committenteDiverso(_att,_ci)');
-assert.ok(iGuardia > 0 && iGuardia < save.indexOf("sb.from('visite').insert(vistaRow)") && iGuardia < save.indexOf('cantiere_importo:impSel'), 'la domanda sul committente sta prima delle scritture');
+assert.ok(iGuardia > 0 && iGuardia < save.indexOf("sb.from('visite').insert({...vistaRow") && iGuardia < save.indexOf('cantiere_importo:impSel'), 'la domanda sul committente sta prima delle scritture');
+// 04/10/2026: risalvare una riga esistente non riscrive «elimina» e «stage_sn» fissi, e non resuscita un eliminato
+assert.ok(/if\(byId&&\+byId\.elimina===1\)throw new Error/.test(save), 'un verbale eliminato mentre era aperto non si risalva');
+assert.ok(/if\(byId\)\{\s*delete vistaRow\.elimina;delete vistaRow\.stage_sn/.test(save), 'sulla riga esistente elimina e stage_sn restano quelli del database');
+assert.ok(/insert\(\{\.\.\.vistaRow,elimina:0,stage_sn:false\}\)/.test(save), 'un verbale nuovo nasce non eliminato');
+assert.ok(/if\(snap\.qual_ppre\)selComEScritto\(\$\('f-qual-ppre'\),snap\.qual_ppre\)/.test(html), 'una qualifica fuori elenco resta «com\'è scritto»');
 assert.ok(/if\(!confirm\('COMMITTENTE DIVERSO DA QUELLO DEL CANTIERE[\s\S]{0,900}return/.test(save), 'con Annulla non si salva niente');
 // dalla pagina si ferma solo l'impresa doppia; il resto lo decide il database
 assert.ok(/const _doppie=_manca\.filter\(x=>x\.cosa==='impresa-doppia'\)/.test(save));
