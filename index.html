@@ -1999,6 +1999,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>Email 3</label><input type="email" id="mi-email3"></div>
       <div class="field"><label>Telefono 2</label><input type="tel" id="mi-tel2"></div>
     </div>
+    <div class="field"><label>PEC</label><input type="email" id="mi-pec" placeholder="impresa@pec.it"></div>
     <div class="sect-title" style="margin-top:10px">Dati societari / Contratto</div>
     <div class="row">
       <div class="field"><label>Tipo iscrizione CCIA</label>
@@ -2111,13 +2112,15 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>Email 3</label><input type="email" id="ei-email3"></div>
       <div class="field"><label>Telefono 2</label><input type="tel" id="ei-tel2"></div>
     </div>
+    <div class="field"><label>PEC</label><input type="email" id="ei-pec" placeholder="impresa@pec.it"></div>
     <div id="ei-riservati-wrap" style="display:none;background:#faf7fc;border-radius:8px;padding:8px 10px;margin:-4px 0 10px;font-size:12px" title="I campi spuntati non compaiono in Rubrica ai tecnici: solo la segreteria li vede.">
       <label style="display:block;font-weight:600;color:#8e44ad;margin-bottom:4px">🔒 Nascondi ai tecnici (solo la segreteria vede questi campi)</label>
-      <label style="margin-right:12px"><input type="checkbox" id="ei-ris-email"> Email</label>
-      <label style="margin-right:12px"><input type="checkbox" id="ei-ris-email2"> Email 2</label>
-      <label style="margin-right:12px"><input type="checkbox" id="ei-ris-email3"> Email 3</label>
-      <label style="margin-right:12px"><input type="checkbox" id="ei-ris-tel"> Telefono</label>
-      <label><input type="checkbox" id="ei-ris-tel2"> Telefono 2</label>
+      <label style="display:inline-flex;align-items:center;gap:5px;margin:0 14px 4px 0;text-transform:none;letter-spacing:0;font-weight:500"><input type="checkbox" id="ei-ris-email" style="width:auto;min-width:0;margin:0"> Email</label>
+      <label style="display:inline-flex;align-items:center;gap:5px;margin:0 14px 4px 0;text-transform:none;letter-spacing:0;font-weight:500"><input type="checkbox" id="ei-ris-email2" style="width:auto;min-width:0;margin:0"> Email 2</label>
+      <label style="display:inline-flex;align-items:center;gap:5px;margin:0 14px 4px 0;text-transform:none;letter-spacing:0;font-weight:500"><input type="checkbox" id="ei-ris-email3" style="width:auto;min-width:0;margin:0"> Email 3</label>
+      <label style="display:inline-flex;align-items:center;gap:5px;margin:0 14px 4px 0;text-transform:none;letter-spacing:0;font-weight:500"><input type="checkbox" id="ei-ris-tel" style="width:auto;min-width:0;margin:0"> Telefono</label>
+      <label style="display:inline-flex;align-items:center;gap:5px;margin:0 14px 4px 0;text-transform:none;letter-spacing:0;font-weight:500"><input type="checkbox" id="ei-ris-tel2" style="width:auto;min-width:0;margin:0"> Telefono 2</label>
+      <label style="display:inline-flex;align-items:center;gap:5px;margin:0 14px 4px 0;text-transform:none;letter-spacing:0;font-weight:500"><input type="checkbox" id="ei-ris-pec" style="width:auto;min-width:0;margin:0"> PEC</label>
     </div>
     <div class="sect-title" style="margin-top:10px">Dati societari / Contratto</div>
     <div class="row">
@@ -3550,7 +3553,7 @@ function renderImpreseAccordion(){
       // pre-compila ragione sociale dal testo cercato
       const searchVal=$(`im-search-${_modalImpIdx}`)?.value||''
       const nomeEl=$('mi-nome');if(nomeEl)nomeEl.value=searchVal
-      ;['mi-piva','mi-cf','mi-ind','mi-com','mi-email','mi-email2','mi-email3','mi-tel','mi-tel2','mi-badge','mi-pat','mi-ceiv','mi-tipo-ccia','mi-ccnl','mi-ccnl-altro','mi-forma'].forEach(id=>{const el=$(id);if(el)el.value=''})
+      ;['mi-piva','mi-cf','mi-ind','mi-com','mi-email','mi-email2','mi-email3','mi-tel','mi-tel2','mi-pec','mi-badge','mi-pat','mi-ceiv','mi-tipo-ccia','mi-ccnl','mi-ccnl-altro','mi-forma'].forEach(id=>{const el=$(id);if(el)el.value=''})
       ;[1,2,3,4,5].forEach(c=>{const el=$(`mi-cert-${c}`);if(el)el.checked=false})
       const stageNo=document.querySelector('input[name="mi-stage"][value="no"]');if(stageNo)stageNo.checked=true
       const ccnlWrap=$('mi-ccnl-altro-wrap');if(ccnlWrap)ccnlWrap.classList.add('hidden')
@@ -4331,6 +4334,7 @@ $('btn-mi-save').onclick=async()=>{
     impresa_email2:vGet('mi-email2').trim()||null,
     impresa_email3:vGet('mi-email3').trim()||null,
     impresa_telefono2:vGet('mi-tel2').trim()||null,
+    pec:vGet('mi-pec').trim()||null,
     cassa_edile:vGet('mi-ceiv')||null,
     tipo_iscrizione_ccia:vGet('mi-tipo-ccia')||null,
     tipo_impresa:vGet('mi-forma')||null,   // vuoto = la ricava il trigger dalla ragione sociale
@@ -11857,7 +11861,7 @@ let _eiRiservati=[]
 async function admEditImpresa(impresaId) {
   _editImpId = impresaId
   // Reset modal
-  ;['ei-nome','ei-piva','ei-cf','ei-ind','ei-com','ei-email','ei-tel','ei-ccnl-altro'].forEach(id=>{const el=$(id);if(el)el.value=''})
+  ;['ei-nome','ei-piva','ei-cf','ei-ind','ei-com','ei-email','ei-tel','ei-email2','ei-email3','ei-tel2','ei-pec','ei-ccnl-altro'].forEach(id=>{const el=$(id);if(el)el.value=''})
   ;['ei-ceiv','ei-tipo-ccia','ei-ccnl'].forEach(id=>{const el=$(id);if(el)el.value=''})
   ;[1,2,3,4,5].forEach(c=>{const el=$(`ei-cert-${c}`);if(el)el.checked=false})
   const ccnlWrap=$('ei-ccnl-altro-wrap');if(ccnlWrap)ccnlWrap.classList.add('hidden')
@@ -11881,15 +11885,16 @@ async function admEditImpresa(impresaId) {
     vSet('ei-email2',imp.impresa_email2 || '')
     vSet('ei-email3',imp.impresa_email3 || '')
     vSet('ei-tel2', imp.impresa_telefono2 || '')
+    vSet('ei-pec',  imp.pec || '')
 
     // riservatezza contatti: solo la segreteria vede e imposta le spunte;
     // gli altri trovano il campo bloccato se marcato riservato
     const isSeg=!!window.__isSegreteria
     const _erw=$('ei-riservati-wrap');if(_erw)_erw.style.display=isSeg?'':'none'
-    ;[['ei-ris-email','impresa_email_ref'],['ei-ris-email2','impresa_email2'],['ei-ris-email3','impresa_email3'],['ei-ris-tel','impresa_telefono'],['ei-ris-tel2','impresa_telefono2']].forEach(([elId,campo])=>{
+    ;[['ei-ris-email','impresa_email_ref'],['ei-ris-email2','impresa_email2'],['ei-ris-email3','impresa_email3'],['ei-ris-tel','impresa_telefono'],['ei-ris-tel2','impresa_telefono2'],['ei-ris-pec','pec']].forEach(([elId,campo])=>{
       const el=$(elId);if(el)el.checked=_eiRiservati.includes(campo)
     })
-    ;[['ei-email','impresa_email_ref'],['ei-email2','impresa_email2'],['ei-email3','impresa_email3'],['ei-tel','impresa_telefono'],['ei-tel2','impresa_telefono2']].forEach(([elId,campo])=>{
+    ;[['ei-email','impresa_email_ref'],['ei-email2','impresa_email2'],['ei-email3','impresa_email3'],['ei-tel','impresa_telefono'],['ei-tel2','impresa_telefono2'],['ei-pec','pec']].forEach(([elId,campo])=>{
       const el=$(elId);if(!el)return
       const nascosto=!isSeg&&_eiRiservati.includes(campo)
       el.disabled=nascosto
@@ -11948,11 +11953,11 @@ async function admSaveEditImpresa() {
   // i campi marcati riservati non si sovrascrivono se chi salva non è
   // segreteria: sono disabilitati in form, e qui non si scrive null sopra
   // un valore che non si è nemmeno visto
-  ;[['impresa_email_ref','ei-email'],['impresa_email2','ei-email2'],['impresa_email3','ei-email3'],['impresa_telefono','ei-tel'],['impresa_telefono2','ei-tel2']].forEach(([campo,elId])=>{
+  ;[['impresa_email_ref','ei-email'],['impresa_email2','ei-email2'],['impresa_email3','ei-email3'],['impresa_telefono','ei-tel'],['impresa_telefono2','ei-tel2'],['pec','ei-pec']].forEach(([campo,elId])=>{
     if(isSeg||!_eiRiservati.includes(campo))updates[campo]=vGet(elId).trim()||null
   })
   if(isSeg){
-    updates.contatti_riservati=[['ei-ris-email','impresa_email_ref'],['ei-ris-email2','impresa_email2'],['ei-ris-email3','impresa_email3'],['ei-ris-tel','impresa_telefono'],['ei-ris-tel2','impresa_telefono2']]
+    updates.contatti_riservati=[['ei-ris-email','impresa_email_ref'],['ei-ris-email2','impresa_email2'],['ei-ris-email3','impresa_email3'],['ei-ris-tel','impresa_telefono'],['ei-ris-tel2','impresa_telefono2'],['ei-ris-pec','pec']]
       .filter(([elId])=>$(elId)?.checked).map(([,campo])=>campo)
   }
   const { error } = await sb.from('imprese').update(updates).eq('impresa_id', _editImpId)
