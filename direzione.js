@@ -74,8 +74,9 @@
     if (_ruoli && _ruoli.email === email) return _ruoli;
     const sb = window.sb;
     const chiedi = async (f) => { try { const { data, error } = await sb.rpc(f); return !error && data === true; } catch (_e) { return false; } };
-    const [direttore, presidenza, coord, segr] = await Promise.all(['is_direttore', 'is_presidenza', 'is_coordinatore', 'is_segreteria'].map(chiedi));
-    _ruoli = { email, direttore, presidenza, coord, segr };
+    // presidente (04/10/2026): solo lui firma i documenti nell'app, non il Vicepresidente
+    const [direttore, presidenza, coord, segr, presidente] = await Promise.all(['is_direttore', 'is_presidenza', 'is_coordinatore', 'is_segreteria', 'is_presidente'].map(chiedi));
+    _ruoli = { email, direttore, presidenza, coord, segr, presidente };
     return _ruoli;
   }
   window.addEventListener('gestionale-logout', () => { _ruoli = null; });
@@ -636,8 +637,114 @@
         boxCritici(cri, critici);
       } catch (e) { boxCritici(cri, [], e.message || String(e)); }
     } else if (cri) cri.innerHTML = '';
+    try { await firmeBox(Rv, _come); } catch (e) { console.warn('da firmare:', e); }
     await decisioniBox($('dir-decisioni'), 'direzione');
     badge().catch(() => {});
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     3-bis. DA FIRMARE (04/10/2026, chiesto dall'utente)
+     Le lettere di incarico — asseverazione e docenza — sono a firma del
+     Presidente: la segreteria le manda qui (app segreteria e app
+     asseverazione, funzione firma-presidente) e al Presidente arriva la
+     mail. Qui legge il PDF e preme «Firmo»: la firma scansionata si
+     appone su QUEL PDF, con data, ora e nome; oppure «Rimando» con due
+     righe di motivo, che tornano alla segreteria. «Firmo» si accende solo
+     dopo aver aperto il documento.
+     Firma solo il Presidente (is_presidente): il Vicepresidente non vede
+     l'elenco (la tabella non glielo dà). Nell'anteprima «Vedi come…» la
+     segreteria vede l'elenco senza i pulsanti, che il server le
+     rifiuterebbe.
+     ════════════════════════════════════════════════════════════ */
+  const _letti = new Set();
+  async function firmeBox(R, anteprima) {
+    let host = $('dir-firme');
+    const vista = $('view-direzione');
+    if (!host && vista) {
+      host = document.createElement('div'); host.id = 'dir-firme';
+      const prima = $('dir-autorizzazioni');
+      if (prima && prima.parentNode) prima.parentNode.insertBefore(host, prima.nextSibling); else vista.appendChild(host);
+    }
+    if (!host) return;
+    const presidente = !anteprima && R.presidente;
+    const guarda = anteprima === 'presidenza' && R.segr;
+    if (!presidente && !guarda) { host.innerHTML = ''; return; }
+    const sb = window.sb;
+    const { data, error } = await sb.from('s_firme_presidente')
+      .select('id, titolo, stato, richiesta_il, firmata_il, rimandata_il, rimandata_motivo, file_originale, file_firmato')
+      .in('stato', ['in_attesa', 'firmata', 'rimandata']).order('richiesta_il', { ascending: false }).limit(60);
+    if (error) {
+      host.innerHTML = `<div class="card" style="border-left:4px solid #c0392b"><h3>✍️ Da firmare</h3><p style="font-size:13px;color:#c0392b;margin:0">Non sono riuscito a leggere i documenti da firmare: ${esc(error.message)}</p></div>`;
+      return;
+    }
+    const attesa = (data || []).filter((r) => r.stato === 'in_attesa').reverse();
+    const recenti = (data || []).filter((r) => r.stato !== 'in_attesa').slice(0, 5);
+    const bottoni = presidente;
+    const riga = (r) => {
+      const g = giorni(r.richiesta_il);
+      const letto = _letti.has(r.id);
+      return `<div data-firma="${r.id}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 0;border-top:1px solid #f0e6dd">
+        <span style="font-size:13px;flex:1;min-width:220px"><strong>${esc(r.titolo)}</strong><br><span style="font-size:11.5px;color:#888">chiesta il ${dIt(r.richiesta_il)}${g ? ' · in attesa da ' + g + ' g' : ''}</span></span>
+        <button class="btn-secondary btn-sm" type="button" data-firma-leggi="${r.id}" data-aiuto="Apre il documento da firmare in una scheda nuova. Dopo averlo letto si accende «Firmo».">📄 Leggi</button>
+        ${bottoni ? `<button class="btn-primary btn-sm" type="button" data-firma-si="${r.id}" ${letto ? '' : 'disabled title="Prima apri il documento con «Leggi»"'} data-aiuto="Appone la tua firma su questo documento, con data e ora, e lo restituisce firmato alla segreteria. Non si torna indietro.">✍ Firmo</button>
+        <button class="btn-secondary btn-sm" type="button" data-firma-no="${r.id}" data-aiuto="Non firmi: scrivi in due righe perché, e il documento torna alla segreteria col tuo motivo.">↩ Rimando</button>` : ''}
+      </div>`;
+    };
+    const rigaFatta = (r) => `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid #f4f4f4;font-size:12px;color:#666">
+        <span style="flex:1;min-width:220px">${r.stato === 'firmata' ? '✅' : '↩'} ${esc(r.titolo)} — ${r.stato === 'firmata' ? 'firmata il ' + oraIt(r.firmata_il) : 'rimandata il ' + dIt(r.rimandata_il) + ': «' + esc(r.rimandata_motivo || '') + '»'}</span>
+        ${r.stato === 'firmata' && r.file_firmato ? `<a href="#" data-firma-apri="${esc(r.file_firmato)}" style="color:var(--orange,#e7500f);font-weight:600">apri firmata</a>` : ''}
+      </div>`;
+    host.innerHTML = `<div class="card" style="border-left:4px solid ${attesa.length ? 'var(--orange,#e7500f)' : '#95C22F'}">
+      <h3>✍️ Da firmare${attesa.length ? ` — <span style="color:#b35c00">${attesa.length} ${attesa.length === 1 ? 'documento' : 'documenti'}</span>` : ''}</h3>
+      ${attesa.length
+        ? `<p style="font-size:12.5px;color:#555;margin:0 0 4px">Le lettere a tua firma preparate dalla segreteria. Apri il documento con «Leggi», poi «Firmo»: la firma si appone sul documento che hai letto, con data e ora.${guarda ? ' <em>(anteprima: i pulsanti li vede solo il Presidente)</em>' : ''}</p>${attesa.map(riga).join('')}`
+        : '<p style="font-size:13px;color:#555;margin:0">Niente da firmare.</p>'}
+      ${recenti.length ? `<div style="font-size:11px;color:#999;margin-top:10px">Ultimi firmati o rimandati:</div>${recenti.map(rigaFatta).join('')}` : ''}
+    </div>`;
+    const apri = async (percorso) => {
+      /* la scheda si apre subito (sul telefono una finestra aperta dopo un'attesa viene bloccata), poi prende l'indirizzo */
+      const w = window.open('', '_blank');
+      const { data: u, error: e } = await sb.storage.from('firme-presidente').createSignedUrl(percorso, 600);
+      if (e || !u?.signedUrl) { if (w) w.close(); avviso('Non riesco ad aprire il documento: ' + (e?.message || ''), 'err'); return false; }
+      if (w) w.location.href = u.signedUrl; else window.location.href = u.signedUrl;
+      return true;
+    };
+    const di = (id) => (data || []).find((r) => r.id === id);
+    host.querySelectorAll('[data-firma-leggi]').forEach((b) => b.addEventListener('click', async () => {
+      const r = di(Number(b.dataset.firmaLeggi)); if (!r) return;
+      if (await apri(r.file_originale)) {
+        _letti.add(r.id);
+        const si = host.querySelector(`[data-firma-si="${r.id}"]`);
+        if (si) { si.disabled = false; si.removeAttribute('title'); }
+      }
+    }));
+    host.querySelectorAll('[data-firma-apri]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); apri(a.dataset.firmaApri); }));
+    host.querySelectorAll('[data-firma-si]').forEach((b) => b.addEventListener('click', async () => {
+      const r = di(Number(b.dataset.firmaSi)); if (!r) return;
+      if (!confirm(`Firmo «${r.titolo}»?\n\nLa tua firma viene apposta sul documento che hai letto, con la data e l'ora di adesso, e il documento firmato torna alla segreteria.`)) return;
+      b.disabled = true; b.textContent = 'Firmo…';
+      const { data: out, error: e } = await sb.functions.invoke('firma-presidente', { body: { azione: 'firma', id: r.id } });
+      if (e || out?.error) {
+        let msg = out?.error; try { msg = msg || (await e.context.json()).error; } catch (_x) { /* niente */ }
+        b.disabled = false; b.textContent = '✍ Firmo';
+        avviso('Firma non riuscita: ' + (msg || e?.message || ''), 'err'); return;
+      }
+      avviso('Firmato. La segreteria trova il documento firmato e lo spedisce.', 'ok');
+      firmeBox(R, anteprima); badge().catch(() => {});
+    }));
+    host.querySelectorAll('[data-firma-no]').forEach((b) => b.addEventListener('click', async () => {
+      const r = di(Number(b.dataset.firmaNo)); if (!r) return;
+      const motivo = prompt(`Non firmi «${r.titolo}».\n\nScrivi in due righe perché: lo legge la segreteria.`);
+      if (motivo === null) return;
+      if (motivo.trim().length < 3) { avviso('Scrivi il motivo: torna alla segreteria.', 'err'); return; }
+      const { data: out, error: e } = await sb.functions.invoke('firma-presidente', { body: { azione: 'rimanda', id: r.id, motivo: motivo.trim() } });
+      if (e || out?.error) {
+        let msg = out?.error; try { msg = msg || (await e.context.json()).error; } catch (_x) { /* niente */ }
+        avviso('Non riuscito: ' + (msg || e?.message || ''), 'err'); return;
+      }
+      avviso('Rimandato alla segreteria col tuo motivo.', 'ok');
+      firmeBox(R, anteprima); badge().catch(() => {});
+    }));
   }
 
   /* il numero sul pulsante «Direzione»: tutto ciò che aspetta chi è collegato */
@@ -652,6 +759,10 @@
       n += (data || []).filter((r) => (r.stato === 'aperta' || (r.rinviata_al && r.rinviata_al <= T)) && ((r.decisore === 'direttore' && R.direttore) || (r.decisore === 'presidenza' && R.presidenza))).length;
       if (R.direttore) { const a = await inAttesa(); n += (a.autorizzazioni || []).length + (a.critici || []).length; }
       else if (R.presidenza) { const a = await inAttesa(); n += (a.critici || []).length; }
+      if (R.presidente) {
+        const { count } = await window.sb.from('s_firme_presidente').select('id', { count: 'exact', head: true }).eq('stato', 'in_attesa');
+        n += count || 0;
+      }
     } catch (e) { console.warn('badge direzione:', e); }
     b.textContent = n; b.style.display = n ? '' : 'none';
   }
