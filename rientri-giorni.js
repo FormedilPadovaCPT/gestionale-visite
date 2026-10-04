@@ -101,7 +101,9 @@
   const indirizzo = (c) => [c.cantiere_indirizzo, /^\s*snc\s*$/i.test(c.cantiere_civico || '') ? '' : c.cantiere_civico].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();   // «SNC» = senza numero civico: nella riga è solo rumore
   function nomeCantiere(v) {
     const c = v.cantieri || {}, ind = indirizzo(c);
-    return ind ? ind + (c.comune_nome ? ' – ' + c.comune_nome : '') : (c.cantiere_etichetta || '—') + (c.comune_nome && !c.cantiere_etichetta ? ' – ' + c.comune_nome : '');
+    if (ind) return ind + (c.comune_nome ? ' – ' + c.comune_nome : '');
+    const et = c.cantiere_etichetta || '—';   // senza indirizzo: l'etichetta, e il comune se l'etichetta non lo dice già
+    return et + (c.comune_nome && !et.toLowerCase().includes(String(c.comune_nome).toLowerCase()) ? ' – ' + c.comune_nome : '');
   }
   const dataGruppo = (d) => GIORNI[d.getDay()] + ' ' + d.getDate() + ' ' + MESI[d.getMonth()];
   const traGiorni = (n) => (n === 0 ? 'oggi' : n === 1 ? 'domani' : 'tra ' + n + ' gg');
@@ -147,7 +149,8 @@
        tecMap              — tecnico_id → «Cognome Nome»
        maxScaduti          — quanti scaduti mostrare (Oggi: 5), il resto è contato
        entroGiorni         — fin dove arrivano i prossimi (Oggi: 7)
-       onFiltri            — se c'è, il pulsante filtri chiama questo (Scadenze: apre i filtri di sempre);
+       onFiltri            — se c'è, il pulsante filtri chiama questo (Scadenze: apre i filtri di sempre),
+                             e filtriAperti() dice se sono aperti (il pulsante resta evidenziato);
                              altrimenti apre un pannellino con IPC e finestra
        segreteria, puoVisitare — che cosa può fare chi guarda (lo decide chi chiama, per «Vedi come…»)
        dopo                — da chiamare dopo una riassegnazione o una chiusura (rilegge le scadenze) */
@@ -171,7 +174,7 @@
 
     let h = '<div class="rg">';
     h += `<div class="rg-cerca"><label><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg><input type="search" data-rg="q" value="${esc(st.q)}" placeholder="Verbale, via, tecnico…" aria-label="Cerca fra i rientri"></label>`
-      + `<button type="button" class="rg-btn rg-btn-bordo${st.pannello || st.ipc || st.gg ? ' on' : ''}" data-rg="filtri" aria-label="Filtri" data-aiuto="${o.onFiltri ? 'Mostra o nasconde i filtri della pagina: tecnico, comuni, IPC, finestra di rientro.' : 'Filtra i rientri per IPC e per quanti giorni guardare avanti.'}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"></path></svg></button></div>`;
+      + `<button type="button" class="rg-btn rg-btn-bordo${(o.onFiltri ? (o.filtriAperti && o.filtriAperti()) : (st.pannello || st.ipc || st.gg)) ? ' on' : ''}" data-rg="filtri" aria-label="Filtri" data-aiuto="${o.onFiltri ? 'Mostra o nasconde i filtri della pagina: tecnico, comuni, IPC, finestra di rientro.' : 'Filtra i rientri per IPC e per quanti giorni guardare avanti.'}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"></path></svg></button></div>`;
     if (!o.onFiltri && st.pannello) {
       const chip = (k, v, t) => `<button type="button" class="rg-chip${st[k] === v ? ' on' : ''}" data-rg="chip" data-k="${k}" data-v="${v}">${t}</button>`;
       h += '<div class="rg-pannello"><div><small>IPC</small>' + chip('ipc', '', 'Tutti') + chip('ipc', 'ALTO', 'Alto') + chip('ipc', 'MEDIO', 'Medio') + chip('ipc', 'BASSO', 'Basso') + '</div>'
@@ -237,7 +240,7 @@
       const o = st.ultimo, az = b.dataset.rg;
       if (az === 'apri') { if (typeof window.showVisitaDetail === 'function') window.showVisitaDetail(b.dataset.vid); return; }
       if (az === 'ritorno') { if (typeof window.chiediNuovaVisitaRitorno === 'function') window.chiediNuovaVisitaRitorno(b.dataset.vid, b.dataset.nr || ''); return; }
-      if (az === 'filtri') { if (o.onFiltri) { o.onFiltri(); b.classList.toggle('on'); } else { st.pannello = !st.pannello; ridisegna(); } return; }
+      if (az === 'filtri') { if (o.onFiltri) o.onFiltri(); else st.pannello = !st.pannello; ridisegna(); return; }
       if (az === 'chip') { st[b.dataset.k] = b.dataset.v; ridisegna(); return; }
       if (az === 'desel') { st.sel.clear(); ridisegna(); return; }
       if (az === 'giro') { giro([...st.sel.values()]); return; }
@@ -284,7 +287,8 @@
     st.sel.clear();
     if (ko.length) avviso('Riassegnati ' + ok + ' su ' + righe.length + ' a ' + nome(t) + '. Non riusciti — ' + ko.join('; '), 'err');
     else avviso((righe.length === 1 ? 'Rientro passato' : righe.length + ' rientri passati') + ' a ' + nome(t) + '.', 'ok');
-    if (st.ultimo.dopo) await st.ultimo.dopo(); else render(box, st.ultimo);
+    render(box, st.ultimo);   // la selezione sparisce subito, poi si rilegge dal database
+    if (st.ultimo.dopo) await st.ultimo.dopo();
   }
 
   async function chiudi(box, st, righe) {
@@ -300,7 +304,8 @@
     }
     if (ko.length) avviso('Chiusi ' + ok + ' su ' + righe.length + '. Non riusciti — ' + ko.join('; '), 'err');
     else avviso((ok === 1 ? 'Cantiere chiuso' : ok + ' cantieri chiusi') + ' · ' + visite + ' visite chiuse', 'ok');
-    if (st.ultimo.dopo) await st.ultimo.dopo(); else render(box, st.ultimo);
+    render(box, st.ultimo);   // la selezione sparisce subito, poi si rilegge dal database
+    if (st.ultimo.dopo) await st.ultimo.dopo();
   }
 
   /* dall'esterno (la mappa dei rientri, mappa.js): spunta o toglie un cantiere nella lista, così finisce nella barra «Giro» */

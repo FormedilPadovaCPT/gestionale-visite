@@ -50,7 +50,7 @@ body.viewer-mode #btn-dove-sono,body.viewer-mode #btn-appunti,body.viewer-mode #
 /* 04/10/2026: rientri sul telefono raggruppati per giorno (rientri-giorni.js); sul PC restano le tabelle. I filtri di sempre si aprono col pulsante della lista */
 #scad-giorni{display:none}
 #scad-giorni .rg-cerca{padding:0 12px 10px}
-@media(max-width:720px){#scad-giorni{display:block}#view-scadenze .scad-tab{display:none!important}#view-scadenze:not(.filtri-aperti) #scad-filtri{display:none}#giro-bar-scad{display:none!important}}
+@media(max-width:720px){#scad-giorni{display:block}#view-scadenze .scad-tab{display:none!important}#view-scadenze:not(.filtri-aperti) #scad-filtri{display:none!important}#giro-bar-scad{display:none!important}}
 /* 26/09/2026: chi è di sola lettura non carica firme (la sua è già caricata) */
 body.viewer-mode #btn-firme{display:none!important}
 /* sul telefono l'intestazione non deve schiacciare il logo (26/09/2026: usciva una targhetta bianca illeggibile) */
@@ -6980,7 +6980,7 @@ function renderScadenze(){
       const _vr=window.vesteV2&&window.vesteV2.ruolo?window.vesteV2.ruolo():null
       window.RientriGiorni.render($('scad-giorni'),{urgenti:fU,prossime:fP,tecMap:_scadData.tecMap,
         segreteria:!!window.__isSegreteria&&(!_vr||_vr==='segreteria'),puoVisitare:!document.body.classList.contains('viewer-mode'),
-        onFiltri:()=>$('view-scadenze').classList.toggle('filtri-aperti'),dopo:()=>window.ricaricaScadenze()})
+        onFiltri:()=>$('view-scadenze').classList.toggle('filtri-aperti'),filtriAperti:()=>$('view-scadenze').classList.contains('filtri-aperti'),dopo:()=>window.ricaricaScadenze()})
     }catch(e){console.warn('rientri per giorno:',e)}
   }
 }
@@ -15358,7 +15358,7 @@ document.addEventListener('input',function(ev){
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=8"></script>
-<script src="rientri-giorni.js?v=2"></script>
+<script src="rientri-giorni.js?v=4"></script>
 <script src="veste-v2.js?v=26"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
