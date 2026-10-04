@@ -2807,8 +2807,8 @@ function showScr(n){
   ;['loading','login','pwd','app'].forEach(s=>$(('screen-'+s))?.classList.toggle('hidden',s!==n))
 }
 function navTo(view){
-  /* (03/10/2026) VESTE V2, in anteprima (veste-v2.js): la accende solo la segreteria. Può cambiare la pagina di
-     destinazione (apertura per ruolo). Spenta, o se il file non si è caricato, non fa niente. */
+  /* VESTE V2 (veste-v2.js): dal 04/10/2026 è l'unica veste, per tutti (deciso dall'utente). Può cambiare la pagina
+     di destinazione (apertura per ruolo). Se il file non si caricasse, qui non fa niente e l'app resta usabile. */
   if(window.vesteV2){const _v2=window.vesteV2.prima(view);if(_v2)view=_v2}
   // il calendario è del solo Direttore (03/10/2026): chi è di sola lettura e non è lui non ci arriva nemmeno per altra via
   if(view==='appuntamenti'&&S.viewer&&!S.direttore)view='dashboard'
@@ -15383,7 +15383,7 @@ document.addEventListener('input',function(ev){
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=8"></script>
 <script src="rientri-giorni.js?v=5"></script>
-<script src="veste-v2.js?v=28"></script>
+<script src="veste-v2.js?v=29"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

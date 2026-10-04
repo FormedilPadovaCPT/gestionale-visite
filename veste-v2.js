@@ -10,9 +10,7 @@
 
    CHI LA VEDE. Chiunque sia collegato, col menu e le pagine del SUO ruolo
    (quello vero dell'accesso: tecnico, coordinatore, segreteria, Direttore,
-   Presidenza, consigliere). Il pulsante in alto «↩ Veste di prima» riporta
-   quel dispositivo all'app com'era, e «🎨 Veste nuova» la riaccende: è la
-   rete di sicurezza. Se questo file non si carica, o qui dentro qualcosa va
+   Presidenza, consigliere). Se questo file non si carica, o qui dentro qualcosa va
    storto, l'app di prima continua a funzionare (ogni ingresso è protetto da
    try/catch e non cambia niente finché la veste è spenta).
 
@@ -44,7 +42,8 @@
    ============================================================ */
 (function () {
   'use strict';
-  const CHIAVE = 'gv-veste';              // localStorage: 'classica' = su questo dispositivo si è scelto di tornare alla veste di prima
+  // (04/10/2026, deciso dall'utente) UNA VESTE SOLA: niente più «↩ Veste di prima» e niente codice per tornare indietro.
+  // La vecchia scelta salvata nei browser ('gv-veste' = 'classica') si cancella al primo accesso.
   const CHIAVE_RUOLO = 'gv-v2-ruolo';     // sessionStorage: il ruolo di «Vedi come…» (vale solo per la segreteria)
   const SEGRETERIA = 'cptpd@did.formedilpadova.it';
   const $ = (id) => document.getElementById(id);
@@ -123,8 +122,8 @@
   const S = () => window.S || {};
   const email = () => String((S().user && S().user.email) || '').toLowerCase();
   const eSegreteria = () => !!email() && email() === SEGRETERIA && !S().viewer;
-  /* Accesa per chiunque sia collegato; spenta solo dove qualcuno ha scelto «↩ Veste di prima». */
-  const accesa = () => !!email() && leggi(localStorage, CHIAVE) !== 'classica';
+  /* Accesa per chiunque sia collegato: è la sola veste (04/10/2026). */
+  const accesa = () => !!email();
   /* IL RUOLO VERO, dall'accesso: chi è di sola lettura lo dice S.viewer (con S.direttore / S.presidenza), la segreteria
      la sua e-mail, il coordinatore il permesso sulla pagina Coordinamento (window.__isCoordPage, messo all'accesso). */
   const ruoloVero = () => {
@@ -138,28 +137,6 @@
   const simula = () => { if (!eSegreteria()) return false; const r = leggi(sessionStorage, CHIAVE_RUOLO); return !!RUOLI[r] && r !== 'segreteria'; };
   const ruolo = () => (simula() ? leggi(sessionStorage, CHIAVE_RUOLO) : ruoloVero());
 
-  /* ── il pulsante che spegne e riaccende la veste, per tutti: è la rete di sicurezza ── */
-  function pulsante() {
-    let b = $('btn-veste-v2');
-    if (!email()) { if (b) b.remove(); return; }
-    const area = document.querySelector('.user-area'); if (!area) return;
-    if (!b) {
-      b = document.createElement('button');
-      b.id = 'btn-veste-v2'; b.type = 'button';
-      b.style.cssText = 'background:transparent;border:1px solid rgba(255,255,255,.6);color:#fff;font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer';
-      b.addEventListener('click', () => {
-        scrivi(localStorage, CHIAVE, accesa() ? 'classica' : 'v2');
-        scrivi(sessionStorage, CHIAVE_RUOLO, null);
-        location.reload();
-      });
-      area.insertBefore(b, area.firstChild);
-    }
-    const on = accesa();
-    b.textContent = on ? '↩ Veste di prima' : '🎨 Veste nuova';
-    b.setAttribute('data-aiuto', on
-      ? 'Riporta questo dispositivo al gestionale com’era prima della veste nuova. Dati e funzioni sono gli stessi: cambia solo come sono disposti. Si riaccende dallo stesso pulsante.'
-      : 'Riaccende la veste nuova su questo dispositivo: menu per ruolo, pagina «Oggi», verbale in tre momenti. Dati e funzioni sono gli stessi.');
-  }
 
   /* ── stile: solo quando la veste è accesa ── */
   function stile() {
@@ -403,15 +380,6 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       if (et && b.firstChild && b.firstChild.nodeType === 3) b.firstChild.textContent = et;
     });
   }
-  function menuComEra() {
-    document.querySelectorAll('nav button').forEach((b) => {
-      if (b.dataset.v2Etichetta === undefined) return;
-      if (b.firstChild && b.firstChild.nodeType === 3 && b.dataset.v2Etichetta) b.firstChild.textContent = b.dataset.v2Etichetta;
-      b.style.display = b.dataset.v2Mostra || '';   // le voci nascoste dalla veste tornano com'erano
-      b.style.order = ''; b.style.marginLeft = ''; b.classList.remove('v2-cta');
-      delete b.dataset.v2Etichetta; delete b.dataset.v2Mostra;
-    });
-  }
 
   /* ── la barra «Vedi come…» ── */
   function barra() {
@@ -463,17 +431,6 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     const lettura = !!RUOLI[ruolo()].lettura;
     if (lettura && !document.body.classList.contains('viewer-mode')) { document.body.classList.add('viewer-mode'); _letturaFinta = true; }
     if (!lettura && _letturaFinta) { document.body.classList.remove('viewer-mode'); _letturaFinta = false; }
-  }
-  function spegni() {
-    if (!document.body.classList.contains('v2')) return;
-    document.body.classList.remove('v2');
-    delete document.body.dataset.v2Ruolo;
-    if (_letturaFinta) { document.body.classList.remove('viewer-mode'); _letturaFinta = false; }
-    ['v2-barra', 'v2-altre', 'v2-uff-menu', 'v2-scrivania', 'v2-rimandi', 'v2-sintesi', 'v2-torna', 'v2-dir-pulsanti', 'v2-az-segnala', 'v2-az-qr', 'v2-az-servizi'].forEach((id) => { const e = $(id); if (e) e.remove(); });
-    ['v2-bozze', 'v2-rientri', 'v2-incarichi', 'v2-azioni', 'v2-oggi-data', 'v2-oggi-ciao'].forEach((id) => { const e = $(id); if (e) e.innerHTML = ''; });   // obiettivo e avvisi sono quelli di sempre: restano
-    const u = $('view-segreteria'); if (u) { u.classList.remove('v2-uff'); u.querySelectorAll('.adm-section').forEach((s) => { s.style.display = ''; }); }
-    menuComEra();
-    verbaleComEra();
   }
 
   /* ── numeri: una lettura fallita si dice, non diventa zero ── */
@@ -869,17 +826,6 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     if (p) { p.disabled = _fase === 1; p.textContent = '‹ Indietro'; }
     if (n) { n.disabled = _fase === 3 || t === 15; n.textContent = _fase === 1 ? 'In cantiere ›' : (_fase === 2 && t === 12) ? 'A fine visita ›' : 'Successivo ›'; }
   }
-  function verbaleComEra() {
-    momentoUnoComEra(); areeComEra(); pagineComEra(); _fase3 = false;
-    const f = $('v2-fasi'); if (f) f.remove();
-    [1, 2, 3].forEach((x) => document.body.classList.remove('v2-fase' + x));
-    const inc = $('inc-scelta-box'), card = document.querySelector('#view-form .tab-content[data-tab="0"] > .card');
-    if (inc && card && inc.parentNode !== card) card.insertBefore(inc, card.firstChild);
-    const b0 = document.querySelector('#tab-bar .tab-btn[data-ti="0"]'); if (b0) b0.textContent = '📋 Visita';
-    const p = $('btn-prev'), n = $('btn-next');
-    if (p) { p.textContent = '◀ Precedente'; p.disabled = tabOra() === 0; }
-    if (n) { n.textContent = 'Successivo ▶'; n.disabled = tabOra() === 15; }
-  }
 
   /* ── PRIMO MOMENTO DEL VERBALE, come nel prototipo ──
      Tre aiuti sopra i campi di sempre. Nessuno scrive dati per conto suo: ognuno preme o riempie il campo che
@@ -1045,7 +991,6 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       riga.children[3].textContent = aperta ? '▾' : '›';
     });
   }
-  function areeComEra() { document.querySelectorAll('#view-form .v2-area').forEach((r) => r.remove()); document.body.classList.remove('v2-area-chiusa'); }
 
   /* ── TERZO MOMENTO: «Prima di chiudere» ──
      Un elenco che aiuta, calcolato da ciò che c'è nella maschera: NON è il giudice. A decidere se il verbale si chiude
@@ -1169,18 +1114,8 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       if (view === 'statistiche') pilloleStatistiche();
     } catch (e) { console.warn('veste v2 (pagine):', e); }
   }
-  function pagineComEra() {
-    ['v2-requisiti', 'v2-pill-lista', 'v2-pill-rub', 'v2-pill-stat'].forEach((id) => { const e = $(id); if (e) e.remove(); });
-    document.querySelectorAll('.v2-schede').forEach((e) => e.classList.remove('v2-schede'));
-    document.querySelectorAll('.v2-nasc').forEach((e) => e.classList.remove('v2-nasc'));
-    document.querySelectorAll('.v2-scuro').forEach((e) => e.classList.remove('v2-scuro'));
-  }
 
   function momentoUno() { try { incarichiSchede(); cantieriVicini(); tipoPulsanti(); } catch (e) { console.warn('veste v2 (primo momento):', e); } }
-  function momentoUnoComEra() {
-    ['v2-inc-schede', 'v2-vicini', 'v2-tipo-chips'].forEach((id) => { const e = $(id); if (e) e.remove(); });
-    const sel = $('f-tipo'); if (sel) sel.classList.remove('v2-tipo-nascosta');
-  }
 
   /* ── DIREZIONE e PRESIDENZA: una sintesi, così la pagina non è mai vuota ── */
   async function sintesi() {
@@ -1223,8 +1158,8 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
         // nello stesso browser è entrato un altro: il riquadro dell'Asseverazione segue il nuovo accesso
         const a = $('nav-assev'); if (a && a.dataset.v2Mostra !== undefined) a.dataset.v2Mostra = a.style.display;
       }
-      pulsante();
-      if (!accesa()) { spegni(); return null; }
+      try { localStorage.removeItem('gv-veste'); } catch (_e) { /* archivio del browser non disponibile */ }
+      { const vecchio = $('btn-veste-v2'); if (vecchio) vecchio.remove(); }
       prepara();
       if (!_aperta) { _aperta = true; if (view === 'dashboard') return RUOLI[ruolo()].apre; }
       return null;
