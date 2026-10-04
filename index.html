@@ -45,7 +45,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 body.viewer-mode #btn-diniego-dash{display:none!important}
 .chips-tipi{display:flex;flex-wrap:wrap;gap:6px}.chips-tipi label{display:inline-flex;align-items:center;gap:6px;margin:0;padding:6px 10px;border:1px solid #ddd;border-radius:18px;font-size:12.5px;font-weight:500;text-transform:none;letter-spacing:0;color:#333;background:#fff;cursor:pointer}.chips-tipi label:has(input:checked){border-color:#e7500f;background:#fff3ec;color:#b33a00}.chips-tipi input{width:auto!important;min-width:0!important;margin:0!important}
 /* sola lettura (Direzione e Consiglio, 25/09/2026): niente riquadri per tecnico; restano Segnala un cantiere, QR e Servizi CPT (chiesto dall'utente) */
-body.viewer-mode #btn-dove-sono,body.viewer-mode #btn-appunti,body.viewer-mode #dash-appunti-card,body.viewer-mode #card-target-mese,body.viewer-mode #dash-notifiche,body.viewer-mode #fld-fd-tec,body.viewer-mode #card-ch-tecnico,body.viewer-mode #card-tbl-prod{display:none!important}
+/* 04/10/2026: nemmeno verbali non consegnati e proposte di chiusura — sono di tecnico, coordinatore e segreteria, e in «Vedi come…» la segreteria li vedeva coi suoi dati (segnalato dall'utente) */
+body.viewer-mode #btn-dove-sono,body.viewer-mode #btn-appunti,body.viewer-mode #dash-appunti-card,body.viewer-mode #card-target-mese,body.viewer-mode #dash-notifiche,body.viewer-mode #fld-fd-tec,body.viewer-mode #card-ch-tecnico,body.viewer-mode #card-tbl-prod,body.viewer-mode #dash-respinte,body.viewer-mode #dash-prop-chiusura{display:none!important}
 /* 26/09/2026: chi è di sola lettura non carica firme (la sua è già caricata) */
 body.viewer-mode #btn-firme{display:none!important}
 /* sul telefono l'intestazione non deve schiacciare il logo (26/09/2026: usciva una targhetta bianca illeggibile) */
