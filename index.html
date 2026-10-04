@@ -3394,9 +3394,10 @@ async function initForm(snap=null){
   bloccaNrVerbale()
 
   vSet('f-data',today())
-  // (03/10/2026) l'ora di inizio e il tipo di accesso non nascono già compilati: un campo
-  // precompilato non è una scelta. L'ora si scrive, o si preme «Adesso».
-  vSet('f-da','')
+  // (03/10/2026) il tipo di accesso non nasce già compilato: un campo precompilato non è una scelta.
+  // (04/10/2026, deciso dall'utente) l'ora di inizio invece SÌ, come prima: si scrive da sola all'apertura
+  // del verbale nuovo e il tecnico la corregge se la visita è cominciata a un'altra ora.
+  oraAdesso('f-da')
   vSet('f-a','')
   vSet('f-tipo','')
   // Pre-seleziona il tecnico loggato
@@ -5487,7 +5488,9 @@ function applySnap(snap){
 
   // ── Tab 0 – Dati visita ───────────────────────────────────────────────────
   if(snap.data_visita)vSet('f-data',snap.data_visita)
-  if(snap.ora_visita)vSet('f-da',snap.ora_visita)
+  // una bozza riaperta (ha il visita_id) tiene la sua ora, o resta vuota: mai l'ora della riapertura.
+  // Una visita nuova copiata da un verbale (ritorno: ora_visita azzerata, niente visita_id) tiene l'ora d'apertura.
+  if(snap.ora_visita||snap.visita_id)vSet('f-da',snap.ora_visita||'')
   if(snap.ora_fine)vSet('f-a',snap.ora_fine)
   if(snap.tipo_accesso)vSet('f-tipo',snap.tipo_accesso)
   if(snap.acc_cant)vSet('f-acc-cant',snap.acc_cant)

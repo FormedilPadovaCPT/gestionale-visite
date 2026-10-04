@@ -74,7 +74,7 @@ window.AIUTO_TESTI = {
   /* ── verbale ── */
   'btn-new-cant': 'Crea un cantiere nuovo in anagrafica. Prima cerca: se esiste già, meglio usarlo che crearne un doppione.',
   'btn-edit-cant': 'Corregge e completa i dati del cantiere selezionato: indirizzo, comune, tipo di intervento e di opera, durata, importo, committente, posizione. Vale per tutte le visite di quel cantiere, anche quelle passate. Con la scheda incompleta il verbale non si chiude.',
-  'btn-ora-inizio': 'Scrive nel campo l\'ora di adesso. L\'ora di inizio non è più già compilata: va indicata, perché quella di apertura della maschera non è detto che sia quella della visita.',
+  'btn-ora-inizio': 'Riscrive nel campo l\'ora di adesso. L\'ora di inizio si compila da sola quando apri il verbale nuovo: se la visita è cominciata a un\'altra ora, correggila.',
   'btn-ora-fine': 'Scrive l\'ora di adesso come ora di fine della visita. Se lasci il campo vuoto e chiudi il verbale nel giorno della visita, ci va l\'ora in cui lo chiudi.',
   'btn-imp-senza-cf': 'Elenca le imprese che compaiono in almeno un verbale e non hanno il codice fiscale, dalla visita più recente. Solo lettura: non cambia niente finché non premi «Salva» su una riga.',
   't:= p.iva': 'Copia la partita IVA nel campo del codice fiscale: per una società di norma coincidono. Non salva: se è giusto, premi «Salva».',
