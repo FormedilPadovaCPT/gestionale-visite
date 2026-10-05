@@ -344,6 +344,8 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
   const _ossData=d=>{const m=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?m[3]+'/'+m[2]+'/'+m[1]:String(d||'')}
   const _ossBreve=t=>String(t||'').replace(/^Scheda del cantiere: /,'').replace(/\s*\(.*\)\s*$/,'')
   const _OSS_DI_VISITA=['impresa','ruolo','tipo-visita','checklist','tecnico','cantiere']
+  // (05/10/2026) i numeri di verbale del cantiere nel periodo; se il database non li manda, il solo conteggio
+  const _ossVerbali=c=>(c.verbali&&c.verbali.length)?c.verbali.map(_xesc).join('<br>'):String(c.visite||'')
   function _ossElenco(ctrl,o){
     o=o||{}
     const testo={};(ctrl.motivi||[]).forEach(m=>{testo[m.cosa]=m.testo})
@@ -364,8 +366,8 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
       const cf=(ctrl.cantieri||[]).filter(c=>(c.blocchi||[]).length)
       if(cf.length){
         h+=`<div style="margin-top:10px"><b>Cantieri da completare (${cf.length})</b> — «✏️ Scheda» apre la scheda del cantiere; poi premi di nuovo «🔎 Controlla».</div>`
-        h+=`<div style="max-height:340px;overflow:auto;margin-top:4px"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr><th ${th}>Cantiere</th><th ${th}>Comune</th><th ${th}>Visite</th><th ${th}>Che cosa manca</th><th ${th}></th></tr>`
-        h+=cf.map(c=>`<tr><td ${td}>${_xesc(c.cantiere||c.cantiere_id)}</td><td ${td}>${_xesc(c.comune||'')}</td><td ${td}>${c.visite}</td><td ${td}>${cosa(c.blocchi)}</td><td ${td}><button class="btn-outline btn-sm" data-oss-cant="${_xesc(c.cantiere_id)}" data-aiuto="Apre la scheda del cantiere per completare il dato che manca. Dopo il salvataggio premi di nuovo «🔎 Controlla».">✏️ Scheda</button></td></tr>`).join('')
+        h+=`<div style="max-height:340px;overflow:auto;margin-top:4px"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr><th ${th}>Cantiere</th><th ${th}>Comune</th><th ${th}>Verbali</th><th ${th}>Che cosa manca</th><th ${th}></th></tr>`
+        h+=cf.map(c=>`<tr><td ${td}>${_xesc(c.cantiere||c.cantiere_id)}</td><td ${td}>${_xesc(c.comune||'')}</td><td ${td}>${_ossVerbali(c)}</td><td ${td}>${cosa(c.blocchi)}</td><td ${td}><button class="btn-outline btn-sm" data-oss-cant="${_xesc(c.cantiere_id)}" data-aiuto="Apre la scheda del cantiere per completare il dato che manca. Dopo il salvataggio premi di nuovo «🔎 Controlla».">✏️ Scheda</button></td></tr>`).join('')
         h+='</table></div>'
       }
       const vf=(ctrl.visite||[]).filter(v=>(v.blocchi||[]).some(k=>_OSS_DI_VISITA.includes(k)))
@@ -385,8 +387,8 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
       h+=`<details style="margin-top:10px"><summary style="cursor:pointer;color:rgba(255,255,255,.6)">ℹ Escono lo stesso, con un dato «Non disponibile» o incompleto (${avvisi.map(m=>m.cantieri).reduce((a,b)=>a+b,0)} segnalazioni su ${ca.length||'alcuni'} cantieri)</summary>`
       h+=avvisi.map(m=>`• ${_xesc(m.testo)} — ${m.cantieri} ${m.cantieri===1?'cantiere':'cantieri'}, ${m.visite} ${m.visite===1?'visita':'visite'}`).join('<br>')
       if(ca.length){
-        h+=`<div style="max-height:260px;overflow:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr><th ${th}>Cantiere</th><th ${th}>Comune</th><th ${th}>Visite</th><th ${th}>Che cosa</th><th ${th}></th></tr>`
-        h+=ca.map(c=>`<tr><td ${td}>${_xesc(c.cantiere||c.cantiere_id)}</td><td ${td}>${_xesc(c.comune||'')}</td><td ${td}>${c.visite}</td><td ${td}>${cosa(c.avvisi)}</td><td ${td}><button class="btn-outline btn-sm" data-oss-cant="${_xesc(c.cantiere_id)}" data-aiuto="Apre la scheda del cantiere per completare il dato che manca. Dopo il salvataggio premi di nuovo «🔎 Controlla».">✏️ Scheda</button></td></tr>`).join('')
+        h+=`<div style="max-height:260px;overflow:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr><th ${th}>Cantiere</th><th ${th}>Comune</th><th ${th}>Verbali</th><th ${th}>Che cosa</th><th ${th}></th></tr>`
+        h+=ca.map(c=>`<tr><td ${td}>${_xesc(c.cantiere||c.cantiere_id)}</td><td ${td}>${_xesc(c.comune||'')}</td><td ${td}>${_ossVerbali(c)}</td><td ${td}>${cosa(c.avvisi)}</td><td ${td}><button class="btn-outline btn-sm" data-oss-cant="${_xesc(c.cantiere_id)}" data-aiuto="Apre la scheda del cantiere per completare il dato che manca. Dopo il salvataggio premi di nuovo «🔎 Controlla».">✏️ Scheda</button></td></tr>`).join('')
         h+='</table></div>'
       }
       h+='</details>'
