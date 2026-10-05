@@ -15,6 +15,16 @@ assert.ok(/\(coalesce\(a\.n, 0\) = 0 and i\.stage_elenco_id is null\)/.test(sql)
 assert.ok(/where t\.id = i\.id and t\.si_chiude and i\.stato in \('aperto','eseguito'\)/.test(sql), 'chiudi_cantiere chiude solo gli incarichi con si_chiude');
 assert.ok(/set stato = coalesce\(stato_prima_chiusura, 'aperto'\)[\s\S]*where chiuso_dal_cantiere = p_cantiere_id and stato = 'chiuso'/.test(sql), 'riapri_cantiere riapre solo quelli chiusi da quel cantiere, nello stato di prima');
 
+/* ── la protezione degli incarichi (tg_incarichi_guard) lascia scrivere stato e chiusura solo alla segreteria:
+      senza la deroga di sistema, la chiusura fatta dal COORDINATORE veniva annullata in silenzio (05/10/2026) ── */
+for (const fn of ['chiudi_cantiere', 'riapri_cantiere']) {
+  const corpo = sql.match(new RegExp('create or replace function public\\.' + fn + '\\([\\s\\S]*?\\nend \\$\\$;'));
+  assert.ok(corpo, 'manca ' + fn + ' nel file SQL');
+  assert.ok(/perform set_config\('app\.incarico_sistema', '1', true\);[\s\S]*update public\.incarichi[\s\S]*perform set_config\('app\.incarico_sistema', '', true\);/.test(corpo[0]),
+    fn + ': gli incarichi si aggiornano con la deroga di sistema accesa, e la si spegne subito dopo');
+  assert.ok(/returning [^\n]*stato/.test(corpo[0]) && /filter \(where (r\.)?stato/.test(corpo[0]), fn + ': l’elenco viene da quello che è stato davvero scritto (RETURNING), non dalla lista preparata prima');
+}
+
 /* ── le funzioni della conferma, provate con un finto database ── */
 const pezzo = html.match(/async function righeIncarichiCantiere\(cantId\)\{[\s\S]*?\n\}\n[\s\S]*?function esitoIncarichiCantiere\(d,chiave\)\{[\s\S]*?\n\}\n/);
 assert.ok(pezzo, 'mancano righeIncarichiCantiere ed esitoIncarichiCantiere in index.html');

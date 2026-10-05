@@ -15,6 +15,13 @@
 -- La chiusura si annota sull'incarico (chiuso_dal_cantiere, stato_prima_chiusura), così «Riapri cantiere»
 -- riapre gli incarichi chiusi con lui, e solo quelli, nello stato in cui erano. Chi chiude o riapre un
 -- incarico a mano (incarichi_set_stato) cancella l'annotazione: da lì in poi l'incarico non segue il cantiere.
+--
+-- ⚠️ Correzione dello stesso giorno: la tabella incarichi ha la protezione tg_incarichi_guard, che rimette stato
+-- e chiusura com'erano se chi scrive non è is_gestione_incarichi() — cioè la sola segreteria. Il COORDINATORE può
+-- chiudere cantieri ma non è «gestione incarichi»: senza il permesso di sistema la protezione annullava la chiusura
+-- degli incarichi in silenzio, mentre l'avviso diceva «chiuso». Le due funzioni ora alzano app.incarico_sistema
+-- (la deroga che la protezione prevede) solo per questo aggiornamento, e l'elenco dei chiusi/riaperti si legge da
+-- RETURNING, cioè da quello che è stato davvero scritto. Scoperto chiudendo l'arretrato #1072 da amministratore.
 
 alter table public.incarichi
   add column if not exists chiuso_dal_cantiere text,
@@ -110,19 +117,22 @@ begin
      and coalesce(elimina,0) = 0;
   get diagnostics v_visite = row_count;
 
-  update public.incarichi i
-     set stato_prima_chiusura = i.stato,
-         chiuso_dal_cantiere  = p_cantiere_id,
-         stato     = 'chiuso',
-         chiuso_il = coalesce(i.chiuso_il, now()),
-         chiuso_da = coalesce(i.chiuso_da, v_email)
-    from jsonb_to_recordset(v_inc) as t(id bigint, si_chiude boolean)
-   where t.id = i.id and t.si_chiude and i.stato in ('aperto','eseguito');
-
-  select coalesce(jsonb_agg(jsonb_build_object('id', t.id, 'tipo', t.tipo_richiesta, 'tecnico', t.tecnico_nome, 'impresa', t.impresa) order by t.id), '[]'::jsonb)
-    into v_chiusi
-    from jsonb_to_recordset(v_inc) as t(id bigint, tipo_richiesta text, tecnico_nome text, impresa text, si_chiude boolean)
-   where t.si_chiude;
+  perform set_config('app.incarico_sistema', '1', true);
+  with chiusi as (
+    update public.incarichi i
+       set stato_prima_chiusura = i.stato,
+           chiuso_dal_cantiere  = p_cantiere_id,
+           stato     = 'chiuso',
+           chiuso_il = coalesce(i.chiuso_il, now()),
+           chiuso_da = coalesce(i.chiuso_da, v_email)
+      from jsonb_to_recordset(v_inc) as t(id bigint, si_chiude boolean)
+     where t.id = i.id and t.si_chiude and i.stato in ('aperto','eseguito')
+    returning i.id, i.tipo_richiesta, i.tecnico_nome, i.impresa, i.stato
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('id', id, 'tipo', tipo_richiesta, 'tecnico', tecnico_nome, 'impresa', impresa) order by id)
+                  filter (where stato = 'chiuso'), '[]'::jsonb)
+    into v_chiusi from chiusi;
+  perform set_config('app.incarico_sistema', '', true);
   select coalesce(jsonb_agg(jsonb_build_object('id', t.id, 'tipo', t.tipo_richiesta, 'tecnico', t.tecnico_nome,
                     'altri_cantieri_aperti', t.altri_cantieri_aperti, 'stage', t.stage) order by t.id), '[]'::jsonb)
     into v_restano
@@ -156,16 +166,19 @@ begin
   get diagnostics v_visite = row_count;
 
   -- solo gli incarichi chiusi DA questo cantiere, nello stato che avevano
+  perform set_config('app.incarico_sistema', '1', true);
   with r as (
     update public.incarichi
        set stato = coalesce(stato_prima_chiusura, 'aperto'),
            chiuso_il = null, chiuso_da = null,
            chiuso_dal_cantiere = null, stato_prima_chiusura = null
      where chiuso_dal_cantiere = p_cantiere_id and stato = 'chiuso'
-    returning id, tipo_richiesta, tecnico_nome
+    returning id, tipo_richiesta, tecnico_nome, stato
   )
-  select coalesce(jsonb_agg(jsonb_build_object('id', r.id, 'tipo', r.tipo_richiesta, 'tecnico', r.tecnico_nome) order by r.id), '[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object('id', r.id, 'tipo', r.tipo_richiesta, 'tecnico', r.tecnico_nome) order by r.id)
+                  filter (where r.stato <> 'chiuso'), '[]'::jsonb)
     into v_riaperti from r;
+  perform set_config('app.incarico_sistema', '', true);
 
   return jsonb_build_object('ok', true, 'cantiere_id', p_cantiere_id, 'visite_riaperte', v_visite,
                             'incarichi_riaperti', v_riaperti);
