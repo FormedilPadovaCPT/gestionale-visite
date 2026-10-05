@@ -365,9 +365,9 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
       h+=blocchi.map(m=>`• ${_xesc(m.testo)} — <b>${m.visite}</b> ${m.visite===1?'visita':'visite'}${m.dove==='cantiere'?', '+m.cantieri+(m.cantieri===1?' cantiere':' cantieri'):''}`).join('<br>')+'<br>'
       const cf=(ctrl.cantieri||[]).filter(c=>(c.blocchi||[]).length)
       if(cf.length){
-        h+=`<div style="margin-top:10px"><b>Cantieri da completare (${cf.length})</b> — «✏️ Scheda» apre la scheda del cantiere; poi premi di nuovo «🔎 Controlla».</div>`
+        h+=`<div style="margin-top:10px"><b>Cantieri da completare (${cf.length})</b> — «✏️ Scheda» apre la scheda del cantiere: salvata, l'elenco si aggiorna da solo.</div>`
         h+=`<div style="max-height:340px;overflow:auto;margin-top:4px"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr><th ${th}>Cantiere</th><th ${th}>Comune</th><th ${th}>Verbali</th><th ${th}>Che cosa manca</th><th ${th}></th></tr>`
-        h+=cf.map(c=>`<tr><td ${td}>${_xesc(c.cantiere||c.cantiere_id)}</td><td ${td}>${_xesc(c.comune||'')}</td><td ${td}>${_ossVerbali(c)}</td><td ${td}>${cosa(c.blocchi)}</td><td ${td}><button class="btn-outline btn-sm" data-oss-cant="${_xesc(c.cantiere_id)}" data-aiuto="Apre la scheda del cantiere per completare il dato che manca. Dopo il salvataggio premi di nuovo «🔎 Controlla».">✏️ Scheda</button></td></tr>`).join('')
+        h+=cf.map(c=>`<tr><td ${td}>${_xesc(c.cantiere||c.cantiere_id)}</td><td ${td}>${_xesc(c.comune||'')}</td><td ${td}>${_ossVerbali(c)}</td><td ${td}>${cosa(c.blocchi)}</td><td ${td}><button class="btn-outline btn-sm" data-oss-cant="${_xesc(c.cantiere_id)}" data-aiuto="Apre la scheda del cantiere per completare il dato che manca. Salvata la scheda, il controllo si rifà da solo.">✏️ Scheda</button></td></tr>`).join('')
         h+='</table></div>'
       }
       const vf=(ctrl.visite||[]).filter(v=>(v.blocchi||[]).some(k=>_OSS_DI_VISITA.includes(k)))
@@ -388,7 +388,7 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
       h+=avvisi.map(m=>`• ${_xesc(m.testo)} — ${m.cantieri} ${m.cantieri===1?'cantiere':'cantieri'}, ${m.visite} ${m.visite===1?'visita':'visite'}`).join('<br>')
       if(ca.length){
         h+=`<div style="max-height:260px;overflow:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr><th ${th}>Cantiere</th><th ${th}>Comune</th><th ${th}>Verbali</th><th ${th}>Che cosa</th><th ${th}></th></tr>`
-        h+=ca.map(c=>`<tr><td ${td}>${_xesc(c.cantiere||c.cantiere_id)}</td><td ${td}>${_xesc(c.comune||'')}</td><td ${td}>${_ossVerbali(c)}</td><td ${td}>${cosa(c.avvisi)}</td><td ${td}><button class="btn-outline btn-sm" data-oss-cant="${_xesc(c.cantiere_id)}" data-aiuto="Apre la scheda del cantiere per completare il dato che manca. Dopo il salvataggio premi di nuovo «🔎 Controlla».">✏️ Scheda</button></td></tr>`).join('')
+        h+=ca.map(c=>`<tr><td ${td}>${_xesc(c.cantiere||c.cantiere_id)}</td><td ${td}>${_xesc(c.comune||'')}</td><td ${td}>${_ossVerbali(c)}</td><td ${td}>${cosa(c.avvisi)}</td><td ${td}><button class="btn-outline btn-sm" data-oss-cant="${_xesc(c.cantiere_id)}" data-aiuto="Apre la scheda del cantiere per completare il dato che manca. Salvata la scheda, il controllo si rifà da solo.">✏️ Scheda</button></td></tr>`).join('')
         h+='</table></div>'
       }
       h+='</details>'
@@ -399,7 +399,8 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
   function _ossClick(e){
     const b=e.target&&e.target.closest?e.target.closest('[data-oss-cant],[data-oss-vis],[data-oss-az],[data-oss-dal]'):null
     if(!b)return
-    if(b.dataset.ossCant){if(typeof window.admEditCantiere==='function')window.admEditCantiere(b.dataset.ossCant);return}
+    // (05/10/2026) salvata la scheda, l'elenco si rifà da solo (saveCantiere guarda _ossRicontrolla)
+    if(b.dataset.ossCant){if(typeof window.admEditCantiere==='function'){window._ossRicontrolla=b.dataset.ossCant;window._mcGeoFrom=null;window.admEditCantiere(b.dataset.ossCant)}return}
     if(b.dataset.ossVis){if(typeof window.modificaVisitaCoord==='function')window.modificaVisitaCoord(b.dataset.ossVis);return}
     if(b.dataset.ossAz==='scarica'){_ossScarica();return}
     if(b.dataset.ossDal){vSet('oss-dal',b.dataset.ossDal);vSet('oss-al',b.dataset.ossAl);admOssControlla();const r=$('oss-report');if(r&&r.scrollIntoView)r.scrollIntoView({behavior:'smooth',block:'center'})}

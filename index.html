@@ -4723,8 +4723,11 @@ $('btn-mc-save').onclick=async()=>{
     toast(_gerr?('Cantiere aggiornato, posizione NON salvata: '+_gerr)
       :(_gp?(_gp.lat==null?'Cantiere aggiornato \u00b7 posizione rimessa in coda per il ricalcolo':'Cantiere aggiornato \u00b7 posizione corretta')
            :'Cantiere aggiornato'), _gerr?'warn':'ok')
+    const _salvato=window._editCantId
     window._editCantId=null;$('modal-cant-title').textContent='Nuovo cantiere'
     const _from=window._mcGeoFrom;window._mcGeoFrom=null
+    // (05/10/2026) scheda aperta dal controllo per l'Osservatorio: il controllo si rifà, e il cantiere sistemato esce dall'elenco
+    if(window._ossRicontrolla&&window._ossRicontrolla===_salvato){window._ossRicontrolla=null;if(typeof window.admOssControlla==='function')window.admOssControlla();return}
     if(_from==='dash'){if(typeof loadDashMap==='function')loadDashMap()}
     else if(_from==='cant'){if(typeof loadCantMap==='function')loadCantMap()}
     else if(_from==='visita'){/* form visita: la lista di segreteria non c'entra */}
