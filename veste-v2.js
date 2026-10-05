@@ -454,8 +454,21 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
   /* ── numeri: una lettura fallita si dice, non diventa zero ── */
   /* 04/10/2026: il nome del riquadro e il messaggio vanno nella console come testo — l'oggetto errore da solo
      si leggeva «{}», e non si capiva quale numero non era stato letto */
-  async function conta(leggiFn, nome) {
-    try { const n = await leggiFn(); return { n: Number(n) || 0 }; } catch (e) { const msg = (e && e.message) || String(e); console.warn('veste v2, conteggio «' + (nome || '?') + '» non letto: ' + msg); return { errore: msg }; }
+  /* 05/10/2026: un conteggio interrotto per «statement timeout» si ritenta UNA volta dopo qualche secondo. Le
+     funzioni da sole rispondono in meno di un secondo (misurate quel giorno: 0,2-0,7 s contro un limite di 8): il
+     timeout arriva quando cadono dentro la raffica di letture dell'apertura. Qualunque altro errore resta un errore
+     subito, e anche il secondo tentativo, se fallisce, si dice — mai uno zero al posto di «non letto». */
+  const ATTESA_RITENTO_MS = 4000;
+  const eTimeout = (msg) => /statement timeout/i.test(msg || '');
+  async function conta(leggiFn, nome, attesa = ATTESA_RITENTO_MS) {
+    const leggi = async () => { const n = await leggiFn(); return { n: Number(n) || 0 }; };
+    const avvisa = (msg) => { console.warn('veste v2, conteggio «' + (nome || '?') + '» non letto: ' + msg); return { errore: msg }; };
+    try { return await leggi(); } catch (e) {
+      const msg = (e && e.message) || String(e);
+      if (!eTimeout(msg)) return avvisa(msg);
+      await new Promise((ok) => setTimeout(ok, attesa));
+      try { return await leggi(); } catch (e2) { return avvisa(((e2 && e2.message) || String(e2)) + ' (anche al secondo tentativo)'); }
+    }
   }
   const quadro = (c) => c.errore ? '<div class="v2-num v2-err" title="' + esc(c.errore) + '">non letto</div>' : '<div class="v2-num' + (c.n ? '' : ' v2-zero') + '">' + c.n + '</div>';
   const rigaScr = (c, titolo, sotto, azione, etichetta) => `<div class="v2-card" style="padding:10px 16px"><div class="v2-riga">${quadro(c)}<div class="v2-t"><b>${titolo}</b><small>${sotto}</small></div><button type="button" class="btn-outline btn-sm" data-v2-az="${azione}">${etichetta}</button></div></div>`;

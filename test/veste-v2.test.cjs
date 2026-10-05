@@ -306,3 +306,29 @@ assert.ok(js.includes('>Parti da un tuo incarico</div>') && !js.includes('>Perch
     console.log('veste-v2: ok');
   }).catch((e) => { console.error(e); process.exit(1); });
 }
+
+/* ── 05/10/2026: l'accesso non riparte due volte, e un conteggio interrotto per timeout si ritenta una volta ── */
+assert.ok(/if\(S\.appReady&&\(event==='INITIAL_SESSION'\|\|event==='TOKEN_REFRESHED'\|\|event==='USER_UPDATED'\|\|event==='SIGNED_IN'\)\)\{S\.user=s\.user;return\}/.test(html),
+  'INITIAL_SESSION, ad app già pronta, non deve far ripartire onLogin (la dashboard si caricava due volte)');
+{
+  const pezzo = js.match(/const ATTESA_RITENTO_MS = \d+;[\s\S]*?async function conta\(leggiFn, nome, attesa = ATTESA_RITENTO_MS\) \{[\s\S]*?\n  \}\n/);
+  assert.ok(pezzo, 'manca conta con il ritento in veste-v2.js');
+  const conta = new Function(pezzo[0] + '\nreturn conta;')();
+  const avvisi = []; const warn = console.warn; console.warn = (m) => avvisi.push(String(m));
+  const sequenza = (...esiti) => { let i = 0; const f = async () => { const e = esiti[i++]; if (e instanceof Error) throw e; return e; }; f.chiamate = () => i; return f; };
+  const timeout = () => new Error('canceling statement due to statement timeout');
+  const casi = [];
+  const t1 = sequenza(timeout(), 7);
+  casi.push(conta(t1, 'ritento riuscito', 1).then((r) => { assert.deepStrictEqual(r, { n: 7 }, 'dopo un timeout il secondo tentativo riuscito dà il numero'); assert.strictEqual(t1.chiamate(), 2); }));
+  const t2 = sequenza(new Error('permission denied'), 7);
+  casi.push(conta(t2, 'altro errore', 1).then((r) => { assert.ok(r.errore && /permission denied/.test(r.errore), 'un errore che non è un timeout resta un errore'); assert.strictEqual(t2.chiamate(), 1, 'e non si ritenta'); }));
+  const t3 = sequenza(timeout(), timeout(), 7);
+  casi.push(conta(t3, 'due timeout', 1).then((r) => { assert.ok(r.errore && /secondo tentativo/.test(r.errore), 'due timeout di fila: «non letto», mai uno zero'); assert.strictEqual(t3.chiamate(), 2, 'un ritento solo'); }));
+  const t4 = sequenza(0);
+  casi.push(conta(t4, 'zero vero', 1).then((r) => assert.deepStrictEqual(r, { n: 0 }, 'uno zero letto resta zero')));
+  Promise.all(casi).then(() => {
+    console.warn = warn;
+    assert.ok(avvisi.some((a) => a.includes('«altro errore»')) && avvisi.some((a) => a.includes('«due timeout»')) && !avvisi.some((a) => a.includes('«ritento riuscito»')), 'nella console solo i conteggi rimasti non letti, col loro nome');
+    console.log('veste-v2 (accesso e ritento): ok');
+  }).catch((e) => { console.warn = warn; console.error(e); process.exit(1); });
+}

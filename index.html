@@ -2619,7 +2619,10 @@ async function initAuth(){
       // far ripartire onLogin: ci pensa obbligaCambioPassword a proseguire (27/09/2026)
       if(S.cambioPwd){S.user=s.user;return}
       // Se l'app è già inizializzata, aggiorna solo l'utente senza reinizializzare (evita reset al cambio scheda)
-      if(S.appReady&&(event==='TOKEN_REFRESHED'||event==='USER_UPDATED'||event==='SIGNED_IN')){S.user=s.user;return}
+      // (05/10/2026) anche INITIAL_SESSION: la libreria lo manda appena ci si mette in ascolto, cioè subito dopo
+      // l'onLogin di initAuth, e faceva ripartire onLogin una seconda volta — tutta la dashboard caricata due volte,
+      // il database saturo e i conteggi della scrivania interrotti per timeout (log del 05/10 alle 09:23)
+      if(S.appReady&&(event==='INITIAL_SESSION'||event==='TOKEN_REFRESHED'||event==='USER_UPDATED'||event==='SIGNED_IN')){S.user=s.user;return}
       onLogin(s.user)
     })
   }catch(e){
@@ -15559,7 +15562,7 @@ document.addEventListener('input',function(ev){
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=9"></script>
 <script src="rientri-giorni.js?v=5"></script>
-<script src="veste-v2.js?v=32"></script>
+<script src="veste-v2.js?v=33"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

@@ -458,7 +458,7 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
         if(c.definitive||c.non_definitive)r+=` <button class="btn-outline btn-sm" style="margin-left:6px" data-oss-dal="${es.dal}" data-oss-al="${es.al}" data-aiuto="Mette nelle date questo esercizio e mostra, qui sotto, le visite che non possono ancora andare all'Osservatorio. Non scarica niente.">Vedi l'elenco</button>`
         righe.push(r)
       }catch(e){
-        console.warn('admOssTessera:',e)
+        console.warn('admOssTessera, esercizio '+es.nome+': '+((e&&e.message)||e))
         righe.push(`<b>Esercizio ${es.nome}</b>: <span style="color:#e74c3c">non sono riuscito a leggere (${_xesc(e.message||e)})</span>`)
       }
     }
