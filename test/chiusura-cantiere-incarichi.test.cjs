@@ -25,6 +25,17 @@ for (const fn of ['chiudi_cantiere', 'riapri_cantiere']) {
   assert.ok(/returning [^\n]*stato/.test(corpo[0]) && /filter \(where (r\.)?stato/.test(corpo[0]), fn + ': l’elenco viene da quello che è stato davvero scritto (RETURNING), non dalla lista preparata prima');
 }
 
+/* ── le visite: riaprendo il cantiere tornano aperte SOLO quelle chiuse con lui (05/10/2026) ── */
+{
+  const sqlV = fs.readFileSync(path.join(radice, 'supabase', 'sql', '2026_10_05_chiusura_cantiere_visite.sql'), 'utf8');
+  const chiudi = sqlV.match(/create or replace function public\.chiudi_cantiere\([\s\S]*?\nend \$\$;/)[0];
+  const riapri = sqlV.match(/create or replace function public\.riapri_cantiere\([\s\S]*?\nend \$\$;/)[0];
+  assert.ok(/update public\.visite\s+set chiusa\s+= true,[\s\S]*?chiusa_dal_cantiere = p_cantiere_id/.test(chiudi), 'chiudi_cantiere annota sulla visita il cantiere che l’ha chiusa');
+  assert.ok(/update public\.visite set chiusa = false[^;]*where cantiere_id = p_cantiere_id and chiusa = true and chiusa_dal_cantiere = p_cantiere_id;/.test(riapri), 'riapri_cantiere riapre solo le visite chiuse da quel cantiere');
+  assert.ok(/perform set_config\('app\.incarico_sistema', '1', true\);/.test(chiudi) && /perform set_config\('app\.incarico_sistema', '1', true\);/.test(riapri), 'l’ultima versione delle due funzioni tiene la deroga per gli incarichi');
+  assert.ok(html.includes("((data&&data.visite_riaperte)||0)+' visite riaperte'") && html.includes("restano chiuse (chiuse a parte)"), 'l’avviso della riapertura dice quante visite tornano aperte e quante restano chiuse');
+}
+
 /* ── le funzioni della conferma, provate con un finto database ── */
 const pezzo = html.match(/async function righeIncarichiCantiere\(cantId\)\{[\s\S]*?\n\}\n[\s\S]*?function esitoIncarichiCantiere\(d,chiave\)\{[\s\S]*?\n\}\n/);
 assert.ok(pezzo, 'mancano righeIncarichiCantiere ed esitoIncarichiCantiere in index.html');

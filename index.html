@@ -13610,11 +13610,12 @@ async function chiudiCantiere(cantId,label){
 }
 window.chiudiCantiere=chiudiCantiere
 async function riapriCantiere(cantId,label){
-  if(!confirm('Riaprire il cantiere "'+(label||cantId)+'"?\nLe visite collegate verranno riaperte, e con loro gli incarichi che si erano chiusi insieme al cantiere.'))return
+  if(!confirm('Riaprire il cantiere "'+(label||cantId)+'"?\nSi riaprono le visite e gli incarichi che si erano chiusi insieme al cantiere; le visite chiuse a parte, prima, restano chiuse.'))return
   try{
     const{data,error}=await sb.rpc('riapri_cantiere',{p_cantiere_id:cantId})
     if(error)throw error
-    toast('Cantiere riaperto'+esitoIncarichiCantiere(data,'incarichi_riaperti'),'ok')
+    // (05/10/2026) si riaprono solo le visite chiuse dal cantiere: si dice quante, e quante restano chiuse
+    toast('Cantiere riaperto \u00b7 '+((data&&data.visite_riaperte)||0)+' visite riaperte'+((data&&data.visite_restano_chiuse)?' \u00b7 '+data.visite_restano_chiuse+' restano chiuse (chiuse a parte)':'')+esitoIncarichiCantiere(data,'incarichi_riaperti'),'ok')
     if(typeof loadIncarichi==='function'&&data&&(data.incarichi_riaperti||[]).length)loadIncarichi().catch(e=>console.warn('loadIncarichi:',e))
     hide('modal-qd')
     if(typeof loadCantieri==='function'&&!$('view-cantieri')?.classList.contains('hidden'))loadCantieri()
