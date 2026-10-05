@@ -114,8 +114,8 @@ window.AIUTO_TESTI = {
   'btn-fondi-sel': 'Unisce i cantieri spuntati in uno solo: le visite di tutti passano sul cantiere che scegli come principale. Non si torna indietro da soli: chiedi alla segreteria se hai dubbi.',
   't:nuova visita di ritorno': 'Apre un verbale nuovo già compilato con cantiere, imprese e le non conformità da rivedere: si controlla se sono state chiuse.',
   't:riapri': 'Riporta il verbale a bozza per correggerlo. Solo la segreteria può farlo su un verbale definitivo.',
-  't:chiudi cantiere (fine lavori)': 'Segna il cantiere come finito: sparisce dalle scadenze e dai cantieri attivi. Le visite fatte restano.',
-  'p:chiudi cantiere': 'Segna il cantiere come finito: sparisce dalle scadenze e dai cantieri attivi. Le visite fatte restano.',
+  't:chiudi cantiere (fine lavori)': 'Segna il cantiere come finito: sparisce dalle scadenze e dai cantieri attivi, e si chiudono i suoi incarichi (prima te li elenca). Le visite fatte restano.',
+  'p:chiudi cantiere': 'Segna il cantiere come finito: sparisce dalle scadenze e dai cantieri attivi, e si chiudono i suoi incarichi (prima te li elenca). Le visite fatte restano.',
   /* codice univoco del cantiere (codice-univoco.js, 23/09/2026) */
   'btn-cod-uni-proponi': 'Propone il codice univoco del cantiere: iniziali del tecnico, strada e civico, sigla dell\'impresa principale. Lo correggi prima di salvarlo; se il cantiere ha già un codice non lo tocca.',
   'btn-mc-cod-uni-proponi': 'Scrive nel campo il codice proposto: iniziali del tecnico, strada e civico, sigla dell\'impresa principale. Correggilo se serve: si salva insieme al cantiere.',

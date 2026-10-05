@@ -219,7 +219,7 @@
     b.innerHTML = `<span><b>${n}</b><em> ${n === 1 ? 'selezionato' : 'selezionati'}</em></span>`
       + `<button type="button" class="rg-b-chiaro" data-rg="giro" data-aiuto="Apre il navigatore con i cantieri spuntati come tappe, in ordine dalla tua posizione (al massimo 10)."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M3 11l19-9-9 19-2-8-8-2z"></path></svg>Giro</button>`
       + (o.segreteria ? `<button type="button" class="rg-b-chiaro" data-rg="riassegna" data-aiuto="Passa il rientro dei cantieri spuntati a un altro tecnico. Il verbale resta di chi l'ha fatto.">Riassegna</button>`
-        + `<button type="button" class="rg-b-pieno" data-rg="chiudi-sel" data-aiuto="Chiude per fine lavori i cantieri spuntati: le loro visite si chiudono e i rientri escono dalle scadenze.">Chiudi</button>` : '')
+        + `<button type="button" class="rg-b-pieno" data-rg="chiudi-sel" data-aiuto="Chiude per fine lavori i cantieri spuntati: le loro visite e i loro incarichi si chiudono, e i rientri escono dalle scadenze.">Chiudi</button>` : '')
       + '<button type="button" class="rg-b-x" data-rg="desel" aria-label="Togli la selezione">✕</button>';
   }
 
@@ -294,16 +294,23 @@
   async function chiudi(box, st, righe) {
     if (!righe.length) return;
     const elenco = righe.slice(0, 8).map((v) => '· ' + ultime4(v.nr_verbale) + ' ' + nomeCantiere(v)).join('\n') + (righe.length > 8 ? '\n· … e altri ' + (righe.length - 8) : '');
-    if (!confirm((righe.length === 1 ? 'Chiudere questo cantiere' : 'Chiudere questi ' + righe.length + ' cantieri') + ' per fine lavori?\n\n' + elenco + '\n\nTutte le visite collegate si chiudono e il rientro esce dalle scadenze.')) return;
+    /* 05/10/2026: con il cantiere si chiudono i suoi incarichi (chiudi_cantiere); la conferma dice quali.
+       Un incarico che ha più cantieri si chiude con l'ultimo: chiudendone diversi insieme può chiudersi anche se qui risulta «resta aperto». */
+    let incarichi = '';
+    if (typeof window.righeIncarichiCantiere === 'function') {
+      for (const v of righe.slice(0, 8)) { const t = await window.righeIncarichiCantiere(v.cantiere_id); if (t) incarichi += '\n\n' + ultime4(v.nr_verbale) + ' ' + nomeCantiere(v) + ':' + t.replace(/^\n\n/, '\n'); }
+    }
+    if (!confirm((righe.length === 1 ? 'Chiudere questo cantiere' : 'Chiudere questi ' + righe.length + ' cantieri') + ' per fine lavori?\n\n' + elenco + '\n\nTutte le visite collegate si chiudono e il rientro esce dalle scadenze.' + incarichi)) return;
     const note = prompt('Note sulla chiusura (facoltative — lascia vuoto se non servono).\nPremi Annulla per interrompere.', '');
     if (note === null) return;
-    let ok = 0, visite = 0; const ko = [];
+    let ok = 0, visite = 0; const ko = [], incChiusi = [];
     for (const v of righe) {
       const { data, error } = await window.sb.rpc('chiudi_cantiere', { p_cantiere_id: v.cantiere_id, p_motivo: 'termini_lavori', p_note: note.trim() || null });
-      if (error) ko.push(ultime4(v.nr_verbale) + ': ' + error.message); else { ok++; visite += (data && data.visite_chiuse) || 0; st.sel.delete(v.cantiere_id); }
+      if (error) ko.push(ultime4(v.nr_verbale) + ': ' + error.message); else { ok++; visite += (data && data.visite_chiuse) || 0; st.sel.delete(v.cantiere_id); incChiusi.push(...((data && data.incarichi_chiusi) || [])); }
     }
-    if (ko.length) avviso('Chiusi ' + ok + ' su ' + righe.length + '. Non riusciti — ' + ko.join('; '), 'err');
-    else avviso((ok === 1 ? 'Cantiere chiuso' : ok + ' cantieri chiusi') + ' · ' + visite + ' visite chiuse', 'ok');
+    const inc = typeof window.esitoIncarichiCantiere === 'function' ? window.esitoIncarichiCantiere({ incarichi_chiusi: incChiusi }) : '';
+    if (ko.length) avviso('Chiusi ' + ok + ' su ' + righe.length + inc + '. Non riusciti — ' + ko.join('; '), 'err');
+    else avviso((ok === 1 ? 'Cantiere chiuso' : ok + ' cantieri chiusi') + ' · ' + visite + ' visite chiuse' + inc, 'ok');
     render(box, st.ultimo);   // la selezione sparisce subito, poi si rilegge dal database
     if (st.ultimo.dopo) await st.ultimo.dopo();
   }
