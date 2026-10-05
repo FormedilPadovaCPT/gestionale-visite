@@ -1895,6 +1895,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 <div class="modal-overlay hidden" id="modal-cant">
   <div class="modal-box">
     <h3 id="modal-cant-title">Nuovo cantiere</h3>
+    <div id="mc-visite" class="hidden" style="margin:0 0 12px;padding:8px 10px;background:#f8f8f8;border:1px solid var(--border);border-radius:6px;font-size:12.5px"></div>
     <div class="row">
       <div class="field" style="flex:3"><label>Indirizzo *</label><input type="text" id="mc-ind"><div id="mc-quartiere" style="margin-top:4px"></div></div>
       <div class="field" style="flex:1"><label>Civico *</label><input type="text" id="mc-civ"></div>
@@ -4460,6 +4461,7 @@ function resetModalCantiere(){
   const wrap=$('mc-tip-ope-altro-wrap');if(wrap)wrap.classList.add('hidden')
   vSet('mc-comm-search','');vSet('mc-comm-id','');const _mci=$('mc-comm-info');if(_mci)_mci.textContent=''
   if(typeof mcGeoReset==='function')mcGeoReset()
+  const mv=$('mc-visite');if(mv){mv.classList.add('hidden');mv.innerHTML=''}
 }
 $('btn-new-cant').onclick=()=>{hideCantCard();resetModalCantiere();show('modal-cant')}
 $('btn-mc-cancel').onclick=()=>{hide('modal-cant');window._editCantId=null;$('modal-cant-title').textContent='Nuovo cantiere'}
@@ -12906,6 +12908,36 @@ async function geoFixCantiere(cantId,from){
 }
 window._geoFixBtn=_geoFixBtn;window.geoFixCantiere=geoFixCantiere
 
+// (05/10/2026) Le visite del cantiere, in sola lettura, in cima alla scheda: per ritrovare il verbale
+// quando si apre la scheda dal controllo per l'Osservatorio (chiesto dall'utente). Se la lettura non
+// riesce lo dice: «nessuna» solo quando il database ha risposto senza righe.
+async function mcVisiteFill(cantId) {
+  const box = $('mc-visite'); if (!box) return
+  box.classList.remove('hidden'); box.innerHTML = '<span style="color:#888">Leggo le visite del cantiere…</span>'
+  const { data: vv, error } = await sb.from('visite').select('visita_id,nr_verbale,data_visita,stato,chiusa,tecnico_id,impresa_id')
+    .eq('cantiere_id', cantId).or('elimina.is.null,elimina.eq.0').order('data_visita', { ascending: false })
+  if (window._editCantId !== cantId) return
+  if (error) { box.innerHTML = '<span style="color:#c0392b">Non sono riuscito a leggere le visite del cantiere (' + esc(error.message) + ')</span>'; return }
+  if (!vv || !vv.length) { box.innerHTML = '<b>Visite su questo cantiere</b>: nessuna.'; return }
+  const tIds = [...new Set(vv.map(v => v.tecnico_id).filter(Boolean))], iIds = [...new Set(vv.map(v => v.impresa_id).filter(Boolean))]
+  const [rt, ri] = await Promise.all([
+    tIds.length ? sb.from('tecnici').select('tecnico_id,tecnico_cognome').in('tecnico_id', tIds) : { data: [] },
+    iIds.length ? sb.from('imprese').select('impresa_id,impresa_nome').in('impresa_id', iIds) : { data: [] }])
+  if (window._editCantId !== cantId) return
+  const tn = {}, im = {}
+  ;(rt.data || []).forEach(t => { tn[t.tecnico_id] = t.tecnico_cognome })
+  ;(ri.data || []).forEach(i => { im[i.impresa_id] = i.impresa_nome })
+  const stato = v => v.chiusa ? 'chiusa' : (v.stato === 'definitivo' ? 'definitivo' : (v.stato || 'bozza'))
+  box.innerHTML = '<b>Visite su questo cantiere (' + vv.length + ')</b>' + ((rt.error || ri.error) ? ' <span style="color:#c0392b">— nomi di tecnici o imprese non letti</span>' : '') +
+    '<div style="max-height:150px;overflow:auto;margin-top:4px"><table style="width:100%;border-collapse:collapse">' +
+    vv.map(v => '<tr><td style="padding:2px 6px 2px 0;white-space:nowrap"><b>' + esc(v.nr_verbale || '(senza numero)') + '</b></td>' +
+      '<td style="padding:2px 6px;white-space:nowrap">' + esc(fmtDate(v.data_visita)) + '</td>' +
+      '<td style="padding:2px 6px">' + esc(tn[v.tecnico_id] || v.tecnico_id || '') + '</td>' +
+      '<td style="padding:2px 6px">' + esc(im[v.impresa_id] || v.impresa_id || '') + '</td>' +
+      '<td style="padding:2px 0 2px 6px;color:#888;white-space:nowrap">' + esc(stato(v)) + '</td></tr>').join('') +
+    '</table></div>'
+}
+window.mcVisiteFill = mcVisiteFill
 async function admEditCantiere(cantId) {
   const { data: c, error } = await sb.from('cantieri').select('*').eq('cantiere_id', cantId).single()
   if (error || !c) { toast('Cantiere non trovato', 'err'); return }
@@ -12967,6 +12999,7 @@ async function admEditCantiere(cantId) {
   }
   mcGeoFill(c)
   show('modal-cant')
+  mcVisiteFill(cantId)
 }
 $('adm-cant-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadCantieri() })
 window.admLoadCantieri = admLoadCantieri
