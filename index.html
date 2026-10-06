@@ -274,6 +274,13 @@ tr.row-detail-hover:hover td{background:#fff3ed}
   #modal-cant .modal-actions{position:sticky;bottom:-22px;background:inherit;margin:14px -22px -22px;padding:10px 22px 14px;border-top:1px solid var(--border);z-index:2}
 }
 @media(min-width:1200px){#modal-cant .mc-cols{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* la posizione sulla mappa: una fascia sotto le colonne, campi a sinistra e mappa a destra */
+@media(min-width:900px){
+  #modal-cant #mc-geo-wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:0 22px;align-items:start}
+  #modal-cant #mc-geo-wrap>*{grid-column:1}
+  #modal-cant #mc-geo-wrap>.sect-title{grid-column:1/-1}
+  #modal-cant #mc-geo-map{grid-column:2;grid-row:2/span 6;height:210px!important}
+}
 /* FOTO */
 .foto-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-bottom:18px}
 .foto-slot{border:2px dashed var(--border);border-radius:var(--radius);background:#fafafa;padding:10px;text-align:center;position:relative;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:border .2s}
@@ -1919,29 +1926,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>CAP <span style="font-weight:400;font-size:11px;color:#aaa">(auto)</span></label><input type="text" id="mc-cap" maxlength="5" readonly style="background:#f8f8f8" placeholder="si compila da Comune"></div>
       <div class="field"><label>Cod. ISTAT <span style="font-weight:400;font-size:11px;color:#aaa">(per XML, 6 cifre)</span></label><input type="text" id="mc-comune-cod" maxlength="6" placeholder="es. 028001" style="font-family:monospace"></div>
     </div>
-    <div id="mc-geo-wrap" class="hidden">
-      <div class="sect-title" style="margin-top:10px;font-size:11px;color:var(--grey)">Posizione sulla mappa</div>
-      <div id="mc-geo-stato" style="font-size:12px;margin-bottom:8px;min-height:18px"></div>
-      <div class="field">
-        <label>Link Google Maps o coordinate</label>
-        <div style="display:flex;gap:6px;align-items:flex-start">
-          <input type="text" id="mc-geo-paste" placeholder="Incolla il link di Google Maps oppure 45.406400, 11.876800" autocomplete="off" style="flex:1">
-          <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-paste" style="white-space:nowrap;margin-top:1px">Applica</button>
-        </div>
-      </div>
-      <div class="row">
-        <div class="field"><label>Latitudine</label><input type="text" id="mc-lat" placeholder="45.406400" style="font-family:monospace"></div>
-        <div class="field"><label>Longitudine</label><input type="text" id="mc-lng" placeholder="11.876800" style="font-family:monospace"></div>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-        <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-gps" title="Prende la posizione dal GPS del dispositivo: usalo mentre sei in cantiere">&#128205; Sono qui (GPS)</button>
-        <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-auto" title="Azzera la posizione: il geocodificatore automatico la ricalcola entro pochi minuti">&#128260; Ricalcola in automatico</button>
-        <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-open" title="Apri la posizione attuale in Google Maps">&#128506;&#65039; Apri in Google Maps</button>
-        <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-undo" title="Torna alla posizione salvata">&#10006; Annulla modifica</button>
-      </div>
-      <div id="mc-geo-map" style="height:220px;border:1px solid var(--border);border-radius:6px"></div>
-      <div style="font-size:11px;color:#888;margin-top:5px;line-height:1.45">Se sei in cantiere usa <b>Sono qui (GPS)</b>: e il modo piu preciso. In alternativa trascina il pin, clicca sulla mappa o incolla un link di Google Maps. La posizione messa a mano non viene piu sovrascritta dal geocodificatore automatico, finche non cambi indirizzo, civico, comune o CAP.</div>
-    </div>
     </div>
     <div class="mc-col">
       <div class="sect-title">Dati per l'Osservatorio</div>
@@ -1984,6 +1968,29 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma" maxlength="50"></div>
     <div class="field"><label>Descrizione cantiere <span style="font-weight:400;font-size:11px;color:#aaa">(cosa si fa nel cantiere)</span></label><textarea id="mc-descr" rows="2" maxlength="500" placeholder="Es. Rifacimento copertura e coibentazione facciata…" style="width:100%;resize:vertical;font-family:inherit;font-size:14px;padding:8px;border:1px solid var(--border);border-radius:6px"></textarea></div>
     </div>
+    </div>
+    <div id="mc-geo-wrap" class="hidden">
+      <div class="sect-title" style="margin-top:10px;font-size:11px;color:var(--grey)">Posizione sulla mappa</div>
+      <div id="mc-geo-stato" style="font-size:12px;margin-bottom:8px;min-height:18px"></div>
+      <div class="field">
+        <label>Link Google Maps o coordinate</label>
+        <div style="display:flex;gap:6px;align-items:flex-start">
+          <input type="text" id="mc-geo-paste" placeholder="Incolla il link di Google Maps oppure 45.406400, 11.876800" autocomplete="off" style="flex:1">
+          <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-paste" style="white-space:nowrap;margin-top:1px">Applica</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Latitudine</label><input type="text" id="mc-lat" placeholder="45.406400" style="font-family:monospace"></div>
+        <div class="field"><label>Longitudine</label><input type="text" id="mc-lng" placeholder="11.876800" style="font-family:monospace"></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-gps" title="Prende la posizione dal GPS del dispositivo: usalo mentre sei in cantiere">&#128205; Sono qui (GPS)</button>
+        <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-auto" title="Azzera la posizione: il geocodificatore automatico la ricalcola entro pochi minuti">&#128260; Ricalcola in automatico</button>
+        <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-open" title="Apri la posizione attuale in Google Maps">&#128506;&#65039; Apri in Google Maps</button>
+        <button class="btn-outline btn-sm" type="button" id="btn-mc-geo-undo" title="Torna alla posizione salvata">&#10006; Annulla modifica</button>
+      </div>
+      <div id="mc-geo-map" style="height:220px;border:1px solid var(--border);border-radius:6px"></div>
+      <div style="font-size:11px;color:#888;margin-top:5px;line-height:1.45">Se sei in cantiere usa <b>Sono qui (GPS)</b>: e il modo piu preciso. In alternativa trascina il pin, clicca sulla mappa o incolla un link di Google Maps. La posizione messa a mano non viene piu sovrascritta dal geocodificatore automatico, finche non cambi indirizzo, civico, comune o CAP.</div>
     </div>
     <div class="modal-actions">
       <button class="btn-outline" id="btn-mc-cancel">Annulla</button>
