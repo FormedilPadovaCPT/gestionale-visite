@@ -133,9 +133,11 @@ assert.ok(/before insert or update of stato on public\.visite/.test(sql), 'il tr
 assert.ok(/auth\.uid\(\) is not null/.test(sql), 'le scritture senza utente (importazioni) non sono toccate');
 assert.ok(/old\.stato is distinct from 'definitivo'/.test(sql), 'chi risalva un definitivo non è toccato');
 
-/* (03/10/2026, pomeriggio) il comune va scritto; il codice ISTAT lo ricava il gestionale: un cantiere fuori
-   provincia, che la tabella dei comuni non conosce, non deve fermare il tecnico in cantiere */
-assert.ok(/if trim\(coalesce\(c\.comune_nome,''\)\) = '' then\s+esito := esito \|\| jsonb_build_object\('cosa','cantiere-comune'/.test(sql), 'la regola del comune deve guardare il nome, non il codice');
-assert.ok(!/if coalesce\(c\.cantiere_comune_cod,''\) !~/.test(sql), 'il codice ISTAT mancante non deve fermare la chiusura del verbale');
+/* (06/10/2026, deciso dall'utente) il comune deve avere anche il codice ISTAT, che chiede l'Osservatorio: il 03/10
+   bastava il nome perché l'elenco era solo provinciale; ora l'elenco ISTAT è completo e c'è «➕ Altro comune» */
+const sqlIstat = fs.readFileSync(path.join(radice, 'supabase', 'sql', '2026_10_06_verbale_mancanze_codice_istat.sql'), 'utf8');
+assert.ok(/if trim\(coalesce\(c\.comune_nome,''\)\) = '' then\s+esito := esito \|\| jsonb_build_object\('cosa','cantiere-comune'/.test(sqlIstat), 'senza il nome del comune il verbale non si chiude');
+assert.ok(/elsif coalesce\(c\.cantiere_comune_cod,''\) !~ '\^\[0-9\]\{6\}\$' then\s+esito := esito \|\| jsonb_build_object\('cosa','cantiere-comune'/.test(sqlIstat), 'senza il codice ISTAT del comune il verbale non si chiude');
+assert.ok(/Altro comune/.test(sqlIstat), 'il messaggio dice come rimediare a un comune fuori provincia');
 
 console.log('ok — verbale completo: chiusura dal database, niente precompilati, scheda cantiere, committente, ora di fine');
