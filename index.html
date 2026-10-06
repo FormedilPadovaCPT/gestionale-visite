@@ -267,6 +267,13 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 .modal-box{background:#fff;border-radius:12px;padding:22px;width:100%;max-width:500px;box-shadow:0 8px 32px rgba(0,0,0,.2);max-height:92vh;overflow-y:auto}
 .modal-box h3{margin-bottom:14px;color:var(--grey);font-size:16px}
 .modal-actions{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+/* (06/10/2026) finestra del cantiere: sul PC larga, campi in tre colonne (due fra 900 e 1200 px), pulsanti sempre in vista; sul telefono com'era */
+@media(min-width:900px){
+  #modal-cant .modal-box{max-width:1240px;width:96vw}
+  #modal-cant .mc-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 22px;align-items:start}
+  #modal-cant .modal-actions{position:sticky;bottom:-22px;background:inherit;margin:14px -22px -22px;padding:10px 22px 14px;border-top:1px solid var(--border);z-index:2}
+}
+@media(min-width:1200px){#modal-cant .mc-cols{grid-template-columns:repeat(3,minmax(0,1fr))}}
 /* FOTO */
 .foto-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-bottom:18px}
 .foto-slot{border:2px dashed var(--border);border-radius:var(--radius);background:#fafafa;padding:10px;text-align:center;position:relative;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:border .2s}
@@ -1897,51 +1904,21 @@ tr.row-detail-hover:hover td{background:#fff3ed}
   <div class="modal-box">
     <h3 id="modal-cant-title">Nuovo cantiere</h3>
     <div id="mc-visite" class="hidden" style="margin:0 0 12px;padding:8px 10px;background:#f8f8f8;border:1px solid var(--border);border-radius:6px;font-size:12.5px"></div>
+    <!-- (06/10/2026) sul PC tre colonne (due fra 900 e 1200 px), sul telefono una sola: vedi #modal-cant nello stile -->
+    <div class="mc-cols">
+    <div class="mc-col">
+      <div class="sect-title">Dove</div>
     <div class="row">
       <div class="field" style="flex:3"><label>Indirizzo *</label><input type="text" id="mc-ind"><div id="mc-quartiere" style="margin-top:4px"></div></div>
       <div class="field" style="flex:1"><label>Civico *</label><input type="text" id="mc-civ"></div>
     </div>
-    <div class="row">
       <div class="field"><label>Comune *</label><select id="mc-com"><option value="">– Seleziona comune –</option></select>
         <div id="mc-com-altro-wrap" class="hidden" style="margin-top:4px"><input type="text" id="mc-com-altro" list="mc-com-altro-lista" autocomplete="off" placeholder="Scrivi il comune, es. Castelfranco Veneto"><datalist id="mc-com-altro-lista"></datalist>
           <div id="mc-com-altro-info" style="font-size:11px;color:#888;margin-top:2px">Si sceglie dall'elenco ISTAT: il codice per l'Osservatorio si compila da solo.</div></div></div>
+    <div class="row">
       <div class="field"><label>CAP <span style="font-weight:400;font-size:11px;color:#aaa">(auto)</span></label><input type="text" id="mc-cap" maxlength="5" readonly style="background:#f8f8f8" placeholder="si compila da Comune"></div>
       <div class="field"><label>Cod. ISTAT <span style="font-weight:400;font-size:11px;color:#aaa">(per XML, 6 cifre)</span></label><input type="text" id="mc-comune-cod" maxlength="6" placeholder="es. 028001" style="font-family:monospace"></div>
     </div>
-    <div class="row">
-      <div class="field"><label>Tipo intervento *</label>
-        <select id="mc-tip-int"><option value="">–</option><option value="1">Costruzione</option><option value="2">Ristrutturazione</option><option value="3">Demolizione</option><option value="4">Ampliamento</option></select></div>
-      <div class="field"><label>Tipo opera *</label>
-        <select id="mc-tip-ope"><option value="">–</option><option value="2">Civile</option><option value="1">Industriale</option><option value="3">Commerciale</option><option value="4">Ospedaliera</option><option value="5">Stradale</option><option value="6">Rurale</option><option value="7">Funeraria</option><option value="8">Scolastica</option><option value="9">Ferroviaria</option><option value="10">Marittima</option><option value="11">Fluviale</option><option value="12">Sportiva</option><option value="13">Carceraria</option><option value="14">Campi eolici</option><option value="15">Fotovoltaica</option><option value="16">Altro</option></select></div>
-    </div>
-    <div class="field hidden" id="mc-tip-ope-altro-wrap"><label>Specificare tipo opera</label><input type="text" id="mc-tip-ope-altro" maxlength="128" placeholder="Descrivere il tipo di opera..."></div>
-    <div class="row">
-      <div class="field"><label>Durata cantiere *</label>
-        <select id="mc-durata"><option value="">–</option><option value="1">Fino a 3 mesi</option><option value="2">Da 3 a 12 mesi</option><option value="3">Da 12 a 24 mesi</option><option value="4">Da 24 a 36 mesi</option><option value="5">Da 36 a 48 mesi</option><option value="6">Oltre 48 mesi</option><option value="7">Non disponibile</option></select></div>
-      <div class="field"><label>Importo lavori (€) *</label>
-        <select id="mc-importo"><option value="">–</option><option value="1">fino a 250.000</option><option value="2">da 250.001 a 500.000</option><option value="3">da 500.001 a 1.000.000</option><option value="4">da 1.000.001 a 1.500.000</option><option value="5">da 1.500.001 a 2.500.000</option><option value="6">da 2.500.001 a 3.500.000</option><option value="7">da 3.500.001 a 5.000.000</option><option value="8">da 5.000.001 a 10.000.000</option><option value="9">da 10.000.001 a 15.000.000</option><option value="10">oltre 15.000.000</option><option value="11">non disponibile</option></select></div>
-    </div>
-    <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma" maxlength="50"></div>
-    <div class="field"><label>Descrizione cantiere <span style="font-weight:400;font-size:11px;color:#aaa">(cosa si fa nel cantiere)</span></label><textarea id="mc-descr" rows="2" maxlength="500" placeholder="Es. Rifacimento copertura e coibentazione facciata…" style="width:100%;resize:vertical;font-family:inherit;font-size:14px;padding:8px;border:1px solid var(--border);border-radius:6px"></textarea></div>
-    <div class="sect-title" style="margin-top:10px;font-size:11px;color:var(--grey)">Committente</div>
-    <div class="field" style="position:relative">
-      <label>Committente <span style="font-weight:400;font-size:11px;color:#aaa">(cerca per nome, CF o P.IVA)</span></label>
-      <div style="display:flex;gap:6px;align-items:flex-start">
-        <input type="text" id="mc-comm-search" placeholder="Cerca committente…" autocomplete="off" style="flex:1">
-        <button class="btn-outline btn-sm" id="btn-mc-comm-new" type="button" style="white-space:nowrap;margin-top:1px">+ Nuovo</button>
-      </div>
-      <input type="hidden" id="mc-comm-id">
-      <div id="mc-comm-list" class="ac-list hidden"></div>
-      <div id="mc-comm-info" style="font-size:12px;color:#555;margin-top:4px"></div>
-    </div>
-    <div class="sect-title" style="margin-top:10px;font-size:11px;color:var(--grey)">Dati identificativi cantiere</div>
-    <div class="row">
-      <div class="field"><label>Codice CNCE</label><input type="text" id="mc-cnce" placeholder="Cod. CNCE" maxlength="50"></div>
-      <div class="field"><label>Lotto <span style="font-weight:400;font-size:11px;color:#aaa">(se il complesso ha più lotti con lo stesso CNCE)</span></label><input type="text" id="mc-lotto" placeholder="es. 1, 2, A…" maxlength="30"></div>
-      <div class="field"><label>Codice univoco cantiere</label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="mc-cod-uni" placeholder="Codice univoco" maxlength="50" style="flex:1 1 120px;min-width:0"><button type="button" class="btn-outline btn-sm" id="btn-mc-cod-uni-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
-    </div>
-    <div class="field"><label>Data inizio lavori</label><input type="date" id="mc-data-inizio" onchange="_autoDurataCantiere()"></div>
-    <div class="field"><label>Data prevista ultimazione lavori</label><input type="date" id="mc-data-ult" onchange="_autoDurataCantiere()"></div>
     <div id="mc-geo-wrap" class="hidden">
       <div class="sect-title" style="margin-top:10px;font-size:11px;color:var(--grey)">Posizione sulla mappa</div>
       <div id="mc-geo-stato" style="font-size:12px;margin-bottom:8px;min-height:18px"></div>
@@ -1964,6 +1941,49 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       </div>
       <div id="mc-geo-map" style="height:220px;border:1px solid var(--border);border-radius:6px"></div>
       <div style="font-size:11px;color:#888;margin-top:5px;line-height:1.45">Se sei in cantiere usa <b>Sono qui (GPS)</b>: e il modo piu preciso. In alternativa trascina il pin, clicca sulla mappa o incolla un link di Google Maps. La posizione messa a mano non viene piu sovrascritta dal geocodificatore automatico, finche non cambi indirizzo, civico, comune o CAP.</div>
+    </div>
+    </div>
+    <div class="mc-col">
+      <div class="sect-title">Dati per l'Osservatorio</div>
+    <div class="row">
+      <div class="field"><label>Tipo intervento *</label>
+        <select id="mc-tip-int"><option value="">–</option><option value="1">Costruzione</option><option value="2">Ristrutturazione</option><option value="3">Demolizione</option><option value="4">Ampliamento</option></select></div>
+      <div class="field"><label>Tipo opera *</label>
+        <select id="mc-tip-ope"><option value="">–</option><option value="2">Civile</option><option value="1">Industriale</option><option value="3">Commerciale</option><option value="4">Ospedaliera</option><option value="5">Stradale</option><option value="6">Rurale</option><option value="7">Funeraria</option><option value="8">Scolastica</option><option value="9">Ferroviaria</option><option value="10">Marittima</option><option value="11">Fluviale</option><option value="12">Sportiva</option><option value="13">Carceraria</option><option value="14">Campi eolici</option><option value="15">Fotovoltaica</option><option value="16">Altro</option></select></div>
+    </div>
+    <div class="field hidden" id="mc-tip-ope-altro-wrap"><label>Specificare tipo opera</label><input type="text" id="mc-tip-ope-altro" maxlength="128" placeholder="Descrivere il tipo di opera..."></div>
+    <div class="row">
+      <div class="field"><label>Durata cantiere *</label>
+        <select id="mc-durata"><option value="">–</option><option value="1">Fino a 3 mesi</option><option value="2">Da 3 a 12 mesi</option><option value="3">Da 12 a 24 mesi</option><option value="4">Da 24 a 36 mesi</option><option value="5">Da 36 a 48 mesi</option><option value="6">Oltre 48 mesi</option><option value="7">Non disponibile</option></select></div>
+      <div class="field"><label>Importo lavori (€) *</label>
+        <select id="mc-importo"><option value="">–</option><option value="1">fino a 250.000</option><option value="2">da 250.001 a 500.000</option><option value="3">da 500.001 a 1.000.000</option><option value="4">da 1.000.001 a 1.500.000</option><option value="5">da 1.500.001 a 2.500.000</option><option value="6">da 2.500.001 a 3.500.000</option><option value="7">da 3.500.001 a 5.000.000</option><option value="8">da 5.000.001 a 10.000.000</option><option value="9">da 10.000.001 a 15.000.000</option><option value="10">oltre 15.000.000</option><option value="11">non disponibile</option></select></div>
+    </div>
+    <div class="sect-title" style="margin-top:10px;font-size:11px;color:var(--grey)">Committente</div>
+    <div class="field" style="position:relative">
+      <label>Committente <span style="font-weight:400;font-size:11px;color:#aaa">(cerca per nome, CF o P.IVA)</span></label>
+      <div style="display:flex;gap:6px;align-items:flex-start">
+        <input type="text" id="mc-comm-search" placeholder="Cerca committente…" autocomplete="off" style="flex:1">
+        <button class="btn-outline btn-sm" id="btn-mc-comm-new" type="button" style="white-space:nowrap;margin-top:1px">+ Nuovo</button>
+      </div>
+      <input type="hidden" id="mc-comm-id">
+      <div id="mc-comm-list" class="ac-list hidden"></div>
+      <div id="mc-comm-info" style="font-size:12px;color:#555;margin-top:4px"></div>
+    </div>
+    </div>
+    <div class="mc-col">
+      <div class="sect-title">Identità e date</div>
+    <div class="row">
+      <div class="field"><label>Codice CNCE</label><input type="text" id="mc-cnce" placeholder="Cod. CNCE" maxlength="50"></div>
+      <div class="field"><label>Lotto <span style="font-weight:400;font-size:11px;color:#aaa">(se il complesso ha più lotti con lo stesso CNCE)</span></label><input type="text" id="mc-lotto" placeholder="es. 1, 2, A…" maxlength="30"></div>
+    </div>
+    <div class="field"><label>Codice univoco cantiere</label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="mc-cod-uni" placeholder="Codice univoco" maxlength="50" style="flex:1 1 120px;min-width:0"><button type="button" class="btn-outline btn-sm" id="btn-mc-cod-uni-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
+    <div class="row">
+      <div class="field"><label>Data inizio lavori</label><input type="date" id="mc-data-inizio" onchange="_autoDurataCantiere()"></div>
+      <div class="field"><label>Data prevista ultimazione lavori</label><input type="date" id="mc-data-ult" onchange="_autoDurataCantiere()"></div>
+    </div>
+    <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma" maxlength="50"></div>
+    <div class="field"><label>Descrizione cantiere <span style="font-weight:400;font-size:11px;color:#aaa">(cosa si fa nel cantiere)</span></label><textarea id="mc-descr" rows="2" maxlength="500" placeholder="Es. Rifacimento copertura e coibentazione facciata…" style="width:100%;resize:vertical;font-family:inherit;font-size:14px;padding:8px;border:1px solid var(--border);border-radius:6px"></textarea></div>
+    </div>
     </div>
     <div class="modal-actions">
       <button class="btn-outline" id="btn-mc-cancel">Annulla</button>
