@@ -329,25 +329,23 @@ const LAV_DATA={
   }
 }
 
+/* (06/10/2026) UN SOLO ELENCO dei nomi dei gruppi della check-list, uguale nel PDF (verbale-pdf.js, PREF_LBL):
+   verificato sulle voci di ogni gruppo e sui nomi delle voci «Note …» di checklist_voci. Prima schermo e PDF
+   avevano due elenchi diversi, sbagliati entrambi (ponteggi e ponti scambiati a video, macchine stradali e
+   movimento terra scambiate nel PDF). test/checklist-nomi-gruppi.test.cjs controlla che restino uguali. */
 const PREF_LBL={
-  'IMP_LOG':'Logistica','IMP_IGS':'Apprestamenti igienico-sanitari e di sicurezza',
-  'IMP_ELE':'Impianti elettrici','IMP_AGI':'Agibilità del cantiere',
-  'IMP_CON':'Contiguità e interferenze','IMP_ORG':'Organizzazione','IMP_SEG':'Segnaletica',
-  'PLL_PER':'Protezione perimetrale','PLL_OCA':'Opere in calcestruzzo armato',
-  'PLL_SCA':'Scavi','PLL_DEM':'Demolizioni',
-  'ASU_ATT':'Attrezzature','ASU_SCA':'Scale','ASU_UTE':'Utensili',
-  'MAC_MMT':'Macchine movimento terra','MAC_MMM':'Macchine movimento materiali',
-  'MAC_MAS':'Macchine asservimento',
-  'OPE_POT':'Ponteggi tubolari','OPE_POF':'Ponteggi a telaio prefabbricato',
-  'OPE_POS':'Ponti su cavalletti','OPE_POC':'Ponti su ruote','OPE_DPC':'Disposizioni contro cadute',
-  'PIN_TES':'Protezione testa','PIN_OCC':'Protezione occhi','PIN_UDI':'Protezione udito',
-  'PIN_RES':'Protezione vie respiratorie','PIN_MAN':'Protezione mani',
-  'PIN_PIE':'Protezione piedi','PIN_IND':'Indumenti protezione','PIN_CAD':'Protezione anticaduta',
-  'DOC_GEN':'Documentazione generale','DOC_GEN_SOL':'Apparecchi di sollevamento',
-  'DOC_MA4':'Macchine e attrezzature','DOC_PON':'Ponteggi','DOC_ELE':'Impianti elettrici',
-  'SOG_FIG':'Figure di cantiere',
-  'FOR_BAS':'Formazione base','FOR_FIG':'Figure specifiche',
-  'FOR_RIS':'Rischi specifici','FOR_ATM':'Attrezzature e macchine'
+  IMP_LOG:'Logistica',IMP_IGS:'Apprestamenti igienico-sanitari e di sicurezza',IMP_ELE:'Impianti elettrici',IMP_AGI:'Agibilità del cantiere',
+  IMP_ORG:'Organizzazione del lavoro',IMP_SEG:'Segnaletica',IMP_CON:'Condizioni al contorno',PLL_SCA:'Aree di scavo',
+  PLL_DEM:'Aree di demolizione',PLL_OCA:'Opere in c.a.',PLL_PER:'Altre aree di pericolo',SOL_GRU:'Gru',
+  SOL_AUT:'Autogru / Gru su autocarro',SOL_ARG:'Argano',SOL_ASO:'Accessori di sollevamento',SOL_PIA:'Piattaforme di lavoro elevabili (PLE)',
+  ASU_ATT:'Attrezzature',ASU_SCA:'Scale',ASU_UTE:'Utensili',MAC_MMT:'Macchine movimento terra',
+  MAC_MMM:'Macchine movimentazione materiale',MAC_MAS:'Macchine stradali',OPE_POF:'Ponteggi fissi',OPE_POS:'Ponteggi sospesi',
+  OPE_POC:'Ponti su cavalletti',OPE_POT:'Ponti su ruote – trabattelli',OPE_DPC:'Altri DPC',PIN_IND:'Indumenti di protezione',
+  PIN_TES:'Protezione della testa',PIN_PIE:'Protezione dei piedi',PIN_MAN:'Protezione delle mani',PIN_UDI:'Protezione dell\'udito',
+  PIN_CAD:'Protezione contro la caduta dall\'alto',PIN_OCC:'Protezione degli occhi',PIN_RES:'Protezione delle vie respiratorie',DOC_GEN:'Documentazione generale',
+  DOC_GEN_SOL:'Apparecchi di sollevamento',DOC_MA4:'Macchine e attrezzature (art. 71 c. 4)',DOC_ELE:'Impianto elettrico e di terra',DOC_PON:'Ponteggi',
+  SOG_FIG:'Nomine figure di sistema',FOR_BAS:'Formazione di base',FOR_FIG:'Figure di sistema',FOR_RIS:'Formazione/addestramento rischi specifici',
+  FOR_ATM:'Formazione/addestramento attrezzature/macchine'
 }
 
 // Colorazione ufficiale esiti checklist: VER verde, OSS giallo, NC- arancione, NC+ rosso

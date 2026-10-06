@@ -2434,7 +2434,7 @@ window.onunhandledrejection = function(e) {
 };
 </script>
 
-<script src="app-data.js?v=12"></script>
+<script src="app-data.js?v=13"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -3269,6 +3269,24 @@ function suggerisciDataRientro(){
   }
 }
 
+/* (06/10/2026) La nota generale del gruppo (voci is_nota: …_N, e le poche altre come IMP_CON_005). Prima era nascosta:
+   ma una «nuova visita da verbale» la copia dal verbale precedente, e finiva nel PDF senza che il tecnico la vedesse né
+   potesse cambiarla (verbale CPT/26_27/0008: dodici note, molte «Non oggetto di verifica…»). Ora sta in fondo al gruppo:
+   aperta e in evidenza se c'è un testo, chiusa se è vuota. Esce nel verbale solo se resta scritta. */
+function _notaGruppoHtml(pref,items){
+  const note=items.filter(i=>i.is_nota)
+  if(!note.length)return ''
+  const nomeGruppo=PREF_LBL[pref]||pref.replace(/_/g,' ')
+  return note.map(item=>{
+    const nota=S.noteChk[item.codice]||''
+    const cosa=note.length>1?String(item.descrizione||'').replace(/^Note\s+/i,''):''
+    return`<details class="nota-gruppo" data-nota-gruppo="${item.codice}" ${nota.trim()?'open':''} style="margin:6px 4px 2px">
+      <summary style="cursor:pointer;font-size:12px;font-weight:600;color:${nota.trim()?'var(--orange)':'#888'}">📝 ${nota.trim()?'Nota generale':'+ Nota generale'} del gruppo «${esc(nomeGruppo)}»${cosa?' — '+esc(cosa):''}${nota.trim()?' <span style="font-weight:400;color:#888">(esce nel verbale: controllala, se viene da un verbale precedente)</span>':''}</summary>
+      <textarea data-nota="${item.codice}" rows="2" placeholder="Nota su tutto il gruppo: esce nel verbale, sotto il gruppo. Lasciala vuota se non serve." style="margin-top:4px">${nota.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>
+    </details>`
+  }).join('')
+}
+
 // ── ZONE RENDER ──
 function renderZoneTab(ti){
   const z=ti-2
@@ -3287,10 +3305,7 @@ function renderZoneTab(ti){
       </div>
       <div class="zona-items">
       ${items.map(item=>{
-        if(item.is_nota){
-          // voce-nota separata: nascosta, ogni voce ha già il proprio campo note inline
-          return ''
-        }
+        if(item.is_nota)return ''   // la nota generale del gruppo si disegna in fondo al gruppo (sotto)
         const cur=S.checklist[item.codice]||''
         const nota=S.noteChk[item.codice]||''
         const notaShow=(cur&&cur!=='NA'||nota)?'show':''
@@ -3308,6 +3323,7 @@ function renderZoneTab(ti){
           </div>
         </div>`
       }).join('')}
+      ${_notaGruppoHtml(pref,items)}
       </div>
     </div>`).join('')
   con.querySelectorAll('input[type=radio]').forEach(r=>{
@@ -15672,7 +15688,7 @@ document.addEventListener('input',function(ev){
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
-<script src="verbale-pdf.js?v=9"></script>
+<script src="verbale-pdf.js?v=10"></script>
 <!-- mappa sul telefono: cantieri vicino a te (Nuova visita) e rientri sulla mappa (Scadenze) -->
 <script src="mappa.js?v=3"></script>
 </body>
