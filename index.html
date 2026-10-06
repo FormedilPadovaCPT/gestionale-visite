@@ -2322,7 +2322,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 <div class="modal-overlay hidden" id="modal-email-verbale">
   <div class="modal-box" style="max-width:500px">
     <h3 id="email-verbale-title" style="margin-bottom:10px;color:var(--grey);font-size:15px">📧 Invia verbale</h3>
-    <p style="font-size:12px;color:#666;margin-bottom:14px">Il PDF del verbale sarà generato e inviato automaticamente da <strong>cptpd@did.formedilpadova.it</strong> ai seguenti destinatari.</p>
+    <p style="font-size:12px;color:#666;margin-bottom:14px">Il PDF del verbale sarà generato e inviato automaticamente da <strong>cptpd@did.formedilpadova.it</strong> ai destinatari spuntati. Togli la spunta a chi non deve riceverlo.</p>
     <div id="email-verbale-rett" class="hidden" style="background:#fdece4;border:1px solid var(--orange);border-radius:6px;padding:8px 12px;margin-bottom:14px;font-size:12px;color:#8a3b12"></div>
     <div id="email-verbale-list" style="margin-bottom:8px;max-height:220px;overflow-y:auto"></div>
     <div style="display:flex;gap:6px;margin-bottom:14px">
@@ -8657,20 +8657,35 @@ async function upsertPersoneVisita(){
   }
 }
 // ── invio verbale: destinatari con scelta email alternativa ──
+/* (06/10/2026, chiesto dall'utente) ogni destinatario ha la sua spunta: il tecnico toglie chi non deve ricevere il
+   verbale. La copia all'ufficio (CPT) non si toglie: è la traccia dell'invio. Nel registro degli invii resta chi
+   l'ha ricevuto davvero, ed è da lì che una rettifica prende i destinatari. */
+const _evImpresa=e=>e.ruolo==='Impresa'||!!e.extra
+function _evScelti(){return(window._evEmails||[]).filter(e=>!e.escluso)}
+window._evSpunta=function(idx,on){const e=(window._evEmails||[])[idx];if(!e||e.ruolo==='CPT')return;e.escluso=!on;_evRenderList()}
 function _evRenderList(){
   const emails=window._evEmails||[]
   const box=$('email-verbale-list');if(!box)return
+  const scelti=emails.filter(e=>!e.escluso)
   // (03/10/2026, regola dell'utente) almeno un'impresa deve ricevere il verbale
-  const _senzaImpresa=!emails.some(e=>e.ruolo==='Impresa'||e.extra)
-  box.innerHTML=(_senzaImpresa?`<div style="background:#fdecea;border-left:3px solid #c0392b;padding:8px 10px;border-radius:4px;margin-bottom:6px;font-size:13px;color:#7b241c">⚠ <b>Nessuna impresa fra i destinatari</b>: nessuna impresa del verbale ha un indirizzo e-mail, e il verbale arriverebbe solo alle figure del cantiere. Aggiungi l’indirizzo dell’impresa con <b>+ Aggiungi</b>: senza, l’invio non parte.</div>`:'')+emails.map((e,i)=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #eee;font-size:13px">
-      <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--grey);min-width:72px;letter-spacing:.4px">${esc(e.ruolo)}</span>
-      <span style="flex:1;color:#333">${esc(e.nome)}</span>
+  const _senzaImpresa=!scelti.some(_evImpresa)
+  const _tolte=_senzaImpresa&&emails.some(_evImpresa)
+  const avviso=_tolte
+    ?`<div style="background:#fdecea;border-left:3px solid #c0392b;padding:8px 10px;border-radius:4px;margin-bottom:6px;font-size:13px;color:#7b241c">⚠ <b>Hai tolto la spunta a tutte le imprese</b>: il verbale arriverebbe solo alle figure del cantiere. Rimetti la spunta ad almeno un’impresa, o aggiungi un altro indirizzo con <b>+ Aggiungi</b>: senza, l’invio non parte.</div>`
+    :_senzaImpresa?`<div style="background:#fdecea;border-left:3px solid #c0392b;padding:8px 10px;border-radius:4px;margin-bottom:6px;font-size:13px;color:#7b241c">⚠ <b>Nessuna impresa fra i destinatari</b>: nessuna impresa del verbale ha un indirizzo e-mail, e il verbale arriverebbe solo alle figure del cantiere. Aggiungi l’indirizzo dell’impresa con <b>+ Aggiungi</b>: senza, l’invio non parte.</div>`:''
+  const conto=scelti.length<emails.length?`<div style="font-size:12px;color:var(--grey);padding:4px 4px 6px">Riceveranno il verbale <b>${scelti.length}</b> destinatar${scelti.length===1?'io':'i'} su ${emails.length}.</div>`:''
+  box.innerHTML=avviso+emails.map((e,i)=>{
+    const cpt=e.ruolo==='CPT',via=!!e.escluso
+    return`
+    <label style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #eee;font-size:13px;cursor:${cpt?'default':'pointer'};${via?'opacity:.5;':''}">
+      <input type="checkbox" data-ev-spunta="${i}" ${via?'':'checked'} ${cpt?'disabled title="La copia all\'ufficio parte sempre: è la traccia dell\'invio"':'title="Togli la spunta per non mandargli il verbale"'} onchange="window._evSpunta(${i},this.checked)" style="width:16px;height:16px;flex:0 0 auto;margin:0">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--grey);min-width:72px;letter-spacing:.4px">${esc(e.ruolo||'—')}</span>
+      <span style="flex:1;color:#333">${esc(e.nome||'')}${via?' <i style="font-size:11px;color:#999">— non lo riceve</i>':''}</span>
       ${(e.alt&&e.alt.length>1)
-        ?`<select onchange="window._evEmails[${i}].email=this.value" title="Questo contatto ha più email: scegli a quale inviare" style="color:var(--orange);font-size:12px;max-width:240px;border:1px solid #f0d9cc;border-radius:6px;padding:2px 4px;background:#fffaf7">${e.alt.map(a=>`<option value="${esc(a)}"${a===e.email?' selected':''}>${esc(a)}</option>`).join('')}</select>`
-        :`<span style="color:var(--orange);font-size:12px">${esc(e.email)}</span>`}
-      ${e.extra?`<button type="button" class="btn-outline btn-sm" onclick="window._evTogli(${i})" title="Togli questo indirizzo" style="padding:2px 8px">✕</button>`:''}
-    </div>`).join('')
+        ?`<select onchange="window._evEmails[${i}].email=this.value" title="Questo contatto ha più email: scegli a quale inviare" style="color:var(--orange);font-size:12px;max-width:240px;border:1px solid #f0d9cc;border-radius:6px;padding:2px 4px;background:#fffaf7"${via?' disabled':''}>${e.alt.map(a=>`<option value="${esc(a)}"${a===e.email?' selected':''}>${esc(a)}</option>`).join('')}</select>`
+        :`<span style="color:var(--orange);font-size:12px;${via?'text-decoration:line-through;':''}">${esc(e.email)}</span>`}
+      ${e.extra?`<button type="button" class="btn-outline btn-sm" onclick="event.preventDefault();window._evTogli(${i})" title="Togli questo indirizzo" style="padding:2px 8px">✕</button>`:''}
+    </label>`}).join('')+conto
 }
 /* Anteprima del testo che parte davvero: e' la copia di quello composto dalla
    funzione send-verbale (supabase/functions/send-verbale/index.ts). Se cambia
@@ -8715,7 +8730,9 @@ function _evAggiungi(){
   if(!em)return
   if(!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(em)){toast('Indirizzo non valido: controlla com\'è scritto','warn');i.focus();return}
   const list=window._evEmails||(window._evEmails=[])
-  if(list.some(e=>String(e.email||'').trim().toLowerCase()===em)){toast('Questo indirizzo è già fra i destinatari','warn');return}
+  const gia=list.find(e=>String(e.email||'').trim().toLowerCase()===em)
+  if(gia&&gia.escluso){gia.escluso=false;i.value='';_evRenderList();toast('Indirizzo rimesso fra i destinatari','ok');return}
+  if(gia){toast('Questo indirizzo è già fra i destinatari','warn');return}
   list.push({ruolo:'Aggiunto',nome:'Indirizzo aggiunto a mano',email:em,extra:true})
   i.value='';_evRenderList();i.focus()
 }
@@ -9216,13 +9233,6 @@ function apriEmailRettifica(p){
   emails=emails.filter(e=>e.email)
   if(!emails.length){toast('Nessun destinatario registrato per il precedente invio','warn');return}
 
-  $('email-verbale-list').innerHTML=emails.map(e=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #eee;font-size:13px">
-      <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--grey);min-width:72px;letter-spacing:.4px">${e.ruolo||'—'}</span>
-      <span style="flex:1;color:#333">${e.nome||''}</span>
-      <span style="color:var(--orange);font-size:12px">${e.email}</span>
-    </div>`).join('')
-
   const nrVerb=vGet('f-verbale')||''
   const cant=vGet('f-cant-search')||''
   const _fInd=[S.fd?.cantiere_indirizzo,S.fd?.cantiere_civico].filter(Boolean).join(' ')
@@ -9277,6 +9287,7 @@ Tel. 049 - 761168 (int.4)
 URL: www.formedilpadova.it`
 
   window._evEmails=emails
+  _evRenderList()
   window._evContext={vid:S.savedId||S.fd?.visita_id||null,nr_verbale:nrVerb,data_visita:_fDsRaw,cantiere:cant,
     impresa:_fImp,tecnico:_fTec1,tecnico2:_fTec2,comune:_fCom,cantIndirizzo:_fInd,dataVisita:_fData}
   _setEvModalRett(true,`Rettifica – sostituisce il verbale trasmesso il ${r.dataPrimoInvio||''}. Destinatari precompilati dal precedente invio.`)
@@ -9430,12 +9441,15 @@ $('btn-ev-extra').onclick=_evAggiungi
 $('ev-extra').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_evAggiungi()}}
 $('btn-ev-close').onclick=()=>{hide('modal-email-verbale');window._evRettifica=null;_setEvModalRett(false)}
 $('btn-ev-invia').onclick=async()=>{
-  const emails=window._evEmails||[]
+  // (06/10/2026) solo i destinatari spuntati; nel registro degli invii resta chi l'ha ricevuto davvero
+  const tutti=window._evEmails||[]
+  const emails=_evScelti().map(({escluso,...e})=>e)
   if(!emails.length){toast('Nessun destinatario','warn');return}
   const vid=S.savedId||S.fd?.visita_id||window._evContext?.vid
   if(!vid){toast('Salva prima la visita','warn');return}
   // (03/10/2026, regola dell'utente) almeno un'impresa deve ricevere il verbale: senza, arriverebbe solo alle figure
-  if(!emails.some(e=>e.ruolo==='Impresa'||e.extra)){toast('Nessuna impresa fra i destinatari: il verbale arriverebbe solo alle figure del cantiere. Aggiungi l\'indirizzo dell\'impresa con «+ Aggiungi» e poi invia.','err',9000);const _x=$('ev-extra');if(_x)_x.focus();return}
+  if(!emails.some(_evImpresa)&&tutti.some(_evImpresa)){toast('Hai tolto la spunta a tutte le imprese: il verbale arriverebbe solo alle figure del cantiere. Rimetti la spunta ad almeno un\'impresa e poi invia.','err',9000);return}
+  if(!emails.some(_evImpresa)){toast('Nessuna impresa fra i destinatari: il verbale arriverebbe solo alle figure del cantiere. Aggiungi l\'indirizzo dell\'impresa con «+ Aggiungi» e poi invia.','err',9000);const _x=$('ev-extra');if(_x)_x.focus();return}
   if(window._evInviiNonLetti===vid&&!window._evRettifica){toast('Non sono riuscito a verificare se questo verbale è già stato inviato: invio fermato. Ricarica e riapri la visita, così si capisce se è un primo invio o una rettifica.','err',9000);return}
 
   const btn=$('btn-ev-invia')

@@ -51,8 +51,10 @@ assert.ok(/from\('imprese'\)\.select\('impresa_id,impresa_email_ref,impresa_emai
 assert.ok(/\|\|_anag\[String\(im\.impresa_id\|\|''\)\.trim\(\)\]/.test(inv), 'campo vuoto = indirizzo dell’anagrafica')
 assert.ok(/if\(_eIa\)_anagErr=_eIa\.message/.test(inv), 'l’errore di lettura si legge')
 // nessuna impresa fra i destinatari: avviso nella finestra e invio fermo
-assert.ok(/_senzaImpresa=!emails\.some\(e=>e\.ruolo==='Impresa'\|\|e\.extra\)/.test(html))
-assert.ok(/if\(!emails\.some\(e=>e\.ruolo==='Impresa'\|\|e\.extra\)\)\{toast\('Nessuna impresa fra i destinatari/.test(html), 'senza impresa l’invio non parte')
+// (06/10/2026) conta fra i destinatari SPUNTATI: il tecnico può togliere la spunta a qualcuno
+assert.ok(/const _evImpresa=e=>e\.ruolo==='Impresa'\|\|!!e\.extra/.test(html))
+assert.ok(/const _senzaImpresa=!scelti\.some\(_evImpresa\)/.test(html))
+assert.ok(/if\(!emails\.some\(_evImpresa\)\)\{toast\('Nessuna impresa fra i destinatari/.test(html), 'senza impresa l’invio non parte')
 // l'indirizzo scritto nel verbale entra in anagrafica solo se lì è vuoto
 assert.ok(/update\(\{impresa_email_ref:_ev\}\)\.eq\('impresa_id',_id\)\.or\('impresa_email_ref\.is\.null,impresa_email_ref\.eq\.'\)/.test(html))
 
