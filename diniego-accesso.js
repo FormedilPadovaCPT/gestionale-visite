@@ -211,7 +211,7 @@
     try {
       let { data, error } = await window.sb.from('cantieri')
         .select('cantiere_id, cantiere_etichetta, cantiere_indirizzo, cantiere_civico, comune_nome, cantiere_cnce, elimina')
-        .or(`cantiere_indirizzo.ilike.%${q}%,comune_nome.ilike.%${q}%,cantiere_cnce.ilike.%${q}%,cantiere_etichetta.ilike.%${q}%`)
+        .or(`cantiere_indirizzo.ilike.%${q}%,comune_nome.ilike.%${q}%,cantiere_cnce.ilike.%${q}%,cantiere_etichetta.ilike.%${q}%,nodo_id.ilike.%${q}%`)
         .order('data_ult', { ascending: false, nullsFirst: false }).limit(25);
       if (req !== reqCant) return;
       if (error) throw error;

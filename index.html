@@ -3837,7 +3837,7 @@ function initCantSearch(){
     // La segreteria vede anche i cantieri chiusi (contrassegnati in lista); gli altri utenti solo gli attivi
     if(!window.__isSegreteria)qb=qb.not('cantiere_chiuso','is',true)
     if(qc)qb=qb.ilike('comune_nome',`%${qc}%`)
-    if(qa)qb=qb.or(`cantiere_indirizzo.ilike.%${qa}%,cantiere_etichetta.ilike.%${qa}%,cantiere_cnce.ilike.%${qa}%`)
+    if(qa)qb=qb.or(`cantiere_indirizzo.ilike.%${qa}%,cantiere_etichetta.ilike.%${qa}%,cantiere_cnce.ilike.%${qa}%,nodo_id.ilike.%${qa}%`)
     const{data}=await qb
     const _rows=data||[]
     // nomi committente in un'unica query per mostrarli nell'elenco
@@ -7353,7 +7353,7 @@ async function loadCantieri(q=''){
   for(;;){
     let qb=sb.from('cantieri').select(_selC).eq('elimina',0).order('updated_at',{ascending:false}).order('cantiere_id').range(_fromC,_fromC+999)
     if(!_incChiusi)qb=qb.or('cantiere_chiuso.is.null,cantiere_chiuso.eq.false')
-    if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*`)
+    if(qStr)qb=qb.or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*,nodo_id.ilike.*${qStr}*`)
     const{data,error}=await qb
     if(error){toast('Errore caricamento cantieri: '+error.message,'err');return}
     rows=rows.concat(data||[])
@@ -7367,7 +7367,7 @@ async function loadCantieri(q=''){
   if(qStr&&!_incChiusi){
     try{
       const{count,error:eCh}=await sb.from('cantieri').select('cantiere_id',{count:'exact',head:true}).eq('elimina',0).eq('cantiere_chiuso',true)
-        .or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*`)
+        .or(`cantiere_indirizzo.ilike.*${qStr}*,cantiere_etichetta.ilike.*${qStr}*,comune_nome.ilike.*${qStr}*,cantiere_cnce.ilike.*${qStr}*,nodo_id.ilike.*${qStr}*`)
       if(eCh)throw eCh
       window._cantChiusiNascosti=count||0
     }catch(e){console.warn('cantieri chiusi nascosti:',e);window._cantChiusiNascosti=null}
@@ -7999,7 +7999,7 @@ async function segnAggCerca(){
   if(!q){
     rows=(_cmRows||[]).filter(r=>r.lat!=null).map(r=>({...r,_d:s?_segnDist(s.lat,s.lng,r.lat,r.lng):null})).sort((a,b)=>(a._d??9e9)-(b._d??9e9)).slice(0,10)
   }else{
-    const{data}=await sb.from('cantieri').select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,lat,lng').eq('elimina',0).or(`cantiere_etichetta.ilike.%${q}%,cantiere_indirizzo.ilike.%${q}%,comune_nome.ilike.%${q}%,cantiere_cnce.ilike.%${q}%`).limit(20)
+    const{data}=await sb.from('cantieri').select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,lat,lng').eq('elimina',0).or(`cantiere_etichetta.ilike.%${q}%,cantiere_indirizzo.ilike.%${q}%,comune_nome.ilike.%${q}%,cantiere_cnce.ilike.%${q}%,nodo_id.ilike.%${q}%`).limit(20)
     rows=(data||[]).map(r=>({...r,_d:(s&&r.lat!=null)?_segnDist(s.lat,s.lng,r.lat,r.lng):null}))
   }
   if(!rows.length){box.innerHTML='<div style="color:#aaa;padding:8px">Nessun cantiere trovato</div>';return}
@@ -12546,7 +12546,7 @@ async function admLoadCantieri() {
   const emptyDiv = $('adm-cant-empty')
   try {
     let qb = sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,cantiere_cnce,prot_int').eq('elimina',0).order('updated_at',{ascending:false}).limit(100)
-    if (q) qb = qb.or(`cantiere_indirizzo.ilike.*${q}*,cantiere_etichetta.ilike.*${q}*,comune_nome.ilike.*${q}*,cantiere_cnce.ilike.*${q}*`)
+    if (q) qb = qb.or(`cantiere_indirizzo.ilike.*${q}*,cantiere_etichetta.ilike.*${q}*,comune_nome.ilike.*${q}*,cantiere_cnce.ilike.*${q}*,nodo_id.ilike.*${q}*`)
     const { data, error } = await qb
     if (error) { toast('Errore: ' + error.message, 'err'); return }
     const rows = data || []
@@ -15566,7 +15566,7 @@ document.addEventListener('input',function(ev){
 <!-- relazione di visita allo stagista: apre dalla pagina Incarichi -->
 <script src="stage-relazione.js?v=3"></script>
 <!-- accesso negato al cantiere: il tecnico segnala, la segreteria gestisce -->
-<script src="diniego-accesso.js?v=4"></script>
+<script src="diniego-accesso.js?v=5"></script>
 <script src="cantieri-critici-coord.js?v=4"></script>
 <script src="controllo-verbale.js?v=2"></script>
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
