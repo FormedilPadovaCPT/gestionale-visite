@@ -1666,6 +1666,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <div class="field" style="min-width:140px"><label>Al</label><input type="date" id="oss-al"></div>
             <button class="btn-outline" id="oss-tutto" onclick="admOssTuttoArchivio()" title="Riempie le date con la prima e l'ultima visita definitiva presenti in archivio">🗄 Tutto l'archivio</button>
             <button class="btn-outline" id="oss-controlla" onclick="admOssControlla()">🔎 Controlla</button>
+            <button class="btn-outline" id="oss-sistema" onclick="admOssSistema()" data-aiuto="Tutti gli esercizi in un elenco: i campi delle schede che l'Osservatorio non accetta si correggono qui con una tendina, e ogni scelta si salva subito, un campo alla volta.">🛠 Sistema in tabella</button>
             <button class="btn-primary" id="oss-genera" onclick="admExportOsservatorio()">📤 Genera file XML</button>
           </div>
           <div id="oss-report" style="font-size:12px;color:rgba(255,255,255,.7);margin-top:10px;line-height:1.5"></div>
@@ -4727,7 +4728,7 @@ $('btn-mc-save').onclick=async()=>{
     window._editCantId=null;$('modal-cant-title').textContent='Nuovo cantiere'
     const _from=window._mcGeoFrom;window._mcGeoFrom=null
     // (05/10/2026) scheda aperta dal controllo per l'Osservatorio: il controllo si rifà, e il cantiere sistemato esce dall'elenco
-    if(window._ossRicontrolla&&window._ossRicontrolla===_salvato){window._ossRicontrolla=null;if(typeof window.admOssControlla==='function')window.admOssControlla();return}
+    if(window._ossRicontrolla&&window._ossRicontrolla===_salvato){window._ossRicontrolla=null;const _dopo=window._ossDopoScheda||window.admOssControlla;window._ossDopoScheda=null;if(typeof _dopo==='function')_dopo(_salvato);return}
     if(_from==='dash'){if(typeof loadDashMap==='function')loadDashMap()}
     else if(_from==='cant'){if(typeof loadCantMap==='function')loadCantMap()}
     else if(_from==='visita'){/* form visita: la lista di segreteria non c'entra */}

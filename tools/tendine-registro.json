@@ -1329,6 +1329,28 @@
         "chiusa",
         "scartata"
       ]
+    },
+    {
+      "id": "gest.oss-sis-es",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "osservatorio.js",
+        "id": "oss-sis-es"
+      },
+      "motivo": "filtro della tabella «Sistema in tabella» (Osservatorio): non scrive"
+    },
+    {
+      "id": "gest.oss-sis-cosa",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "osservatorio.js",
+        "id": "oss-sis-cosa"
+      },
+      "motivo": "filtro della tabella «Sistema in tabella» (Osservatorio): non scrive"
     }
   ],
   "segreteria_gia_presenti": [
