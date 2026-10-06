@@ -530,7 +530,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     { k: 'scrivania', nome: 'Scrivania', titoli: [] },
     { k: 'comunicazioni', nome: 'Comunicazioni', titoli: ['Promemoria ricontrolli', 'Campagna informativa'], rimandi: [['admin', '📢 Bacheca avvisi ai tecnici', 'sta nella pagina del coordinamento']] },
     { k: 'incarichi', nome: 'Incarichi', titoli: ['Incarichi ai tecnici'], rimandi: [['incarichi', '📋 Incarichi aperti', 'l\'elenco di tutti gli incarichi, da assegnare e da chiudere']] },
-    { k: 'anagrafiche', nome: 'Anagrafiche', titoli: ['Gestione imprese', 'Gestione cantieri'], rimandi: [['committenti', '👤 Committenti', 'ricerca, modifica e unione dei committenti'], ['rubrica', '📒 Persone e contatti', 'la rubrica, con la pulizia dei doppioni']] },
+    { k: 'anagrafiche', nome: 'Anagrafiche', titoli: ['Gestione imprese', 'Imprese doppie', 'Gestione cantieri'], rimandi: [['committenti', '👤 Committenti', 'ricerca, modifica e unione dei committenti'], ['rubrica', '📒 Persone e contatti', 'la rubrica, con la pulizia dei doppioni']] },
     { k: 'qualita', nome: 'Qualità dati', titoli: ['Imprese visitate senza codice fiscale', 'Imprese con l\'indirizzo di un\'altra impresa', 'Riaggancio cantieri senza CNCE', 'Controllo duplicati CNCE'] },
     { k: 'report', nome: 'Report ed export', titoli: ['Estrazione XML', 'Schema XSD', 'Estrazione CEIV', 'Report statistico', 'Excel'] },
     { k: 'obiettivi', nome: 'Obiettivo dell\'esercizio', titoli: ['Obiettivo visite'] },

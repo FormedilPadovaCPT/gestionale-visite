@@ -1342,6 +1342,17 @@
       "motivo": "filtro della tabella «Sistema in tabella» (Osservatorio): non scrive"
     },
     {
+      "id": "gest.ia-segnale",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "imprese-anagrafica.js",
+        "id": "ia-segnale"
+      },
+      "motivo": "filtro dell'elenco imprese (Ufficio › Anagrafiche): non scrive"
+    },
+    {
       "id": "gest.oss-sis-cosa",
       "app": "gestionale",
       "classe": "filtro",

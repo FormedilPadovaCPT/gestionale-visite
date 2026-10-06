@@ -1538,42 +1538,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
         </div>
 
-        <!-- ── GESTIONE IMPRESE ── -->
-        <div class="adm-section">
-          <div class="adm-section-title">🏢 Gestione imprese</div>
-          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:12px">Cerca e modifica i dati anagrafici delle imprese registrate nel sistema (ragione sociale, P.IVA, contratto CCNL, certificazioni, ecc.).</p>
-          <div style="display:flex;gap:8px;margin-bottom:12px">
-            <input type="text" id="adm-imp-search" placeholder="Ragione sociale o P.IVA…"
-              style="flex:1;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff"
-              oninput="this.style.color='#fff'">
-            <button class="btn-primary btn-sm" onclick="admLoadImprese()">🔍 Cerca</button>
-          </div>
-          <div id="imp-merge-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(231,80,15,.12);border:1px solid rgba(231,80,15,.5);border-radius:8px;padding:8px 12px;margin-bottom:10px">
-            <span id="imp-merge-count" style="font-size:13px;font-weight:600"></span>
-            <button class="btn-primary btn-sm" onclick="admFondiImprese()">🔗 Unisci le imprese selezionate</button>
-            <button class="btn-outline btn-sm" onclick="_impSelClear()">Deseleziona</button>
-            <span style="font-size:11px;color:rgba(255,255,255,.5);flex-basis:100%">Spunta due o più imprese che sono la stessa: sceglierai quale tenere come principale; visite, presenze e certificazioni delle altre verranno spostate su di essa e i doppioni archiviati.</span>
-          </div>
-          <div class="tbl-wrap" style="background:rgba(255,255,255,.05);border-radius:8px">
-            <table id="tbl-adm-imp" style="color:rgba(255,255,255,.85);font-size:12px">
-              <thead>
-                <tr style="border-bottom:1px solid rgba(255,255,255,.15)">
-                  <th style="padding:8px 4px;width:26px" title="Seleziona per unione">🔗</th>
-                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Ragione sociale</th>
-                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">P.IVA</th>
-                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Comune</th>
-                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">CCNL</th>
-                  <th style="padding:8px 10px;text-align:left;color:rgba(255,255,255,.5);font-weight:600;font-size:11px">Cassa Edile</th>
-                  <th style="padding:8px 4px"></th>
-                </tr>
-              </thead>
-              <tbody id="tbody-adm-imp">
-                <tr><td colspan="7" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Usa la ricerca per trovare un'impresa</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div id="adm-imp-empty" class="hidden" style="text-align:center;padding:16px;color:rgba(255,255,255,.35);font-size:13px">Nessuna impresa trovata</div>
-        </div>
+        <!-- ── GESTIONE IMPRESE (06/10/2026: elenco, doppioni, unione, eliminazione in imprese-anagrafica.js) ── -->
+        <div class="adm-section" id="ia-sezione"><div class="adm-section-title">🏢 Gestione imprese</div></div>
+        <div class="adm-section" id="dp-sezione"><div class="adm-section-title">🧩 Imprese doppie</div></div>
 
         <!-- Imprese visitate senza codice fiscale (03/10/2026) -->
         <div class="adm-section">
@@ -11995,49 +11962,10 @@ window.osSetAnnoEdile = osSetAnnoEdile
 let _editImpId = null  // impresa_id in modifica
 
 // Carica e mostra lista imprese filtrate per la ricerca
+/* (06/10/2026) l'elenco delle imprese sta in imprese-anagrafica.js: ordinabile, a pagine, con doppioni,
+   unione con la scelta dei valori ed eliminazione. Qui resta il nome, che la finestra di modifica richiama. */
 async function admLoadImprese() {
-  const q = ($('adm-imp-search')?.value || '').trim().toLowerCase()
-  const tbody = $('tbody-adm-imp')
-  const emptyDiv = $('adm-imp-empty')
-  if (!tbody) return
-  tbody.innerHTML = '<tr><td colspan="6" style="padding:16px;text-align:center;color:rgba(255,255,255,.35)">Caricamento…</td></tr>'
-  try {
-    let query = sb.from('imprese')
-      .select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,impresa_email_ref,cassa_edile,contratto_ccnl,tipo_iscrizione_ccia,elimina')
-      .eq('elimina', 0)
-      .order('impresa_nome', { ascending: true })
-      .limit(100)
-    if (q) {
-      query = query.or(`impresa_nome.ilike.%${q}%,piva.ilike.%${q}%,comune.ilike.%${q}%`)
-    }
-    const { data, error } = await query
-    if (error) throw error
-    if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:rgba(255,255,255,.3)">Nessuna impresa trovata</td></tr>'
-      if (emptyDiv) emptyDiv.classList.remove('hidden')
-      return
-    }
-    if (emptyDiv) emptyDiv.classList.add('hidden')
-    _impRows = data
-    tbody.innerHTML = data.map(imp => {
-      const id = imp.impresa_id||imp.piva||''
-      return `
-      <tr data-imp="${esc(id)}" ondblclick="apriImpresaInSegreteria(this.dataset.imp,event)" title="Doppio clic: apre la scheda dell'impresa nell'app segreteria" style="border-bottom:1px solid rgba(255,255,255,.08);transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">
-        <td style="padding:8px 4px;text-align:center"><input type="checkbox" class="imp-sel-chk" data-id="${esc(id)}" data-nome="${esc(imp.impresa_nome||'')}" ${_impSel.has(id)?'checked':''} onchange="_impSelToggle(this)" style="width:16px;height:16px;cursor:pointer"></td>
-        <td style="padding:8px 10px;font-weight:500">${esc(imp.impresa_nome||'')}</td>
-        <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:rgba(255,255,255,.6)">${esc(imp.piva||imp.impresa_id||'')}</td>
-        <td style="padding:8px 10px;color:rgba(255,255,255,.65)">${esc(imp.comune||'')}</td>
-        <td style="padding:8px 10px;color:rgba(255,255,255,.65);font-size:11px">${esc(imp.contratto_ccnl||'')}</td>
-        <td style="padding:8px 10px;color:rgba(255,255,255,.65);font-size:11px">${esc(imp.cassa_edile||'')}</td>
-        <td style="padding:8px 4px;text-align:right">
-          <button class="btn-primary btn-sm" onclick="admEditImpresa('${esc(id)}')">✏️ Modifica</button>
-        </td>
-      </tr>`}).join('')
-    _impMergeBar()
-  } catch(e) {
-    console.error('admLoadImprese:', e)
-    tbody.innerHTML = '<tr><td colspan="6" style="padding:16px;text-align:center;color:#ff6b6b">Errore: ' + esc(e.message||'') + '</td></tr>'
-  }
+  if (window.ImpreseAnag) return window.ImpreseAnag.carica()
 }
 
 // Apre il modal di modifica pre-popolato con i dati dell'impresa
@@ -12194,50 +12122,7 @@ $('ei-ccnl')?.addEventListener('change', function(){
   const wrap = $('ei-ccnl-altro-wrap')
   if (wrap) ccnlAltro(this.value) ? wrap.classList.remove('hidden') : wrap.classList.add('hidden')
 })
-$('adm-imp-search')?.addEventListener('keydown', e => { if(e.key === 'Enter') admLoadImprese() })
 
-// ── Selezione multipla per unione imprese duplicate ──
-let _impRows = []
-const _impSel = new Map()  // id -> nome
-function _impMergeBar(){
-  const bar=$('imp-merge-bar'); if(!bar)return
-  const n=_impSel.size
-  bar.style.display=n>=2?'flex':'none'
-  const c=$('imp-merge-count'); if(c)c.textContent=n+' impresa/e selezionate'
-}
-function _impSelToggle(cb){
-  const id=cb.dataset.id
-  if(cb.checked)_impSel.set(id,cb.dataset.nome||id); else _impSel.delete(id)
-  _impMergeBar()
-}
-function _impSelClear(){
-  _impSel.clear()
-  document.querySelectorAll('.imp-sel-chk').forEach(c=>c.checked=false)
-  _impMergeBar()
-}
-async function admFondiImprese(){
-  const ids=[..._impSel.keys()]
-  if(ids.length<2){toast('Seleziona almeno due imprese','warn');return}
-  // Scelta della principale
-  const opts=ids.map((id,i)=>`${i+1}. ${_impSel.get(id)} [${id}]`).join('\n')
-  const raw=prompt('UNIONE IMPRESE\n\nQuale vuoi TENERE come principale?\nDigita il numero:\n\n'+opts,'1')
-  if(raw===null)return
-  const idx=parseInt(raw,10)-1
-  if(isNaN(idx)||idx<0||idx>=ids.length){toast('Scelta non valida','err');return}
-  const masterId=ids[idx]
-  const dupeIds=ids.filter(x=>x!==masterId)
-  if(!confirm('Confermi l\'unione?\n\nPRINCIPALE (tenuta): '+_impSel.get(masterId)+'\n\nUnite e archiviate ('+dupeIds.length+'): \n'+dupeIds.map(x=>'• '+_impSel.get(x)).join('\n')+'\n\nTutto cio’ che e’ collegato alle imprese archiviate (visite, presenze, certificazioni, rapporti di lavoro, nomine, ATECO, pratiche dei servizi e di asseverazione, corsi, incarichi) verra’ spostato sulla principale. Operazione non automaticamente reversibile.'))return
-  try{
-    const{data,error}=await sb.rpc('fondi_imprese',{p_master_id:masterId,p_dupe_ids:dupeIds})
-    if(error)throw error
-    toast('Unione completata: '+((data&&data.imprese_archiviate)||dupeIds.length)+' impresa/e archiviata/e ('+_riepUnione(data)+')','ok')
-    _impSelClear()
-    admLoadImprese()
-  }catch(e){toast('Errore unione: '+(e.message||e),'err')}
-}
-window._impSelToggle=_impSelToggle
-window._impSelClear=_impSelClear
-window.admFondiImprese=admFondiImprese
 window.admLoadImprese = admLoadImprese
 
 /* ── IMPRESE VISITATE SENZA CODICE FISCALE (03/10/2026, chiesto dall'utente) ──
@@ -15687,6 +15572,7 @@ document.addEventListener('input',function(ev){
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
 <script src="riepilogo-verbali.js?v=2"></script>
 <script src="scheda-impresa.js?v=2"></script>
+<script src="imprese-anagrafica.js?v=1"></script>
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
@@ -15701,7 +15587,7 @@ document.addEventListener('input',function(ev){
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=9"></script>
 <script src="rientri-giorni.js?v=6"></script>
-<script src="veste-v2.js?v=33"></script>
+<script src="veste-v2.js?v=34"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
