@@ -1902,7 +1902,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field" style="flex:1"><label>Civico *</label><input type="text" id="mc-civ"></div>
     </div>
     <div class="row">
-      <div class="field"><label>Comune *</label><select id="mc-com"><option value="">– Seleziona comune –</option></select></div>
+      <div class="field"><label>Comune *</label><select id="mc-com"><option value="">– Seleziona comune –</option></select>
+        <div id="mc-com-altro-wrap" class="hidden" style="margin-top:4px"><input type="text" id="mc-com-altro" list="mc-com-altro-lista" autocomplete="off" placeholder="Scrivi il comune, es. Castelfranco Veneto"><datalist id="mc-com-altro-lista"></datalist>
+          <div id="mc-com-altro-info" style="font-size:11px;color:#888;margin-top:2px">Si sceglie dall'elenco ISTAT: il codice per l'Osservatorio si compila da solo.</div></div></div>
       <div class="field"><label>CAP <span style="font-weight:400;font-size:11px;color:#aaa">(auto)</span></label><input type="text" id="mc-cap" maxlength="5" readonly style="background:#f8f8f8" placeholder="si compila da Comune"></div>
       <div class="field"><label>Cod. ISTAT <span style="font-weight:400;font-size:11px;color:#aaa">(per XML, 6 cifre)</span></label><input type="text" id="mc-comune-cod" maxlength="6" placeholder="es. 028001" style="font-family:monospace"></div>
     </div>
@@ -4453,6 +4455,7 @@ $('btn-mi-save').onclick=async()=>{
 function resetModalCantiere(){
   ;['mc-ind','mc-civ','mc-etich','mc-cap','mc-cnce','mc-lotto','mc-cod-uni','mc-data-inizio','mc-data-ult','mc-comune-cod','mc-tip-ope-altro','mc-descr'].forEach(id=>{const el=$(id);if(el)el.value=''})
   const com=$('mc-com');if(com){com.querySelectorAll('option[data-extra="1"]').forEach(o=>o.remove());com.value=''}
+  { const w=$('mc-com-altro-wrap');if(w)w.classList.add('hidden');const i=$('mc-com-altro');if(i)i.value='';const l=$('mc-com-altro-lista');if(l)l.innerHTML='';const n=$('mc-com-altro-info');if(n)n.textContent='Si sceglie dall\'elenco ISTAT: il codice per l\'Osservatorio si compila da solo.' }
   window._editCantComuneOrig=null
   const ti=$('mc-tip-int');if(ti)ti.value=''
   const to=$('mc-tip-ope');if(to)to.value=''
@@ -4666,6 +4669,7 @@ function _useCommittenteEsistente(c){
   toast('Committente esistente selezionato','ok')
 }
 $('btn-mc-save').onclick=async()=>{
+  if(vGet('mc-com')==='__altro__'){toast('Scrivi il comune e sceglilo dall\'elenco ISTAT: serve il suo codice','warn');const _i=$('mc-com-altro');if(_i)_i.focus();return}
   const ind=vGet('mc-ind').trim();const civ=vGet('mc-civ').trim()
   if(!ind||!civ){toast('Indirizzo e civico obbligatori','warn');return}
   /* (03/10/2026) comune, tipo di intervento, tipo di opera, durata e importo sono obbligatori per
@@ -5822,16 +5826,60 @@ function _normCom(s){
   return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim()
 }
 window._normCom=_normCom
+/* (06/10/2026) Comune fuori provincia: si scrive, l'elenco ISTAT propone (prima il Veneto) e solo un comune
+   scelto dall'elenco entra nella tendina, col suo codice ISTAT, che l'Osservatorio chiede. Un nome scritto a
+   mano e non trovato non si accetta: senza codice il cantiere resterebbe fermo per l'Osservatorio. */
+const _mcComEtich=c=>c.nome+' ('+c.prov+')'
+let _mcComTrovati=[],_mcComT=null
+function mcScegliComuneAltro(c){
+  const sel=$('mc-com');if(!sel)return
+  sel.querySelectorAll('option[data-extra="1"]').forEach(o=>o.remove())
+  const o=document.createElement('option');o.value=c.nome;o.textContent=c.nome+' ('+c.prov+') — fuori provincia';o.dataset.extra='1';o.dataset.istat=c.cod
+  sel.appendChild(o);sel.value=c.nome
+  sel.dispatchEvent(new Event('change',{bubbles:true}))
+  const info=$('mc-com-altro-info');if(info)info.textContent='✓ '+c.nome+' ('+c.prov+'), codice ISTAT '+c.cod
+}
+function mcComAltroInit(){
+  const inp=$('mc-com-altro'),dl=$('mc-com-altro-lista'),info=$('mc-com-altro-info')
+  if(!inp||inp._mcInit)return;inp._mcInit=true
+  inp.addEventListener('input',()=>{
+    clearTimeout(_mcComT)
+    const t=inp.value.trim()
+    const scelto=_mcComTrovati.find(c=>_mcComEtich(c)===t)
+    if(scelto){mcScegliComuneAltro(scelto);return}
+    if(t.length<2){if(dl)dl.innerHTML='';return}
+    _mcComT=setTimeout(async()=>{
+      const q=t.replace(/[%_,()\\]/g,' ').trim()
+      const{data,error}=await sb.from('comuni_istat').select('nome,cod,prov,regione').ilike('nome','%'+q+'%').is('soppresso_il',null).order('nome').limit(40)
+      if(error){if(info)info.textContent='Non sono riuscito a leggere l\'elenco ISTAT ('+error.message+')';return}
+      _mcComTrovati=(data||[]).sort((a,b)=>(b.regione==='Veneto')-(a.regione==='Veneto'))
+      if(dl)dl.innerHTML=_mcComTrovati.map(c=>'<option value="'+esc(_mcComEtich(c))+'"></option>').join('')
+      if(info)info.textContent=_mcComTrovati.length?'Scegli dall\'elenco: il codice ISTAT si compila da solo.':'Nessun comune con questo nome nell\'elenco ISTAT.'
+    },250)
+  })
+}
 function populateComuniSelect(){
   const sel=$('mc-com'); if(!sel)return
   sel.innerHTML='<option value="">– Seleziona comune –</option>' // idempotente: evita opzioni duplicate se richiamata due volte
   COMUNI_PD.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o) })
+  // (06/10/2026) raramente il cantiere è fuori provincia: si scrive il comune e si sceglie dall'elenco ISTAT
+  { const o=document.createElement('option'); o.value='__altro__'; o.textContent='➕ Altro comune (fuori provincia)…'; sel.appendChild(o) }
+  mcComAltroInit()
   // CAP e codice ISTAT auto-fill
   sel.onchange=()=>{
+    const _wrap=$('mc-com-altro-wrap')
+    if(sel.value==='__altro__'){
+      if(_wrap)_wrap.classList.remove('hidden')
+      const _i=$('mc-com-altro');if(_i){_i.value='';_i.focus()}
+      const _c=$('mc-comune-cod');if(_c)_c.value=''
+      const _cap=$('mc-cap');if(_cap){_cap.value='';_cap.readOnly=false;_cap.style.background='#fff'}
+      return
+    }
+    if(_wrap)_wrap.classList.add('hidden')
     const cap=CAP_PD[sel.value]||''
     const capEl=$('mc-cap')
     if(capEl){capEl.value=cap;capEl.readOnly=!!cap;capEl.style.background=cap?'#f8f8f8':'#fff'}
-    const istat=ISTAT_PD[sel.value]||''
+    const istat=ISTAT_PD[sel.value]||(sel.selectedOptions[0]&&sel.selectedOptions[0].dataset.istat)||''
     const codEl=$('mc-comune-cod')
     /* (03/10/2026) cambiando comune il codice è quello del comune scelto: prima restava quello di prima
        (due cantieri di Carceri portavano il codice di Carmignano di Brenta). Se la pagina non lo conosce
