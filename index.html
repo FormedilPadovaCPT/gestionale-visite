@@ -3417,6 +3417,55 @@ document.addEventListener('change',async e=>{
   try{const nr=await nextVerbale(vGet('f-data'));vSet('f-verbale',nr);S.fd.nr_verbale=nr}catch(_e){console.warn('numero verbale:',_e)}
 })
 
+/* (06/10/2026) UN VERBALE DEFINITIVO NON SI CAMBIA DALLA MASCHERA. Dopo «Definitivo» la maschera restava aperta e
+   modificabile, e ripremendo «Definitivo» il verbale si riscriveva in silenzio (chiesto dall'utente). Ora si blocca:
+   restano PDF e mail. Per correggerlo la segreteria lo riapre («🔓 Riapri al tecnico»): torna in bozza al tecnico,
+   col motivo scritto (riapri_verbale, visite_riaperture). La segreteria che apre un definitivo con «✏️ Modifica»
+   lo corregge come prima. */
+function bloccaMascheraDefinitivo(){
+  const v=$('view-form');if(!v)return
+  S._definitivoBloccato=true
+  v.querySelectorAll('.tab-content').forEach(c=>{
+    if(c.dataset.tab==='15'){c.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=true;el.dataset.bloccoDef='1'})}
+    else c.inert=true
+  })
+  ;['btn-bozza','btn-final'].forEach(id=>{const b=$(id);if(b)b.classList.add('hidden')})
+  let b=$('banner-definitivo')
+  if(!b){b=document.createElement('div');b.id='banner-definitivo';(v.querySelector('.tab-area')||v).prepend(b)}
+  b.style.cssText='margin:0 0 12px;padding:10px 14px;border-radius:8px;background:#eef9f0;border-left:4px solid #27ae60;font-size:13px;line-height:1.5'
+  b.innerHTML='🔒 <b>Verbale definitivo.</b> Non si modifica più da qui: puoi fare il PDF e mandare la mail. Se c\'è da correggere qualcosa, chiedi alla segreteria di riaprirlo: ti tornerà fra le bozze.'
+}
+function sbloccaMascheraDefinitivo(){
+  const v=$('view-form');if(!v)return
+  S._definitivoBloccato=false
+  v.querySelectorAll('.tab-content').forEach(c=>{c.inert=false})
+  v.querySelectorAll('[data-blocco-def]').forEach(el=>{el.disabled=false;delete el.dataset.bloccoDef})
+  ;['btn-bozza','btn-final'].forEach(id=>{const b=$(id);if(b)b.classList.remove('hidden')})
+  ;['banner-definitivo','banner-riapertura'].forEach(id=>{const b=$(id);if(b)b.remove()})
+}
+/* il verbale riaperto dalla segreteria: in testa alla maschera chi, quando e che cosa va corretto */
+async function mostraRiapertura(vid){
+  const{data,error}=await sb.from('visite_riaperture').select('motivo,riaperto_da,riaperto_il').eq('visita_id',vid).is('richiuso_il',null).order('riaperto_il',{ascending:false}).limit(1)
+  if(error||!data||!data.length)return
+  const ri=data[0],v=$('view-form');if(!v)return
+  let b=$('banner-riapertura')
+  if(!b){b=document.createElement('div');b.id='banner-riapertura';(v.querySelector('.tab-area')||v).prepend(b)}
+  b.style.cssText='margin:0 0 12px;padding:10px 14px;border-radius:8px;background:#fff6e5;border-left:4px solid var(--orange);font-size:13px;line-height:1.5'
+  b.innerHTML='🔓 <b>Verbale riaperto dalla segreteria</b> il '+esc(fmtDate(String(ri.riaperto_il).slice(0,10)))+': <i>«'+esc(ri.motivo)+'»</i>. Correggi e chiudilo di nuovo con «Definitivo».'
+}
+async function riapriAlTecnico(vid,nr){
+  if(!window.__isCoord){toast('Riaprire un verbale definitivo spetta alla segreteria','err');return}
+  const motivo=prompt('Riapri il verbale '+(nr||'')+' al tecnico?\n\nTorna in BOZZA: il tecnico lo trova fra le sue bozze, lo corregge e lo richiude con «Definitivo». Finché è in bozza resta fuori da statistiche e Osservatorio.\n\nScrivi che cosa va corretto (lo legge il tecnico):','')
+  if(motivo==null)return
+  if(motivo.trim().length<3){toast('Scrivi che cosa va corretto: il tecnico lo legge quando riapre la bozza','warn');return}
+  const{data,error}=await sb.rpc('riapri_verbale',{p_visita_id:vid,p_motivo:motivo.trim()})
+  if(error||!data||!data.ok){toast('Non riaperto: '+(error?error.message:'risposta inattesa'),'err',8000);return}
+  hide('modal-qd')
+  toast('Verbale '+(data.nr_verbale||nr||'')+' riaperto: è tornato in bozza al tecnico'+(data.notifica?' (avvisato sul telefono)':''),'ok',6000)
+  if(typeof loadLista==='function')loadLista()
+}
+window.riapriAlTecnico=riapriAlTecnico
+
 // ── INIT FORM ──
 /* (03/10/2026) UNA MASCHERA NUOVA NASCE VUOTA DAVVERO. initForm svuotava un elenco di campi scritto a
    mano, e quelli che nell'elenco non c'erano restavano dal verbale aperto prima: il titolo di
@@ -3443,6 +3492,7 @@ async function initForm(snap=null){
   try{_formAzzera()}catch(_e){console.warn('azzeramento della maschera:',_e)}
   hide('btn-pdf')
   hide('btn-email-verbale')
+  sbloccaMascheraDefinitivo()
 
   // numero PROVVISORIO: quello vero si fissa al primo salvataggio, sulla data della visita
   // (S.nrAuto = il numero l'ha proposto l'app, non viene da un verbale gia' esistente)
@@ -5326,6 +5376,8 @@ async function _saveVisitaCorpo(stato){
        scriveva elimina=0 e stage_sn=false: un verbale eliminato dalla segreteria mentre il tecnico
        lo aveva aperto tornava visibile, e i 171 verbali storici segnati stage perdevano il segno. */
     if(byId&&+byId.elimina===1)throw new Error('Questo verbale è stato eliminato dalla segreteria mentre era aperto: non lo risalvo. Chiedi alla segreteria se va ripristinato.')
+    // (06/10/2026) un definitivo non si riscrive dalla maschera: lo riapre la segreteria
+    if(byId&&byId.stato==='definitivo'&&!window.__isCoord){bloccaMascheraDefinitivo();throw new Error('questo verbale è già definitivo e non si modifica più. Se va corretto, chiedi alla segreteria di riaprirlo: ti tornerà fra le bozze.')}
     if(byId){
       delete vistaRow.elimina;delete vistaRow.stage_sn
       /* 01/10/2026 — Risalvare un verbale già definitivo non riscrive quello che nessuno ha toccato.
@@ -5361,6 +5413,7 @@ async function _saveVisitaCorpo(stato){
         vid=byNr.visita_id
         vistaRow.visita_id=vid
         S.fd.visita_id=vid
+        if(byNr.stato==='definitivo'&&!window.__isCoord)throw new Error('il verbale '+nrv+' è già definitivo e non si modifica più. Se va corretto, chiedi alla segreteria di riaprirlo.')
         if(byNr.stato==='definitivo'){_eraDefinitivo=true;stato='definitivo';vistaRow.stato='definitivo'}
         const{error}=await sb.from('visite').update(vistaRow).eq('visita_id',vid)
         if(error)throw error
@@ -5495,6 +5548,7 @@ async function _saveVisitaCorpo(stato){
 
     show('btn-pdf')
     show('btn-email-verbale')
+    if(stato==='definitivo'&&(!_eraDefinitivo||!window.__isCoord))bloccaMascheraDefinitivo()
     upsertPersoneVisita().catch(_e=>console.warn('upsertPersone:',_e))
     if(_mancanze)toast('Salvato come bozza: per chiuderlo come definitivo manca ancora qualcosa.','warn',6000)
     else toast(`Visita salvata come ${stato==='bozza'?'bozza':'definitivo'}`, 'ok')
@@ -9533,6 +9587,7 @@ async function riapriBozza(vid){
     navTo('form')
     if(S.savedId)show('btn-pdf')   // il PDF della bozza si puo' fare subito (23/09/2026)
     toast(`Bozza ${snap.nr_verbale_origine||''} riaperta — completa e salva come Definitivo`,'ok')
+    mostraRiapertura(vid).catch(e=>console.warn('riapertura:',e))
     if(al.diversi.length)toast('Questo verbale è stato corretto dopo l\'ultimo salvataggio dalla maschera ('+al.diversi.slice(0,6).join(', ')+(al.diversi.length>6?'…':'')+'): lo apro con i dati di adesso.','warn',10000)
     if(al.avvisi.length)toast('Nel database non risultano salvate '+al.avvisi.join(', ')+': tengo quelle dell\'ultima copia. Controlla e salva di nuovo.','warn',12000)
   }catch(e){toast('Errore apertura bozza: '+e.message,'err');console.error(e)}
@@ -13463,7 +13518,10 @@ async function showVisitaDetail(vid){
       `<button class="btn-outline btn-sm" onclick="inviEmailVerbaleFromList('${vid}');hide('modal-qd')">📧 Email</button>`,
     ]
     if(isBozza) acts.push(`<button class="btn-warn btn-sm" onclick="riapriBozza('${vid}');hide('modal-qd')">✏️ Riapri</button>`)
-    else if(window.__isCoord) acts.push(`<button class="btn-warn btn-sm" onclick="modificaVisitaCoord('${vid}');hide('modal-qd')">✏️ Modifica</button>`)
+    else if(window.__isCoord){
+      acts.push(`<button class="btn-warn btn-sm" onclick="riapriAlTecnico('${vid}','${(v.nr_verbale||'').replace(/'/g,'')}')" title="Il verbale torna in bozza al tecnico, che lo corregge e lo richiude: il motivo resta scritto">🔓 Riapri al tecnico</button>`)
+      acts.push(`<button class="btn-warn btn-sm" onclick="modificaVisitaCoord('${vid}');hide('modal-qd')">✏️ Modifica</button>`)
+    }
     // (04/10/2026) sul telefono l'elenco non ha più il cestino: «Elimina» sta qui, per la segreteria
     if(window.__isCoord&&+v.elimina!==1) acts.push(`<button class="btn-outline btn-sm" style="color:#c0392b" onclick="hide('modal-qd');softDeleteVisita('${vid}','${(v.nr_verbale||'').replace(/'/g,'')}')">🗑 Elimina</button>`)
     $('qd-actions').innerHTML=acts.join('')
