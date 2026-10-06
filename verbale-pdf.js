@@ -115,6 +115,7 @@
     fig('CSP', v.csp, v.csp_email, v.csp_tel)
     fig('CSE', v.cse, v.cse_email, v.cse_tel)
 
+    const ncImp = +v.nr_imp_non_censite || 0, ncLav = +v.nr_lav_non_censite || 0, ncAut = +v.nr_ind_non_censite || 0
     const cantiere = [
       ['Indirizzo', cant.cantiere_indirizzo || '–', 'N° civico', cant.cantiere_civico || '–'],
       ['Comune', cant.comune_nome || '–', 'CAP', cant.cantiere_cap || '–'],
@@ -122,8 +123,12 @@
       ['Tipo intervento', TIP_INT[v.vis_tip_int ?? cant.cantiere_tip_int] || '–', 'Tipo opera', TIP_OPE[v.vis_tip_ope ?? cant.cantiere_tip_ope] || '–'],
       ['Importo lavori (€)', IMP_LBL[v.vis_importo ?? cant.cantiere_importo] || '–', 'Durata cantiere', DUR_LBL[v.vis_durata ?? cant.cantiere_durata] || '–'],
       ['Codice CNCE', cant.cantiere_cnce || '–', 'Codice univoco', cant.nodo_id || '–'],
-      ['N° imprese in cantiere', String(imps.filter((im) => im.impresa_id).length || v.nr_imp || 1), 'Totale lavoratori', String(imps.reduce((s, im) => s + (+im.nr_lav || 0), 0) || v.nr_lavoratori || 0)]
+      ['N° imprese in cantiere', String((imps.filter((im) => im.impresa_id).length + ncImp + ncAut) || v.nr_imp || 1), 'Totale lavoratori', String((imps.reduce((s, im) => s + (+im.nr_lav || 0), 0) + ncLav) || v.nr_lavoratori || 0)]
     ]
+    // (06/10/2026) imprese, lavoratori e autonomi visti ma non elencati: già nei totali qui sopra, la riga dice quanti sono
+    if (ncImp || ncLav || ncAut) {
+      cantiere.push(['Non censiti', [ncImp ? ncImp + (ncImp === 1 ? ' impresa' : ' imprese') + ' con ' + ncLav + (ncLav === 1 ? ' lavoratore' : ' lavoratori') : (ncLav ? ncLav + ' lavoratori' : ''), ncAut ? ncAut + (ncAut === 1 ? ' lavoratore autonomo' : ' lavoratori autonomi') : ''].filter(Boolean).join(', '), '', ''])
+    }
     const lavorazioni = lavs.length ? lavs.map((l) => [l.genere, l.fase, l.lavorazione].filter(Boolean).join(' - ')).filter(Boolean).join('; ') : '–'
 
     // IPC — logica ufficiale Formedil (identica a calcIPC dell'app)

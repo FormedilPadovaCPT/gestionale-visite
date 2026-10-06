@@ -959,6 +959,17 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           <div id="imp-proposte"></div>
           <div id="imp-accordion-list"></div>
           <button class="btn-outline btn-sm" id="btn-add-imp" style="margin-top:8px">+ Aggiungi impresa</button>
+          <!-- (06/10/2026) cantieri grandi: imprese, lavoratori e autonomi visti ma non elencati, che entrano nei totali -->
+          <div id="imp-non-censite" style="margin-top:16px;padding:10px 12px;background:#f8f8f8;border-radius:8px;border-left:3px solid var(--orange)">
+            <div style="font-weight:600;font-size:13px;margin-bottom:2px">Altre imprese presenti, non censite</div>
+            <p style="font-size:12px;color:#888;margin:0 0 8px">Nei cantieri grandi, quando non si riescono a raccogliere i dati di tutte le imprese: quante altre imprese, quanti loro lavoratori e quanti lavoratori autonomi hai visto, senza elencarli. Si sommano ai totali del cantiere (verbale, statistiche, Osservatorio). Se non serve, lascia vuoto.</p>
+            <div class="row">
+              <div class="field"><label>Altre imprese</label><input type="number" id="f-nc-imp" min="0" max="9999" step="1" inputmode="numeric" placeholder="0"></div>
+              <div class="field"><label>Lavoratori di queste imprese</label><input type="number" id="f-nc-lav" min="0" max="9999" step="1" inputmode="numeric" placeholder="0"></div>
+              <div class="field"><label>Lavoratori autonomi</label><input type="number" id="f-nc-aut" min="0" max="9999" step="1" inputmode="numeric" placeholder="0"></div>
+            </div>
+            <div id="imp-totali" style="font-size:12px;color:#565c66;margin-top:2px"></div>
+          </div>
         </div>
       </div>
 
@@ -2423,7 +2434,7 @@ window.onunhandledrejection = function(e) {
 };
 </script>
 
-<script src="app-data.js?v=11"></script>
+<script src="app-data.js?v=12"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -3661,6 +3672,7 @@ function renderImpreseAccordion(){
     const tiEl=$(`im-tipo-${idx}`)
     if(tiEl)tiEl.onchange=()=>S.imprese[idx].tipo_imp=tiEl.value
   })
+  aggiornaTotaliCantiere()
   // scheda impresa pre-visita: si legge dal DB solo per le imprese già scelte
   if(window.SchedaImpresa) S.imprese.forEach((im,idx)=>{ SchedaImpresa.mostra(idx, im.impresa_id, sb) })
   caricaProposteImprese()
@@ -3728,16 +3740,34 @@ $('btn-add-imp').onclick=()=>{
 }
 
 // (03/10/2026) funzione pura: nessun lavoratore dichiarato, né dipendenti né autonomi
+/* (06/10/2026) il totale del cantiere sotto il riquadro dei non censiti, rifatto a ogni cambio di righe o numeri */
+function aggiornaTotaliCantiere(){
+  const el=$('imp-totali');if(!el)return
+  const t=computeImpTotals(),nc=altreNonCensite()
+  el.textContent=(nc.imp||nc.lav||nc.aut)
+    ?'Totale del cantiere: '+t.nr_imp+(t.nr_imp===1?' impresa':' imprese')+', '+t.nr_lavoratori+(t.nr_lavoratori===1?' lavoratore':' lavoratori')+', '+t.nr_ind+(t.nr_ind===1?' autonomo':' autonomi')+' (elencati più non censiti)'
+    :''
+}
+document.addEventListener('input',e=>{const id=e.target&&e.target.id||'';if(/^f-nc-|^im-nr_lav-/.test(id))aggiornaTotaliCantiere()})
+document.addEventListener('change',e=>{const id=e.target&&e.target.id||'';if(/^im-tipo-/.test(id))aggiornaTotaliCantiere()})
+window.altreNonCensite=altreNonCensite   // la veste lo usa nel riepilogo del passo Imprese
 function zeroLavoratori(tot){return !!tot&&(+tot.nr_lavoratori||0)===0&&(+tot.nr_ind||0)===0}
 // Totali lavoratori/imprese calcolati dalle imprese inserite
-function computeImpTotals(righe){
+/* (06/10/2026) imprese, lavoratori e autonomi presenti ma non elencati: un numero intero da 0 in su, vuoto = 0 */
+function _ncNum(x){const n=parseInt(x,10);return Number.isFinite(n)&&n>0?Math.min(n,9999):0}
+function altreNonCensite(){return{imp:_ncNum(vGet('f-nc-imp')),lav:_ncNum(vGet('f-nc-lav')),aut:_ncNum(vGet('f-nc-aut'))}}
+/* righe: le imprese elencate (di default quelle della maschera); altre: i non censiti (di default quelli della
+   maschera se le righe sono quelle della maschera, altrimenti nessuno: chi passa righe lette dal database passa
+   anche i non censiti di quel verbale) */
+function computeImpTotals(righe,altre){
   const list=(righe||S.imprese||[]).filter(im=>im.impresa_id)
+  const nc=altre||(righe?{imp:0,lav:0,aut:0}:altreNonCensite())
   // autonomi e ditte individuali si contano a parte (nr_ind), come nel modulo: 1.9 imprese, 1.10 ditte individuali
   const aut=list.filter(im=>+im.tipo_imp===TIPO_IMP_AUTONOMO).length
   return{
-    nr_imp:(list.length-aut)||0,
-    nr_ind:aut,
-    nr_lavoratori:list.reduce((s,im)=>s+(+im.nr_lav||0),0),
+    nr_imp:(list.length-aut)+_ncNum(nc.imp),
+    nr_ind:aut+_ncNum(nc.aut),
+    nr_lavoratori:list.reduce((s,im)=>s+(+im.nr_lav||0),0)+_ncNum(nc.lav),
     nr_lavoratori_stranieri:list.reduce((s,im)=>s+(+im.nr_lav_str||0),0)
   }
 }
@@ -5231,6 +5261,7 @@ async function _saveVisitaCorpo(stato){
       comm_rag_soc:vGet('f-comm-rag-soc')||null,
       nr_imp:computeImpTotals().nr_imp||null,
       nr_ind:computeImpTotals().nr_ind,
+      nr_imp_non_censite:altreNonCensite().imp,nr_lav_non_censite:altreNonCensite().lav,nr_ind_non_censite:altreNonCensite().aut,
       coord:coordVal(),
       costi:vGet('f-costi')||null,
       stato_lav:vGet('f-stato-lav')||null,
@@ -5273,7 +5304,7 @@ async function _saveVisitaCorpo(stato){
     }
 
     // 1) Esiste già una riga con questo visita_id?
-    const{data:byId,error:eById}=await sb.from('visite').select('visita_id,stato,elimina').eq('visita_id',vid).maybeSingle()
+    const{data:byId,error:eById}=await sb.from('visite').select('visita_id,stato,elimina,nr_imp_non_censite,nr_lav_non_censite,nr_ind_non_censite').eq('visita_id',vid).maybeSingle()
     if(eById)throw eById
     /* 04/10/2026: la riga già esistente tiene i suoi «elimina» e «stage_sn». Prima ogni salvataggio
        scriveva elimina=0 e stage_sn=false: un verbale eliminato dalla segreteria mentre il tecnico
@@ -5291,7 +5322,7 @@ async function _saveVisitaCorpo(stato){
         _eraDefinitivo=true;stato='definitivo';vistaRow.stato='definitivo'
         const{data:_impDb,error:_eImpDb}=await sb.from('visite_imprese_presenti').select('impresa_id,tipo_imp,nr_lav,nr_lav_str').eq('visita_id',vid)
         if(_eImpDb)throw _eImpDb
-        const _tDb=computeImpTotals(_impDb||[]),_tOra=computeImpTotals()
+        const _tDb=computeImpTotals(_impDb||[],{imp:byId.nr_imp_non_censite,lav:byId.nr_lav_non_censite,aut:byId.nr_ind_non_censite}),_tOra=computeImpTotals()
         if(['nr_imp','nr_ind','nr_lavoratori','nr_lavoratori_stranieri'].every(k=>_tDb[k]===_tOra[k])){
           delete vistaRow.nr_imp;delete vistaRow.nr_ind
           delete vistaRow.nr_lavoratori;delete vistaRow.nr_lavoratori_stranieri
@@ -5532,6 +5563,7 @@ function buildSnap(vid=null){
     // Tab 1 – Dati cantiere al momento della visita
     nr_imp:computeImpTotals().nr_imp||0,
     nr_ind:computeImpTotals().nr_ind,
+    nc_imp:altreNonCensite().imp,nc_lav:altreNonCensite().lav,nc_aut:altreNonCensite().aut,
     nr_lavoratori:computeImpTotals().nr_lavoratori,
     nr_lavoratori_stranieri:computeImpTotals().nr_lavoratori_stranieri,
     importo:vGet('f-importo')||null,
@@ -5685,6 +5717,9 @@ function applySnap(snap){
   vSet('f-nr-ind',snap.nr_ind||0)
   vSet('f-nr-lav',snap.nr_lavoratori||0)
   vSet('f-nr-lav-str',snap.nr_lavoratori_stranieri||0)
+  // (06/10/2026) imprese, lavoratori e autonomi non censiti: vuoto se zero
+  vSet('f-nc-imp',_ncNum(snap.nc_imp)||'');vSet('f-nc-lav',_ncNum(snap.nc_lav)||'');vSet('f-nc-aut',_ncNum(snap.nc_aut)||'')
+  aggiornaTotaliCantiere()
   if(snap.importo)vSet('f-importo',snap.importo)
   if(snap.costi)vSet('f-costi',snap.costi)
   vSet('f-stato-lav',snap.stato_lav||'')
@@ -7684,6 +7719,7 @@ function _riepUnione(res){
   const note=((res&&res.note)||[]).map(n=>n.lasciata_sul_doppione?('ATTENZIONE: '+n.lasciata_sul_doppione+' e\u2019 rimasta sulla scheda unita ('+n.perche+')'):n.da_guardare?('da guardare: '+n.da_guardare):n.ereditato?('ereditato '+n.ereditato+' '+(n.valore||'')):'').filter(Boolean)
   return (voci.length?voci.join(', '):'nessuna riga collegata')+(somma?' — '+somma:'')+(note.length?' — '+note.join('; '):'')
 }
+window._riepUnione=_riepUnione   // anche imprese-anagrafica.js dice che cosa ha spostato l'unione
 // ── FUSIONE CANTIERI SELEZIONATI (solo segreteria) ──
 window.fondiSelezionati=async function(){
   if(!window.__isSegreteria){toast('Funzione riservata alla segreteria','err');return}
@@ -9011,7 +9047,7 @@ Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle per
 
 // ── RETTIFICA VERBALE GIÀ INVIATO ──
 const RETT_SKIP=new Set(['visita_id','exported_at','cantiere_detail','tecnico_id','tecnico_email','tecnico2_id','tecnico2_email','committente_id','ppre_titolo','ppre_nome','ppre_cog','comm_tipo_sogg','comm_tipo','comm_titolo','rl_titolo','csp_titolo','cse_titolo','comm_cf_pg','comm_email_pg','comm_tel_pg','comm_email_alt','nr_ind','cantiere_id','privacy'])
-const RETT_LABELS={nr_verbale_origine:'Numero verbale',data_visita:'Data visita',ora_visita:'Ora inizio',ora_fine:'Ora fine',tipo_accesso:'Tipo accesso',acc_cant:'Accesso al cantiere',rlst_sn:'RLST',stage_vis:'Stagista presente',nom_stage:'Nominativo stagista',nom_ppre:'Persona presente alla visita',qual_ppre:'Qualifica persona presente',tel_ppre:'Telefono persona presente',tec_display:'Tecnico',tec2_display:'Secondo tecnico',cantiere_label:'Cantiere',prot_int:'Protocollo interno',cnce:'Codice CNCE',cod_uni:'Codice univoco cantiere',data_ult:'Data ultimazione lavori',comm_nome:'Nome committente',comm_cog:'Cognome committente',comm_rag_soc:'Ragione sociale committente',comm_cf:'CF committente',comm_email:'Email committente',comm_tel:'Telefono committente',comm_piva:'P.IVA committente',coord:'Coordinamento',rl_nome:'Nome RL',rl_cog:'Cognome RL',rl_email:'Email RL',rl_tel:'Telefono RL',csp_nome:'Nome CSP',csp_cog:'Cognome CSP',csp_email:'Email CSP',csp_tel:'Telefono CSP',cse_nome:'Nome CSE',cse_cog:'Cognome CSE',cse_email:'Email CSE',cse_tel:'Telefono CSE',nr_imp:'N. imprese',nr_lavoratori:'N. lavoratori',nr_lavoratori_stranieri:'N. lavoratori stranieri',importo:'Importo lavori',costi:'Costi sicurezza',stato_lav:'Stato lavori (%)',note_lav:'Note lavori',oss_tec:'Osservazioni del tecnico',oss_int:'Osservazioni interne',note_for_sn:'Necessità formative',note_for_m:'Note formazione',segnalazione:'Segnalazione',data_ritorno:'Data ritorno'}
+const RETT_LABELS={nc_imp:'Altre imprese non censite',nc_lav:'Lavoratori delle imprese non censite',nc_aut:'Lavoratori autonomi non censiti',nr_verbale_origine:'Numero verbale',data_visita:'Data visita',ora_visita:'Ora inizio',ora_fine:'Ora fine',tipo_accesso:'Tipo accesso',acc_cant:'Accesso al cantiere',rlst_sn:'RLST',stage_vis:'Stagista presente',nom_stage:'Nominativo stagista',nom_ppre:'Persona presente alla visita',qual_ppre:'Qualifica persona presente',tel_ppre:'Telefono persona presente',tec_display:'Tecnico',tec2_display:'Secondo tecnico',cantiere_label:'Cantiere',prot_int:'Protocollo interno',cnce:'Codice CNCE',cod_uni:'Codice univoco cantiere',data_ult:'Data ultimazione lavori',comm_nome:'Nome committente',comm_cog:'Cognome committente',comm_rag_soc:'Ragione sociale committente',comm_cf:'CF committente',comm_email:'Email committente',comm_tel:'Telefono committente',comm_piva:'P.IVA committente',coord:'Coordinamento',rl_nome:'Nome RL',rl_cog:'Cognome RL',rl_email:'Email RL',rl_tel:'Telefono RL',csp_nome:'Nome CSP',csp_cog:'Cognome CSP',csp_email:'Email CSP',csp_tel:'Telefono CSP',cse_nome:'Nome CSE',cse_cog:'Cognome CSE',cse_email:'Email CSE',cse_tel:'Telefono CSE',nr_imp:'N. imprese',nr_lavoratori:'N. lavoratori',nr_lavoratori_stranieri:'N. lavoratori stranieri',importo:'Importo lavori',costi:'Costi sicurezza',stato_lav:'Stato lavori (%)',note_lav:'Note lavori',oss_tec:'Osservazioni del tecnico',oss_int:'Osservazioni interne',note_for_sn:'Necessità formative',note_for_m:'Note formazione',segnalazione:'Segnalazione',data_ritorno:'Data ritorno'}
 const _rettEq=(a,b)=>{const n=x=>(x===null||x===undefined||x===false)?'':String(x).trim();return n(a)===n(b)}
 const _rettVal=x=>{const s=(x===null||x===undefined)?'':String(x).trim();return s===''?'—':s}
 function _rettFmtDate(iso,soloData=false){
@@ -13180,6 +13216,7 @@ async function rebuildSnapFromDB(vid,opt){
     ..._figSnap('cse',v.cse_titolo,v.cse_nome,v.cse_cog,v.cse),cse_email:v.cse_email||null,cse_tel:v.cse_tel||null,
     nr_imp:v.nr_imp||0,nr_ind:v.nr_ind||0,
     nr_lavoratori:v.nr_lavoratori||0,nr_lavoratori_stranieri:v.nr_lavoratori_stranieri||0,
+    nc_imp:v.nr_imp_non_censite||0,nc_lav:v.nr_lav_non_censite||0,nc_aut:v.nr_ind_non_censite||0,
     importo:v.importo||null,costi:v.costi||null,stato_lav:v.stato_lav||null,
     imprese,checklist,note_checklist,
     lavorazioni:(lavRows||[]).map(l=>({genere:l.genere,fase:l.fase,lavorazione:l.lavorazione})),
@@ -15631,11 +15668,11 @@ document.addEventListener('input',function(ev){
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=9"></script>
 <script src="rientri-giorni.js?v=6"></script>
-<script src="veste-v2.js?v=34"></script>
+<script src="veste-v2.js?v=35"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
-<script src="verbale-pdf.js?v=8"></script>
+<script src="verbale-pdf.js?v=9"></script>
 <!-- mappa sul telefono: cantieri vicino a te (Nuova visita) e rientri sulla mappa (Scadenze) -->
 <script src="mappa.js?v=3"></script>
 </body>

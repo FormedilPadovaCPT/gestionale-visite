@@ -121,6 +121,7 @@ function snapAllineaAlDb(copia,db){
   const si=x=>(x===true||x===1||x==='1'||x==='true'||x==='si')?'1':'0'
   const tre=x=>(x==null||x==='')?'':si(x)
   const lista=x=>JSON.stringify((Array.isArray(x)?x:[]).map(String).sort())
+  const num0=x=>String(parseInt(x,10)||0)   // (06/10/2026) i non censiti: vuoto e 0 sono la stessa cosa
   const CAMPI=[
     ['nr_verbale_origine','numero del verbale',t],['data_visita','data della visita',t],['ora_visita','ora di inizio',ora],['ora_fine','ora di fine',ora],
     ['tipo_accesso','tipologia di accesso',t],['acc_cant','accesso al cantiere',t],['rlst_sn','RLST',si],['stage_vis','stage',si],['nom_stage','stage',t],
@@ -133,7 +134,8 @@ function snapAllineaAlDb(copia,db){
     ['cse_titolo','CSE',t],['cse_nome','CSE',t],['cse_cog','CSE',t],['cse_email','CSE',t],['cse_tel','CSE',t],
     ['importo','importo dei lavori',t],['costi','costi della sicurezza',t],['stato_lav','stato dei lavori',t],['note_lav','note sui lavori',t],
     ['oss_tec','osservazioni',t],['oss_int','note interne',t],['note_for_sn','formazione',si],['note_for_m','formazione',t],['note_for_tipi','formazione',lista],
-    ['segnalazione','segnalazione',si],['data_ritorno','data di ritorno',t]
+    ['segnalazione','segnalazione',si],['data_ritorno','data di ritorno',t],
+    ['nc_imp','imprese non censite',num0],['nc_lav','imprese non censite',num0],['nc_aut','imprese non censite',num0]
   ]
   for(const[k,nome,norm]of CAMPI){
     if(!(k in db))continue

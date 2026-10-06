@@ -1022,8 +1022,11 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       } else if (n === 2) {
         nome = 'Imprese in cantiere'; pallino = '🏢';
         const imp = (S().imprese || []).filter((x) => x.impresa_id || x.impresa_nome);
-        const lav = imp.reduce((a, x) => a + (Number(x.nr_lav) || 0), 0);
-        riep = imp.length ? { testo: imp.length + (imp.length === 1 ? ' impresa' : ' imprese') + ' · ' + lav + (lav === 1 ? ' lavoratore' : ' lavoratori'), classe: '', stato: 'completa' } : { testo: 'da compilare', classe: '', stato: '' };
+        // (06/10/2026) più le imprese, i lavoratori e gli autonomi non censiti del riquadro sotto l'elenco
+        const nc = typeof window.altreNonCensite === 'function' ? window.altreNonCensite() : { imp: 0, lav: 0, aut: 0 };
+        const lav = imp.reduce((a, x) => a + (Number(x.nr_lav) || 0), 0) + nc.lav;
+        const piu = nc.imp + nc.aut ? ' (+' + (nc.imp + nc.aut) + ' non censite)' : '';
+        riep = imp.length ? { testo: imp.length + (imp.length === 1 ? ' impresa' : ' imprese') + piu + ' · ' + lav + (lav === 1 ? ' lavoratore' : ' lavoratori'), classe: '', stato: 'completa' } : { testo: 'da compilare', classe: '', stato: '' };
       } else {
         const b = document.querySelector('#tab-bar .tab-btn[data-ti="' + n + '"]');
         nome = b ? b.textContent.replace(/^\s*\d+\.\s*/, '') : 'Area ' + (n - 2); pallino = String(n - 2);
