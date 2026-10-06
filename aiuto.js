@@ -116,9 +116,10 @@ window.AIUTO_TESTI = {
   't:riapri': 'Riporta il verbale a bozza per correggerlo. Solo la segreteria può farlo su un verbale definitivo.',
   't:chiudi cantiere (fine lavori)': 'Segna il cantiere come finito: sparisce dalle scadenze e dai cantieri attivi, e si chiudono i suoi incarichi (prima te li elenca). Le visite fatte restano.',
   'p:chiudi cantiere': 'Segna il cantiere come finito: sparisce dalle scadenze e dai cantieri attivi, e si chiudono i suoi incarichi (prima te li elenca). Le visite fatte restano.',
-  /* codice univoco del cantiere (codice-univoco.js, 23/09/2026) */
-  'btn-cod-uni-proponi': 'Propone il codice univoco del cantiere: iniziali del tecnico, strada e civico, sigla dell\'impresa principale. Lo correggi prima di salvarlo; se il cantiere ha già un codice non lo tocca.',
-  'btn-mc-cod-uni-proponi': 'Scrive nel campo il codice proposto: iniziali del tecnico, strada e civico, sigla dell\'impresa principale. Correggilo se serve: si salva insieme al cantiere.',
+  /* etichetta del cantiere (codice-univoco.js, 06/10/2026: prima proponeva il codice univoco) */
+  'btn-etich-proponi': 'Propone l\'etichetta del cantiere, quella che va all\'Osservatorio e che si vede negli elenchi: indirizzo e civico, poi il nome dell\'impresa principale. La correggi prima di salvarla; se il cantiere ce l\'ha già non la tocca.',
+  'btn-mc-etich-proponi': 'Scrive nel campo l\'etichetta proposta: indirizzo e civico, poi il nome dell\'impresa principale. Correggila se serve: si salva insieme al cantiere.',
+  'mi-esiste': 'La P.IVA o il CF che hai scritto sono di un\'impresa già in anagrafica: con «Usa questa» la metti nel verbale senza crearne una doppia.',
   /* proposta di chiusura (proposte-chiusura.js, 23/09/2026) */
   't:proponi chiusura': 'Dici alla segreteria che il cantiere è finito, con due parole sul perché. Non chiude niente: decide la segreteria, e fino ad allora il cantiere resta attivo.',
   't:proponi chiusura alla segreteria': 'Dici alla segreteria che il cantiere è finito, con due parole sul perché. Non chiude niente: decide la segreteria, e fino ad allora il cantiere resta attivo.',

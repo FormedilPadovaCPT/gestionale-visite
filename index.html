@@ -682,7 +682,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
                 <option value="12">Progetto SPISAL</option>
               </select>
             </div>
-            <div class="field" style="flex:0 0 150px">
+            <!-- (06/10/2026) l'accesso n° si calcola da solo e si legge nel riepilogo: il campo resta per il codice -->
+            <div class="field hidden" style="flex:0 0 150px">
               <label>Accesso n° <span style="font-weight:400;font-size:11px;color:#aaa">(automatico)</span></label>
               <input type="text" id="f-acc-cant" placeholder="–" readonly title="Calcolato automaticamente alla selezione del cantiere" style="background:#f8f8f8;cursor:not-allowed">
               <p style="font-size:11px;color:#aaa;margin-top:3px">Si calcola da solo selezionando il cantiere</p>
@@ -785,13 +786,16 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
           </div>
           <div class="row" style="margin-top:12px">
-            <div class="field" style="flex:0 1 420px"><label>Accesso cantiere n° (dal DB cantiere)</label><input type="text" id="f-acc-cant2" placeholder="Codice accesso interno" readonly style="background:#f8f8f8"></div>
+            <input type="hidden" id="f-acc-cant2">
             <div class="field"><label>Protocollo interno <span style="font-weight:400;font-size:11px;color:#aaa">(n° richiesta)</span></label><div style="display:flex;gap:6px"><input type="text" id="f-prot-int" placeholder="Prot. richiesta" style="flex:1;min-width:0"></div><div id="f-prot-msg" style="font-size:11px;margin-top:3px"></div></div>
           </div>
           <div class="row">
             <div class="field" style="flex:0 1 260px"><label>Codice CNCE <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="text" id="f-cnce" placeholder="–" readonly style="background:#f8f8f8"></div>
-            <div class="field" style="flex:0 1 440px"><label>Codice univoco <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="f-cod-uni" placeholder="Scrivilo o premi Proponi" maxlength="50" style="flex:1 1 120px;min-width:0"><button type="button" class="btn-outline btn-sm" id="btn-cod-uni-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
-            <div class="field" style="flex:0 1 380px"><label style="white-space:nowrap">Data ultimazione lavori <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="date" id="f-data-ult" readonly style="background:#f8f8f8"></div>
+            <!-- (06/10/2026, deciso dall'utente) il codice univoco non si chiede più nel verbale: resta nel database come
+                 storico e nella ricerca. Formedil chiede l'ETICHETTA (cantiereEtichetta), che qui si legge e si propone. -->
+            <input type="hidden" id="f-cod-uni">
+            <div class="field" style="flex:0 1 440px"><label>Etichetta cantiere <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere, va all'Osservatorio)</span></label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="f-etich" placeholder="–" readonly style="flex:1 1 120px;min-width:0;background:#f8f8f8"><button type="button" class="btn-outline btn-sm" id="btn-etich-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
+            <div class="field hidden" style="flex:0 1 380px"><label style="white-space:nowrap">Data ultimazione lavori <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="date" id="f-data-ult" readonly style="background:#f8f8f8"></div>
           </div>
           <div class="sect-title">Committente</div>
           <!-- 1. Tipologia (prima scelta) -->
@@ -1905,10 +1909,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div id="mc-com-altro-wrap" class="hidden" style="margin-top:4px"><input type="text" id="mc-com-altro" list="mc-com-altro-lista" autocomplete="off" placeholder="Scrivi il comune, es. Castelfranco Veneto"><datalist id="mc-com-altro-lista"></datalist>
           <div id="mc-com-altro-info" style="font-size:11px;color:#888;margin-top:2px">Si sceglie dall'elenco ISTAT: il codice per l'Osservatorio si compila da solo.</div></div></div>
     <div class="row">
-      <div class="field"><label>CAP <span style="font-weight:400;font-size:11px;color:#aaa">(auto)</span></label><input type="text" id="mc-cap" maxlength="5" readonly style="background:#f8f8f8" placeholder="si compila da Comune"></div>
+      <div class="field hidden" id="mc-cap-wrap"><label>CAP</label><input type="text" id="mc-cap" maxlength="5" placeholder="scrivilo: il comune non lo dà"></div>
       <div class="field"><label>Cod. ISTAT <span style="font-weight:400;font-size:11px;color:#aaa">(per XML, 6 cifre)</span></label><input type="text" id="mc-comune-cod" maxlength="6" placeholder="es. 028001" style="font-family:monospace"></div>
     </div>
-    <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma" maxlength="50"></div>
+    <div class="field"><label>Etichetta cantiere <span style="font-weight:400;font-size:11px;color:#aaa">(va all'Osservatorio; negli elenchi si vede al posto dell'indirizzo)</span></label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="mc-etich" placeholder="es. Via Roma 12 – ROSSI" maxlength="50" style="flex:1 1 120px;min-width:0"><button type="button" class="btn-outline btn-sm" id="btn-mc-etich-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
     </div>
     <div class="mc-col">
       <div class="sect-title">Dati per l'Osservatorio</div>
@@ -1943,7 +1947,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>Codice CNCE</label><input type="text" id="mc-cnce" placeholder="Cod. CNCE" maxlength="50"></div>
       <div class="field"><label>Lotto <span style="font-weight:400;font-size:11px;color:#aaa">(se il complesso ha più lotti con lo stesso CNCE)</span></label><input type="text" id="mc-lotto" placeholder="es. 1, 2, A…" maxlength="30"></div>
     </div>
-    <div class="field"><label>Codice univoco cantiere</label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="mc-cod-uni" placeholder="Codice univoco" maxlength="50" style="flex:1 1 120px;min-width:0"><button type="button" class="btn-outline btn-sm" id="btn-mc-cod-uni-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
+    <!-- (06/10/2026) il codice univoco non si assegna più: si vede solo sui cantieri che ce l'hanno, come storico -->
+    <div class="field hidden" id="mc-cod-uni-wrap"><label>Codice univoco <span style="font-weight:400;font-size:11px;color:#aaa">(storico, non si assegna più)</span></label><input type="text" id="mc-cod-uni" readonly maxlength="50" style="background:#f8f8f8"></div>
     <div class="row">
       <div class="field"><label>Data inizio lavori</label><input type="date" id="mc-data-inizio" onchange="_autoDurataCantiere()"></div>
       <div class="field"><label>Data prevista ultimazione lavori</label><input type="date" id="mc-data-ult" onchange="_autoDurataCantiere()"></div>
@@ -2007,6 +2012,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>Partita IVA</label><input type="text" id="mi-piva" placeholder="IT…"></div>
       <div class="field"><label>Codice fiscale *</label><input type="text" id="mi-cf" placeholder="CF… (identificativo impresa)" style="border-color:var(--orange);text-transform:uppercase"></div>
     </div>
+    <div id="mi-esiste" class="hidden" style="margin:-4px 0 10px;padding:8px 10px;border-radius:6px;background:#fff6e5;border-left:4px solid var(--orange);font-size:13px;line-height:1.4"></div>
     <div class="row">
       <div class="field"><label>Indirizzo sede</label><input type="text" id="mi-ind" placeholder="Via/Piazza…"></div>
       <div class="field"><label>Comune</label>
@@ -2061,7 +2067,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>Badge cantiere</label><input type="text" id="mi-badge" placeholder="N° badge"></div>
       <div class="field"><label>Patente a crediti</label><input type="text" id="mi-pat" placeholder="N° o esito"></div>
     </div>
-    <div class="field"><label>Iscrizione CEIV</label>
+    <div class="field" id="mi-ceiv-wrap"><label>Cassa Edile <span style="font-weight:400;font-size:11px;color:#aaa">(chi è nella lista C.E.I.V. è già in anagrafica)</span></label>
       <select id="mi-ceiv">
         <option value="">– Seleziona –</option>
         <option>C.E.I.V.</option>
@@ -2071,6 +2077,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <option>CASSA EDILE VICENZA</option>
         <option>ALTRO</option>
       </select>
+      <div id="mi-ceiv-avviso" class="hidden" style="margin-top:4px;font-size:12px;color:#8a3b12">⚠ Questa impresa non è nella lista della Cassa: iscritta è solo chi è in lista. Se si è iscritta da poco, verifica con la Cassa; altrimenti lascia vuoto o scegli «ALTRO».</div>
     </div>
     <div class="field"><label>Certificazioni</label>
       <div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">
@@ -3516,7 +3523,7 @@ async function initForm(snap=null){
 
   // Clear all fields
   const clearIds=['f-nr-verb','f-ppre-titolo','f-ppre-nome','f-ppre-cog','f-qual-ppre','f-tel-ppre','f-nom-stage',
-    'f-acc-cant','f-cant-comune','f-cant-search','f-cant-id','f-prot-int','f-cnce','f-cod-uni','f-data-ult',
+    'f-acc-cant','f-cant-comune','f-cant-search','f-cant-id','f-prot-int','f-cnce','f-cod-uni','f-etich','f-data-ult',
     'f-acc-cant2','f-comm-search','f-comm-id',
     'f-comm-titolo','f-comm-nome','f-comm-cog','f-comm-cf','f-comm-email','f-comm-tel',
     'f-comm-rag-soc','f-comm-piva','f-comm-cf-pg','f-comm-email-pg','f-comm-tel-pg',
@@ -3679,6 +3686,7 @@ function renderImpreseAccordion(){
       ;[1,2,3,4,5].forEach(c=>{const el=$(`mi-cert-${c}`);if(el)el.checked=false})
       const stageNo=document.querySelector('input[name="mi-stage"][value="no"]');if(stageNo)stageNo.checked=true
       const ccnlWrap=$('mi-ccnl-altro-wrap');if(ccnlWrap)ccnlWrap.classList.add('hidden')
+      miEsisteAzzera()
       // datalist comuni imprese: popolato dinamicamente via oninput (tutti i comuni d'Italia)
       show('modal-imp')
     }
@@ -3751,7 +3759,7 @@ function impreseAccordionHTML(im,idx){
   const capCog=im.capo_cog||''
   return`<div class="imp-accordion">
     <div class="imp-acc-header" data-imp-idx="${idx}">
-      <span class="imp-name">${isPrinc?'1️⃣ Principale – ':''+(idx+1)+'. '}${title}</span>
+      <span class="imp-name">${isPrinc?'1️⃣ Principale – ':''+(idx+1)+'. '}${title}${(im.piva||im.cf_imp)?`<span class="imp-ids" style="font-weight:400;font-size:11px;color:#888;font-family:monospace;margin-left:8px">${im.piva?'P.IVA '+esc(im.piva):''}${im.cf_imp&&im.cf_imp!==im.piva?(im.piva?' · ':'')+'CF '+esc(im.cf_imp):''}</span>`:''}</span>
       <div class="imp-actions">
         ${!isPrinc?`<button class="btn-danger btn-sm" data-imp-remove="${idx}" title="Rimuovi">✕</button>`:''}
         <span style="color:#aaa;font-size:18px">▾</span>
@@ -3772,8 +3780,7 @@ function impreseAccordionHTML(im,idx){
       <!-- scheda impresa pre-visita (scheda-impresa.js): quello che l'ufficio sa già di questa impresa -->
       <div id="imp-scheda-${idx}"></div>
       <div class="row">
-        <div class="field"><label>Partita IVA</label><input type="text" id="im-piva-${idx}" value="${im.piva||''}" placeholder="IT…" readonly style="background:#f8f8f8"></div>
-        <div class="field"><label>Codice fiscale</label><input type="text" id="im-cf_imp-${idx}" value="${im.cf_imp||''}" placeholder="CF…" readonly style="background:#f8f8f8"></div>
+        <!-- (06/10/2026) P.IVA e CF non si modificano qui: si leggono nell'intestazione della scheda -->
         <div class="field">
           <label>Tipologia (ruolo in cantiere) *</label>
           <select id="im-tipo-${idx}">
@@ -3920,7 +3927,7 @@ async function _verbaleRinfrescaCantiere(cid,opt){
   if(error){console.warn('riepilogo del cantiere:',error.message);return}
   if(!c||vGet('f-cant-id')!==String(cid))return
   if(!opt.soloScheda){
-    vSet('f-cnce',c.cantiere_cnce||'');vSet('f-cod-uni',c.nodo_id||'');vSet('f-data-ult',c.data_ult||'')
+    vSet('f-cnce',c.cantiere_cnce||'');vSet('f-cod-uni',c.nodo_id||'');vSet('f-etich',c.cantiere_etichetta||'');vSet('f-data-ult',c.data_ult||'')
     S.fd.comune_nome=c.comune_nome||'';S.fd.cantiere_indirizzo=c.cantiere_indirizzo||'';S.fd.cantiere_civico=c.cantiere_civico||''
     const det=$('cant-detail');if(det)det.textContent=[`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim(),c.comune_nome].filter(Boolean).join(' – ')
   }
@@ -3943,7 +3950,7 @@ function initCantSearch(){
     S.fd.cantiere_id=item.id
     if(item.extra){
       vSet('f-cnce',item.extra.cantiere_cnce||'')
-      vSet('f-cod-uni',item.extra.nodo_id||'')
+      vSet('f-cod-uni',item.extra.nodo_id||'');vSet('f-etich',item.extra.cantiere_etichetta||'')
       vSet('f-data-ult',item.extra.data_ult||'')
       vSet('f-acc-cant2',item.extra.acc_cant||'')
       S.fd.comune_nome=item.extra.comune_nome||''
@@ -3983,7 +3990,7 @@ function initCantSearch(){
       const comm=_cid?(_cmap[_cid]||_cid):''
       const chiuso=c.cantiere_chiuso===true
       const chiusoTag=chiuso?` <span style="color:#c0392b;font-weight:800">*</span> <span style="display:inline-block;font-size:9px;font-weight:800;color:#fff;background:#c0392b;padding:1px 5px;border-radius:3px;vertical-align:middle;letter-spacing:.5px">CHIUSO</span>`:''
-      const meta=[et?`Etichetta interna: ${esc(et)}`:'',cnce?`CNCE: ${esc(cnce)}`:'',cu?`Cod. univoco: ${esc(cu)}`:''].filter(Boolean).join(' · ')
+      const meta=[et?`Etichetta: ${esc(et)}`:'',cnce?`CNCE: ${esc(cnce)}`:'',cu?`Cod. univoco: ${esc(cu)}`:''].filter(Boolean).join(' · ')
       const display=`<div style="font-weight:600;color:#333">${esc(et||ind||'(senza indirizzo)')}${chiusoTag}</div>`+
         `<div style="font-size:12px;color:#666">${esc(ind||'—')}${loc?' · '+esc(loc):''}</div>`+
         (comm?`<div style="font-size:11px;color:#e7500f">👤 ${esc(comm)}</div>`:'')+
@@ -4133,7 +4140,7 @@ function importoVerbaleAzione(scelto,cant){
 function staccaCantiere(){
   if(!vGet('f-cant-id'))return
   vSet('f-cant-id','');S.fd.cantiere_id=null
-  ;['f-cnce','f-cod-uni','f-data-ult'].forEach(id=>vSet(id,''))
+  ;['f-cnce','f-cod-uni','f-etich','f-data-ult'].forEach(id=>vSet(id,''))
   hideCantCard()
   const det=$('cant-detail');if(det)det.textContent='⚠ Nessun cantiere scelto: sceglilo dall’elenco che compare scrivendo, oppure creane uno nuovo.'
   toast('Hai cambiato il testo del cantiere: quello scelto prima non è più collegato al verbale. Scegli il cantiere giusto dall’elenco, oppure creane uno nuovo.','warn',8000)
@@ -4494,6 +4501,38 @@ setupAC('f-comm-search','comm-list', async q=>{
 // ── MODAL NUOVA IMPRESA ──
 let _modalImpIdx=0
 $('btn-mi-cancel').onclick=()=>hide('modal-imp')
+/* (06/10/2026, deciso dall'utente) La lista della Cassa Edile sta già nell'anagrafica (16.737 imprese col codice
+   C.E.I.V.): se la P.IVA o il CF che il tecnico scrive sono di un'impresa già presente, quell'impresa si USA, non se
+   ne crea un'altra (17 P.IVA erano doppie). La cassa non si chiede: la dice la lista. Se non c'è in anagrafica,
+   l'impresa non è nella lista e «iscritta è solo chi è in lista» (regola del 01/10/2026): C.E.I.V. si può scegliere
+   lo stesso, con l'avviso di verificare con la Cassa. */
+function miEsisteAzzera(){
+  const b=$('mi-esiste');if(b){b.classList.add('hidden');b.innerHTML=''}
+  const w=$('mi-ceiv-wrap');if(w)w.classList.remove('hidden')
+  const a=$('mi-ceiv-avviso');if(a)a.classList.add('hidden')
+  window._miEsistenti=[]
+}
+async function miControllaEsistente(){
+  const box=$('mi-esiste'),wrap=$('mi-ceiv-wrap');if(!box)return
+  const piva=vGet('mi-piva').replace(/\D/g,''),cf=vGet('mi-cf').trim().toUpperCase()
+  const filtri=[]
+  if(piva.length===11)filtri.push(`piva.eq.${piva}`,`impresa_cf.eq.${piva}`,`impresa_id.eq.${piva}`)
+  if(cf.length>=11)filtri.push(`impresa_cf.eq.${cf}`,`impresa_id.eq.${cf}`,`piva.eq.${cf}`)
+  if(!filtri.length){miEsisteAzzera();return}
+  const{data,error}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,stato_cassa,cod_ceiv,tipo_iscrizione_ccia,contratto_ccnl').eq('elimina',0).or(filtri.join(',')).limit(3)
+  if(error){box.classList.remove('hidden');box.innerHTML='⚠ Non sono riuscito a controllare l\'anagrafica ('+esc(error.message)+'): prima di salvare, cerca l\'impresa per P.IVA.';return}
+  if(!data||!data.length){miEsisteAzzera();return}
+  window._miEsistenti=data
+  if(wrap)wrap.classList.add('hidden')
+  box.classList.remove('hidden')
+  box.innerHTML='<b>Questa impresa è già in anagrafica</b>: non serve crearla di nuovo.'+data.map((x,i)=>{
+    const iscr=_ceivDa(x.cassa_edile,x.stato_cassa)==='si'
+    const cassa=x.cod_ceiv?('C.E.I.V. '+(x.stato_cassa||'')+(iscr?' ✅':' (non conta come iscritta)')):(x.cassa_edile||'non nella lista della Cassa')
+    return`<div style="display:flex;align-items:center;gap:10px;margin-top:6px"><div style="flex:1"><div style="font-weight:600">${esc(x.impresa_nome||'')}</div><div style="font-size:12px;color:#666">${[x.piva?'P.IVA '+x.piva:'',x.impresa_cf&&x.impresa_cf!==x.piva?'CF '+x.impresa_cf:'',[x.indirizzo,x.comune].filter(Boolean).join(' '),cassa].filter(Boolean).map(esc).join(' · ')}</div></div><button type="button" class="btn-primary btn-sm" data-mi-usa="${i}" style="white-space:nowrap">Usa questa</button></div>`}).join('')
+  box.querySelectorAll('[data-mi-usa]').forEach(b=>b.onclick=()=>{const x=(window._miEsistenti||[])[+b.dataset.miUsa];if(x)_useImpresaEsistente(x,_modalImpIdx)})
+}
+;['mi-piva','mi-cf'].forEach(id=>{const el=$(id);if(el)el.addEventListener('change',()=>miControllaEsistente().catch(e=>console.warn('controllo anagrafica:',e)))})
+$('mi-ceiv')?.addEventListener('change',function(){const a=$('mi-ceiv-avviso');if(a)a.classList.toggle('hidden',this.value!=='C.E.I.V.')})
 // Mostra campo testo CCNL solo se selezionato "Altro"
 $('mi-ccnl')?.addEventListener('change',function(){
   const wrap=$('mi-ccnl-altro-wrap')
@@ -4583,7 +4622,8 @@ function resetModalCantiere(){
   const to=$('mc-tip-ope');if(to)to.value=''
   const du=$('mc-durata');if(du)du.value=''
   const im=$('mc-importo');if(im)im.value=''
-  const capEl=$('mc-cap');if(capEl){capEl.readOnly=false;capEl.style.background='#fff'}
+  mcCapAggiorna()
+  {const _w=$('mc-cod-uni-wrap');if(_w)_w.classList.add('hidden')}
   const wrap=$('mc-tip-ope-altro-wrap');if(wrap)wrap.classList.add('hidden')
   vSet('mc-comm-search','');vSet('mc-comm-id','');const _mci=$('mc-comm-info');if(_mci)_mci.textContent=''
   if(typeof mcGeoReset==='function')mcGeoReset()
@@ -4651,7 +4691,7 @@ async function _useCantiereEsistente(c){
   S.fd.cantiere_civico=civ
   S.fd.comune_nome=c.comune_nome||''
   vSet('f-cnce',c.cantiere_cnce||'')
-  vSet('f-cod-uni',c.nodo_id||'')
+  vSet('f-cod-uni',c.nodo_id||'');vSet('f-etich',c.cantiere_etichetta||'')
   vSet('f-data-ult',c.data_ult||'')
   renderCantCard(c)
   proponiImportoCantiere(c.cantiere_importo)
@@ -4881,7 +4921,7 @@ $('btn-mc-save').onclick=async()=>{
   S.fd.comune_nome=c.comune_nome||''
   // Popola i campi readonly nel form visita
   vSet('f-cnce',c.cantiere_cnce||'')
-  vSet('f-cod-uni',c.nodo_id||'')
+  vSet('f-cod-uni',c.nodo_id||'');vSet('f-etich',c.cantiere_etichetta||'')
   vSet('f-data-ult',c.data_ult||'')
   renderCantCard(c)
   // Cantiere nuovo: nessuna visita precedente → accesso n° 1
@@ -6006,13 +6046,15 @@ function populateComuniSelect(){
       if(_wrap)_wrap.classList.remove('hidden')
       const _i=$('mc-com-altro');if(_i){_i.value='';_i.focus()}
       const _c=$('mc-comune-cod');if(_c)_c.value=''
-      const _cap=$('mc-cap');if(_cap){_cap.value='';_cap.readOnly=false;_cap.style.background='#fff'}
+      const _cap=$('mc-cap');if(_cap)_cap.value=''
+      mcCapAggiorna()
       return
     }
     if(_wrap)_wrap.classList.add('hidden')
     const cap=CAP_PD[sel.value]||''
     const capEl=$('mc-cap')
-    if(capEl){capEl.value=cap;capEl.readOnly=!!cap;capEl.style.background=cap?'#f8f8f8':'#fff'}
+    if(capEl)capEl.value=cap
+    mcCapAggiorna()
     const istat=ISTAT_PD[sel.value]||(sel.selectedOptions[0]&&sel.selectedOptions[0].dataset.istat)||''
     const codEl=$('mc-comune-cod')
     /* (03/10/2026) cambiando comune il codice è quello del comune scelto: prima restava quello di prima
@@ -6032,6 +6074,12 @@ function populateComuniSelect(){
   }
 }
 
+/* (06/10/2026) il CAP lo dà il comune: il campo compare solo quando il comune non è in tabella o è fuori provincia */
+function mcCapAggiorna(){
+  const w=$('mc-cap-wrap'),sel=$('mc-com');if(!w||!sel)return
+  const v=sel.value
+  w.classList.toggle('hidden',!v||(v!=='__altro__'&&!!CAP_PD[v]))
+}
 // ── TOGGLE COMMITTENTE PERSONA FISICA / GIURIDICA ──────────────────────────────
 function toggleCommSogg(tipo){
   const pfF=$('comm-pf-fields'),pgF=$('comm-pg-fields')
@@ -6341,6 +6389,7 @@ function buildRiepilogo(){
     ['Cantiere',vGet('f-cant-search')||'-'],
     ['Impresa principale',S.imprese[0]?.impresa_nome||'-'],
     ['Tecnico',vGet('f-tec-display')],
+    ['Accesso n° (calcolato)',accCant+(accCant==='1'?' – prima visita su questo cantiere':'ª visita su questo cantiere')],   // 06/10/2026: non è più nella maschera
     ['N° imprese',String(computeImpTotals().nr_imp)],
     ['N° lavoratori',String(computeImpTotals().nr_lavoratori)],
   ].map(([k,v])=>`<div class="rp-item"><div class="rp-k">${k}</div><div class="rp-v">${esc(v||'-')}</div></div>`).join('')
@@ -7739,7 +7788,7 @@ function _clRender(){
         const{data:cd}=await sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_cap,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id').eq('cantiere_id',btn.dataset.cantId).single()
         if(cd){
           vSet('f-cnce',cd.cantiere_cnce||'')
-          vSet('f-cod-uni',cd.nodo_id||'')
+          vSet('f-cod-uni',cd.nodo_id||'');vSet('f-etich',cd.cantiere_etichetta||'')
           vSet('f-data-ult',cd.data_ult||'')
           S.fd.comune_nome=cd.comune_nome||''
           S.fd.cantiere_indirizzo=cd.cantiere_indirizzo||''
@@ -13084,6 +13133,7 @@ async function admEditCantiere(cantId) {
   vSet('mc-cnce', c.cantiere_cnce || '')
   vSet('mc-lotto', c.lotto || '')
   vSet('mc-cod-uni', c.nodo_id || '')
+  {const _w=$('mc-cod-uni-wrap');if(_w)_w.classList.toggle('hidden',!String(c.nodo_id||'').trim())}   // 06/10/2026: storico, solo se c'è
   vSet('mc-data-ult', c.data_ult || '')
   vSet('mc-data-inizio', c.data_inizio_lavori || '')
   vSet('mc-comune-cod', c.cantiere_comune_cod || '')
@@ -13108,6 +13158,7 @@ async function admEditCantiere(cantId) {
       }
     }
   }
+  mcCapAggiorna()
   if ($('mc-tip-int') && c.cantiere_tip_int) selComEScritto($('mc-tip-int'), c.cantiere_tip_int)   // 04/10/2026: il 5 («Altro», 169 cantieri) resta visibile invece di diventare vuoto
   if ($('mc-tip-ope') && c.cantiere_tip_ope) {
     $('mc-tip-ope').value = c.cantiere_tip_ope
@@ -13369,7 +13420,7 @@ async function nuovaVisitaDaVerbale(vid, mode){
       const r=await sb.from('cantieri').select('*').eq('cantiere_id',cid).single()
       if(r.data){
         vSet('f-cnce',r.data.cantiere_cnce||'')
-        vSet('f-cod-uni',r.data.nodo_id||'')
+        vSet('f-cod-uni',r.data.nodo_id||'');vSet('f-etich',r.data.cantiere_etichetta||'')
         vSet('f-prot-int',r.data.prot_int||'')
         S.fd.comune_nome=r.data.comune_nome||''
         S.fd.cantiere_indirizzo=r.data.cantiere_indirizzo||''
@@ -13713,7 +13764,7 @@ async function showCantiereDetail(cantId){
         const r=await sb.from('cantieri').select('*').eq('cantiere_id',cid).single()
         if(r.data){
           vSet('f-cnce',r.data.cantiere_cnce||'')
-          vSet('f-cod-uni',r.data.nodo_id||'')
+          vSet('f-cod-uni',r.data.nodo_id||'');vSet('f-etich',r.data.cantiere_etichetta||'')
           S.fd.comune_nome=r.data.comune_nome||''
           S.fd.cantiere_indirizzo=r.data.cantiere_indirizzo||''
           S.fd.cantiere_civico=r.data.cantiere_civico||''
@@ -15745,12 +15796,12 @@ document.addEventListener('input',function(ev){
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
-<script src="aiuto.js?v=20"></script>
+<script src="aiuto.js?v=21"></script>
 <script src="mail-respinte-tec.js?v=2"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
-<script src="codice-univoco.js?v=3"></script>
+<script src="codice-univoco.js?v=4"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
@@ -15760,7 +15811,7 @@ document.addEventListener('input',function(ev){
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
-<script src="verbale-pdf.js?v=10"></script>
+<script src="verbale-pdf.js?v=11"></script>
 <!-- mappa sul telefono: cantieri vicino a te (Nuova visita) e rientri sulla mappa (Scadenze) -->
 <script src="mappa.js?v=3"></script>
 </body>

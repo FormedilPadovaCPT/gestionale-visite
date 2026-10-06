@@ -1,20 +1,24 @@
 /* ============================================================
-   CODICE UNIVOCO DEL CANTIERE — proposto dall'app
-   (23/09/2026, chiesto dall'utente: «di solito si compone iniziali
-   del tecnico, nome della strada del cantiere, civico se esiste e
-   3 o 4 lettere della ragione sociale dell'impresa»).
+   ETICHETTA DEL CANTIERE — proposta dall'app
+   (06/10/2026, deciso dall'utente: il «codice univoco» non ha più
+   ragione di esistere nel verbale. Formedil chiede l'ETICHETTA
+   (cantiereEtichetta, 50 caratteri), e il cantiere si riconosce da
+   comune + indirizzo + civico + etichetta. Il codice univoco resta
+   nel database e nella scheda del cantiere come storico, e si cerca.)
 
-   Lo schema è quello che i tecnici scrivono già a mano, per esempio
-   NDM-viadellazuanna5-VET  (Nicola De Marco, via della Zuanna 5,
-   Vettorazzo) o NDM-viaroma123125-SAR (Costruzioni edili Sartorato).
+   Prima (23/09/2026) questo file proponeva il codice univoco con lo
+   schema dei tecnici: NDM-viadellazuanna5-VET. L'etichetta la vede
+   Formedil e identifica il cantiere, non chi l'ha visitato, quindi
+   SENZA le iniziali del tecnico e leggibile:
+     Via della Zuanna 5 – VETTORAZZO
+   (indirizzo e civico come sono scritti, poi la parola che
+   distingue l'impresa principale, senza «Costruzioni», «S.r.l.»…).
 
-   ⚠️ È una PROPOSTA: si mostra in una finestra dove si corregge, e si
-   scrive solo se il cantiere non ha già un codice. Altri tecnici usano
-   altri schemi (Visentini spesso il numero del titolo edilizio,
-   «PdC n. …»): quelli restano validi e l'app non li tocca.
-
-   Se il codice proposto c'è già su un altro cantiere, si aggiunge
-   -2, -3…: «univoco» deve esserlo davvero.
+   ⚠️ È una PROPOSTA, e si scrive SOLO se il cantiere non ha ancora
+   un'etichetta: quelle già presenti (anche le 6.195 importate dalla
+   Cassa) non si toccano. Se la stessa proposta c'è già su un altro
+   cantiere si aggiunge -2, -3…: due lotti allo stesso indirizzo
+   con la stessa impresa devono restare distinguibili.
 
    Script classico: usa window.sb, window.S, window.toast.
    ============================================================ */
@@ -29,51 +33,39 @@
     'SOCIETA', 'SOC', 'COOP', 'COOPERATIVA', 'GRUPPO', 'IL', 'LA', 'LE', 'LO', 'I', 'GLI', 'DI', 'DE', 'DEL', 'DELLA', 'DEI',
     'E', 'ED', 'F', 'FLLI', 'FRATELLI', 'SRL', 'SRLS', 'SPA', 'SNC', 'SAS', 'SS', 'UNIPERSONALE', 'CONSORZIO', 'GENERALI']);
 
-  function iniziali(tecnico) {
-    return senzaAccenti(tecnico).split(/\s+/).filter((w) => w && !/\.$/.test(w) && /^[A-Za-z]/.test(w))
-      .map((w) => w[0].toUpperCase()).join('');
-  }
-  function strada(ind) {
-    return senzaAccenti(ind).toLowerCase().replace(/[^a-z0-9]/g, '');
+  /* la parola che distingue l'impresa: «VETTORAZZO» da «Vettorazzo Costruzioni S.r.l.» */
+  function sigla(impresa) {
+    const parole = senzaAccenti(impresa).toUpperCase().replace(/\./g, '').split(/[^A-Z0-9']+/).filter(Boolean);
+    return parole.find((w) => !GENERICHE.has(w) && w.length >= 2) || parole.find((w) => !GENERICHE.has(w)) || '';
   }
   function civico(civ) {
-    const c = senzaAccenti(civ).trim();
+    const c = String(civ || '').trim();
     if (!c || /^s\.?\s*n\.?\s*c?\.?$/i.test(c)) return '';
-    return c.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
-  }
-  function sigla(impresa) {
-    const parole = senzaAccenti(impresa).toUpperCase().replace(/\./g, '').split(/[^A-Z0-9]+/).filter(Boolean);
-    const buona = parole.find((w) => !GENERICHE.has(w) && w.length >= 2) || parole.find((w) => !GENERICHE.has(w)) || '';
-    return buona.slice(0, 3);
+    return c;
   }
 
-  /* il codice, dalle parti che si conoscono; le mancanti si saltano */
-  function componi({ tecnico, indirizzo, civ, impresa }) {
-    const a = iniziali(tecnico), s = sigla(impresa);
-    let b = strada(indirizzo) + civico(civ);
-    const fisso = [a, s].filter(Boolean).join('--').length + 2;
-    if (b.length + fisso > 50) b = b.slice(0, Math.max(8, 50 - fisso));
-    return [a, b, s].filter(Boolean).join('-');
+  /* l'etichetta, dalle parti che si conoscono; le mancanti si saltano; al massimo 50 caratteri */
+  function componi({ indirizzo, civ, impresa }) {
+    const via = String(indirizzo || '').replace(/\s+/g, ' ').trim();
+    const s = sigla(impresa);
+    let luogo = [via, civico(civ)].filter(Boolean).join(' ');
+    const coda = s ? ' – ' + s : '';
+    if (luogo.length + coda.length > 50) luogo = luogo.slice(0, Math.max(8, 50 - coda.length)).trim();
+    return (luogo + coda).slice(0, 50);
   }
 
   /* se c'è già su un altro cantiere: -2, -3… */
-  async function libero(codice, cantiereId) {
+  async function libera(etichetta, cantiereId) {
     for (let n = 1; n < 50; n++) {
-      const prova = n === 1 ? codice : `${codice}-${n}`;
-      const { data, error } = await window.sb.from('cantieri').select('cantiere_id').ilike('nodo_id', prova.replace(/[\\%_]/g, '\\$&'))
-        .neq('cantiere_id', cantiereId || '').limit(1);
+      const prova = n === 1 ? etichetta : `${etichetta}-${n}`.slice(0, 50);
+      const { data, error } = await window.sb.from('cantieri').select('cantiere_id').ilike('cantiere_etichetta', prova.replace(/[\\%_]/g, '\\$&'))
+        .eq('elimina', 0).neq('cantiere_id', cantiereId || '').limit(1);
       if (error) throw error;
       if (!data || !data.length) return prova;
     }
-    return codice;
+    return etichetta;
   }
 
-  function tecnicoDelVerbale() {
-    const v = ($('f-tec-display') && $('f-tec-display').value) || '';
-    if (v.trim()) return v;
-    const t = window.S && window.S.tecnico;
-    return t ? `${t.tecnico_nome || ''} ${t.tecnico_cognome || ''}` : '';
-  }
   function impresaPrincipale() {
     const im = window.S && window.S.imprese && window.S.imprese[0];
     return (im && im.impresa_nome) || '';
@@ -84,81 +76,56 @@
     const cid = $('f-cant-id') && $('f-cant-id').value;
     if (!cid) { avviso('Scegli prima il cantiere.', 'warn'); return; }
     try {
-      const { data: c, error } = await window.sb.from('cantieri').select('cantiere_indirizzo, cantiere_civico, nodo_id').eq('cantiere_id', cid).maybeSingle();
+      const { data: c, error } = await window.sb.from('cantieri').select('cantiere_indirizzo, cantiere_civico, cantiere_etichetta').eq('cantiere_id', cid).maybeSingle();
       if (error) throw error;
       if (!c) { avviso('Cantiere non trovato.', 'err'); return; }
-      if (String(c.nodo_id || '').trim()) {
-        $('f-cod-uni').value = c.nodo_id;
-        avviso('Il cantiere ha già il suo codice univoco: ' + c.nodo_id, 'warn');
+      if (String(c.cantiere_etichetta || '').trim()) {
+        if ($('f-etich')) $('f-etich').value = c.cantiere_etichetta;
+        avviso('Il cantiere ha già la sua etichetta: «' + c.cantiere_etichetta + '». Si cambia da «✏️ Modifica cantiere».', 'warn');
         return;
       }
       const imp = impresaPrincipale();
-      const base = componi({ tecnico: tecnicoDelVerbale(), indirizzo: c.cantiere_indirizzo, civ: c.cantiere_civico, impresa: imp });
-      const proposto = await libero(base, cid);
-      const scelto = prompt('Codice univoco proposto per questo cantiere' + (imp ? '' : ' (manca l\'impresa principale: sceglila prima per avere anche la sigla)')
-        + ':\niniziali del tecnico - strada e civico - sigla dell\'impresa.\n\nCorreggilo se serve, poi OK per salvarlo sul cantiere.', proposto);
-      if (scelto === null || !scelto.trim()) return;
-      await salvaSulCantiere(cid, scelto);
-    } catch (e) { avviso('Codice non salvato: ' + (e.message || e), 'err'); }
+      const base = componi({ indirizzo: c.cantiere_indirizzo, civ: c.cantiere_civico, impresa: imp });
+      const proposta = await libera(base, cid);
+      const scelta = prompt('Etichetta proposta per questo cantiere' + (imp ? '' : ' (manca l\'impresa principale: sceglila prima per avere anche il suo nome)')
+        + ':\nindirizzo e civico – impresa principale. È quella che va all\'Osservatorio e che si vede negli elenchi.\n\nCorreggila se serve, poi OK per salvarla sul cantiere.', proposta);
+      if (scelta === null || !scelta.trim()) return;
+      await salvaSulCantiere(cid, scelta);
+    } catch (e) { avviso('Etichetta non salvata: ' + (e.message || e), 'err'); }
   }
 
-  /* salva sul cantiere, solo se è ancora vuoto: non si scrive sopra al codice di un collega */
-  async function salvaSulCantiere(cid, codice) {
-    const finale = String(codice || '').trim().slice(0, 50);
+  /* salva sul cantiere, solo se è ancora vuota: non si scrive sopra all'etichetta di un collega o della Cassa */
+  async function salvaSulCantiere(cid, etichetta) {
+    const finale = String(etichetta || '').replace(/\s+/g, ' ').trim().slice(0, 50);
     if (!finale) return false;
-    const { data: agg, error } = await window.sb.from('cantieri').update({ nodo_id: finale })
-      .eq('cantiere_id', cid).or('nodo_id.is.null,nodo_id.eq.').select('nodo_id');
+    const { data: agg, error } = await window.sb.from('cantieri').update({ cantiere_etichetta: finale })
+      .eq('cantiere_id', cid).or('cantiere_etichetta.is.null,cantiere_etichetta.eq.').select('cantiere_etichetta');
     if (error) throw error;
-    if (!agg || !agg.length) { avviso('Nel frattempo il cantiere ha ricevuto un codice: ricaricalo.', 'warn'); return false; }
-    $('f-cod-uni').value = finale;
-    if (window.S && window.S.fd) window.S.fd.cod_uni = finale;
-    avviso('Codice univoco salvato sul cantiere: ' + finale, 'ok');
+    if (!agg || !agg.length) { avviso('Nel frattempo il cantiere ha ricevuto un\'etichetta: ricaricalo.', 'warn'); return false; }
+    if ($('f-etich')) $('f-etich').value = finale;
+    avviso('Etichetta salvata sul cantiere: ' + finale, 'ok');
     return true;
   }
 
-  /* Scritto a mano nel verbale (23/09/2026, chiesto dall'utente: «oltre a
-     proponi posso anche inserire direttamente»): uscendo dalla casella si
-     salva sul cantiere, con le stesse cautele di «Proponi». */
-  async function scrittoAMano() {
-    const campo = $('f-cod-uni');
-    const cid = $('f-cant-id') && $('f-cant-id').value;
-    const val = campo.value.trim();
-    if (!cid) { if (val) { campo.value = ''; avviso('Scegli prima il cantiere: il codice univoco è del cantiere.', 'warn'); } return; }
-    try {
-      const { data: c, error } = await window.sb.from('cantieri').select('nodo_id').eq('cantiere_id', cid).maybeSingle();
-      if (error) throw error;
-      const attuale = String((c && c.nodo_id) || '').trim();
-      if (attuale) {
-        if (val !== attuale) { campo.value = attuale; avviso('Il cantiere ha già il codice ' + attuale + ': si cambia da «✏️ Modifica cantiere».', 'warn'); }
-        return;
-      }
-      if (!val) return;
-      const usato = await libero(val, cid);
-      if (usato !== val && !confirm(`Il codice «${val}» c'è già su un altro cantiere.\n\nSalvarlo lo stesso? (Annulla per correggerlo)`)) { campo.focus(); return; }
-      await salvaSulCantiere(cid, val);
-    } catch (e) { avviso('Codice non salvato: ' + (e.message || e), 'err'); }
-  }
-  document.addEventListener('change', (e) => { if (e.target && e.target.id === 'f-cod-uni') scrittoAMano(); });
-
   /* Nella scheda del cantiere: propone nel campo, si salva col cantiere */
   async function daScheda() {
-    const campo = $('mc-cod-uni');
+    const campo = $('mc-etich');
     if (!campo) return;
-    if (campo.value.trim() && !confirm('Il campo ha già un codice. Sostituirlo con quello proposto?')) return;
+    if (campo.value.trim() && !confirm('Il campo ha già un\'etichetta. Sostituirla con quella proposta?')) return;
     const ind = ($('mc-ind') && $('mc-ind').value) || '';
     if (!ind.trim()) { avviso('Scrivi prima l\'indirizzo del cantiere.', 'warn'); return; }
     try {
-      const base = componi({ tecnico: tecnicoDelVerbale(), indirizzo: ind, civ: ($('mc-civ') && $('mc-civ').value) || '', impresa: impresaPrincipale() });
-      campo.value = await libero(base, window._editCantId || '');
+      const base = componi({ indirizzo: ind, civ: ($('mc-civ') && $('mc-civ').value) || '', impresa: impresaPrincipale() });
+      campo.value = await libera(base, window._editCantId || '');
       campo.focus();
-      avviso('Codice proposto: correggilo se serve, si salva col cantiere.', 'ok');
+      avviso('Etichetta proposta: correggila se serve, si salva col cantiere.', 'ok');
     } catch (e) { avviso('Non riuscito: ' + (e.message || e), 'err'); }
   }
 
   document.addEventListener('click', (e) => {
-    if (e.target.closest('#btn-cod-uni-proponi')) { e.preventDefault(); daVerbale(); return; }
-    if (e.target.closest('#btn-mc-cod-uni-proponi')) { e.preventDefault(); daScheda(); }
+    if (e.target.closest('#btn-etich-proponi')) { e.preventDefault(); daVerbale(); return; }
+    if (e.target.closest('#btn-mc-etich-proponi')) { e.preventDefault(); daScheda(); }
   });
 
-  window.CodiceUnivoco = { componi, iniziali, strada, civico, sigla };
+  window.EtichettaCantiere = { componi, sigla, civico };
 })();

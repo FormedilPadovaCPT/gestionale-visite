@@ -122,7 +122,7 @@
       // quello che risultava in questa visita (30/09/2026), altrimenti quello del cantiere
       ['Tipo intervento', TIP_INT[v.vis_tip_int ?? cant.cantiere_tip_int] || '–', 'Tipo opera', TIP_OPE[v.vis_tip_ope ?? cant.cantiere_tip_ope] || '–'],
       ['Importo lavori (€)', IMP_LBL[v.vis_importo ?? cant.cantiere_importo] || '–', 'Durata cantiere', DUR_LBL[v.vis_durata ?? cant.cantiere_durata] || '–'],
-      ['Codice CNCE', cant.cantiere_cnce || '–', 'Codice univoco', cant.nodo_id || '–'],
+      ['Codice CNCE', cant.cantiere_cnce || '–', 'Etichetta cantiere', cant.cantiere_etichetta || '–'],   // 06/10/2026: l'etichetta (Osservatorio) al posto del codice univoco
       ['N° imprese in cantiere', String((imps.filter((im) => im.impresa_id).length + ncImp + ncAut) || v.nr_imp || 1), 'Totale lavoratori', String((imps.reduce((s, im) => s + (+im.nr_lav || 0), 0) + ncLav) || v.nr_lavoratori || 0)]
     ]
     // (06/10/2026) imprese, lavoratori e autonomi visti ma non elencati: già nei totali qui sopra, la riga dice quanti sono
