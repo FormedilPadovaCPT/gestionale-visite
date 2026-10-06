@@ -276,10 +276,14 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 @media(min-width:1200px){#modal-cant .mc-cols{grid-template-columns:repeat(3,minmax(0,1fr))}}
 /* la posizione sulla mappa: una fascia sotto le colonne, campi a sinistra e mappa a destra */
 @media(min-width:900px){
-  #modal-cant #mc-geo-wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:0 22px;align-items:start}
-  #modal-cant #mc-geo-wrap>*{grid-column:1}
-  #modal-cant #mc-geo-wrap>.sect-title{grid-column:1/-1}
-  #modal-cant #mc-geo-map{grid-column:2;grid-row:2/span 6;height:210px!important}
+  #modal-cant #mc-geo-wrap{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr) minmax(0,1.3fr);gap:0 22px;align-items:start}
+  #modal-cant #mc-geo-wrap>.sect-title{grid-column:1/-1;grid-row:1}
+  #modal-cant #mc-geo-wrap>.field{grid-column:1;grid-row:2}
+  #modal-cant #mc-geo-wrap>.row{grid-column:1;grid-row:3}
+  #modal-cant #mc-geo-stato{grid-column:2;grid-row:2}
+  #modal-cant #mc-geo-wrap>div:has(>#btn-mc-geo-gps){grid-column:2;grid-row:3}
+  #modal-cant #mc-geo-wrap>div:last-child{grid-column:1/3;grid-row:4}
+  #modal-cant #mc-geo-map{grid-column:3;grid-row:2/span 3;height:200px!important}
 }
 /* FOTO */
 .foto-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-bottom:18px}
@@ -1926,6 +1930,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>CAP <span style="font-weight:400;font-size:11px;color:#aaa">(auto)</span></label><input type="text" id="mc-cap" maxlength="5" readonly style="background:#f8f8f8" placeholder="si compila da Comune"></div>
       <div class="field"><label>Cod. ISTAT <span style="font-weight:400;font-size:11px;color:#aaa">(per XML, 6 cifre)</span></label><input type="text" id="mc-comune-cod" maxlength="6" placeholder="es. 028001" style="font-family:monospace"></div>
     </div>
+    <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma" maxlength="50"></div>
     </div>
     <div class="mc-col">
       <div class="sect-title">Dati per l'Osservatorio</div>
@@ -1965,7 +1970,6 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field"><label>Data inizio lavori</label><input type="date" id="mc-data-inizio" onchange="_autoDurataCantiere()"></div>
       <div class="field"><label>Data prevista ultimazione lavori</label><input type="date" id="mc-data-ult" onchange="_autoDurataCantiere()"></div>
     </div>
-    <div class="field"><label>Etichetta interna</label><input type="text" id="mc-etich" placeholder="es. Condominio Via Roma" maxlength="50"></div>
     <div class="field"><label>Descrizione cantiere <span style="font-weight:400;font-size:11px;color:#aaa">(cosa si fa nel cantiere)</span></label><textarea id="mc-descr" rows="2" maxlength="500" placeholder="Es. Rifacimento copertura e coibentazione facciata…" style="width:100%;resize:vertical;font-family:inherit;font-size:14px;padding:8px;border:1px solid var(--border);border-radius:6px"></textarea></div>
     </div>
     </div>
