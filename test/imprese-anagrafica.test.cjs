@@ -70,7 +70,7 @@ assert.ok(!/\$\{m\.impresa_nome\}|\$\{r\.impresa_nome\}|\$\{m\.indirizzo\}|\$\{r
 /* aggancio: riquadri, script, veste, pubblicazione */
 assert.ok(html.includes('id="ia-sezione"') && html.includes('id="dp-sezione"'));
 assert.ok(/<script src="imprese-anagrafica\.js\?v=\d+"><\/script>/.test(html));
-assert.ok(/async function admLoadImprese\(\) \{\s+if \(window\.ImpreseAnag\) return window\.ImpreseAnag\.carica\(\)/.test(html), 'dopo «Modifica impresa» l’elenco si ricarica');
+assert.ok(/async function admLoadImprese\(\) \{\s+if \(window\.ImpreseAnag && window\.__isSegreteria\) return window\.ImpreseAnag\.carica\(\)/.test(html), 'dopo «Modifica impresa» l’elenco si ricarica (solo per la segreteria: le funzioni sono sue)');
 assert.ok(/k: 'anagrafiche'[^\n]*'Imprese doppie'/.test(veste), 'il riquadro dei doppioni sta in «Anagrafiche», non in «Altro»');
 assert.ok(deploy.includes("- 'imprese-anagrafica.js'") && /for f in [^\n]*imprese-anagrafica\.js/.test(deploy), 'il file va pubblicato (altrimenti 404 sul sito)');
 

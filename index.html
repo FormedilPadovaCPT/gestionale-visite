@@ -3606,6 +3606,14 @@ function renderImpreseAccordion(){
       show('modal-imp')
     }
   })
+  // (06/10/2026) Modifica dell'impresa già scelta: la stessa finestra della Rubrica; salvando, la riga si aggiorna
+  wrap.querySelectorAll('[data-imp-edit]').forEach(b=>{
+    b.onclick=e=>{
+      e.stopPropagation()
+      const id=S.imprese[+b.dataset.impEdit]?.impresa_id
+      if(id&&typeof admEditImpresa==='function')admEditImpresa(id)
+    }
+  })
   // Remove btns
   wrap.querySelectorAll('[data-imp-remove]').forEach(b=>{
     b.onclick=e=>{
@@ -3679,6 +3687,7 @@ function impreseAccordionHTML(im,idx){
             <input type="text" id="im-search-${idx}" value="${im.impresa_nome}" placeholder="Cerca per nome o P.IVA…" autocomplete="off">
             <div class="ac-list hidden" id="im-list-${idx}"></div>
           </div>
+          ${im.impresa_id?`<button class="btn-outline btn-sm" data-imp-edit="${idx}" type="button" style="white-space:nowrap;margin-top:1px" title="Apre la scheda di questa impresa per correggere o completare i dati (ragione sociale, P.IVA, indirizzo, contatti)">✏️ Modifica</button>`:''}
           <button class="btn-outline btn-sm" data-imp-new="${idx}" type="button" style="white-space:nowrap;margin-top:1px">+ Nuova</button>
         </div>
       </div>
@@ -3803,6 +3812,25 @@ async function _renderCantCardExtra(c){
     if(box)box.innerHTML=html
   }catch(e){console.error('_renderCantCardExtra:',e)}
 }
+/* (06/10/2026) Il cantiere del verbale riletto dal database: il riepilogo (con «✏️ Modifica cantiere») e, salvo
+   soloScheda, i campi del verbale che vengono dal cantiere. Serve dopo la visita di ritorno e dopo aver salvato la
+   scheda del cantiere aperta dal verbale, quando il riepilogo restava quello vecchio. Se nel frattempo il verbale
+   ha cambiato cantiere non tocca niente. */
+async function _verbaleRinfrescaCantiere(cid,opt){
+  opt=opt||{}
+  if(!cid)return
+  {const _bec=$('btn-edit-cant');if(_bec)_bec.style.display='inline-flex'}
+  const{data:c,error}=await sb.from('cantieri').select('*').eq('cantiere_id',cid).maybeSingle()
+  if(error){console.warn('riepilogo del cantiere:',error.message);return}
+  if(!c||vGet('f-cant-id')!==String(cid))return
+  if(!opt.soloScheda){
+    vSet('f-cnce',c.cantiere_cnce||'');vSet('f-cod-uni',c.nodo_id||'');vSet('f-data-ult',c.data_ult||'')
+    S.fd.comune_nome=c.comune_nome||'';S.fd.cantiere_indirizzo=c.cantiere_indirizzo||'';S.fd.cantiere_civico=c.cantiere_civico||''
+    const det=$('cant-detail');if(det)det.textContent=[`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim(),c.comune_nome].filter(Boolean).join(' – ')
+  }
+  renderCantCard(c)
+}
+window._verbaleRinfrescaCantiere=_verbaleRinfrescaCantiere
 function hideCantCard(){const card=$('cant-info-card');if(card){card.innerHTML='';card.classList.add('hidden')}const _bec=$('btn-edit-cant');if(_bec)_bec.style.display='none'}
 
 // ── AUTOCOMPLETE CANTIERE ──
@@ -4733,7 +4761,7 @@ $('btn-mc-save').onclick=async()=>{
     if(window._ossRicontrolla&&window._ossRicontrolla===_salvato){window._ossRicontrolla=null;const _dopo=window._ossDopoScheda||window.admOssControlla;window._ossDopoScheda=null;if(typeof _dopo==='function')_dopo(_salvato);return}
     if(_from==='dash'){if(typeof loadDashMap==='function')loadDashMap()}
     else if(_from==='cant'){if(typeof loadCantMap==='function')loadCantMap()}
-    else if(_from==='visita'){/* form visita: la lista di segreteria non c'entra */}
+    else if(_from==='visita'){/* form visita: la lista di segreteria non c'entra; il riepilogo nel verbale si rilegge (06/10/2026) */_verbaleRinfrescaCantiere(_salvato)}
     else if(typeof admLoadCantieri==='function')admLoadCantieri()
     return
   }
@@ -5597,7 +5625,10 @@ function applySnap(snap){
   if(snap.tecnico2_id)vSet('f-tec2-id',snap.tecnico2_id)
 
   // ── Tab 1 – Cantiere ──────────────────────────────────────────────────────
-  if(snap.cantiere_id){vSet('f-cant-id',snap.cantiere_id);vSet('f-cant-search',snap.cantiere_label||'');if($('cant-detail'))$('cant-detail').textContent=snap.cantiere_detail||''}
+  if(snap.cantiere_id){vSet('f-cant-id',snap.cantiere_id);vSet('f-cant-search',snap.cantiere_label||'');if($('cant-detail'))$('cant-detail').textContent=snap.cantiere_detail||''
+    /* (06/10/2026) visita di ritorno e bozza riaperta: come quando il cantiere si sceglie dalla ricerca, il riepilogo e
+       «✏️ Modifica cantiere» per correggere i dati sbagliati o mancanti. Solo la scheda: i campi del verbale restano quelli copiati. */
+    _verbaleRinfrescaCantiere(snap.cantiere_id,{soloScheda:true})}
   if(snap.prot_int)vSet('f-prot-int',snap.prot_int)
   if(snap.cnce)vSet('f-cnce',snap.cnce)
   if(snap.cod_uni)vSet('f-cod-uni',snap.cod_uni)
@@ -11965,7 +11996,7 @@ let _editImpId = null  // impresa_id in modifica
 /* (06/10/2026) l'elenco delle imprese sta in imprese-anagrafica.js: ordinabile, a pagine, con doppioni,
    unione con la scelta dei valori ed eliminazione. Qui resta il nome, che la finestra di modifica richiama. */
 async function admLoadImprese() {
-  if (window.ImpreseAnag) return window.ImpreseAnag.carica()
+  if (window.ImpreseAnag && window.__isSegreteria) return window.ImpreseAnag.carica()
 }
 
 // Apre il modal di modifica pre-popolato con i dati dell'impresa
@@ -12059,6 +12090,18 @@ async function admEditImpresa(impresaId) {
   }
 }
 
+/* (06/10/2026) L'impresa appena corretta dalla finestra «Modifica impresa»: se è in una riga del verbale aperto,
+   la riga prende ragione sociale, P.IVA e codice fiscale nuovi. Gli altri campi della riga (ruolo, lavoratori,
+   capocantiere…) sono del verbale, non dell'anagrafica, e restano come sono. */
+async function verbaleRinfrescaImpresa(id) {
+  const righe = (S.imprese || []).filter(im => im.impresa_id && im.impresa_id === id)
+  if (!righe.length) return
+  const { data, error } = await sb.from('imprese').select('impresa_nome,impresa_cf,piva').eq('impresa_id', id).maybeSingle()
+  if (error || !data) return
+  righe.forEach(im => { im.impresa_nome = data.impresa_nome || im.impresa_nome; im.piva = data.piva || ''; im.cf_imp = data.impresa_cf || '' })
+  if ($('imp-accordion-list')) renderImpreseAccordion()
+}
+
 async function admSaveEditImpresa() {
   const nome = vGet('ei-nome').trim()
   if (!nome) { toast('Ragione sociale obbligatoria','warn'); $('ei-nome').focus(); return }
@@ -12112,6 +12155,7 @@ async function admSaveEditImpresa() {
   hide('modal-edit-imp')
   toast('Impresa "' + nome + '" aggiornata', 'ok')
   admLoadImprese()
+  verbaleRinfrescaImpresa(_editImpId).catch(e => console.warn('impresa nel verbale:', e))
 }
 
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') }
