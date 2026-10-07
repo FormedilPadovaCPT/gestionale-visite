@@ -15036,6 +15036,12 @@ async function loadIncarichi(){
   if(error){ console.warn('incarichi:',error); _incErrore=error.message||String(error); return }
   _incErrore=null
   _incCache=data||[]
+  /* le foto delle uscite senza visita (07/10/2026): lettura fallita = si dice nella scheda, non «nessuna foto» */
+  const _conEsito=_incCache.filter(r=>r.esito_senza_visita).map(r=>r.id)
+  if(_conEsito.length){
+    const{data:ff,error:ef}=await sb.from('incarichi_foto').select('incarico_id,drive_url,thumb_url').in('incarico_id',_conEsito).order('id')
+    _incCache.forEach(r=>{ if(r.esito_senza_visita){ r._foto=(ff||[]).filter(f=>f.incarico_id===r.id); r._fotoErr=!!ef } })
+  }
   if(!_incCache.length && !gest){ incAggiornaBanner(); incAggiornaNavBadge(); renderIncarichi(); return }
   incPopolaFiltri()
   incAggiornaNavBadge()
@@ -15152,7 +15158,11 @@ function renderIncarichi(){
       +(r.oggetto?'<div style="color:#555;margin-top:3px">'+esc(r.oggetto)+'</div>':'')
       +(r.referente?'<div style="color:#666;margin-top:3px">👤 '+esc(r.referente)+(r.cell_referente?' · <a href="tel:'+esc(r.cell_referente)+'" style="color:#e7500f;text-decoration:none">'+esc(r.cell_referente)+'</a>':'')+'</div>':'')
       +(r.note_comunicazione?'<div style="margin-top:5px;background:#fff8f3;border-left:3px solid #e7500f;padding:6px 9px;border-radius:0 5px 5px 0;white-space:pre-wrap;font-size:12px">'+esc(r.note_comunicazione)+'</div>':'')
-      +(r.esito_senza_visita?'<div style="margin-top:5px;background:#fff6e8;border-left:3px solid #e7a00f;padding:6px 9px;border-radius:0 5px 5px 0;font-size:12px;color:#6b4300"><strong>🏁 Esito senza visita</strong>'+(r.esito_data?' — sul posto il '+r.esito_data.split('-').reverse().join('/'):'')+': '+esc(r.esito_nota||'')+'</div>':'')
+      +(r.esito_senza_visita?'<div style="margin-top:5px;background:#fff6e8;border-left:3px solid #e7a00f;padding:6px 9px;border-radius:0 5px 5px 0;font-size:12px;color:#6b4300"><strong>🏁 Esito senza visita</strong>'+(r.esito_data?' — sul posto il '+r.esito_data.split('-').reverse().join('/'):'')+': '+esc(r.esito_nota||'')
+        +(r._foto&&r._foto.length&&window.EsitoIncarico?'<div>'+EsitoIncarico.fotoHtml(r._foto)+'</div>':'')
+        +(r._fotoErr?'<div style="color:#c0392b">Non sono riuscito a leggere le foto: ricarica la pagina.</div>':'')
+        +(eseguito?' <a href="#" style="font-size:11px" onclick="EsitoIncarico.foto('+r.id+');return false" data-aiuto="Aggiunge una foto a prova dell\'uscita: va su Drive come le foto dei verbali.">📷 aggiungi foto</a>':'')
+        +'</div>':'')
       +(rif&&!chiuso?'<div style="margin-top:5px;background:#fdeaea;border-left:3px solid #c0392b;padding:6px 9px;border-radius:0 5px 5px 0;font-size:12px;color:#8e2b20"><strong>Non disponibile</strong>'+(r.rifiuto_motivo?': '+esc(r.rifiuto_motivo):'')+(r.rifiutato_il?' <span style="color:#b07a72">('+new Date(r.rifiutato_il).toLocaleDateString('it-IT')+')</span>':'')+'</div>':'')
       /* il testo della richiesta si vede subito, senza un altro clic (26/09/2026,
          chiesto dall'utente): prima stava chiuso sotto «Testo della richiesta» */
@@ -15887,7 +15897,7 @@ document.addEventListener('input',function(ev){
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
 <script src="codice-univoco.js?v=4"></script>
 <script src="lotti-cantiere.js?v=1"></script>
-<script src="esito-incarico.js?v=1"></script>
+<script src="esito-incarico.js?v=2"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
