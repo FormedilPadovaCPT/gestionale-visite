@@ -15110,6 +15110,9 @@ function renderIncarichi(){
           : vis
           ? '<span style="font-size:11px;color:#27ae60">✓ presa visione</span> <a href="#" style="font-size:11px;color:#999" onclick="incAnnullaVisione('+r.id+');return false">annulla</a>'
           : '<span style="font-size:11px;color:#bbb">non ancora vista dal tecnico</span>')
+          /* (07/10/2026, deciso dall'utente) la segreteria riassegna anche un incarico che il tecnico non ha rifiutato:
+             cambi di zona, tecnico non più in servizio. Le visite già fatte restano a chi le ha firmate. */
+          +(rif?'':' <button class="btn-outline btn-sm" onclick="incRiassegna('+r.id+')" data-aiuto="Passa l\'incarico a un altro tecnico: chiede a chi e il motivo, che resta scritto nelle note. Il conto dei giorni riparte; le visite già fatte restano a chi le ha firmate.">Riassegna</button>')
         : (rif
           ? '<span style="font-size:11px;color:#c0392b">hai dichiarato di non essere disponibile</span> <a href="#" style="font-size:11px;color:#999" onclick="incAnnullaRifiuto('+r.id+');return false">annulla</a>'
           : acc
@@ -15366,19 +15369,31 @@ window.incAnnullaRifiuto=incAnnullaRifiuto
    precedente aveva dichiarato, altrimenti il nuovo eredita il rifiuto. */
 async function incRiassegna(id){
   if(!window.__isSegreteria){toast('Riservato alla segreteria','err');return}
-  const{data:tec}=await sb.from('tecnici').select('tecnico_nome,tecnico_cognome,titolo,email').eq('attivo',true).not('email','is',null).order('tecnico_cognome')
-  const lista=(tec||[]).filter(t=>t.email)
-  if(!lista.length){toast('Nessun tecnico attivo con email','warn');return}
-  const scelta=prompt('A chi riassegno l\'incarico #'+id+'?\n\n'+lista.map((t,i)=>(i+1)+') '+[t.tecnico_nome,t.tecnico_cognome].filter(Boolean).join(' ')).join('\n')+'\n\nScrivi il numero:')
+  /* (07/10/2026) un incarico nato da una pratica dei servizi CPT si riassegna dalla pratica, nell'app Segreteria:
+     lì cambiano insieme pratica e incarico e si preparano le due mail. Da qui la pratica resterebbe al tecnico di prima. */
+  const _pr=await incPraticaCollegata(id)
+  if(_pr===false){toast('Non sono riuscito a controllare se l\u2019incarico nasce da una pratica dei servizi: non riassegnato. Riprova.','err');return}
+  if(_pr){alert('L\u2019incarico n. '+id+' nasce dalla pratica «'+_pr+'» dei servizi CPT.\n\nRiassegnalo da quella pratica nell\u2019app Segreteria (campo del tecnico): così cambiano insieme pratica e incarico e si preparano le mail ai due tecnici.');return}
+  const{data:tec,error:eTec}=await sb.from('tecnici').select('tecnico_nome,tecnico_cognome,titolo,email').eq('attivo',true).not('email','is',null).order('tecnico_cognome')
+  if(eTec){toast('Non sono riuscito a leggere l\u2019elenco dei tecnici. Riprova.','err');return}
+  // la traccia: senza, fra un mese nessuno sa perche' l'incarico ha cambiato mano
+  const{data:_prima,error:ePrima}=await sb.from('incarichi').select('tecnico_nome,tecnico_email,note_comunicazione,rifiuto_motivo,accettato_il,visite_fatte,visite_previste').eq('id',id).maybeSingle()
+  if(ePrima||!_prima){toast('Non sono riuscito a leggere l\u2019incarico n. '+id+'. Riprova.','err');return}
+  const _ora=String(_prima.tecnico_email||'').toLowerCase()
+  const lista=(tec||[]).filter(t=>t.email&&String(t.email).toLowerCase()!==_ora)
+  if(!lista.length){toast('Nessun altro tecnico attivo con email','warn');return}
+  const _gia=(_prima.visite_previste||1)>1&&_prima.visite_fatte?'\nLe '+_prima.visite_fatte+' visite già fatte restano a '+(_prima.tecnico_nome||'chi le ha firmate')+'; al nuovo tecnico vanno le altre '+Math.max(0,_prima.visite_previste-_prima.visite_fatte)+'.':''
+  const _acc=_prima.accettato_il&&!_prima.rifiuto_motivo?'\n'+(_prima.tecnico_nome||'Il tecnico')+' l\u2019aveva già accettato.':''
+  const scelta=prompt('A chi riassegno l\'incarico #'+id+'? Ora è di '+(_prima.tecnico_nome||'nessuno')+'.'+_acc+_gia+'\n\n'+lista.map((t,i)=>(i+1)+') '+[t.tecnico_nome,t.tecnico_cognome].filter(Boolean).join(' ')).join('\n')+'\n\nScrivi il numero:')
   if(scelta===null)return
   const t=lista[parseInt(scelta,10)-1]
   if(!t){toast('Numero non valido','warn');return}
-  // la traccia: senza, fra un mese nessuno sa perche' l'incarico ha cambiato mano
-  const{data:_prima}=await sb.from('incarichi').select('tecnico_nome,note_comunicazione,rifiuto_motivo').eq('id',id).maybeSingle()
+  const _motivo=_prima.rifiuto_motivo?'':prompt('Perché lo riassegni? (facoltativo: resta scritto nelle note dell\u2019incarico, es. «cambio di zona»)','')
+  if(_motivo===null)return
   /* il nome nella forma degli incarichi, «Cognome Titolo Nome» (26/09/2026: la forma
      «Nome Cognome» faceva sembrare due tecnici diversi la stessa persona) */
   const _chi=[t.tecnico_cognome,t.titolo,t.tecnico_nome].filter(Boolean).join(' ')
-  const _riga='['+new Date().toLocaleDateString('it-IT')+'] Riassegnato dal gestionale: da '+((_prima&&_prima.tecnico_nome)||'?')+' a '+_chi+((_prima&&_prima.rifiuto_motivo)?' (il precedente non era disponibile: '+_prima.rifiuto_motivo+')':'')+'. Nessuna mail inviata da qui.'
+  const _riga='['+new Date().toLocaleDateString('it-IT')+'] Riassegnato dal gestionale: da '+((_prima&&_prima.tecnico_nome)||'?')+' a '+_chi+((_prima&&_prima.rifiuto_motivo)?' (il precedente non era disponibile: '+_prima.rifiuto_motivo+')':'')+(_motivo&&_motivo.trim()?' — '+_motivo.trim():'')+'. Nessuna mail inviata da qui.'
   const{error}=await sb.from('incarichi').update({
     note_comunicazione:[(_prima&&_prima.note_comunicazione)||'',_riga].filter(Boolean).join('\n'),
     tecnico_email:t.email,tecnico_nome:_chi,
@@ -15390,6 +15405,15 @@ async function incRiassegna(id){
   await loadIncarichi()
 }
 window.incRiassegna=incRiassegna
+/* La pratica dei servizi CPT da cui nasce l'incarico (incarico_id sulla pratica): il nome da mostrare, null se non
+   c'è, false se la lettura non è riuscita (non vuol dire «nessuna»). */
+async function incPraticaCollegata(id){
+  const T=[['s_visite_richieste','richiesta di visita'],['s_segnalazioni','segnalazione'],['s_consulenze','consulenza'],['s_conferenze_cantiere','conferenza di cantiere']]
+  const ris=await Promise.all(T.map(([t])=>sb.from(t).select('id').eq('incarico_id',id).limit(1)))
+  if(ris.some(r=>r.error)) return false
+  const i=ris.findIndex(r=>(r.data||[]).length)
+  return i<0?null:T[i][1]+' n. '+ris[i].data[0].id
+}
 
 /* Apre la Nuova visita gia' agganciata all'incarico: numero della
    richiesta nel Protocollo interno e, se il cantiere e' noto, cantiere
