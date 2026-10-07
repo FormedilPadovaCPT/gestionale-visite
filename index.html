@@ -15090,7 +15090,8 @@ function renderIncarichi(){
       +(r.stato==='aperto'&&!serie?'<span style="font-size:11px;margin-left:8px">'+incAttesaHtml(r)+'</span>':'')
       +(gest&&r.tecnico_nome?'<span style="font-size:11px;color:#666;margin-left:8px;background:#f0f0f0;border-radius:9px;padding:1px 8px">'+esc(r.tecnico_nome)+'</span>':'')
       +(chiuso?'<span style="font-size:11px;color:#27ae60;margin-left:8px">✓ completato</span>':'')
-      +(eseguito&&!serie?'<span style="font-size:11px;color:#7aa527;margin-left:8px;background:#eef7dd;border-radius:9px;padding:1px 8px">✓ visita registrata'+(r.visita_id?' n° '+esc(r.visita_id):'')+'</span>':'')
+      +(eseguito&&r.esito_senza_visita?'<span style="font-size:11px;color:#9a5a00;margin-left:8px;background:#fff1dc;border-radius:9px;padding:1px 8px;font-weight:600">🏁 senza visita: '+esc(window.EsitoIncarico?EsitoIncarico.etichetta(r.esito_senza_visita):r.esito_senza_visita)+'</span>'
+        :eseguito&&!serie?'<span style="font-size:11px;color:#7aa527;margin-left:8px;background:#eef7dd;border-radius:9px;padding:1px 8px">✓ visita registrata'+(r.visita_id?' n° '+esc(r.visita_id):'')+'</span>':'')
       +(rif&&!chiuso?'<span style="font-size:11px;color:#c0392b;margin-left:8px;background:#fdeaea;border-radius:9px;padding:1px 8px;font-weight:600">✋ rifiutato</span>':'')
       +(acc&&!rif&&!eseguito&&!chiuso?'<span style="font-size:11px;color:#2d7a06;margin-left:8px;background:#eef7dd;border-radius:9px;padding:1px 8px">✓ accettato</span>':'')
       +(serie?'<span style="font-size:11px;margin-left:8px;background:'+(fatte>=prev?'#eef7dd':'#f2f2f2')+';color:'+(fatte>=prev?'#5f8c1a':'#666')+';border-radius:9px;padding:1px 9px;font-weight:600">'+fatte+' di '+prev+' visite</span>':'')
@@ -15126,6 +15127,12 @@ function renderIncarichi(){
             +(vis?'':'<button class="btn-outline btn-sm" onclick="incPresaVisione('+r.id+',this)">Presa visione</button> ')
             +'<button class="btn-sm" style="background:#95C22F;border:1px solid #7aa527;color:#fff;border-radius:6px;padding:3px 9px;cursor:pointer" onclick="incAccetta('+r.id+')">✅ Accetto</button> '
             +'<button class="btn-outline btn-sm" onclick="incRifiuta('+r.id+')">✋ Non posso</button>')
+      /* (07/10/2026) sul posto ma niente da verbalizzare: cantiere finito o non trovato. Lo dichiara il tecnico,
+         l'incarico passa alla segreteria che lo chiude; l'uscita si paga come una visita (esito-incarico.js) */
+      if(!eseguito&&!gest&&!rif&&incTipoAccesso(r)!=null)
+        head+=' <button class="btn-outline btn-sm" onclick="EsitoIncarico.apri('+r.id+')" data-aiuto="Sei andato ma la visita non si poteva fare (lavori finiti, cantiere che non c\'è): registri l\'esito con una nota, l\'incarico passa alla segreteria e l\'uscita si paga come una visita. Nessun verbale.">🏁 Cantiere finito / non trovato</button>'
+      if(eseguito&&!gest&&r.esito_senza_visita)
+        head+=' <a href="#" style="font-size:11px;color:#999" onclick="EsitoIncarico.annulla('+r.id+');return false" data-aiuto="Ritira l\'esito senza visita: l\'incarico torna fra quelli da evadere. Si può finché la segreteria non l\'ha chiuso.">ritira l\'esito</a>'
       /* Visite allo stagista: non c'e' il rapporto di cantiere, c'e' la
          relazione — e da qui si compila, senza scrivere una mail a mano.
          Chiude l'incarico da sola (04/09/2026). */
@@ -15145,6 +15152,7 @@ function renderIncarichi(){
       +(r.oggetto?'<div style="color:#555;margin-top:3px">'+esc(r.oggetto)+'</div>':'')
       +(r.referente?'<div style="color:#666;margin-top:3px">👤 '+esc(r.referente)+(r.cell_referente?' · <a href="tel:'+esc(r.cell_referente)+'" style="color:#e7500f;text-decoration:none">'+esc(r.cell_referente)+'</a>':'')+'</div>':'')
       +(r.note_comunicazione?'<div style="margin-top:5px;background:#fff8f3;border-left:3px solid #e7500f;padding:6px 9px;border-radius:0 5px 5px 0;white-space:pre-wrap;font-size:12px">'+esc(r.note_comunicazione)+'</div>':'')
+      +(r.esito_senza_visita?'<div style="margin-top:5px;background:#fff6e8;border-left:3px solid #e7a00f;padding:6px 9px;border-radius:0 5px 5px 0;font-size:12px;color:#6b4300"><strong>🏁 Esito senza visita</strong>'+(r.esito_data?' — sul posto il '+r.esito_data.split('-').reverse().join('/'):'')+': '+esc(r.esito_nota||'')+'</div>':'')
       +(rif&&!chiuso?'<div style="margin-top:5px;background:#fdeaea;border-left:3px solid #c0392b;padding:6px 9px;border-radius:0 5px 5px 0;font-size:12px;color:#8e2b20"><strong>Non disponibile</strong>'+(r.rifiuto_motivo?': '+esc(r.rifiuto_motivo):'')+(r.rifiutato_il?' <span style="color:#b07a72">('+new Date(r.rifiutato_il).toLocaleDateString('it-IT')+')</span>':'')+'</div>':'')
       /* il testo della richiesta si vede subito, senza un altro clic (26/09/2026,
          chiesto dall'utente): prima stava chiuso sotto «Testo della richiesta» */
@@ -15176,6 +15184,7 @@ const _incAperti=new Set()
 function incTabellaHtml(rows,cardHtml,gest){
   const oggi=new Date()
   const stato=r=>r.stato==='chiuso'?'<span style="color:#27ae60">✓ completato</span>'
+    :r.stato==='eseguito'&&r.esito_senza_visita?'<span style="color:#9a5a00;font-weight:600">🏁 senza visita</span>'
     :r.stato==='eseguito'?'<span style="color:#7aa527">✓ visita registrata</span>'
     :r.rifiutato_il?'<span style="color:#c0392b;font-weight:600">✋ rifiutato</span>'
     :r.accettato_il?'<span style="color:#2d7a06">✓ accettato</span>'
@@ -15878,6 +15887,7 @@ document.addEventListener('input',function(ev){
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
 <script src="codice-univoco.js?v=4"></script>
 <script src="lotti-cantiere.js?v=1"></script>
+<script src="esito-incarico.js?v=1"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
