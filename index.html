@@ -9506,8 +9506,19 @@ $('btn-ev-invia').onclick=async()=>{
   const tutti=window._evEmails||[]
   const emails=_evScelti().map(({escluso,...e})=>e)
   if(!emails.length){toast('Nessun destinatario','warn');return}
-  const vid=S.savedId||S.fd?.visita_id||window._evContext?.vid
+  /* (07/10/2026, ERRORE GRAVE) la visita da allegare è SOLO quella per cui si è aperta questa finestra (_evContext.vid).
+     Prima vinceva S.savedId, cioè la visita rimasta aperta nella maschera: Caon ha salvato e inviato il verbale 0012
+     (Arianna), poi dall'elenco ha inviato lo 0011 (Baraldo) e alla mail di Baraldo è stato allegato il PDF di Arianna. */
+  const vid=window._evContext?.vid||null
   if(!vid){toast('Salva prima la visita','warn');return}
+  /* e prima di generare il PDF si controlla che sia proprio il verbale scritto nell'oggetto: se non coincide, non parte */
+  {const _nrMail=String(window._evContext?.nr_verbale||'').trim()
+   const{data:_vChk,error:_eChk}=await sb.from('visite').select('visita_id,nr_verbale').eq('visita_id',vid).maybeSingle()
+   if(_eChk||!_vChk){toast('Non sono riuscito a controllare quale verbale sto per allegare: invio fermato. Riprova.','err',9000);return}
+   if(!_nrMail||String(_vChk.nr_verbale||'').trim()!==_nrMail){
+     console.error('invio verbale fermato: allegato',_vChk.nr_verbale,'≠ mail',_nrMail,vid)
+     toast('Invio FERMATO: il verbale da allegare ('+(_vChk.nr_verbale||'?')+') non è quello della mail ('+(_nrMail||'?')+'). Chiudi questa finestra e riapri l\'invio dal verbale giusto.','err',15000)
+     return}}
   // (03/10/2026, regola dell'utente) almeno un'impresa deve ricevere il verbale: senza, arriverebbe solo alle figure
   if(!emails.some(_evImpresa)&&tutti.some(_evImpresa)){toast('Hai tolto la spunta a tutte le imprese: il verbale arriverebbe solo alle figure del cantiere. Rimetti la spunta ad almeno un\'impresa e poi invia.','err',9000);return}
   if(!emails.some(_evImpresa)){toast('Nessuna impresa fra i destinatari: il verbale arriverebbe solo alle figure del cantiere. Aggiungi l\'indirizzo dell\'impresa con «+ Aggiungi» e poi invia.','err',9000);const _x=$('ev-extra');if(_x)_x.focus();return}
