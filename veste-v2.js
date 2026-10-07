@@ -749,12 +749,22 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
         const io = chi.email;
         // la segreteria legge gli incarichi di tutti: per un tecnico (vero o guardato in anteprima) si tengono i suoi
         const aperti = d.filter((x) => x.stato === 'aperto' && (tutti || String(x.tecnico_email || '').toLowerCase() === io));
-        const righe = aperti.slice(0, 5).map((x) => {
+        /* (07/10/2026, chiesto dall'utente) prima quelli che aspettano da più tempo, le serie di visite in fondo:
+           durano mesi e coprirebbero gli altri */
+        const att = (x) => (typeof window.incAttesa === 'function' ? window.incAttesa(x) : { serie: false, giorni: null });
+        const ordinati = aperti.slice().sort((a, b) => {
+          const A = att(a), B = att(b);
+          if (A.serie !== B.serie) return A.serie ? 1 : -1;
+          return (B.giorni == null ? -1 : B.giorni) - (A.giorni == null ? -1 : A.giorni) || Number(a.id) - Number(b.id);
+        });
+        const righe = ordinati.slice(0, 5).map((x) => {
           const suo = !!x.tecnico_email && String(x.tecnico_email).toLowerCase() === io;
           const visita = typeof window.incTipoAccesso === 'function' && window.incTipoAccesso(x) != null;
           const dove = [x.indirizzo, x.comune].filter(Boolean).join(', ');
-          return `<div class="v2-riga"><div class="v2-t"><div class="v2-sopra">n. ${esc(x.id)} · ${esc(x.tipo_richiesta || 'richiesta')}${x.data_richiesta ? ' · dal ' + gg(x.data_richiesta) : ''}${!x.presa_visione_il ? ' · <b style="color:var(--orange)">nuovo</b>' : ''}</div>`
-            + `<b>${esc(x.impresa || x.richiedente || '—')}</b><small>${dove ? '› ' + esc(dove) : ''}${tutti && x.tecnico_nome ? (dove ? ' · ' : '') + esc(x.tecnico_nome) : ''}</small></div>`
+          const attesa = typeof window.incAttesaHtml === 'function' ? window.incAttesaHtml(x) : (x.data_richiesta ? 'dal ' + gg(x.data_richiesta) : '');
+          const impresa = typeof window.incImpresaTesto === 'function' ? window.incImpresaTesto(x) : (x.impresa || x.richiedente);
+          return `<div class="v2-riga"><div class="v2-t"><div class="v2-sopra">n. ${esc(x.id)} · ${esc(x.tipo_richiesta || 'richiesta')}${attesa ? ' · ' + attesa : ''}${!x.presa_visione_il ? ' · <b style="color:var(--orange)">nuovo</b>' : ''}</div>`
+            + `<b>${impresa ? esc(impresa) : impresa === '' ? (window.INC_IMPRESA_DA_TROVARE || 'impresa da individuare in cantiere') : '—'}</b><small>${dove ? '› ' + esc(dove) : ''}${tutti && x.tecnico_nome ? (dove ? ' · ' : '') + esc(x.tecnico_nome) : ''}</small></div>`
             + `<div class="v2-bottoni">${dove ? `<a style="width:44px;height:44px;min-height:0;padding:0;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;text-decoration:none;border:0;background:#f3f4f5;color:#565c66" target="_blank" rel="noopener" href="${esc(mappa(null, null, dove))}" aria-label="Naviga all'indirizzo dell'incarico" data-aiuto="Apre il navigatore verso l'indirizzo dell'incarico."><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"></path></svg></a>` : ''}`
             + (visita && !chi.anteprima && (suo || tutti)
               ? `<button type="button" style="width:44px;height:44px;min-height:0;padding:0;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:1.5px solid #e7500f;background:#fff;color:#e7500f;cursor:pointer" data-v2-incarico="${esc(x.id)}" data-v2-mio="${suo ? 1 : 0}" data-aiuto="Apre il verbale con impresa e cantiere dell'incarico già compilati. Se l'incarico è tuo, lo accetta." aria-label="Avvia visita"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>`

@@ -1204,7 +1204,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       .inc-tab .inc-imp{font-weight:600;color:#222;max-width:330px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .inc-tab .inc-com,.inc-tab .inc-tec{max-width:210px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#555}
       .inc-tab .num{font-variant-numeric:tabular-nums;white-space:nowrap}.inc-tab .dx{text-align:right}
-      .inc-tab .vecchio{color:#b35c00;font-weight:600}.inc-tab .freccia{color:#999;width:14px}
+      .inc-tab .att-attenzione{color:#e7500f;font-weight:700}.inc-tab .att-fermo{color:#c0392b;font-weight:700}.inc-tab .freccia{color:#999;width:14px}
       .inc-tab tr.inc-exp>td{background:#fffaf6;padding:8px 12px 12px}
       .inc-tab tr.inc-exp>td>div{margin-bottom:0!important}
       @media (min-width:1100px){#view-incarichi{max-width:1400px;margin-left:auto;margin-right:auto}}
@@ -15065,8 +15065,8 @@ function renderIncarichi(){
   const rp=$('inc-riepilogo')
   const _oggiInc=new Date()
   const nonVisti=_incCache.filter(r=>r.stato==='aperto'&&passaTec(r)&&!r.presa_visione_il&&!r.accettato_il).length
-  const vecchi=_incCache.filter(r=>r.stato==='aperto'&&passaTec(r)&&r.data_richiesta&&(_oggiInc-new Date(r.data_richiesta+'T12:00:00'))>183*86400000).length
-  if(rp) rp.textContent=rows.length+' visualizzati · '+aperti+' da evadere'+(nonVisti?' ('+nonVisti+' non ancora visti)':'')+(vecchi?' · '+vecchi+' aperti da più di sei mesi':'')+' · '+eseg+' con visita registrata · '+chiusi+' chiusi'
+  const fermi=_incCache.filter(r=>r.stato==='aperto'&&passaTec(r)&&incAttesa(r,_oggiInc).livello==='fermo').length
+  if(rp) rp.textContent=rows.length+' visualizzati · '+aperti+' da evadere'+(nonVisti?' ('+nonVisti+' non ancora visti)':'')+(fermi?' · '+fermi+' fermi da più di 30 giorni':'')+' · '+eseg+' con visita registrata · '+chiusi+' chiusi'
   const vuoto=$('inc-vuoto'); if(vuoto) vuoto.style.display=rows.length?'none':''
   incAggiornaBanner()
   incAggiornaNavBadge()
@@ -15087,6 +15087,7 @@ function renderIncarichi(){
       +'<span title="Numero della richiesta: riportalo nel campo Protocollo interno della visita" style="display:inline-block;background:'+col+';color:#fff;font-weight:800;font-size:15px;letter-spacing:.4px;border-radius:6px;padding:2px 9px;margin-right:9px;vertical-align:middle">N. '+r.id+'</span>'
       +'<strong style="color:'+col+';font-size:13px;vertical-align:middle">'+esc(r.tipo_richiesta||'Incarico')+'</strong>'
       +'<span style="font-size:11px;color:#999;margin-left:8px">'+(dt||'')+'</span>'
+      +(r.stato==='aperto'&&!serie?'<span style="font-size:11px;margin-left:8px">'+incAttesaHtml(r)+'</span>':'')
       +(gest&&r.tecnico_nome?'<span style="font-size:11px;color:#666;margin-left:8px;background:#f0f0f0;border-radius:9px;padding:1px 8px">'+esc(r.tecnico_nome)+'</span>':'')
       +(chiuso?'<span style="font-size:11px;color:#27ae60;margin-left:8px">✓ completato</span>':'')
       +(eseguito&&!serie?'<span style="font-size:11px;color:#7aa527;margin-left:8px;background:#eef7dd;border-radius:9px;padding:1px 8px">✓ visita registrata'+(r.visita_id?' n° '+esc(r.visita_id):'')+'</span>':'')
@@ -15136,7 +15137,7 @@ function renderIncarichi(){
     const barra=serie?'<div style="margin-top:7px"><div style="height:7px;background:#eee;border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(fatte>=prev?'#95C22F':'#e7500f')+'"></div></div></div>':''
     const fine=(serie&&fatte>=prev&&!chiuso)?'<div id="inc-serie-fine" style="margin-top:8px;background:#eef7dd;border:1px solid #95C22F;border-left:4px solid #7aa527;border-radius:0 6px 6px 0;padding:8px 11px;font-size:12px;color:#456b12"><strong>✓ Serie completata — '+prev+' visite effettuate.</strong><br>Il servizio per questo cantiere è concluso: se l\'impresa vuole proseguire deve richiedere una nuova serie di visite alla segreteria.</div>':''
     const body='<div style="font-size:13px;color:#333;margin-top:5px;line-height:1.55">'
-      +(r.impresa?'<div><strong>'+esc(r.impresa)+'</strong></div>':'')
+      +(!_incVuoto(r.impresa)?'<div><strong>'+esc(r.impresa)+'</strong></div>':(r.stato==='aperto'&&incImpresaTesto(r)===''?'<div>'+INC_IMPRESA_DA_TROVARE+'</div>':''))
       +(luogo?'<div style="color:#666">📍 '+esc(luogo)+'</div>':'')
       +(r.oggetto?'<div style="color:#555;margin-top:3px">'+esc(r.oggetto)+'</div>':'')
       +(r.referente?'<div style="color:#666;margin-top:3px">👤 '+esc(r.referente)+(r.cell_referente?' · <a href="tel:'+esc(r.cell_referente)+'" style="color:#e7500f;text-decoration:none">'+esc(r.cell_referente)+'</a>':'')+'</div>':'')
@@ -15171,7 +15172,6 @@ window.renderIncarichi=renderIncarichi
 const _incAperti=new Set()
 function incTabellaHtml(rows,cardHtml,gest){
   const oggi=new Date()
-  const giorni=d=>d?Math.floor((oggi-new Date(d+'T12:00:00'))/86400000):null
   const stato=r=>r.stato==='chiuso'?'<span style="color:#27ae60">✓ completato</span>'
     :r.stato==='eseguito'?'<span style="color:#7aa527">✓ visita registrata</span>'
     :r.rifiutato_il?'<span style="color:#c0392b;font-weight:600">✋ rifiutato</span>'
@@ -15179,20 +15179,20 @@ function incTabellaHtml(rows,cardHtml,gest){
     :r.presa_visione_il?'<span style="color:#27ae60">visto</span>'
     :'<span style="color:#aaa">non ancora visto</span>'
   const nCol=gest?10:9
-  let h='<div class="card" style="padding:0;overflow:hidden"><table class="inc-tab"><thead><tr><th>N°</th><th>Tipo</th><th>Impresa</th><th>Comune</th>'+(gest?'<th>Tecnico</th>':'')+'<th>Richiesto il</th><th class="dx">Da</th><th class="dx">Visite</th><th>Stato</th><th></th></tr></thead><tbody>'
+  let h='<div class="card" style="padding:0;overflow:hidden"><table class="inc-tab"><thead><tr><th>N°</th><th>Tipo</th><th>Impresa</th><th>Comune</th>'+(gest?'<th>Tecnico</th>':'')+'<th>Richiesto il</th><th class="dx" title="Da quanti giorni l’incarico è stato dato al tecnico (solo quelli da evadere; le serie contano le visite)">Da</th><th class="dx">Visite</th><th>Stato</th><th></th></tr></thead><tbody>'
   rows.forEach(r=>{
     const col=INC_COL[r.tipo_richiesta]||'#565c66'
-    const g=giorni(r.data_richiesta)
+    const att=r.stato==='aperto'?incAttesa(r,oggi):null
     const prev=r.visite_previste||1, fatte=r.visite_fatte||0
     const aperto=_incAperti.has(r.id)
     h+='<tr class="inc-r'+(aperto?' on':'')+(r.stato==='chiuso'?' chiuso':'')+'" data-inc-r="'+r.id+'" data-aiuto="Un clic apre sotto la scheda dell\'incarico con i pulsanti; un altro la chiude.">'
       +'<td><span class="inc-n" style="background:'+col+'">'+r.id+'</span></td>'
       +'<td class="inc-tipo" style="color:'+col+'" title="'+esc(r.tipo_richiesta||'')+'">'+esc(r.tipo_richiesta||'Incarico')+'</td>'
-      +'<td class="inc-imp" title="'+esc(r.impresa||'')+'">'+esc(r.impresa||r.cantiere||'—')+'</td>'
+      +'<td class="inc-imp" title="'+esc(r.impresa||'')+'">'+(r.impresa||r.cantiere?esc(r.impresa||r.cantiere):r.stato==='aperto'&&incImpresaTesto(r)===''?INC_IMPRESA_DA_TROVARE:'—')+'</td>'
       +'<td class="inc-com" title="'+esc(r.comune||'')+'">'+esc(r.comune||'—')+'</td>'
       +(gest?'<td class="inc-tec">'+esc(r.tecnico_nome||'—')+'</td>':'')
       +'<td class="num">'+(r.data_richiesta?r.data_richiesta.split('-').reverse().join('/'):'')+'</td>'
-      +'<td class="num dx'+(g>183&&r.stato==='aperto'?' vecchio':'')+'">'+(g!=null?g+' g':'—')+'</td>'
+      +'<td class="num dx'+(att&&att.giorni!=null?' att-'+att.livello:'')+'"'+(att&&att.giorni!=null?' title="Dato al tecnico il '+att.dal+'"':'')+'>'+(att&&att.giorni!=null?att.giorni+' g':'—')+'</td>'
       +'<td class="num dx">'+(prev>1?fatte+' / '+prev:'—')+'</td>'
       +'<td>'+stato(r)+'</td><td class="freccia">'+(aperto?'▴':'▾')+'</td></tr>'
     if(aperto) h+='<tr class="inc-exp"><td colspan="'+nCol+'">'+cardHtml(r)+'</td></tr>'
@@ -15460,6 +15460,45 @@ function incTipoAccesso(r){
   return null
 }
 window.incTipoAccesso=incTipoAccesso
+/* Da quanti giorni aspetta un incarico (07/10/2026, chiesto dall'utente). Si conta da quando è stato dato al tecnico
+   che lo ha adesso (assegnato_il, la scrive il database e riparte se l'incarico viene riassegnato); per gli incarichi
+   senza, dalla data di risposta o di richiesta. Fino a 14 giorni grigio, da 15 a 30 arancione, oltre 30 rosso.
+   Le serie di visite durano mesi: per loro conta l'avanzamento («4 di 10 visite»), non i giorni (giorni = null). */
+const INC_ATTESA_SOGLIE={attenzione:15,fermo:31}
+function incAttesa(r,oggi){
+  r=r||{}
+  const prev=r.visite_previste||1
+  if(prev>1) return {serie:true,fatte:r.visite_fatte||0,previste:prev,giorni:null,livello:'serie'}
+  let d=null
+  if(r.assegnato_il){ const t=new Date(r.assegnato_il); if(!isNaN(t)) d=new Date(t.getFullYear(),t.getMonth(),t.getDate(),12) }
+  if(!d){ const m=String(r.data_risposta||r.data_richiesta||'').match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) d=new Date(+m[1],+m[2]-1,+m[3],12) }
+  if(!d) return {serie:false,giorni:null,livello:'',dal:''}
+  const o=oggi||new Date(), og=new Date(o.getFullYear(),o.getMonth(),o.getDate(),12)
+  const giorni=Math.max(0,Math.round((og-d)/86400000))
+  const livello=giorni>=INC_ATTESA_SOGLIE.fermo?'fermo':giorni>=INC_ATTESA_SOGLIE.attenzione?'attenzione':'ok'
+  const dal=String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear()
+  return {serie:false,giorni,livello,dal}
+}
+const INC_ATTESA_COL={ok:'#888',attenzione:'#e7500f',fermo:'#c0392b'}
+function incAttesaHtml(r,oggi){
+  const a=incAttesa(r,oggi)
+  if(a.serie) return '<span class="inc-attesa" style="color:#666;font-weight:600" data-aiuto="Serie di visite: conta quante visite sono state fatte su quelle previste, non i giorni.">'+a.fatte+' di '+a.previste+' visite</span>'
+  if(a.giorni==null) return ''
+  const testo=a.giorni===0?'da oggi':a.giorni===1?'da 1 giorno':'da '+a.giorni+' giorni'
+  return '<span class="inc-attesa inc-attesa-'+a.livello+'" style="color:'+INC_ATTESA_COL[a.livello]+';font-weight:'+(a.livello==='ok'?'400':'700')+'" data-aiuto="Giorni passati da quando l\'incarico è stato dato al tecnico ('+a.dal+'). Arancione da 15 giorni, rosso oltre 30.">'+testo+'</span>'
+}
+/* Chi è l'impresa dell'incarico (07/10/2026). Su una segnalazione l'impresa spesso si scopre solo in cantiere: non si
+   mostra «0» o «—» come se fosse un nome, si dice che è da individuare. */
+const _incVuoto=v=>!v||/^[\s0.\-–—_]*$/.test(String(v))
+function incImpresaTesto(r){
+  r=r||{}
+  if(!_incVuoto(r.impresa)) return String(r.impresa)
+  if(!_incVuoto(r.richiedente)&&!/segnalazion/i.test(String(r.tipo_richiesta||'')+' '+String(r.tipologia_richiesta||''))) return String(r.richiedente)
+  return incTipoAccesso(r)!=null||/sopralluogo|cantiere/i.test(String(r.tipo_richiesta||''))?'':null
+}
+window.incAttesa=incAttesa; window.incAttesaHtml=incAttesaHtml; window.incImpresaTesto=incImpresaTesto
+const INC_IMPRESA_DA_TROVARE='<i style="color:#888;font-weight:400">impresa da individuare in cantiere</i>'
+window.INC_IMPRESA_DA_TROVARE=INC_IMPRESA_DA_TROVARE
 
 /* L'incarico entra nella visita: numero della richiesta, impresa principale e
    cantiere. E' la strada unica di «Nuova visita» / «Fai la visita» (pagina
@@ -15820,7 +15859,7 @@ document.addEventListener('input',function(ev){
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=9"></script>
 <script src="rientri-giorni.js?v=6"></script>
-<script src="veste-v2.js?v=35"></script>
+<script src="veste-v2.js?v=36"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
