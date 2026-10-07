@@ -6371,6 +6371,24 @@ async function loadFotoExisting(vid){
   }
 }
 
+/* (07/10/2026, deciso dall'utente) Sul verbale il numero di accesso è quello del singolo lotto; nel riepilogo, se il
+   cantiere è un lotto di un complesso, accanto compare anche il conto generale del complesso (visite di tutti i
+   lotti fino alla data di questa, esclusa questa). I numeri arrivano da lotti_acc_complesso, che li conta anche
+   sulle visite che il tecnico non vede. */
+async function rpAccessoComplesso(accCant){
+  const cid=S.fd&&S.fd.cantiere_id;if(!cid)return
+  const it=[...document.querySelectorAll('#rp-dati .rp-item')].find(x=>/^Accesso n°/.test(x.querySelector('.rp-k')?.textContent||''))
+  if(!it)return
+  const{data:lotti,error}=await sb.rpc('lotti_del_cantiere',{p_cantiere_id:cid})
+  if(error||!lotti||lotti.length<2)return
+  const io=lotti.find(l=>l.cantiere_id===cid)
+  const{data:acc,error:e2}=await sb.rpc('lotti_acc_complesso',{p_cantiere_id:cid})
+  const v=it.querySelector('.rp-v')
+  if(e2){v.innerHTML+=' <span style="color:#c0392b;font-size:12px">· complesso: non sono riuscito a contare ('+esc(e2.message)+')</span>';return}
+  const curId=S.savedId||S.fd.visita_id||null,dataV=vGet('f-data')
+  const n=(acc||[]).filter(a=>a.visita_id!==curId&&(!dataV||!a.data_visita||a.data_visita<=dataV)).length+1
+  v.innerHTML=esc(accCant)+'ª visita su questo lotto'+(io&&io.lotto?' ('+esc(io.lotto)+')':'')+' <span style="color:#888">· '+n+'ª sul complesso, '+lotti.length+' lotti</span>'
+}
 // ── RIEPILOGO ──
 function buildRiepilogo(){
   const{ipc,np,nm,os}=calcIPC(S.checklist)
@@ -6401,11 +6419,12 @@ function buildRiepilogo(){
     ['Cantiere',vGet('f-cant-search')||'-'],
     ['Impresa principale',S.imprese[0]?.impresa_nome||'-'],
     ['Tecnico',vGet('f-tec-display')],
-    ['Accesso n° (calcolato)',accCant+(accCant==='1'?' – prima visita su questo cantiere':'ª visita su questo cantiere')],   // 06/10/2026: non è più nella maschera
+    ['Accesso n° (calcolato)',accCant+(accCant==='1'?' – prima visita su questo cantiere':'ª visita su questo cantiere')],   // 06/10/2026: non è più nella maschera; 07/10: il complesso si aggiunge sotto (rpAccessoComplesso)
     ['N° imprese',String(computeImpTotals().nr_imp)],
     ['N° lavoratori',String(computeImpTotals().nr_lavoratori)],
   ].map(([k,v])=>`<div class="rp-item"><div class="rp-k">${k}</div><div class="rp-v">${esc(v||'-')}</div></div>`).join('')
     +`<div class="rp-item"><div class="rp-k">Visita di ritorno</div><div class="rp-v">${ritornoTxt}</div></div>`
+  rpAccessoComplesso(accCant).catch(e=>console.warn('accesso sul complesso:',e))
 
   let zoneHtml=''
   for(let z=1;z<=10;z++){
@@ -7541,7 +7560,7 @@ let _clZona=null, _clZonaLetta=false
 const _clInZona=d=>!!_clZona&&_clZona.has(String(d.zona_key||d.comune_nome||'').trim().toLowerCase())
 async function loadCantieri(q=''){
   const qStr=q||vGet('q-cant')?.trim()||''
-  const _selC='cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,elimina,lat,lng,geocode_status,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_descrizione,cantiere_importo,data_ult,cantiere_committente_id,cantiere_chiuso,cantiere_cap,cantiere_comune_cod'
+  const _selC='cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,elimina,lat,lng,geocode_status,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_descrizione,cantiere_importo,data_ult,cantiere_committente_id,cantiere_chiuso,cantiere_cap,cantiere_comune_cod,lotto,lotto_di'
   const _chkC=$('chk-cant-chiusi');if(_chkC&&!_chkC.dataset.b){_chkC.dataset.b='1';_chkC.onchange=()=>{window._cantShowAll=false;loadCantieri()}}
   const _incChiusi=!!_chkC?.checked
   // Carica TUTTI i cantieri non eliminati (paginazione): i filtri lato client (comune, ecc.)
@@ -7748,7 +7767,36 @@ function _clRender(){
   _clNascosti(all)
   if(!all.length){tbody.innerHTML='';empty.classList.remove('hidden');return}
   empty.classList.add('hidden')
-  tbody.innerHTML=all.slice(0,_shown).map(c=>{
+  /* (07/10/2026, deciso dall'utente: «apro il CNCE principale e vedo tutti i cantieri suddivisi per lotto»)
+     I lotti dello stesso complesso stanno sotto UNA riga del complesso, che si apre con la freccina: stessa
+     radice (lotto_di), oppure stesso CNCE con il lotto compilato. Il «+ Visita» sta sui lotti, non sul
+     complesso: la visita si fa in un lotto. Con una ricerca attiva i complessi sono già aperti. */
+  const _lb=window.LottiCantiere&&LottiCantiere.base?LottiCantiere.base:(s=>String(s||''))
+  const _chiave=c=>c._segn?null:((String(c.lotto||'').trim()&&/^cnce/i.test(c.cantiere_cnce||''))?'cnce:'+String(c.cantiere_cnce).replace(/\s+/g,'').toUpperCase():(c.lotto_di||c.cantiere_id))
+  const _grp=new Map(),_unita=[]
+  all.forEach(c=>{const k=_chiave(c);if(!k){_unita.push({righe:[c]});return}
+    if(_grp.has(k))_grp.get(k).righe.push(c);else{const u={k,righe:[c]};_grp.set(k,u);_unita.push(u)}})
+  window._clAperti=window._clAperti||new Set()
+  const _apertiTutti=!!window._cantRicerca
+  const _ordLotto=l=>{const s=String(l||'').trim();return /^\d+$/.test(s)?s.padStart(6,'0'):s.toLowerCase()}
+  const _pill=c=>String(c.lotto||'').trim()?` <span style="display:inline-block;font-size:10px;font-weight:700;color:var(--orange);border:1px solid var(--orange);padding:0 5px;border-radius:3px;vertical-align:middle;white-space:nowrap">🧩 lotto ${esc(c.lotto)}</span>`:''
+  const _rigaComplesso=(u,aperto)=>{
+    const righe=u.righe.slice().sort((a,b)=>_ordLotto(a.lotto).localeCompare(_ordLotto(b.lotto)))
+    const c0=righe[0],tot=righe.reduce((s,c)=>s+(c.n_visite||0),0)
+    const nome=_lb(c0.cantiere_etichetta)||`${c0.cantiere_indirizzo||''} ${c0.cantiere_civico||''}`.trim()||'(senza indirizzo)'
+    const cnce=righe.map(c=>c.cantiere_cnce).find(x=>/^cnce/i.test(x||''))||'–'
+    const comm=righe.map(c=>c.committente_nome).find(Boolean)||''
+    return`<tr class="row-detail-hover cl-complesso" data-cl-grp="${esc(u.k)}" style="cursor:pointer;background:#fbfbfb" title="${aperto?'Chiudi':'Apri'} i lotti del complesso">
+      <td onclick="event.stopPropagation()"></td>
+      <td><span class="cl-chev" style="display:inline-block;width:14px;color:#888;font-size:12px">${aperto?'▾':'▸'}</span><strong>${esc(nome)}</strong> <span style="font-size:11px;color:#888;white-space:nowrap">· complesso, ${righe.length} lotti</span>${quartiereBadge(c0.cantiere_indirizzo||'',c0.comune_nome||'')}</td>
+      <td>${esc(c0.comune_nome||'–')}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${esc(comm)}">${comm?esc(comm):'–'}</td>
+      <td>–</td>
+      <td>${esc(cnce)}</td>
+      <td><span class="badge badge-bozza" title="Visite su tutti i lotti">${tot}</span></td>
+      <td><div class="tbl-actions"><button class="btn-outline btn-sm" data-act="detail-cantiere" data-id="${esc(c0.cantiere_id)}" title="Scheda del complesso, coi suoi lotti">👁</button><span style="font-size:11px;color:#888;white-space:nowrap;align-self:center">visita su un lotto ↓</span></div></td>
+    </tr>`}
+  const _rigaCant=(c,inLotto)=>{
     if(c._segn){
       const _dt=c.seg_data?new Date(c.seg_data).toLocaleDateString('it-IT'):''
       const _nav='https://www.google.com/maps/dir/?api=1&destination='+c.lat+','+c.lng+'&travelmode=driving'
@@ -7765,9 +7813,9 @@ function _clRender(){
     }
     const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
     const nVisite=c.n_visite||0
-    return`<tr class="row-detail-hover" data-act="detail-cantiere" data-id="${c.cantiere_id}">
+    return`<tr class="row-detail-hover${inLotto?' cl-lotto':''}" data-act="detail-cantiere" data-id="${c.cantiere_id}"${inLotto?` data-cl-of="${esc(inLotto.k)}" style="background:#fafafa${inLotto.aperto?'':';display:none'}"`:''}>
       <td onclick="event.stopPropagation()" ondblclick="event.stopPropagation()"><input type="checkbox" class="giro-chk" data-id="${c.cantiere_id}" data-lat="${c.lat??''}" data-lng="${c.lng??''}" data-addr="${esc(((c.cantiere_indirizzo||'')+' '+(c.cantiere_civico||'')).trim()+(c.comune_nome?', '+c.comune_nome:''))}" data-label="${esc(label)}" ${_giroSel.has(c.cantiere_id)?'checked':''} onchange="_giroToggle(this)" style="width:17px;height:17px;cursor:pointer"></td>
-      <td><strong>${label}</strong>${c.cantiere_chiuso?' <span title="Cantiere chiuso">\uD83D\uDD12</span>':''}${quartiereBadge(c.cantiere_indirizzo||'',c.comune_nome||'')}</td>
+      <td${inLotto?' style="padding-left:28px"':''}>${inLotto?_pill(c)+' ':''}<strong>${label}</strong>${inLotto?'':_pill(c)}${c.cantiere_chiuso?' <span title="Cantiere chiuso">\uD83D\uDD12</span>':''}${quartiereBadge(c.cantiere_indirizzo||'',c.comune_nome||'')}</td>
       <td>${c.comune_nome||'–'}</td>
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${esc(c.committente_nome||'')}">${c.committente_nome?esc(c.committente_nome):'–'}</td>
       <td>${c.nodo_id||'–'}</td>
@@ -7779,7 +7827,26 @@ function _clRender(){
         ${window.propChius?window.propChius.cellaRiga(c):''}
       </div></td>
     </tr>`
+  }
+  let _resi=0
+  tbody.innerHTML=_unita.map(u=>{
+    if(_resi>=_shown)return ''
+    if(u.righe.length<2){_resi+=1;return _rigaCant(u.righe[0],null)}
+    _resi+=u.righe.length
+    const aperto=_apertiTutti||window._clAperti.has(u.k)
+    const righe=u.righe.slice().sort((a,b)=>_ordLotto(a.lotto).localeCompare(_ordLotto(b.lotto)))
+    return _rigaComplesso(u,aperto)+righe.map(c=>_rigaCant(c,{k:u.k,aperto})).join('')
   }).join('')+(all.length>_shown?`<tr><td colspan="8" style="text-align:center;padding:12px"><button class="btn-outline btn-sm" id="btn-cant-more" type="button">Mostra tutti i ${all.length} cantieri (altri ${all.length-_shown})</button></td></tr>`:'')
+  // la riga del complesso apre e chiude i suoi lotti (il 👁 dentro la riga no)
+  tbody.querySelectorAll('tr.cl-complesso').forEach(tr=>{
+    tr.onclick=e=>{
+      if(e.target.closest('button'))return
+      const k=tr.dataset.clGrp,aperto=!(window._clAperti.has(k)||(_apertiTutti&&!tr.dataset.clChiuso))
+      if(aperto){window._clAperti.add(k);delete tr.dataset.clChiuso}else{window._clAperti.delete(k);tr.dataset.clChiuso='1'}
+      tr.querySelector('.cl-chev').textContent=aperto?'▾':'▸'
+      tbody.querySelectorAll(`tr.cl-lotto[data-cl-of="${CSS.escape(k)}"]`).forEach(r=>{r.style.display=aperto?'':'none'})
+    }
+  })
   const _bm=$('btn-cant-more')
   if(_bm)_bm.onclick=()=>{window._cantShowAll=true;_clRender()}
   // Click "+ Visita": apre nuova visita precompilando il cantiere
@@ -7856,15 +7923,13 @@ window.fondiSelezionati=async function(){
   if(!window.__isSegreteria){toast('Funzione riservata alla segreteria','err');return}
   const ids=[..._giroSel.keys()]
   if(ids.length<2){toast('Seleziona almeno 2 cantieri da unire','warn');return}
-  const{data:cs,error}=await sb.from('cantieri').select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,lotto,created_at').in('cantiere_id',ids)
+  const{data:cs,error}=await sb.from('cantieri').select('cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,lotto,lotto_di,created_at').in('cantiere_id',ids)
   if(error){toast('Errore: '+error.message,'err');return}
   // Lotti diversi dello stesso complesso NON sono doppioni (regola dell'08/09/2026): ognuno ha i suoi
-  // rientri. Il «Controllo duplicati CNCE» lo sapeva gia', questa unione no.
-  const _lotti=[...new Set((cs||[]).map(c=>String(c.lotto||'').trim().toLowerCase()).filter(Boolean))]
-  if(_lotti.length>1){
-    alert('Questi cantieri sono LOTTI DIVERSI ('+(cs||[]).filter(c=>String(c.lotto||'').trim()).map(c=>'lotto '+c.lotto).join(', ')+'): non sono doppioni e non si uniscono.\n\nOgni lotto ha le sue visite di ritorno. Se uno dei lotti e\u2019 scritto male, correggilo prima da Modifica cantiere.')
-    return
-  }
+  // rientri. Dal 07/10/2026 la finestra lo gestisce da sola: le schede che hanno già un lotto restano
+  // com'erano, e per le altre si sceglie riga per riga se unirle o riconoscerle come lotto a sé
+  // («Unisci come lotti», deciso dall'utente: i cantieri importati hanno il lotto scritto nell'indirizzo).
+  const _rileva=window.LottiCantiere&&LottiCantiere.rilevaLotto?LottiCantiere.rilevaLotto:(()=>null)
   /* il conteggio decide quale cantiere proporre da mantenere: se non si legge,
      l'unione non parte (con «0 visite» ovunque si terrebbe il cantiere sbagliato) */
   let vs
@@ -7875,34 +7940,86 @@ window.fondiSelezionati=async function(){
   const ov=document.createElement('div');ov.className='modal-overlay'
   ov.innerHTML='<div class="card" style="max-width:560px;width:100%;max-height:85vh;overflow:auto">'
     +'<h3 style="color:#e7500f;margin-bottom:6px">🔗 Unisci '+rows.length+' cantieri</h3>'
-    +'<p style="font-size:12px;color:#888;margin-bottom:10px">Scegli il cantiere da <b>mantenere</b>: visite e segnalazioni degli altri verranno spostate su di esso, i dati mancanti completati dove possibile e i cantieri uniti archiviati. Da usare solo per doppioni dello stesso cantiere reale.</p>'
-    +rows.map((c,i)=>'<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:5px 0;cursor:pointer;border-bottom:1px solid #f0f0f0">'
-      +'<input type="radio" name="fsel-keep" value="'+esc(c.cantiere_id)+'"'+(i===0?' checked':'')+' style="width:auto;margin-top:3px">'
-      +'<span><b>'+esc(c.cantiere_etichetta||((c.cantiere_indirizzo||'')+' '+(c.cantiere_civico||'')).trim()||'(senza indirizzo)')+'</b> · '+esc(c.comune_nome||'–')
-      +'<br><span style="font-size:11px;color:#888">CNCE: '+esc(c.cantiere_cnce||'–')+(String(c.lotto||'').trim()?' · lotto: '+esc(c.lotto):'')+' · visite: '+(nv[c.cantiere_id]||0)+'</span></span></label>').join('')
+    +'<p style="font-size:12px;color:#888;margin-bottom:10px">Scegli il cantiere da <b>mantenere</b>: visite e segnalazioni degli altri verranno spostate su di esso, i dati mancanti completati dove possibile e i cantieri uniti archiviati. Da usare solo per doppioni dello stesso cantiere reale. <b>Se una scheda è un lotto a sé</b> dello stesso complesso (il lotto è spesso scritto nell\'indirizzo: è già proposto in arancione), scegli «è il lotto…»: non si fonde, prende il CNCE del principale e il lotto esce dall\'indirizzo.</p>'
+    +rows.map((c,i)=>{
+      const _ha=String(c.lotto||'').trim(),_prop=_ha?'':_rileva((c.cantiere_indirizzo||'')+' '+(c.cantiere_etichetta||''))
+      return '<div style="display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:6px 0;border-bottom:1px solid #f0f0f0">'
+      +'<input type="radio" name="fsel-keep" value="'+esc(c.cantiere_id)+'"'+(i===0?' checked':'')+' style="width:auto;margin-top:3px;flex:0 0 auto" title="Cantiere da mantenere">'
+      +'<span style="flex:1;min-width:0"><b>'+esc(c.cantiere_etichetta||((c.cantiere_indirizzo||'')+' '+(c.cantiere_civico||'')).trim()||'(senza indirizzo)')+'</b> · '+esc(c.comune_nome||'–')
+      +'<br><span style="font-size:11px;color:#888">CNCE: '+esc(c.cantiere_cnce||'–')+(_ha?' · lotto: '+esc(c.lotto):'')+' · visite: '+(nv[c.cantiere_id]||0)+(_prop?' · <span style="color:var(--orange)">nell\'indirizzo c\'è scritto «lotto '+esc(_prop)+'»</span>':'')+'</span></span>'
+      +'<span style="flex:0 0 auto;display:flex;flex-direction:column;gap:3px;align-items:flex-end">'
+      +(_ha?'<span style="font-size:11px;color:#888;white-space:nowrap">già lotto '+esc(c.lotto)+': resta com\'è</span>'
+        :'<select data-fsel-lotto="'+esc(c.cantiere_id)+'" style="width:auto;padding:3px 6px;font-size:12px"><option value="">unisci: stesso cantiere</option><option value="__lotto"'+(_prop?' selected':'')+'>è il lotto…</option></select>'
+         +'<input type="text" data-fsel-nome="'+esc(c.cantiere_id)+'" value="'+esc(_prop||'')+'" maxlength="30" placeholder="nome del lotto" style="width:130px;padding:3px 6px;font-size:12px;'+(_prop?'':'display:none')+'">')
+      +'</span></div>'}).join('')
+    +'<div id="fsel-master-lotto" style="display:none;margin-top:10px;font-size:12px;color:#444">Il cantiere mantenuto diventa il lotto <input type="text" id="fsel-master-nome" value="1" maxlength="30" style="width:70px;padding:3px 6px;font-size:12px;display:inline-block"> del complesso (se non ha già un lotto).</div>'
     +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">'
     +'<button class="btn-outline btn-sm" onclick="this.closest(\'.modal-overlay\').remove()">Annulla</button>'
     +'<button class="btn-warn btn-sm" id="fsel-go">🔗 Unisci sul selezionato</button></div></div>'
   document.body.appendChild(ov)
+  const _aggiorna=()=>{
+    let qualcheLotto=false
+    ov.querySelectorAll('[data-fsel-lotto]').forEach(sel=>{
+      const inp=ov.querySelector('[data-fsel-nome="'+CSS.escape(sel.dataset.fselLotto)+'"]')
+      const keeper=ov.querySelector('input[name="fsel-keep"]:checked')?.value
+      const isKeeper=sel.dataset.fselLotto===keeper
+      sel.disabled=isKeeper;if(isKeeper)sel.value=''
+      const on=sel.value==='__lotto'&&!isKeeper
+      if(inp)inp.style.display=on?'':'none'
+      if(on)qualcheLotto=true
+    })
+    const _kr=rows.find(c=>c.cantiere_id===(ov.querySelector('input[name="fsel-keep"]:checked')?.value))
+    const box=ov.querySelector('#fsel-master-lotto');if(box)box.style.display=(qualcheLotto&&_kr&&!String(_kr.lotto||'').trim())?'':'none'
+    const go=ov.querySelector('#fsel-go');if(go)go.textContent=qualcheLotto?'🔗 Unisci e riconosci i lotti':'🔗 Unisci sul selezionato'
+  }
+  ov.querySelectorAll('[data-fsel-lotto],input[name="fsel-keep"]').forEach(el=>el.onchange=_aggiorna)
+  _aggiorna()
   ov.querySelector('#fsel-go').onclick=async()=>{
     const keeper=ov.querySelector('input[name="fsel-keep"]:checked')?.value
     if(!keeper)return
-    const losers=ids.filter(id=>id!==keeper)
-    // Se il cantiere mantenuto non ha CNCE ma uno dei doppioni si, il codice viene ereditato: lo dico prima.
     const _kr=rows.find(c=>c.cantiere_id===keeper)
-    const _cnceEred=(_kr&&!String(_kr.cantiere_cnce||'').trim())?(rows.find(c=>c.cantiere_id!==keeper&&String(c.cantiere_cnce||'').trim())||{}).cantiere_cnce||'':''
-    if(!confirm('Unire '+losers.length+' cantiere/i su quello selezionato?\nVisite, segnalazioni, incarichi e cantieri critici verranno spostati, gli altri cantieri archiviati.'+(_cnceEred?'\n\nIl cantiere mantenuto non ha codice CNCE: eredita il codice '+_cnceEred+' dal doppione.':'')+'\n\nOperazione non reversibile dalla lista.'))return
+    // le schede che hanno già un lotto restano com'erano; le altre: lotto a sé, oppure da unire
+    const lottiDaRiconoscere=[],losers=[]
+    for(const id of ids.filter(x=>x!==keeper)){
+      const c=rows.find(x=>x.cantiere_id===id)
+      if(String(c?.lotto||'').trim()&&String(c.lotto).trim().toLowerCase()!==String(_kr?.lotto||'').trim().toLowerCase())continue
+      const sel=ov.querySelector('[data-fsel-lotto="'+CSS.escape(id)+'"]')
+      if(sel&&sel.value==='__lotto'){
+        const nome=(ov.querySelector('[data-fsel-nome="'+CSS.escape(id)+'"]')?.value||'').trim()
+        if(!nome){toast('Scrivi il nome del lotto per «'+(c.cantiere_etichetta||c.cantiere_indirizzo||id)+'», o scegli «unisci»','warn');return}
+        lottiDaRiconoscere.push({id,nome})
+      }else losers.push(id)
+    }
+    const nomi=lottiDaRiconoscere.map(l=>l.nome.toLowerCase())
+    if(new Set(nomi).size!==nomi.length){toast('Due schede hanno lo stesso nome di lotto: dagli nomi diversi','warn');return}
+    const masterNome=(ov.querySelector('#fsel-master-nome')?.value||'1').trim()||'1'
+    if(!losers.length&&!lottiDaRiconoscere.length){toast('Niente da fare: tutte le schede hanno già il loro lotto','warn');return}
+    // Se il cantiere mantenuto non ha CNCE ma uno dei doppioni si, il codice viene ereditato: lo dico prima.
+    const _cnceEred=(_kr&&!String(_kr.cantiere_cnce||'').trim())?(rows.find(c=>losers.includes(c.cantiere_id)&&String(c.cantiere_cnce||'').trim())||{}).cantiere_cnce||'':''
+    if(!confirm((losers.length?'Unire '+losers.length+' cantiere/i su quello selezionato?\nVisite, segnalazioni, incarichi e cantieri critici verranno spostati, gli altri cantieri archiviati.':'Nessuna scheda da fondere.')
+      +(lottiDaRiconoscere.length?'\n\n'+lottiDaRiconoscere.length+' scheda/e diventano lotti a sé del complesso ('+lottiDaRiconoscere.map(l=>'lotto '+l.nome).join(', ')+'): non si fondono, prendono il CNCE del principale'+(_kr&&!String(_kr.lotto||'').trim()?', e il principale diventa il lotto '+masterNome:'')+'.':'')
+      +(_cnceEred?'\n\nIl cantiere mantenuto non ha codice CNCE: eredita il codice '+_cnceEred+' dal doppione.':'')+'\n\nOperazione non reversibile dalla lista.'))return
     const go=ov.querySelector('#fsel-go');go.disabled=true;go.textContent='Fusione…'
     try{
-      // tutto sul database, in un colpo solo: visite, segnalazioni, incarichi, cantieri critici, notifiche…
-      const{data:_ru,error:_eu}=await sb.rpc('fondi_cantieri',{p_master_id:keeper,p_dupe_ids:losers,p_origine:'unione'})
-      if(_eu)throw _eu
-      console.info('fondi_cantieri:',_ru)
+      // prima i lotti riconosciuti (adotta_lotto_cantiere, uno per scheda), poi la fusione dei doppioni veri
+      const riconosciuti=[]
+      for(const l of lottiDaRiconoscere){
+        const{data:_ra,error:_ea}=await sb.rpc('adotta_lotto_cantiere',{p_master_id:keeper,p_cantiere_id:l.id,p_lotto:l.nome,p_lotto_master:masterNome})
+        if(_ea)throw new Error('lotto '+l.nome+': '+_ea.message)
+        riconosciuti.push(_ra)
+      }
+      let _ru=null
+      if(losers.length){
+        // tutto sul database, in un colpo solo: visite, segnalazioni, incarichi, cantieri critici, notifiche…
+        const{data,error:_eu}=await sb.rpc('fondi_cantieri',{p_master_id:keeper,p_dupe_ids:losers,p_origine:'unione'})
+        if(_eu)throw _eu
+        _ru=data;console.info('fondi_cantieri:',_ru)
+      }
       ov.remove()
-      toast('Fusione completata: '+losers.length+' cantiere/i uniti e archiviati ('+_riepUnione(_ru)+')','ok')
+      toast((losers.length?'Fusione completata: '+losers.length+' cantiere/i uniti e archiviati ('+_riepUnione(_ru)+')':'Nessuna fusione')+(riconosciuti.length?' · '+riconosciuti.length+' lott'+(riconosciuti.length===1?'o riconosciuto':'i riconosciuti')+' nel complesso ('+riconosciuti.map(r=>'lotto '+r.lotto).join(', ')+')':''),'ok',8000)
       _giroClear()
       if(typeof loadCantieri==='function')loadCantieri()
-    }catch(e){console.error('fondiSelezionati:',e);go.disabled=false;go.textContent='🔗 Unisci sul selezionato';toast('Errore fusione: '+(e.message||e),'err')}
+    }catch(e){console.error('fondiSelezionati:',e);go.disabled=false;go.textContent='🔗 Unisci sul selezionato';toast('Errore: '+(e.message||e)+(e.message&&/lotto /.test(e.message)?' — i lotti già riconosciuti restano, la fusione non è partita':''),'err',9000)}
   }
 }
 function _gHav(a,b){const R=6371,r=Math.PI/180,dLa=(b.lat-a.lat)*r,dLo=(b.lng-a.lng)*r
@@ -10381,10 +10498,12 @@ async function sgrCercaDupCnce(){
     window.__dupCnceGroups[gi]=rows.map(c=>c.cantiere_id)
     return '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px;margin-bottom:10px">'
       +'<div style="font-size:12px;font-weight:700;color:#e7500f;margin-bottom:6px">'+esc(k)+' — '+rows.length+' cantieri</div>'
-      +rows.map((c,i)=>'<label style="display:flex;gap:8px;align-items:center;font-size:12px;color:#fff;padding:3px 0;cursor:pointer">'
+      +rows.map((c,i)=>{const _pl=(window.LottiCantiere&&LottiCantiere.rilevaLotto)?LottiCantiere.rilevaLotto((c.cantiere_indirizzo||'')+' '+(c.cantiere_etichetta||'')):null
+        return '<label style="display:flex;gap:8px;align-items:center;font-size:12px;color:#fff;padding:3px 0;cursor:pointer">'
         +'<input type="radio" name="dupk'+gi+'" value="'+esc(c.cantiere_id)+'"'+(i===0?' checked':'')+'>'
         +'<span>'+esc(c.cantiere_etichetta||((c.cantiere_indirizzo||'')+' '+(c.cantiere_civico||'')).trim()||'(senza indirizzo)')+' · '+esc(c.comune_nome||'–')
-        +' · visite: '+(nv[c.cantiere_id]||0)+' · id '+esc(c.cantiere_id)+'</span></label>').join('')
+        +' · visite: '+(nv[c.cantiere_id]||0)+' · id '+esc(c.cantiere_id)
+        +(_pl?' · <span style="color:#ffb380">⚠ nell\'indirizzo c\'è scritto «lotto '+esc(_pl)+'»: forse è un lotto a sé, non un doppione — spuntali nell\'elenco cantieri e usa «Unisci» da lì per riconoscerlo come lotto</span>':'')+'</span></label>'}).join('')
       +'<button class="btn-primary btn-sm" style="margin-top:6px;background:#95C22F;border-color:#7aa527" onclick="sgrFondiDupCnce('+gi+',\''+esc(k)+'\')">🔗 Fondi sul selezionato</button>'
       +'<span id="dupst'+gi+'" style="font-size:11px;color:rgba(255,255,255,.6);margin-left:8px"></span>'
       +'</div>'
@@ -13626,21 +13745,46 @@ async function showCantiereDetail(cantId){
     const{data:c,error}=await sb.from('cantieri').select(
       'cantiere_id,cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,'+
       'cantiere_cnce,nodo_id,prot_int,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,'+
-      'cantiere_importo,cantiere_durata,data_ult,cantiere_comune_cod,cantiere_chiuso,data_chiusura,chiuso_da,motivo_chiusura,note_chiusura,cantiere_descrizione,cantiere_committente_id,lat,lng,geocode_status'
+      'cantiere_importo,cantiere_durata,data_ult,cantiere_comune_cod,cantiere_chiuso,data_chiusura,chiuso_da,motivo_chiusura,note_chiusura,cantiere_descrizione,cantiere_committente_id,lat,lng,geocode_status,lotto,lotto_di'
     ).eq('cantiere_id',cantId).single()
     if(error||!c){toast('Cantiere non trovato'+(error?' – '+error.message:''),'err');hide('modal-qd');return}
     const label=c.cantiere_etichetta||`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()
     $('qd-title').textContent=`🏗️ ${label}`
     $('qd-badges').innerHTML=quartiereBadge(c.cantiere_indirizzo||'',c.comune_nome||'')
     const{data:visite}=await sb.from('visite')
-      .select('visita_id,nr_verbale,data_visita,ipc,stato,tecnici!visite_tecnico_id_fkey(tecnico_cognome)')
+      .select('visita_id,nr_verbale,data_visita,ipc,stato,acc_cant,tecnici!visite_tecnico_id_fkey(tecnico_cognome)')
       .eq('cantiere_id',cantId).eq('elimina',0)
       .order('data_visita',{ascending:false}).limit(8)
+    /* (07/10/2026) i lotti del complesso: la stessa sezione da qualunque lotto la si apra; se la lettura fallisce lo dice */
+    let lotti=null,lottiErr=null
+    try{const r=await sb.rpc('lotti_del_cantiere',{p_cantiere_id:cantId});if(r.error)throw r.error;lotti=r.data||[]}catch(e){lottiErr=e}
+    const complesso=!!(lotti&&lotti.length>1)
     let html=qdSec('Ubicazione')
     html+=qdDl([
       ['Indirizzo',`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()],
       ['Comune',c.comune_nome],['CAP',c.cantiere_cap],['Etichetta',c.cantiere_etichetta],
+      ['Lotto',String(c.lotto||'').trim()?('🧩 lotto '+c.lotto):''],
     ])
+    if(lottiErr){
+      html+='<div style="font-size:12px;color:#c0392b;margin:4px 0">Non sono riuscito a leggere i lotti del complesso: '+esc(lottiErr.message||String(lottiErr))+'</div>'
+    }else if(complesso){
+      const _ordL=l=>{const s=String(l||'').trim();return /^\d+$/.test(s)?s.padStart(6,'0'):s.toLowerCase()}
+      const ls=lotti.slice().sort((a,b)=>_ordL(a.lotto).localeCompare(_ordL(b.lotto)))
+      const tot=ls.reduce((s,l)=>s+(+l.visite||0),0)
+      html+=qdSec('Lotti del complesso ('+ls.length+') · '+tot+' visite in tutto')
+      html+='<div style="font-size:12px;color:#888;margin:-2px 0 6px">Il numero di accesso sul verbale conta le visite del singolo lotto; il totale del complesso è qui sopra.</div>'
+      html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><tbody>'
+      ls.forEach(l=>{
+        const qui=l.cantiere_id===cantId
+        html+='<tr style="border-top:1px solid #f0f0f0'+(qui?';background:#fff8f4':'')+'">'
+          +'<td style="padding:5px 6px;white-space:nowrap"><span style="display:inline-block;font-size:10px;font-weight:700;color:var(--orange);border:1px solid var(--orange);padding:0 5px;border-radius:3px">🧩 '+(l.lotto?'lotto '+esc(l.lotto):'senza lotto')+'</span>'+(qui?' <span style="font-size:10px;color:var(--orange)">questa scheda</span>':'')+'</td>'
+          +'<td style="padding:5px 6px">'+esc(l.etichetta||[l.indirizzo,l.civico].filter(Boolean).join(' ')||'–')+'</td>'
+          +'<td style="padding:5px 6px;color:#888;white-space:nowrap">'+(+l.visite||0)+' visit'+((+l.visite)===1?'a':'e')+(l.ultima_visita?' · ultima '+fmtDate(l.ultima_visita):'')+(l.ultima_impresa?' · '+esc(l.ultima_impresa):'')+'</td>'
+          +'<td style="padding:5px 6px;text-align:right;white-space:nowrap">'+(qui?'':'<button type="button" class="btn-outline btn-sm" data-qd-lotto="'+esc(l.cantiere_id)+'" title="Apre la scheda di questo lotto">👁</button>')+'</td>'
+        +'</tr>'
+      })
+      html+='</tbody></table>'
+    }
     // ── Naviga fino al cantiere ──
     {
       const _prec=c.lat!=null&&c.lng!=null&&c.geocode_status!=='comune'
@@ -13729,20 +13873,50 @@ async function showCantiereDetail(cantId){
         html+=qdSec('Imprese')+'<div style="color:#aaa;font-size:13px;padding:6px 0">Nessuna impresa associata</div>'
       }
     }catch(_e){console.error('scheda imprese:',_e)}
-    if(visite&&visite.length){
-      html+=qdSec(`Ultime visite (${visite.length})`)
+    /* (07/10/2026) la segreteria può dividere le visite di questa scheda fra i lotti: serve sui cantieri importati
+       dalle visite vecchie, dove il lotto era scritto nell'indirizzo e l'unione le ha messe tutte insieme */
+    const _btnDividi=(window.__isSegreteria&&visite&&visite.length&&window.LottiCantiere&&LottiCantiere.dividi)
+      ?' <button type="button" class="btn-outline btn-sm" id="qd-dividi-lotti" style="margin-left:8px;font-weight:400;text-transform:none;letter-spacing:0" data-aiuto="Elenca le visite di questa scheda con l\'indirizzo com\'era scritto nel modulo originale e ti fa scegliere, per ognuna, su quale lotto va. I lotti nuovi nascono come copie di questa scheda. Solo segreteria.">🧩 Dividi le visite in lotti</button>':''
+    if(complesso){
+      /* le visite di tutto il complesso, raggruppate per lotto, con l'accesso sul lotto (quello del verbale) e sul complesso */
+      let vc=null,vcErr=null
+      try{const r=await sb.rpc('visite_complesso',{p_cantiere_id:cantId});if(r.error)throw r.error;vc=r.data||[]}catch(e){vcErr=e}
+      html+=qdSec('Visite per lotto'+(vc?' ('+vc.length+')':''))+(_btnDividi?'<div style="margin:-4px 0 6px">'+_btnDividi.replace('margin-left:8px;','')+'</div>':'')
+      if(vcErr){html+='<div style="font-size:12px;color:#c0392b">Non sono riuscito a leggere le visite del complesso: '+esc(vcErr.message||String(vcErr))+'</div>'}
+      else if(!vc.length){html+='<div style="color:#aaa;font-size:13px;padding:6px 0">Nessuna visita registrata</div>'}
+      else{
+        let ultimo=null
+        html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><tbody>'
+        vc.forEach(vv=>{
+          const lk=String(vv.lotto||'')
+          if(lk!==ultimo){ultimo=lk;const n=vc.filter(x=>String(x.lotto||'')===lk).length
+            html+='<tr><td colspan="5" style="padding:8px 6px 3px;font-weight:600;color:var(--grey);font-size:12px">🧩 '+(lk?'Lotto '+esc(lk):'Senza lotto')+' <span style="font-weight:400;color:#888">· '+n+' visit'+(n===1?'a':'e')+(vv.cantiere_id===cantId?' · questa scheda':'')+'</span></td></tr>'}
+          html+='<tr style="border-top:1px solid #f0f0f0">'
+            +'<td style="padding:5px 6px;white-space:nowrap">'+esc(vv.nr_verbale||'–')+(vv.stato==='definitivo'?'':' <span style="font-size:10px;color:#999">bozza</span>')+'</td>'
+            +'<td style="padding:5px 6px;white-space:nowrap">'+fmtDate(vv.data_visita)+'</td>'
+            +'<td style="padding:5px 6px">'+esc(vv.tecnico||'–')+'</td>'
+            +'<td style="padding:5px 6px">'+esc(vv.impresa||'–')+'</td>'
+            +'<td style="padding:5px 6px;color:#888;white-space:nowrap;text-align:right">'+(vv.acc_lotto?vv.acc_lotto+'° sul lotto':'')+(vv.acc_complesso?' · '+vv.acc_complesso+'° sul complesso':'')+(vv.acc_cant&&String(vv.acc_cant)!==String(vv.acc_lotto)?' <span title="Numero di accesso scritto sul verbale">(verbale: '+esc(vv.acc_cant)+')</span>':'')+'</td>'
+          +'</tr>'
+        })
+        html+='</tbody></table>'
+      }
+    }else if(visite&&visite.length){
+      html+=qdSec(`Ultime visite (${visite.length})`)+(_btnDividi?'<div style="margin:-4px 0 6px">'+_btnDividi.replace('margin-left:8px;','')+'</div>':'')
       html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr>'
       html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Verbale</th>'
       html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Data</th>'
       html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Tecnico</th>'
+      html+='<th style="padding:4px 6px;text-align:left;color:#888;font-weight:600;font-size:11px">Acc.</th>'
       html+='<th style="padding:4px 6px;color:#888;font-weight:600;font-size:11px">IPC</th>'
       html+='</tr></thead><tbody>'
       visite.forEach(vv=>{
         const ipc=vv.ipc||'NR'
         html+=`<tr style="border-top:1px solid #f0f0f0">
-          <td style="padding:5px 6px">${vv.nr_verbale||'–'}</td>
+          <td style="padding:5px 6px">${esc(vv.nr_verbale||'–')}</td>
           <td style="padding:5px 6px">${fmtDate(vv.data_visita)}</td>
-          <td style="padding:5px 6px">${vv.tecnici?.tecnico_cognome||'–'}</td>
+          <td style="padding:5px 6px">${esc(vv.tecnici?.tecnico_cognome||'–')}</td>
+          <td style="padding:5px 6px;color:#888">${esc(vv.acc_cant||'–')}</td>
           <td style="padding:5px 6px"><span class="badge ${ipcCls(ipc)}" style="font-size:10px">${ipcLbl(ipc)}</span></td>
         </tr>`
       })
@@ -13771,6 +13945,9 @@ async function showCantiereDetail(cantId){
       }
     }catch(_e){}
     $('qd-body').innerHTML=html
+    // (07/10/2026) i lotti del complesso: 👁 passa alla scheda del lotto; «Dividi» riapre la scheda quando ha finito
+    $('qd-body').querySelectorAll('[data-qd-lotto]').forEach(b=>{b.onclick=()=>showCantiereDetail(b.dataset.qdLotto)})
+    {const _bd=$('qd-dividi-lotti');if(_bd)_bd.onclick=()=>LottiCantiere.dividi(cantId,()=>{showCantiereDetail(cantId);if(typeof loadCantieri==='function'&&!$('view-cantieri')?.classList.contains('hidden'))loadCantieri()})}
     // Azione nuova visita
     const btnNuova=document.createElement('button')
     btnNuova.className='btn-primary btn-sm'
@@ -14412,7 +14589,7 @@ document.getElementById('btn-adm-excel-exp')?.addEventListener('click',admEsport
       const committente = v.comm_rag_soc || [v.comm_nome, v.comm_cog].filter(Boolean).join(' ') || '';
       const indirizzo = [c.cantiere_indirizzo, c.cantiere_civico].filter(Boolean).join(' ');
       return {
-        cnce: c.cantiere_cnce || '', data: v.data_visita || '', tecnico,
+        cnce: c.cantiere_cnce || '', lotto: String(c.lotto || '').trim(), data: v.data_visita || '', tecnico,
         acc: v.acc_cant || '', indirizzo, comune: c.comune_nome || '',
         nrImp: v.nr_imp == null ? 0 : v.nr_imp, nrInd: v.nr_ind == null ? 0 : v.nr_ind,
         lavTot, nDipImp, verbale: v.nr_verbale || '',
@@ -14425,16 +14602,21 @@ document.getElementById('btn-adm-excel-exp')?.addEventListener('click',admEsport
     '35', '36', '40', '54', '57',
     'IVA1', 'Lav1', 'Mail1', 'IVA2', 'Lav2', 'Mail2', 'IVA3', 'Lav3', 'Mail3', 'IVA4', 'Lav4', 'Mail4',
     'Ragione Sociale Impresa'];
+  /* (07/10/2026, chiesto dall'utente) per la Cassa tutte le visite stanno sotto il CNCE unico, ma distinte per
+     lotto: l'ordine è CNCE, lotto, data; il tracciato Excel resta quello concordato, il lotto va accanto
+     all'indirizzo («Via Roma 12 – lotto 2»); nel PDF ogni lotto ha la sua fascia dentro il cantiere. */
+  const _ordLotto = (l) => { const s = String(l || '').trim(); return /^\d+$/.test(s) ? s.padStart(6, '0') : s.toLowerCase(); };
+  const indirizzoConLotto = (r) => (r.indirizzo || '') + (r.lotto ? ' – lotto ' + r.lotto : '');
   function buildExcelAoa(data) {
     const sorted = data.slice().sort((a, b) =>
-      (a.cnce || '').localeCompare(b.cnce || '') || (b.data || '').localeCompare(a.data || ''));
+      (a.cnce || '').localeCompare(b.cnce || '') || _ordLotto(a.lotto).localeCompare(_ordLotto(b.lotto)) || (b.data || '').localeCompare(a.data || ''));
     const aoa = [Q_HEADER.slice()];
     sorted.forEach((r) => {
       const im = r.imprese || [];
       const p1 = im[0] || {}, s = im.slice(1);
       const sub = (i) => s[i] || {};
       aoa.push([
-        r.cnce, _fmtDate(r.data), r.tecnico, r.acc, r.indirizzo, r.comune,
+        r.cnce, _fmtDate(r.data), r.tecnico, r.acc, indirizzoConLotto(r), r.comune,
         r.nrImp, r.nrInd, r.lavTot,
         p1.nome || '', p1.piva || '', p1.nlav === undefined ? '' : p1.nlav, r.verbale, r.ipc,
         sub(0).piva || '', sub(0).nlav ?? '', sub(0).mail || '',
@@ -14456,7 +14638,7 @@ document.getElementById('btn-adm-excel-exp')?.addEventListener('click',admEsport
       const ca = (groups[a][0].comune || ''), cb = (groups[b][0].comune || '');
       return ca.localeCompare(cb) || a.localeCompare(b);
     });
-    keys.forEach((k) => groups[k].sort((a, b) => (b.data || '').localeCompare(a.data || '')));
+    keys.forEach((k) => groups[k].sort((a, b) => _ordLotto(a.lotto).localeCompare(_ordLotto(b.lotto)) || (b.data || '').localeCompare(a.data || '')));
     let page = 0;
     const header = () => {
       page++;
@@ -14489,13 +14671,26 @@ document.getElementById('btn-adm-excel-exp')?.addEventListener('click',admEsport
       doc.setFillColor(86, 92, 102); doc.rect(M, y, W, 8, 'F');
       doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
       doc.text('Cantiere CNCE  ' + k, M + 2.5, y + 5.4);
-      const nvis = rows.length + (rows.length === 1 ? ' visita' : ' visite');
+      const lottiQui = [...new Set(rows.map((r) => r.lotto).filter(Boolean))];
+      const nvis = rows.length + (rows.length === 1 ? ' visita' : ' visite') + (lottiQui.length ? ' in ' + lottiQui.length + (lottiQui.length === 1 ? ' lotto' : ' lotti') : '');
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
       const loc = [(r0.comune || '').toUpperCase(), r0.indirizzo || ''].filter(Boolean).join(' – ');
       doc.text((loc ? loc + '   ·   ' : '') + nvis, PW - M - 2.5, y + 5.4, { align: 'right', maxWidth: 105 });
       y += 11;
-      // ── schede visita ──
+      // ── schede visita, con la fascia del lotto quando il cantiere ne ha ──
+      let lottoCorrente = null;
       rows.forEach((r, ri) => {
+        if (lottiQui.length && r.lotto !== lottoCorrente) {
+          lottoCorrente = r.lotto;
+          if (y + 8 > BOT) newPage();
+          const nl = rows.filter((x) => x.lotto === r.lotto).length;
+          doc.setFillColor(253, 236, 226); doc.rect(M, y, W, 5.6, 'F');
+          doc.setTextColor(179, 58, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+          doc.text(r.lotto ? 'Lotto ' + r.lotto : 'Senza lotto', M + 2.5, y + 4);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+          doc.text(nl + (nl === 1 ? ' visita' : ' visite') + '  ·  accesso n° contato sul lotto', PW - M - 2.5, y + 4, { align: 'right' });
+          y += 7;
+        }
         const impresa = ((r.imprese[0] && r.imprese[0].nome) || '').toUpperCase();
         const committente = (r.committente || '–') + (r.commPiva ? '   ·   P.IVA/CF ' + r.commPiva : '');
         const numeri = 'Imprese ' + r.nrImp + '    ·    Ditte individuali ' + r.nrInd + '    ·    Lavoratori totali ' + r.lavTot + (r.nDipImp === '' ? '' : '    ·    Dipendenti impresa ' + r.nDipImp);
@@ -14560,7 +14755,7 @@ document.getElementById('btn-adm-excel-exp')?.addEventListener('click',admEsport
     return doc;
   }
 
-  const api = { normalizeRows, buildExcelAoa, drawPdf, Q_HEADER, Q_COLW, CEIV_IPC_LBL, _fmtDate };
+  const api = { normalizeRows, buildExcelAoa, drawPdf, Q_HEADER, Q_COLW, CEIV_IPC_LBL, _fmtDate, indirizzoConLotto };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.CEIVCORE = api;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -14579,7 +14774,7 @@ function _ceivPeriodo(){
 function _ceivPeriodoOk(p, stato){ if(!p.errore) return true; stato(p.errore, true); toast('Controlla le date','warn'); return false; }
 async function _ceivFetch(dal, al){
   const vis = await sbTutte((da,a)=>sb.from('visite')
-    .select('visita_id,nr_verbale,data_visita,ipc,acc_cant,nr_imp,nr_ind,nr_lavoratori,impresa_id,comm_rag_soc,comm_piva,comm_cf,comm_nome,comm_cog,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri!inner(cantiere_cnce,cantiere_indirizzo,cantiere_civico,comune_nome),imprese!visite_impresa_id_fkey(impresa_nome,piva,impresa_email_ref)')
+    .select('visita_id,nr_verbale,data_visita,ipc,acc_cant,nr_imp,nr_ind,nr_lavoratori,impresa_id,comm_rag_soc,comm_piva,comm_cf,comm_nome,comm_cog,tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),cantieri!inner(cantiere_cnce,cantiere_indirizzo,cantiere_civico,comune_nome,lotto),imprese!visite_impresa_id_fkey(impresa_nome,piva,impresa_email_ref)')
     .gte('data_visita', dal).lte('data_visita', al).eq('elimina', 0)
     .ilike('cantieri.cantiere_cnce', 'cnce%')
     .order('data_visita', { ascending:false }).order('visita_id').range(da,a));
@@ -15901,13 +16096,13 @@ document.addEventListener('input',function(ev){
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
-<script src="aiuto.js?v=22"></script>
+<script src="aiuto.js?v=23"></script>
 <script src="mail-respinte-tec.js?v=2"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
 <script src="codice-univoco.js?v=4"></script>
-<script src="lotti-cantiere.js?v=1"></script>
+<script src="lotti-cantiere.js?v=2"></script>
 <script src="esito-incarico.js?v=2"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
