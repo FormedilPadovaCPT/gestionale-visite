@@ -22,9 +22,9 @@
      · rilevaLotto(testo) legge il lotto scritto dentro un indirizzo
        importato («via De Gasperi - Lotto 14» → «14»): lo propone
        l'unione e la divisione delle visite, decide la segreteria;
-     · dividi(cid) — solo segreteria — assegna le visite di una
-       scheda ai lotti, con l'indirizzo com'era scritto nel modulo
-       originale accanto a ogni visita (sposta_visite_in_lotti).
+     · dividi(cid) — segreteria e coordinatore — assegna le visite
+       di una scheda ai lotti, con l'indirizzo com'era scritto nel
+       modulo originale accanto a ogni visita (sposta_visite_in_lotti).
 
    Script classico: usa window.sb, window.toast e
    window._verbaleUsaCantiere (index.html).
@@ -170,7 +170,9 @@
      sceglie il lotto (quelli del complesso, o uno nuovo). Proposta: il lotto letto nell'indirizzo originale. */
   async function dividi(cid, onDone) {
     if (!cid) { avviso('Scegli prima il cantiere.', 'warn'); return; }
-    if (!window.__isSegreteria) { avviso('Dividere le visite in lotti spetta alla segreteria', 'err'); return; }
+    /* (07/10/2026, chiesto dall'utente) anche il coordinatore divide: il flag lo mette la scheda del cantiere
+       chiedendo al database (is_coordinatore), la regola vera sta in sposta_visite_in_lotti */
+    if (!window.__isSegreteria && !window.__isCoordinatoreVero) { avviso('Dividere le visite in lotti spetta alla segreteria o al coordinatore', 'err'); return; }
     const [{ data: lotti, error: e1 }, { data: visite, error: e2 }] = await Promise.all([
       window.sb.rpc('lotti_del_cantiere', { p_cantiere_id: cid }),
       window.sb.rpc('visite_complesso', { p_cantiere_id: cid }),

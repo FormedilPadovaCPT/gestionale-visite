@@ -53,7 +53,15 @@ assert.ok(/lat,lng,geocode_status,lotto,lotto_di'\s*\)\.eq\('cantiere_id',cantId
 assert.ok(/sb\.rpc\('lotti_del_cantiere',\{p_cantiere_id:cantId\}\)/.test(html) && /Non sono riuscito a leggere i lotti del complesso/.test(html), 'legge i lotti e dice se non riesce');
 assert.ok(/qdSec\('Lotti del complesso \('\+ls\.length\+'\) · '\+tot\+' visite in tutto'\)/.test(html), 'sezione Lotti col totale del complesso');
 assert.ok(/sb\.rpc\('visite_complesso',\{p_cantiere_id:cantId\}\)/.test(html) && /° sul lotto'/.test(html) && /° sul complesso'/.test(html), 'visite per lotto con i due numeri');
-assert.ok(/id="qd-dividi-lotti"/.test(html) && /window\.__isSegreteria&&visite&&visite\.length/.test(html), 'Dividi solo per la segreteria e solo con visite');
+assert.ok(/id="qd-dividi-lotti"/.test(html) && /\(window\.__isSegreteria\|\|window\.__isCoordinatoreVero\)&&visite&&visite\.length/.test(html), 'Dividi per segreteria e coordinatore, solo con visite');
+assert.ok(/sb\.rpc\('is_coordinatore'\)/.test(html.slice(html.indexOf('async function showCantiereDetail'))) && /window\.__isCoordinatoreVero=!!r\.data/.test(html), 'il coordinatore lo dice il database, non la pagina');
+assert.ok(/if \(!window\.__isSegreteria && !window\.__isCoordinatoreVero\)/.test(js), 'dividi: segreteria o coordinatore');
+{
+  const sqlC = fs.readFileSync(path.join(dir, 'supabase', 'sql', '2026_10_07_lotti_coordinatore.sql'), 'utf8');
+  assert.ok(/if not \(public\.s_unioni_autorizzato\(\) or coalesce\(public\.is_coordinatore\(\), false\)\) then/.test(sqlC), 'sposta_visite_in_lotti: segreteria o coordinatore');
+  assert.ok(/create policy modulo_originale_segreteria_sel[\s\S]*?is_coordinatore/.test(sqlC) && /create policy modulo_fonti_segreteria_sel[\s\S]*?is_coordinatore/.test(sqlC), 'il modulo originale lo legge anche il coordinatore');
+  assert.ok(!/adotta_lotto_cantiere/.test(sqlC.replace(/^--.*$/gm, '')), 'l’unione resta della segreteria');
+}
 
 /* ── il riepilogo del verbale: lotto e complesso ── */
 assert.ok(/async function rpAccessoComplesso\(accCant\)/.test(html) && /sb\.rpc\('lotti_acc_complesso',\{p_cantiere_id:cid\}\)/.test(html), 'il complesso nel riepilogo');
@@ -117,6 +125,6 @@ assert.ok(/'visita spostata sul lotto ' \|\| a\.lotto \|\| ' dalla divisione in 
 
 /* ── aiuto e versioni ── */
 assert.ok(/'t:dividi le visite in lotti':/.test(aiuto) && /'t:unisci e riconosci i lotti':/.test(aiuto) && /'t:sposta le visite':/.test(aiuto), 'le nuvolette dei pulsanti nuovi');
-assert.ok(/<script src="lotti-cantiere\.js\?v=2"><\/script>/.test(html) && /<script src="aiuto\.js\?v=23"><\/script>/.test(html), 'versioni alzate');
+assert.ok(/<script src="lotti-cantiere\.js\?v=3"><\/script>/.test(html) && /<script src="aiuto\.js\?v=24"><\/script>/.test(html), 'versioni alzate');
 
 console.log('ok — il complesso a lotti: elenco, scheda, unione, divisione, CEIV');

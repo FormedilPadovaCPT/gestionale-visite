@@ -2441,7 +2441,7 @@ window.onunhandledrejection = function(e) {
 };
 </script>
 
-<script src="app-data.js?v=13"></script>
+<script src="app-data.js?v=14"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -13292,10 +13292,11 @@ async function admEditCantiere(cantId) {
       const opt = [...comSel.options].find(o => _normCom(o.value) === _normCom(_cn) || _normCom(o.textContent) === _normCom(_cn))
       if (opt) comSel.value = opt.value
       else {
-        // comune non in elenco (fuori provincia o grafia diversa): opzione temporanea
-        // cosi resta visibile e non viene azzerato al salvataggio
+        // comune non in elenco (fuori provincia, grafia diversa o soppresso per fusione): opzione temporanea
+        // cosi resta visibile e non viene azzerato al salvataggio (07/10/2026: i soppressi dicono dove sono confluiti)
         const o = document.createElement('option')
-        o.value = _cn; o.textContent = _cn + ' (fuori elenco)'; o.dataset.extra = '1'
+        const _conf = typeof comuneConfluito === 'function' ? comuneConfluito(_cn) : null
+        o.value = _cn; o.textContent = _cn + (_conf ? ' (com\'è scritto: dal ' + fmtDate(_conf.dal) + ' è ' + _conf.in + ')' : ' (fuori elenco)'); o.dataset.extra = '1'
         comSel.appendChild(o); comSel.value = _cn
       }
     }
@@ -13875,8 +13876,12 @@ async function showCantiereDetail(cantId){
     }catch(_e){console.error('scheda imprese:',_e)}
     /* (07/10/2026) la segreteria può dividere le visite di questa scheda fra i lotti: serve sui cantieri importati
        dalle visite vecchie, dove il lotto era scritto nell'indirizzo e l'unione le ha messe tutte insieme */
-    const _btnDividi=(window.__isSegreteria&&visite&&visite.length&&window.LottiCantiere&&LottiCantiere.dividi)
-      ?' <button type="button" class="btn-outline btn-sm" id="qd-dividi-lotti" style="margin-left:8px;font-weight:400;text-transform:none;letter-spacing:0" data-aiuto="Elenca le visite di questa scheda con l\'indirizzo com\'era scritto nel modulo originale e ti fa scegliere, per ognuna, su quale lotto va. I lotti nuovi nascono come copie di questa scheda. Solo segreteria.">🧩 Dividi le visite in lotti</button>':''
+    /* (07/10/2026, chiesto dall'utente) anche il coordinatore: lo si chiede al database una volta, non si deduce dalla pagina */
+    if(!window.__isSegreteria&&window.__isCoordinatoreVero==null&&visite&&visite.length){
+      try{const r=await sb.rpc('is_coordinatore');if(r.error)throw r.error;window.__isCoordinatoreVero=!!r.data}catch(e){console.warn('is_coordinatore:',e);window.__isCoordinatoreVero=false}
+    }
+    const _btnDividi=((window.__isSegreteria||window.__isCoordinatoreVero)&&visite&&visite.length&&window.LottiCantiere&&LottiCantiere.dividi)
+      ?' <button type="button" class="btn-outline btn-sm" id="qd-dividi-lotti" style="margin-left:8px;font-weight:400;text-transform:none;letter-spacing:0" data-aiuto="Elenca le visite di questa scheda con l\'indirizzo com\'era scritto nel modulo originale e ti fa scegliere, per ognuna, su quale lotto va. I lotti nuovi nascono come copie di questa scheda. Segreteria e coordinatore.">🧩 Dividi le visite in lotti</button>':''
     if(complesso){
       /* le visite di tutto il complesso, raggruppate per lotto, con l'accesso sul lotto (quello del verbale) e sul complesso */
       let vc=null,vcErr=null
@@ -15853,7 +15858,12 @@ function incPrecompilaCantiere(r){
   if(comSel&&cn){
     const nc=(s)=>typeof _normCom==='function'?_normCom(s):String(s||'').toLowerCase().trim()
     const opt=[...comSel.options].find(o=>nc(o.value)===nc(cn)||nc(o.textContent)===nc(cn))
+    const _conf=typeof comuneConfluito==='function'?comuneConfluito(cn):null
     if(opt) comSel.value=opt.value
+    else if(_conf){ // (07/10/2026) cantiere NUOVO da un incarico con un comune soppresso: si propone quello in cui è confluito
+      const o2=[...comSel.options].find(o=>nc(o.value)===nc(_conf.in)); if(o2){comSel.value=o2.value; toast('Il comune «'+cn+'» dal '+fmtDate(_conf.dal)+' è '+_conf.in+': proposto quello','warn',7000)}
+      else{ const o=document.createElement('option'); o.value=cn; o.textContent=cn+' (fuori elenco)'; o.dataset.extra='1'; comSel.appendChild(o); comSel.value=cn }
+    }
     else{ const o=document.createElement('option'); o.value=cn; o.textContent=cn+' (fuori elenco)'; o.dataset.extra='1'; comSel.appendChild(o); comSel.value=cn }
     comSel.dispatchEvent(new Event('change',{bubbles:true}))
   }
@@ -16096,13 +16106,13 @@ document.addEventListener('input',function(ev){
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
-<script src="aiuto.js?v=23"></script>
+<script src="aiuto.js?v=24"></script>
 <script src="mail-respinte-tec.js?v=2"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
 <script src="codice-univoco.js?v=4"></script>
-<script src="lotti-cantiere.js?v=2"></script>
+<script src="lotti-cantiere.js?v=3"></script>
 <script src="esito-incarico.js?v=2"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>

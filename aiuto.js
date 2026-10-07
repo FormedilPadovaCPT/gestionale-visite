@@ -113,7 +113,7 @@ window.AIUTO_TESTI = {
   't:giro a tappe sul navigatore': 'Manda al navigatore del telefono i cantieri spuntati, nell\'ordine più breve partendo da dove sei.',
   'btn-fondi-sel': 'Unisce i cantieri spuntati in uno solo: le visite di tutti passano sul cantiere che scegli come principale. Se una scheda è un lotto a sé dello stesso complesso, nella finestra la riconosci come lotto: non si fonde. Non si torna indietro da soli.',
   /* ── (07/10/2026) il complesso a lotti ── */
-  't:dividi le visite in lotti': 'Elenca le visite di questa scheda con l\'indirizzo com\'era scritto nel modulo originale e ti fa scegliere, per ognuna, su quale lotto va. I lotti nuovi nascono come copie di questa scheda. Solo segreteria.',
+  't:dividi le visite in lotti': 'Elenca le visite di questa scheda con l\'indirizzo com\'era scritto nel modulo originale e ti fa scegliere, per ognuna, su quale lotto va. I lotti nuovi nascono come copie di questa scheda. Segreteria e coordinatore.',
   't:sposta le visite': 'Sposta le visite sui lotti scelti e crea i lotti nuovi. I verbali definitivi tengono il numero di accesso stampato; le bozze lo riprendono dal lotto. Resta tutto nel registro delle correzioni.',
   't:unisci e riconosci i lotti': 'Le schede segnate «è il lotto…» diventano lotti del complesso del cantiere mantenuto (prendono il suo CNCE, il lotto esce dall\'indirizzo); le altre si fondono su di lui. Non si torna indietro da soli.',
   't:conferma': 'Divide il cantiere in lotti come hai indicato: la scheda prende il suo nome di lotto e, se sei in un altro lotto, nasce la copia e il verbale passa lì.',

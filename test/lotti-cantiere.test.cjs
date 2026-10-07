@@ -35,7 +35,7 @@ assert.ok(/id="btn-lotti" data-cant="\$\{esc\(c\.cantiere_id\)\}" onclick="windo
 assert.ok(/\$\{row\('Lotto',c\.lotto\?esc\(c\.lotto\):null\)\}/.test(html) && !/row\('Cod\. univoco',c\.nodo_id\)/.test(html), 'la scheda mostra il lotto, non più il codice univoco');
 assert.ok(/window\._verbaleUsaCantiere=async cid=>\{[\s\S]{0,300}await _useCantiereEsistente\(c\)/.test(html), 'aggancio del verbale al lotto');
 assert.ok(/cantiere_chiuso,lotto'\)\.eq\('elimina',0\)/.test(html) && /🧩 lotto \$\{esc\(c\.lotto\)\}/.test(html) && /ultima visita \$\{esc\(fmtDate\(_uv\.data_visita\)\)\}/.test(html), 'nella ricerca il lotto, con l’ultima visita');
-assert.ok(/<script src="lotti-cantiere\.js\?v=2"><\/script>/.test(html));
+assert.ok(/<script src="lotti-cantiere\.js\?v=3"><\/script>/.test(html));
 assert.ok(/- 'lotti-cantiere\.js'/.test(yml) && / lotti-cantiere\.js /.test(yml), 'pubblicato (tutte e due le liste del deploy)');
 
 /* ── il database ── */

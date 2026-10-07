@@ -4,8 +4,25 @@
 
 // COMUNI_PD è derivata da ISTAT_PD (definita sotto) — così la tendina è sempre allineata
 // all'elenco ISTAT completo dei comuni attuali della provincia. Qui solo le voci extra:
-// comuni fuori provincia limitrofi + comuni soppressi presenti nei cantieri storici.
-const COMUNI_EXTRA=['Arquà Polesine','Carceri','Chioggia','Guarda Veneta','Megliadino San Fidenzio','Motta','Torre di Mosto','Vighizzolo d\'Este','Vigonovo']
+// comuni fuori provincia limitrofi.
+const COMUNI_EXTRA=['Arquà Polesine','Chioggia','Guarda Veneta','Motta','Torre di Mosto','Vigonovo']
+
+// (07/10/2026, chiesto dall'utente) i comuni soppressi per fusione NON si scelgono più per i cantieri nuovi:
+// la tendina non li elenca. Restano in CAP_PD e nelle schede che li hanno già: lì la tendina li mostra
+// «(com'è scritto)» con il comune in cui sono confluiti, e aprire e salvare non cambia niente.
+const COMUNI_SOPPRESSI={
+  'Saletto':{in:'Borgo Veneto',dal:'2018-02-17'},
+  'Megliadino San Fidenzio':{in:'Borgo Veneto',dal:'2018-02-17'},
+  'Santa Margherita d\'Adige':{in:'Borgo Veneto',dal:'2018-02-17'},
+  'Carceri':{in:'Santa Caterina d\'Este',dal:'2024-01-22'},
+  'Vighizzolo d\'Este':{in:'Santa Caterina d\'Este',dal:'2024-01-22'},
+}
+// il comune in cui è confluito un nome soppresso, qualunque grafia (PADOVA / Padova / d'Este / d Este); null se è attuale
+function comuneConfluito(nome){
+  const k=String(nome||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim()
+  const hit=Object.keys(COMUNI_SOPPRESSI).find(s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim()===k)
+  return hit?COMUNI_SOPPRESSI[hit]:null
+}
 
 const CAP_PD={
   'Abano Terme':'35031','Agna':'35021','Albignasego':'35020','Anguillara Veneta':'35022',
@@ -68,7 +85,7 @@ const ISTAT_PD={
   'Vo\'':'028105'
 }
 
-const COMUNI_PD=[...new Set([...Object.keys(ISTAT_PD),...COMUNI_EXTRA])].sort((a,b)=>a.localeCompare(b,'it'))
+const COMUNI_PD=[...new Set([...Object.keys(ISTAT_PD),...COMUNI_EXTRA])].filter(c=>!COMUNI_SOPPRESSI[c]).sort((a,b)=>a.localeCompare(b,'it'))
 
 // --- Batch 2: codelist / etichette / palette ---
 const ZONE_LBL={1:'Impianti di cantiere',2:'Protezione luoghi di lavoro',3:'Apparecchi di sollevamento',4:'Attrezzature, scale, utensili',5:'Macchine di cantiere',6:'Opere provvisionali',7:'DPI',8:'Documentazione',9:'Soggetti',10:'Formazione'}
