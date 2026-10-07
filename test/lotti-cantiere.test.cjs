@@ -45,4 +45,11 @@ assert.ok(/insert into public\.cantieri_correzioni[\s\S]*'lotto creato dal verba
 assert.ok(/coalesce\(public\.is_personale\(\), false\) and not coalesce\(public\.is_viewer\(\), false\)/.test(sql), 'lo fa chi fa le visite, non chi ha la sola lettura');
 assert.ok(/raise exception 'Il lotto «%» c''è già in questo complesso/.test(sql), 'lo stesso nome non si ripete');
 
+/* ── (07/10/2026) su tutti i cantieri, non solo CNCE: la copia ricorda la scheda di partenza ── */
+const sql2 = fs.readFileSync(path.join(dir, 'supabase', 'sql', '2026_10_07_lotti_senza_cnce.sql'), 'utf8');
+assert.ok(/add column if not exists lotto_di text references public\.cantieri\(cantiere_id\) on delete set null/.test(sql2), 'lotto_di punta alla scheda di partenza');
+assert.ok(/'lotto_di', coalesce\(c\.lotto_di, c\.cantiere_id\)/.test(sql2), 'la copia di una copia punta alla prima');
+assert.ok(/or coalesce\(k\.lotto_di, k\.cantiere_id\) = c\.radice/.test(sql2), 'i lotti si riconoscono dal complesso, anche senza CNCE e con l’indirizzo corretto');
+assert.ok(!/cantiere_cnce/.test((html.match(/id=\"btn-lotti\"[^\n]*/) || [''])[0]), 'il pulsante non dipende dal CNCE');
+
 console.log('ok — lotti del cantiere guidati dal verbale');
