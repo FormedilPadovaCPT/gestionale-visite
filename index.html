@@ -3868,11 +3868,12 @@ function renderCantCard(c){
     ${row('Importo lavori',importo)}
     ${row('Durata',durata)}
     ${row('Codice CNCE',c.cantiere_cnce)}
-    ${row('Cod. univoco',c.nodo_id)}
+    ${row('Lotto',c.lotto?esc(c.lotto):null)}
     ${row('Data ult. lavori',dataUlt)}
     ${row('Etichetta',c.cantiere_etichetta)}
     ${row('Descrizione',c.cantiere_descrizione)}
     <div id="cant-card-extra" data-cant="${c.cantiere_id||''}"></div>
+    ${c.cantiere_id?`<div style="margin-top:8px"><button type="button" class="btn-outline btn-sm" id="btn-lotti" data-cant="${esc(c.cantiere_id)}" onclick="window.LottiCantiere&&LottiCantiere.apri(this.dataset.cant)">🧩 ${c.lotto?'Lotti del cantiere':'Ha più lotti'}</button></div>`:''}
   `.trim()
   card.classList.remove('hidden')
   _renderCantCardExtra(c)
@@ -3964,13 +3965,16 @@ function initCantSearch(){
     await proponiCommittenteCantiere(item.id)
   }
   const fetchCant=async(qa,qc)=>{
-    let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id,cantiere_chiuso').eq('elimina',0).order('comune_nome').order('cantiere_indirizzo').limit(30)
+    let qb=sb.from('cantieri').select('cantiere_id,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cap,cantiere_etichetta,prot_int,nodo_id,cantiere_cnce,data_ult,cantiere_tip_int,cantiere_tip_ope,cantiere_tip_ope_altro,cantiere_importo,cantiere_durata,cantiere_comune_cod,cantiere_committente_id,cantiere_chiuso,lotto').eq('elimina',0).order('comune_nome').order('cantiere_indirizzo').limit(30)
     // La segreteria vede anche i cantieri chiusi (contrassegnati in lista); gli altri utenti solo gli attivi
     if(!window.__isSegreteria)qb=qb.not('cantiere_chiuso','is',true)
     if(qc)qb=qb.ilike('comune_nome',`%${qc}%`)
     if(qa)qb=qb.or(`cantiere_indirizzo.ilike.%${qa}%,cantiere_etichetta.ilike.%${qa}%,cantiere_cnce.ilike.%${qa}%,nodo_id.ilike.%${qa}%`)
     const{data}=await qb
     const _rows=data||[]
+    /* (07/10/2026) i lotti dello stesso complesso si distinguono dall'ultima visita e dalla sua impresa */
+    const _ult={},_lotIds=_rows.filter(c=>String(c.lotto||'').trim()).map(c=>c.cantiere_id)
+    if(_lotIds.length){try{const{data:_uv}=await sb.from('visite').select('cantiere_id,data_visita,imprese(impresa_nome)').in('cantiere_id',_lotIds).eq('elimina',0).order('data_visita',{ascending:false}).limit(300);(_uv||[]).forEach(v=>{if(!_ult[v.cantiere_id])_ult[v.cantiere_id]=v})}catch(_e){}}
     // nomi committente in un'unica query per mostrarli nell'elenco
     const _cids=[...new Set(_rows.map(c=>String(c.cantiere_committente_id||'').trim()).filter(Boolean))]
     const _cmap={}
@@ -3991,7 +3995,9 @@ function initCantSearch(){
       const chiuso=c.cantiere_chiuso===true
       const chiusoTag=chiuso?` <span style="color:#c0392b;font-weight:800">*</span> <span style="display:inline-block;font-size:9px;font-weight:800;color:#fff;background:#c0392b;padding:1px 5px;border-radius:3px;vertical-align:middle;letter-spacing:.5px">CHIUSO</span>`:''
       const meta=[et?`Etichetta: ${esc(et)}`:'',cnce?`CNCE: ${esc(cnce)}`:'',cu?`Cod. univoco: ${esc(cu)}`:''].filter(Boolean).join(' · ')
-      const display=`<div style="font-weight:600;color:#333">${esc(et||ind||'(senza indirizzo)')}${chiusoTag}</div>`+
+      const _uv=_ult[c.cantiere_id]
+      const lottoTag=String(c.lotto||'').trim()?` <span style="display:inline-block;font-size:10px;font-weight:700;color:var(--orange);border:1px solid var(--orange);padding:0 5px;border-radius:3px;vertical-align:middle">🧩 lotto ${esc(c.lotto)}</span>${_uv?`<span style="font-weight:400;font-size:11px;color:#888"> · ultima visita ${esc(fmtDate(_uv.data_visita))}${_uv.imprese&&_uv.imprese.impresa_nome?' · '+esc(_uv.imprese.impresa_nome):''}</span>`:''}`:''
+      const display=`<div style="font-weight:600;color:#333">${esc(et||ind||'(senza indirizzo)')}${lottoTag}${chiusoTag}</div>`+
         `<div style="font-size:12px;color:#666">${esc(ind||'—')}${loc?' · '+esc(loc):''}</div>`+
         (comm?`<div style="font-size:11px;color:#e7500f">👤 ${esc(comm)}</div>`:'')+
         (meta?`<div style="font-size:11px;color:#999">${meta}</div>`:'')
@@ -4698,6 +4704,12 @@ async function _useCantiereEsistente(c){
   caricaProposteImprese(true)
   await autoAccCant(c.cantiere_id)
   toast('Cantiere esistente selezionato','ok')
+}
+/* (07/10/2026) lotti-cantiere.js: creato o scelto un lotto, il verbale passa su quel cantiere */
+window._verbaleUsaCantiere=async cid=>{
+  const{data:c,error}=await sb.from('cantieri').select('*').eq('cantiere_id',cid).maybeSingle()
+  if(error||!c){toast('Non sono riuscito a leggere il lotto scelto'+(error?': '+error.message:''),'err',8000);return}
+  await _useCantiereEsistente(c)
 }
 
 // -- Anti-duplicato anagrafiche (imprese / committenti) - stessa logica dei cantieri --
@@ -15796,12 +15808,13 @@ document.addEventListener('input',function(ev){
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
-<script src="aiuto.js?v=21"></script>
+<script src="aiuto.js?v=22"></script>
 <script src="mail-respinte-tec.js?v=2"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=1"></script>
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
 <script src="codice-univoco.js?v=4"></script>
+<script src="lotti-cantiere.js?v=1"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->

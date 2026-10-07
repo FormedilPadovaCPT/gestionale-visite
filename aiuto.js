@@ -119,6 +119,7 @@ window.AIUTO_TESTI = {
   /* etichetta del cantiere (codice-univoco.js, 06/10/2026: prima proponeva il codice univoco) */
   'btn-etich-proponi': 'Propone l\'etichetta del cantiere, quella che va all\'Osservatorio e che si vede negli elenchi: indirizzo e civico, poi il nome dell\'impresa principale. La correggi prima di salvarla; se il cantiere ce l\'ha già non la tocca.',
   'btn-mc-etich-proponi': 'Scrive nel campo l\'etichetta proposta: indirizzo e civico, poi il nome dell\'impresa principale. Correggila se serve: si salva insieme al cantiere.',
+  'btn-lotti': 'Il cantiere ha più lotti: questa scheda diventa uno dei lotti e, se oggi sei in un altro, ne nasce una copia identica su cui va il verbale. Le visite già fatte restano dove sono.',
   'mi-esiste': 'La P.IVA o il CF che hai scritto sono di un\'impresa già in anagrafica: con «Usa questa» la metti nel verbale senza crearne una doppia.',
   /* proposta di chiusura (proposte-chiusura.js, 23/09/2026) */
   't:proponi chiusura': 'Dici alla segreteria che il cantiere è finito, con due parole sul perché. Non chiude niente: decide la segreteria, e fino ad allora il cantiere resta attivo.',
