@@ -34,6 +34,14 @@ assert.ok(!/\$\{(?![^}]*esc\()[^}]*\b(?:l|io)\.(?:etichetta|lotto|ultima_impresa
 assert.ok(/id="btn-lotti" data-cant="\$\{esc\(c\.cantiere_id\)\}" onclick="window\.LottiCantiere&&LottiCantiere\.apri\(this\.dataset\.cant\)">🧩 \$\{c\.lotto\?'Lotti del cantiere':'Ha più lotti'\}/.test(html), 'il pulsante nella scheda del cantiere');
 assert.ok(/\$\{row\('Lotto',c\.lotto\?esc\(c\.lotto\):null\)\}/.test(html) && !/row\('Cod\. univoco',c\.nodo_id\)/.test(html), 'la scheda mostra il lotto, non più il codice univoco');
 assert.ok(/window\._verbaleUsaCantiere=async cid=>\{[\s\S]{0,300}await _useCantiereEsistente\(c\)/.test(html), 'aggancio del verbale al lotto');
+/* (08/10/2026, segnalato dall'utente) la visita su un lotto non riprendeva il committente della scheda */
+const _uce = html.slice(html.indexOf('async function _useCantiereEsistente(c){'), html.indexOf('/* (07/10/2026) lotti-cantiere.js: creato o scelto un lotto'));
+assert.ok(/await proponiCommittenteCantiere\(c\.cantiere_id\)/.test(_uce), 'scegliendo un lotto (o un cantiere dall’incarico) il committente della scheda va proposto');
+const _nvd = html.slice(html.indexOf('async function nuovaVisitaDaVerbale(vid, mode){'), html.indexOf("// mode === 'full'"));
+assert.ok(/await proponiCommittenteCantiere\(cid\)/.test(_nvd), 'anche «Nuova visita» con i soli dati del cantiere riprende il committente');
+const _pcc = html.slice(html.indexOf('async function proponiCommittenteCantiere(cantId){'), html.indexOf('async function proponiCommittenteCantiere(cantId){') + 2500);
+assert.ok(/if\(!_attuale\)\{\s*_useCommittenteEsistente\(co\)/.test(_pcc), 'con il committente della visita vuoto, quello del cantiere entra senza domanda');
+assert.ok(/else if\(confirm\(`Nella visita il committente è/.test(_pcc), 'se nella visita ce n’è già un altro, si chiede prima di sostituirlo');
 assert.ok(/cantiere_chiuso,lotto'\)\.eq\('elimina',0\)/.test(html) && /🧩 lotto \$\{esc\(c\.lotto\)\}/.test(html) && /ultima visita \$\{esc\(fmtDate\(_uv\.data_visita\)\)\}/.test(html), 'nella ricerca il lotto, con l’ultima visita');
 assert.ok(/<script src="lotti-cantiere\.js\?v=3"><\/script>/.test(html));
 assert.ok(/- 'lotti-cantiere\.js'/.test(yml) && / lotti-cantiere\.js /.test(yml), 'pubblicato (tutte e due le liste del deploy)');

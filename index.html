@@ -4196,7 +4196,14 @@ async function proponiCommittenteCantiere(cantId){
     const{data:co}=await sb.from('committenti').select('committente_id,committente_nome,committente_tipo,cf_piva,piva,email,telefono,tipo_sogg').eq('committente_id',cid).eq('elimina',0).maybeSingle()
     if(co){
       const lbl=co.tipo_sogg==='PG'?'P.IVA':'CF'
-      if(confirm(`Questo cantiere risulta associato al committente:\n\n${co.committente_nome}\n${lbl}: ${co.cf_piva||cid}\n\nImpostarlo come committente della visita?`)){
+      /* (08/10/2026, segnalato dall'utente) con il committente della visita ancora vuoto, quello della scheda del
+         cantiere entra da solo: un committente c'è sempre, ed è quello del cantiere (o del lotto). La domanda resta
+         solo se nella visita ce n'è già un altro, che verrebbe sostituito. */
+      const _attuale=vGet('f-comm-id')||String(vGet('f-comm-search')||'').trim()
+      if(!_attuale){
+        _useCommittenteEsistente(co)
+        toast('Committente dalla scheda del cantiere: '+(co.committente_nome||cid),'ok',5000)
+      }else if(confirm(`Nella visita il committente è «${vGet('f-comm-search')||_attuale}».\n\nLa scheda del cantiere indica invece:\n${co.committente_nome}\n${lbl}: ${co.cf_piva||cid}\n\nLo sostituisco con quello del cantiere?`)){
         _useCommittenteEsistente(co)
       }
     }else{
@@ -4703,6 +4710,9 @@ async function _useCantiereEsistente(c){
   proponiImportoCantiere(c.cantiere_importo)
   caricaProposteImprese(true)
   await autoAccCant(c.cantiere_id)
+  // (08/10/2026) da qui passano anche il lotto scelto con 🧩, l'incarico («Fai la visita») e il cantiere vicino:
+  // il committente della scheda va proposto come nelle altre strade
+  await proponiCommittenteCantiere(c.cantiere_id)
   toast('Cantiere esistente selezionato','ok')
 }
 /* (07/10/2026) lotti-cantiere.js: creato o scelto un lotto, il verbale passa su quel cantiere */
@@ -13573,6 +13583,7 @@ async function nuovaVisitaDaVerbale(vid, mode){
         proponiImportoCantiere(r.data.cantiere_importo)
       }
       await autoAccCant(cid)
+      await proponiCommittenteCantiere(cid)   // (08/10/2026) il committente è un dato del cantiere
       toast('Nuova visita — dati del cantiere importati','ok')
       return
     }
