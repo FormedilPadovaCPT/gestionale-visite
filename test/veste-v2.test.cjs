@@ -241,7 +241,8 @@ assert.ok(js.includes("vaiFase(2, n);") && js.includes("function vaiFase(f, tab)
 assert.ok(js.includes('body.v2.v2-fase3 #view-form .tab-content[data-tab="13"]{display:block') && js.includes('body.v2.v2-fase3 #view-form .tab-content[data-tab="15"]{display:block'), 'note, foto e riepilogo stanno insieme sullo schermo');
 assert.ok(js.includes("if (!_fase3) { _fase3 = true; [13, 14, 15].forEach((n) => premiPasso(n)); }"), 'entrando nel terzo momento si aprono i tre passi di sempre, così l’app li prepara');
 // l'elenco aiuta, non decide: i suoi nomi sono quelli di verbale_mancanze, e il controllo vero resta al database
-const sqlVc = fs.readFileSync(path.join(radice, 'supabase', 'sql', '2026_10_03_verbale_completo.sql'), 'utf8');
+const sqlVc = ['2026_10_03_verbale_completo.sql', '2026_10_08_verbale_mancanze_osservazioni.sql']
+  .map((f) => fs.readFileSync(path.join(radice, 'supabase', 'sql', f), 'utf8')).join('\n');
 const req = s.v2.requisiti();
 assert.ok(req.length >= 12, 'mi aspetto almeno dodici voci in «Prima di chiudere»');
 for (const r of req) if (r.cosa !== 'cantiere') assert.ok(sqlVc.includes("'cosa','" + r.cosa + "'"), 'la voce «' + r.cosa + '» non esiste in verbale_mancanze: le due liste devono parlare la stessa lingua');

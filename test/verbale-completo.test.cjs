@@ -140,4 +140,11 @@ assert.ok(/if trim\(coalesce\(c\.comune_nome,''\)\) = '' then\s+esito := esito \
 assert.ok(/elsif coalesce\(c\.cantiere_comune_cod,''\) !~ '\^\[0-9\]\{6\}\$' then\s+esito := esito \|\| jsonb_build_object\('cosa','cantiere-comune'/.test(sqlIstat), 'senza il codice ISTAT del comune il verbale non si chiude');
 assert.ok(/Altro comune/.test(sqlIstat), 'il messaggio dice come rimediare a un comune fuori provincia');
 
+/* (08/10/2026, deciso dall'utente) le osservazioni del tecnico, quelle del report e del PDF, sono obbligatorie */
+const sqlOss = fs.readFileSync(path.join(radice, 'supabase', 'sql', '2026_10_08_verbale_mancanze_osservazioni.sql'), 'utf8');
+assert.ok(/if coalesce\(trim\(v\.oss_tec\),''\) = '' then\s+esito := esito \|\| jsonb_build_object\('cosa','osservazioni','tab',13,'campo','f-oss-tec'/.test(sqlOss), 'senza osservazioni del tecnico il verbale non si chiude');
+assert.ok(!/oss_tec_int\),''\) = ''/.test(sqlOss), 'le osservazioni interne restano facoltative');
+for (const cosa of ['cantiere-comune', 'nc-senza-nota', 'doppione', 'email-impresa']) assert.ok(sqlOss.includes("'cosa','" + cosa + "'"), 'la versione nuova ha perso il controllo: ' + cosa);
+assert.ok(/<label>Osservazioni \(visibili nel report \/ PDF\) \*<\/label><textarea id="f-oss-tec"/.test(html), 'il campo porta l’asterisco come gli altri obbligatori');
+
 console.log('ok — verbale completo: chiusura dal database, niente precompilati, scheda cantiere, committente, ora di fine');

@@ -59,7 +59,7 @@ assert.ok(/const att=r\.stato==='aperto'\?incAttesa\(r,oggi\):null/.test(html) &
 assert.ok(/window\.incAttesaHtml\(x\)/.test(v2) && !/' · dal ' \+ gg\(x\.data_richiesta\)/.test(v2), 'il riquadro di Oggi mostra i giorni');
 assert.ok(/if \(A\.serie !== B\.serie\) return A\.serie \? 1 : -1;/.test(v2) && /ordinati\.slice\(0, 5\)/.test(v2), 'il riquadro mette prima chi aspetta da più tempo, le serie in fondo');
 assert.ok(/window\.incImpresaTesto\(x\)/.test(v2) && !/esc\(x\.impresa \|\| x\.richiedente \|\| '—'\)/.test(v2), 'il riquadro non mostra «0» come impresa');
-assert.ok(/veste-v2\.js\?v=36/.test(html), 'la versione di veste-v2 è salita');
+assert.ok(/veste-v2\.js\?v=37/.test(html), 'la versione di veste-v2 è salita');
 
 /* ── il database ── */
 assert.ok(/add column if not exists assegnato_il timestamptz/.test(sql) && /trg_incarichi_su_assegnazione before insert or update/.test(sql), 'la data la scrive il database');

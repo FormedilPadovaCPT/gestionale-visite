@@ -1073,6 +1073,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       { cosa: 'ruolo', ok: imp.length > 0 && imp.every((x) => x.tipo_imp), testo: 'Ruolo di ogni impresa', tab: 2 },
       { cosa: 'checklist', ok: valutate.length > 0, testo: 'Almeno una voce valutata nella check-list', tab: 3 },
       { cosa: 'nc-senza-nota', ok: ncSenza.length === 0, testo: 'Ogni non conformità con la sua nota' + (ncSenza.length ? ' (' + ncSenza.length + ' senza)' : ''), tab: 3 },
+      { cosa: 'osservazioni', ok: !!v('f-oss-tec'), testo: 'Osservazioni del tecnico (vanno nel report e nel PDF)', campo: 'f-oss-tec' },
       { cosa: 'ora-fine', ok: !!v('f-a'), testo: 'Ora di fine', campo: 'f-a', nota: 'se chiudi oggi e la lasci vuota, ci va l\'ora di chiusura' },
     ];
   }
