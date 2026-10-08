@@ -13888,7 +13888,8 @@ async function showCantiereDetail(cantId){
     /* (07/10/2026) la segreteria può dividere le visite di questa scheda fra i lotti: serve sui cantieri importati
        dalle visite vecchie, dove il lotto era scritto nell'indirizzo e l'unione le ha messe tutte insieme */
     /* (07/10/2026, chiesto dall'utente) anche il coordinatore: lo si chiede al database una volta, non si deduce dalla pagina */
-    if(!window.__isSegreteria&&window.__isCoordinatoreVero==null&&visite&&visite.length){
+    /* (08/10/2026) anche senza visite: al coordinatore serve per «↩️ Riapri» sui cantieri chiusi */
+    if(!window.__isSegreteria&&window.__isCoordinatoreVero==null){
       try{const r=await sb.rpc('is_coordinatore');if(r.error)throw r.error;window.__isCoordinatoreVero=!!r.data}catch(e){console.warn('is_coordinatore:',e);window.__isCoordinatoreVero=false}
     }
     const _btnDividi=((window.__isSegreteria||window.__isCoordinatoreVero)&&visite&&visite.length&&window.LottiCantiere&&LottiCantiere.dividi)
@@ -13996,12 +13997,15 @@ async function showCantiereDetail(cantId){
     $('qd-actions').appendChild(btnNuova)
     if(window.__isCoord){
       const _be=document.createElement('button');_be.className='btn-outline btn-sm';_be.style.marginLeft='8px';_be.textContent='✏️ Modifica cantiere';_be.onclick=()=>{hide('modal-qd');admEditCantiere(cantId)};$('qd-actions').appendChild(_be)
-      if(c.cantiere_chiuso){
-        const _ci=document.createElement('span');_ci.style.cssText='font-size:12px;color:#c0392b;margin-left:8px;align-self:center';_ci.textContent='🔒 Chiuso il '+(c.data_chiusura?new Date(c.data_chiusura).toLocaleDateString('it-IT'):'')+(c.chiuso_da?' · '+c.chiuso_da:'');$('qd-actions').appendChild(_ci)
-        const _br=document.createElement('button');_br.className='btn-outline btn-sm';_br.style.marginLeft='8px';_br.textContent='↩️ Riapri';_br.onclick=()=>riapriCantiere(cantId,label);$('qd-actions').appendChild(_br)
-      }else{
+      if(!c.cantiere_chiuso){
         const _bc=document.createElement('button');_bc.className='btn-warn btn-sm';_bc.style.marginLeft='8px';_bc.textContent='🔒 Chiudi cantiere (fine lavori)';_bc.onclick=()=>chiudiCantiere(cantId,label);$('qd-actions').appendChild(_bc)
       }
+    }
+    /* (08/10/2026, chiesto dall'utente) «↩️ Riapri» anche al coordinatore: riapri_cantiere lo permette già
+       (is_segreteria() or is_coordinatore()); la chiusura e la modifica della scheda restano alla segreteria */
+    if(c.cantiere_chiuso&&(window.__isCoord||window.__isCoordinatoreVero)){
+        const _ci=document.createElement('span');_ci.style.cssText='font-size:12px;color:#c0392b;margin-left:8px;align-self:center';_ci.textContent='🔒 Chiuso il '+(c.data_chiusura?new Date(c.data_chiusura).toLocaleDateString('it-IT'):'')+(c.chiuso_da?' · '+c.chiuso_da:'');$('qd-actions').appendChild(_ci)
+        const _br=document.createElement('button');_br.className='btn-outline btn-sm';_br.style.marginLeft='8px';_br.textContent='↩️ Riapri';_br.onclick=()=>riapriCantiere(cantId,label);$('qd-actions').appendChild(_br)
     }
     // proposta di chiusura: il tecnico la fa, la segreteria la vede e la respinge (23/09/2026)
     if(window.propChius)window.propChius.scheda(cantId,label,!!c.cantiere_chiuso).catch(e=>console.warn('proposta chiusura:',e))
