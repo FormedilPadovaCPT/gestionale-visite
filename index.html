@@ -13620,8 +13620,12 @@ function qdDl(pairs){
   return rows ? `<dl class="qd-dl">${rows}</dl>` : ''
 }
 function qdSec(t){ return `<div class="qd-section">${t}</div>` }
+/* (08/10/2026, chiesto dall'utente: «si legge male») la scheda di un complesso a lotti ha la tabella dei lotti e le
+   visite per lotto: la finestra si allarga. Ogni scheda riparte stretta, così visite e cantieri semplici restano come prima. */
+function qdLargo(largo){ const b=document.querySelector('#modal-qd .modal-box'); if(b) b.style.maxWidth=largo?'min(1100px,96vw)':'580px' }
 
 async function showVisitaDetail(vid){
+  qdLargo(false)
   $('qd-title').textContent='📋 Caricamento…'
   $('qd-badges').innerHTML=''
   $('qd-body').innerHTML='<div style="padding:20px;text-align:center;color:#aaa">Caricamento…</div>'
@@ -13748,6 +13752,7 @@ async function showVisitaDetail(vid){
 }
 
 async function showCantiereDetail(cantId){
+  qdLargo(false)
   $('qd-title').textContent='🏗️ Caricamento…'
   $('qd-badges').innerHTML=''
   $('qd-body').innerHTML='<div style="padding:20px;text-align:center;color:#aaa">Caricamento…</div>'
@@ -13771,6 +13776,7 @@ async function showCantiereDetail(cantId){
     let lotti=null,lottiErr=null
     try{const r=await sb.rpc('lotti_del_cantiere',{p_cantiere_id:cantId});if(r.error)throw r.error;lotti=r.data||[]}catch(e){lottiErr=e}
     const complesso=!!(lotti&&lotti.length>1)
+    qdLargo(complesso)
     let html=qdSec('Ubicazione')
     html+=qdDl([
       ['Indirizzo',`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()],

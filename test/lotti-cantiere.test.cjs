@@ -45,6 +45,10 @@ assert.ok(/else if\(confirm\(`Nella visita il committente è/.test(_pcc), 'se ne
 /* (08/10/2026, chiesto dall'utente) «↩️ Riapri» sul cantiere chiuso anche al coordinatore, non solo alla segreteria */
 assert.ok(/if\(c\.cantiere_chiuso&&\(window\.__isCoord\|\|window\.__isCoordinatoreVero\)\)\{[\s\S]{0,900}riapriCantiere\(cantId,label\)/.test(html), 'il coordinatore deve vedere «Riapri» sui cantieri chiusi');
 assert.ok(/if\(!window\.__isSegreteria&&window\.__isCoordinatoreVero==null\)\{/.test(html), 'il ruolo di coordinatore si chiede anche per le schede senza visite');
+/* (08/10/2026, chiesto dall'utente) la scheda di un complesso a lotti si allarga; le altre schede ripartono strette */
+assert.ok(/const complesso=!!\(lotti&&lotti\.length>1\)\n\s+qdLargo\(complesso\)/.test(html), 'la scheda del complesso deve allargarsi');
+assert.ok(/async function showVisitaDetail\(vid\)\{\n\s+qdLargo\(false\)/.test(html) && /async function showCantiereDetail\(cantId\)\{\n\s+qdLargo\(false\)/.test(html), 'ogni scheda riparte stretta');
+assert.ok(/b\.style\.maxWidth=largo\?'min\(1100px,96vw\)':'580px'/.test(html), 'larga ma mai oltre lo schermo; stretta come nel markup');
 assert.ok(/if\(window\.__isCoord\)\{\n\s+const _be=[^\n]*\n\s+if\(!c\.cantiere_chiuso\)\{\n\s+const _bc=/.test(html), 'chiusura e modifica della scheda restano alla segreteria');
 assert.ok(/cantiere_chiuso,lotto'\)\.eq\('elimina',0\)/.test(html) && /🧩 lotto \$\{esc\(c\.lotto\)\}/.test(html) && /ultima visita \$\{esc\(fmtDate\(_uv\.data_visita\)\)\}/.test(html), 'nella ricerca il lotto, con l’ultima visita');
 assert.ok(/<script src="lotti-cantiere\.js\?v=3"><\/script>/.test(html));
