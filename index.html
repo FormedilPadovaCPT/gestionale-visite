@@ -2734,6 +2734,10 @@ async function onLogin(user){
   const isSegreteria=_uem==='cptpd@did.formedilpadova.it'
   const isCoordPage=isSegreteria||_uem==='nicola.demarco@did.formedilpadova.it'
   window.__isCoord=isSegreteria;window.__isSegreteria=isSegreteria;window.__isCoordPage=isCoordPage
+  /* (08/10/2026) il coordinatore lo dice il database (is_coordinatore), una volta all'accesso: chiude e riapre i
+     cantieri e divide le visite in lotti. Se la lettura fallisce resta null e la scheda del cantiere riprova. */
+  window.__isCoordinatoreVero=null
+  if(!isSegreteria){try{const r=await sb.rpc('is_coordinatore');if(r.error)throw r.error;window.__isCoordinatoreVero=!!r.data}catch(e){console.warn('is_coordinatore:',e)}}
   const navAdm=$('nav-admin')
   if(navAdm)navAdm.style.display=isCoordPage?'':'none'
   const navSgr=$('nav-segreteria')
@@ -7208,7 +7212,7 @@ async function loadScadenze(){
       <td style="font-size:12px">${tec}</td>
       <td style="font-size:12px">${cant}</td>
       <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
-      <td style="white-space:nowrap"><button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Dettaglio">👁</button>${window.__isSegreteria?'<button class="btn-warn btn-sm" data-act="chiudi-cant" style="margin-left:4px" data-id="'+v.cantiere_id+'" data-lbl="'+esc(cant)+'" title="Chiudi cantiere (fine lavori)">🔒</button>':''}</td>
+      <td style="white-space:nowrap"><button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Dettaglio">👁</button>${(window.__isSegreteria||window.__isCoordinatoreVero)?'<button class="btn-warn btn-sm" data-act="chiudi-cant" style="margin-left:4px" data-id="'+v.cantiere_id+'" data-lbl="'+esc(cant)+'" title="Chiudi cantiere (fine lavori)">🔒</button>':''}</td>
     </tr>`
   }
 
@@ -14003,15 +14007,14 @@ async function showCantiereDetail(cantId){
     $('qd-actions').appendChild(btnNuova)
     if(window.__isCoord){
       const _be=document.createElement('button');_be.className='btn-outline btn-sm';_be.style.marginLeft='8px';_be.textContent='✏️ Modifica cantiere';_be.onclick=()=>{hide('modal-qd');admEditCantiere(cantId)};$('qd-actions').appendChild(_be)
-      if(!c.cantiere_chiuso){
-        const _bc=document.createElement('button');_bc.className='btn-warn btn-sm';_bc.style.marginLeft='8px';_bc.textContent='🔒 Chiudi cantiere (fine lavori)';_bc.onclick=()=>chiudiCantiere(cantId,label);$('qd-actions').appendChild(_bc)
-      }
     }
-    /* (08/10/2026, chiesto dall'utente) «↩️ Riapri» anche al coordinatore: riapri_cantiere lo permette già
-       (is_segreteria() or is_coordinatore()); la chiusura e la modifica della scheda restano alla segreteria */
+    /* (08/10/2026, chiesto dall'utente) chiudere e riaprire il cantiere anche al coordinatore: chiudi_cantiere e
+       riapri_cantiere lo permettono già (is_segreteria() or is_coordinatore()); la modifica della scheda resta alla segreteria */
     if(c.cantiere_chiuso&&(window.__isCoord||window.__isCoordinatoreVero)){
         const _ci=document.createElement('span');_ci.style.cssText='font-size:12px;color:#c0392b;margin-left:8px;align-self:center';_ci.textContent='🔒 Chiuso il '+(c.data_chiusura?new Date(c.data_chiusura).toLocaleDateString('it-IT'):'')+(c.chiuso_da?' · '+c.chiuso_da:'');$('qd-actions').appendChild(_ci)
         const _br=document.createElement('button');_br.className='btn-outline btn-sm';_br.style.marginLeft='8px';_br.textContent='↩️ Riapri';_br.onclick=()=>riapriCantiere(cantId,label);$('qd-actions').appendChild(_br)
+    }else if(window.__isCoord||window.__isCoordinatoreVero){
+        const _bc=document.createElement('button');_bc.className='btn-warn btn-sm';_bc.style.marginLeft='8px';_bc.textContent='🔒 Chiudi cantiere (fine lavori)';_bc.onclick=()=>chiudiCantiere(cantId,label);$('qd-actions').appendChild(_bc)
     }
     // proposta di chiusura: il tecnico la fa, la segreteria la vede e la respinge (23/09/2026)
     if(window.propChius)window.propChius.scheda(cantId,label,!!c.cantiere_chiuso).catch(e=>console.warn('proposta chiusura:',e))
@@ -16130,7 +16133,7 @@ document.addEventListener('input',function(ev){
 <script src="aiuto.js?v=24"></script>
 <script src="mail-respinte-tec.js?v=2"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
-<script src="proposte-chiusura.js?v=1"></script>
+<script src="proposte-chiusura.js?v=2"></script>
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
 <script src="codice-univoco.js?v=4"></script>
 <script src="lotti-cantiere.js?v=3"></script>

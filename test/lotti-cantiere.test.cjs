@@ -49,7 +49,13 @@ assert.ok(/if\(!window\.__isSegreteria&&window\.__isCoordinatoreVero==null\)\{/.
 assert.ok(/const complesso=!!\(lotti&&lotti\.length>1\)\n\s+qdLargo\(complesso\)/.test(html), 'la scheda del complesso deve allargarsi');
 assert.ok(/async function showVisitaDetail\(vid\)\{\n\s+qdLargo\(false\)/.test(html) && /async function showCantiereDetail\(cantId\)\{\n\s+qdLargo\(false\)/.test(html), 'ogni scheda riparte stretta');
 assert.ok(/b\.style\.maxWidth=largo\?'min\(1100px,96vw\)':'580px'/.test(html), 'larga ma mai oltre lo schermo; stretta come nel markup');
-assert.ok(/if\(window\.__isCoord\)\{\n\s+const _be=[^\n]*\n\s+if\(!c\.cantiere_chiuso\)\{\n\s+const _bc=/.test(html), 'chiusura e modifica della scheda restano alla segreteria');
+assert.ok(/if\(window\.__isCoord\)\{\n\s+const _be=[^\n]*\n\s+\}\n/.test(html), 'la modifica della scheda resta alla segreteria');
+/* (08/10/2026, chiesto dall'utente) anche la chiusura del cantiere al coordinatore: nella scheda e col lucchetto delle Scadenze */
+assert.ok(/\}else if\(window\.__isCoord\|\|window\.__isCoordinatoreVero\)\{\n\s+const _bc=[^\n]*chiudiCantiere\(cantId,label\)/.test(html), 'il coordinatore deve vedere «Chiudi cantiere» nella scheda');
+assert.ok(/\$\{\(window\.__isSegreteria\|\|window\.__isCoordinatoreVero\)\?'<button class="btn-warn btn-sm" data-act="chiudi-cant"/.test(html), 'il coordinatore deve avere il lucchetto nelle Scadenze');
+assert.ok(/window\.__isCoordinatoreVero=null\n\s+if\(!isSegreteria\)\{try\{const r=await sb\.rpc\('is_coordinatore'\)/.test(html), 'il ruolo di coordinatore si chiede al database all’accesso');
+const _pc = fs.readFileSync(path.join(__dirname, '..', 'proposte-chiusura.js'), 'utf8');
+assert.ok(_pc.includes('const ufficio = () => !!(window.__isCoord || window.__isSegreteria || window.__isCoordinatoreVero);') && html.includes('proposte-chiusura.js?v=2'), 'il coordinatore non propone alla segreteria: chiude o respinge');
 assert.ok(/cantiere_chiuso,lotto'\)\.eq\('elimina',0\)/.test(html) && /🧩 lotto \$\{esc\(c\.lotto\)\}/.test(html) && /ultima visita \$\{esc\(fmtDate\(_uv\.data_visita\)\)\}/.test(html), 'nella ricerca il lotto, con l’ultima visita');
 assert.ok(/<script src="lotti-cantiere\.js\?v=3"><\/script>/.test(html));
 assert.ok(/- 'lotti-cantiere\.js'/.test(yml) && / lotti-cantiere\.js /.test(yml), 'pubblicato (tutte e due le liste del deploy)');

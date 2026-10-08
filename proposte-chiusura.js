@@ -33,7 +33,9 @@
   const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const dIt = (s) => (s ? String(s).slice(0, 10).split('-').reverse().join('/') : '');
   const avviso = (msg, tipo) => (window.toast ? window.toast(msg, tipo) : alert(msg));
-  const ufficio = () => !!(window.__isCoord || window.__isSegreteria);
+  // (08/10/2026) anche il coordinatore chiude i cantieri e risponde alle proposte (chiudi_cantiere e
+  // respingi_proposta_chiusura lo permettono già): non gli si chiede di proporre alla segreteria
+  const ufficio = () => !!(window.__isCoord || window.__isSegreteria || window.__isCoordinatoreVero);
 
   /* proposte aperte, per cantiere */
   async function aperte() {
