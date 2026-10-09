@@ -65,6 +65,22 @@ assert.ok(_up.includes("'2_AREE/Sopralluoghi/verbali'") && /return `Verbale_\$\{
 assert.ok(/esist\.appProperties\?\.impronta === String\(impronta\)/.test(_up) && /method: 'PATCH', headers: \{ Authorization: `Bearer \$\{token\}`, 'Content-Type': tipo \}/.test(_up), 'stessi dati: niente; dati cambiati: si sostituisce lo stesso file');
 assert.ok(/role: 'reader', type: 'anyone'/.test(_up), 'il link pubblico resta (deciso dall’utente)');
 assert.ok(/const dove = cartella \|\| FOLDER_ID/.test(_up), 'se l’archivio non si trova, si salva dove si salvava prima');
+/* (09/10/2026) nel nome del file l'impresa va corta: niente forma giuridica né soci, massimo 35 caratteri */
+{
+  const m = /const FORMA_GIURIDICA = (\/.*\/iu)\r?\n[\s\S]*?export function impresaBreve\(s: unknown, max = 35\): string \{([\s\S]*?)\r?\n\}/.exec(_up);
+  assert.ok(m && /const imp = impresaBreve\(x\.impresa\)/.test(_up), 'il nome usa l’impresa accorciata');
+  const pulisci = (s) => String(s ?? '').replace(/[\\/:*?"<>|\r\n\t_]/g, ' ').replace(/\s+/g, ' ').trim();
+  const impresaBreve = new Function('pulisci', 'FORMA_GIURIDICA', 's', 'max', m[2].replace(/: unknown/g, ''))
+    .bind(null, pulisci, new RegExp(m[1].slice(1, -3), 'iu'));
+  const breve = (s) => impresaBreve(s, 35);
+  assert.equal(breve('ROR COSTRUZIONI S.A.S. DI ROSU IONEL & C'), 'ROR COSTRUZIONI');
+  assert.equal(breve('GALIAZZO F.LLI COSTRUZIONI SRL'), 'GALIAZZO F.LLI COSTRUZIONI');
+  assert.equal(breve('GN Edile Srls'), 'GN Edile');
+  assert.equal(breve('S.A.F. S.A.S. DI SARTORATO ANTONIO & C'), 'S.A.F.');
+  assert.equal(breve('F.lli Martini di Martini Giuseppe & C. snc'), 'F.lli Martini di Martini Giuseppe');
+  assert.equal(breve('C.S. Costruzioni'), 'C.S. Costruzioni');
+  assert.ok(breve('Costruzioni Edili M F di Botton Mauro e Desolei Fabrizio').length <= 35);
+}
 assert.ok(/cantiere_chiuso,lotto'\)\.eq\('elimina',0\)/.test(html) && /🧩 lotto \$\{esc\(c\.lotto\)\}/.test(html) && /ultima visita \$\{esc\(fmtDate\(_uv\.data_visita\)\)\}/.test(html), 'nella ricerca il lotto, con l’ultima visita');
 assert.ok(/<script src="lotti-cantiere\.js\?v=3"><\/script>/.test(html));
 assert.ok(/- 'lotti-cantiere\.js'/.test(yml) && / lotti-cantiere\.js /.test(yml), 'pubblicato (tutte e due le liste del deploy)');

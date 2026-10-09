@@ -116,10 +116,25 @@ function comuneLeggibile(s: string): string {
   return c.toLowerCase().split(' ').map((w, i) => (i > 0 && minuscole.has(w)) ? w
     : w.replace(/(^|['’-])(\p{L})/gu, (_m, a, b) => a + b.toUpperCase())).join(' ')
 }
+/* (09/10/2026, chiesto dall'utente: «il nome dell'azienda potrebbe essere ridotto, altrimenti viene troppo lungo»)
+   Nel nome del file l'impresa va senza forma giuridica e senza i soci che la seguono («ROR COSTRUZIONI S.A.S.
+   DI ROSU IONEL & C» → «ROR COSTRUZIONI»), come le cartelle-impresa dell'asseverazione, e al massimo 35
+   caratteri tagliati fra due parole. La ragione sociale intera resta nel database e sul PDF. */
+const FORMA_GIURIDICA = /\s(?:&\s*c\.?\s*)?(?:s\.?\s?r\.?\s?l\.?\s?s?|s\.?\s?p\.?\s?a|s\.?\s?n\.?\s?c|s\.?\s?a\.?\s?s|s\.?\s?c\.?\s?a\.?\s?r\.?\s?l|soc(?:iet[àa]'?)?\.?\s+coop\S*|coop\S*)\.?(?=\s|$).*$/iu
+export function impresaBreve(s: unknown, max = 35): string {
+  const tutto = pulisci(s)
+  let c = tutto.replace(FORMA_GIURIDICA, '').replace(/\s+(&|e)\s*c\.?$/i, '').trim() || tutto
+  if (c.length > max) {
+    let r = ''
+    for (const p of c.split(' ')) { if ((r ? r.length + 1 : 0) + p.length > max) break; r = r ? r + ' ' + p : p }
+    c = r || c.slice(0, max)
+  }
+  return c.replace(/(\s+(di|dei|del|della|e|&))+$/i, '').replace(/[ ,&-]+$/, '') || tutto.slice(0, max)
+}
 /* Verbale_NNNN_Impresa_Comune_Tecnico_aaaa mm gg.pdf — la convenzione dei verbali del vault */
 export function nomeArchivio(x: { nr: string; impresa: string; comune: string; tecnico: string; data: string }): string {
   const num = ((x.nr || '').match(/(\d+)\s*$/)?.[1] || '').padStart(4, '0').slice(-4) || 'SN'
-  const imp = pulisci(x.impresa).slice(0, 50).replace(/[ .]+$/, '') || 'ImpresaNonIndicata'
+  const imp = impresaBreve(x.impresa) || 'ImpresaNonIndicata'
   const com = comuneLeggibile(x.comune) || 'ComuneNonDocumentato'
   const tec = pulisci(x.tecnico) || 'TecnicoNonIndicato'
   const dat = /^\d{4}-\d{2}-\d{2}/.test(x.data || '') ? x.data.slice(0, 10).replace(/-/g, ' ') : 'data-non-indicata'
