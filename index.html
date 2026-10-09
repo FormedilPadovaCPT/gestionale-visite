@@ -9686,7 +9686,8 @@ $('btn-ev-invia').onclick=async()=>{
           pdf_base64: pdfBase64,
           nr_verbale: vGet('f-verbale')||window._evContext?.nr_verbale||'',
           data_visita: vGet('f-data')||window._evContext?.data_visita||'',
-          visita_id: vid
+          visita_id: vid,
+          impronta: window._pdfImpronta||null   // (09/10/2026) stessi dati = il file in archivio non si riscrive
         })
       })
     }finally{clearTimeout(upTout)}
@@ -10033,6 +10034,17 @@ async function genPDF(vid, output='save'){
 
     const doc=window.VerbalePDF.crea(window.jspdf.jsPDF,pd,img)
 
+    /* (09/10/2026) L'IMPRONTA DEI DATI DEL VERBALE: dice all'archivio se il PDF e' cambiato. Contiene tutto
+       quello che va sul foglio tranne la data di stampa («Padova, gg/mm/aaaa» e «Generato il»): rigenerare
+       lo stesso verbale un altro giorno non e' una modifica. Stessa impronta = il file in archivio resta. */
+    let _impronta=null
+    try{
+      const _j=JSON.stringify({pd:{...pd,dataOggi:null},img})
+      const _h=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(_j))
+      _impronta=[...new Uint8Array(_h)].map(b=>b.toString(16).padStart(2,'0')).join('')
+    }catch(_eI){console.warn('impronta del verbale non calcolata:',_eI)}
+    window._pdfImpronta=_impronta
+
     // Salva PDF su Drive in background (non bloccante)
     const _uploadPdfDrive=async(b64)=>{
       try{
@@ -10041,10 +10053,10 @@ async function genPDF(vid, output='save'){
         const r=await fetch(`${SB_URL}/functions/v1/upload-pdf`,{
           method:'POST',
           headers:{'Content-Type':'application/json','Authorization':`Bearer ${tkn}`,'apikey':SB_KEY},
-          body:JSON.stringify({pdf_base64:b64,nr_verbale:v.nr_verbale,data_visita:v.data_visita,visita_id:vid})
+          body:JSON.stringify({pdf_base64:b64,nr_verbale:v.nr_verbale,data_visita:v.data_visita,visita_id:vid,impronta:_impronta})
         })
         const d=await r.json()
-        if(d.ok)toast('PDF salvato su Drive ✓','ok')
+        if(d.ok)toast(d.esito==='invariato'?'PDF già in archivio, uguale: non l\'ho ricopiato ✓':d.esito==='sostituito'?'PDF aggiornato in archivio (sostituito il precedente) ✓':'PDF salvato in archivio ✓','ok')
         else console.warn('upload-pdf:',d.error)
       }catch(e){console.warn('upload-pdf:',e)}
     }

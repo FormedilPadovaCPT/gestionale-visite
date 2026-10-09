@@ -56,6 +56,15 @@ assert.ok(/\$\{\(window\.__isSegreteria\|\|window\.__isCoordinatoreVero\)\?'<but
 assert.ok(/window\.__isCoordinatoreVero=null\n\s+if\(!isSegreteria\)\{try\{const r=await sb\.rpc\('is_coordinatore'\)/.test(html), 'il ruolo di coordinatore si chiede al database all’accesso');
 const _pc = fs.readFileSync(path.join(__dirname, '..', 'proposte-chiusura.js'), 'utf8');
 assert.ok(_pc.includes('const ufficio = () => !!(window.__isCoord || window.__isSegreteria || window.__isCoordinatoreVero);') && html.includes('proposte-chiusura.js?v=2'), 'il coordinatore non propone alla segreteria: chiude o respinge');
+/* (09/10/2026, chiesto dall'utente) i PDF dei verbali vanno nell'archivio dei verbali, un file per verbale:
+   l'impronta dei dati (senza la data di stampa) evita di riscriverlo se non e' cambiato */
+assert.ok(/JSON\.stringify\(\{pd:\{\.\.\.pd,dataOggi:null\},img\}\)/.test(html), 'l’impronta esclude la data di stampa');
+assert.ok(/visita_id:vid,impronta:_impronta\}/.test(html) && /impronta: window\._pdfImpronta\|\|null/.test(html), 'tutte e due le strade passano l’impronta');
+const _up = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'upload-pdf', 'index.ts'), 'utf8');
+assert.ok(_up.includes("'2_AREE/Sopralluoghi/verbali'") && /return `Verbale_\$\{num\}_\$\{imp\}_\$\{com\}_\$\{tec\}_\$\{dat\}\.pdf`/.test(_up), 'archivio e nome a convenzione');
+assert.ok(/esist\.appProperties\?\.impronta === String\(impronta\)/.test(_up) && /method: 'PATCH', headers: \{ Authorization: `Bearer \$\{token\}`, 'Content-Type': tipo \}/.test(_up), 'stessi dati: niente; dati cambiati: si sostituisce lo stesso file');
+assert.ok(/role: 'reader', type: 'anyone'/.test(_up), 'il link pubblico resta (deciso dall’utente)');
+assert.ok(/const dove = cartella \|\| FOLDER_ID/.test(_up), 'se l’archivio non si trova, si salva dove si salvava prima');
 assert.ok(/cantiere_chiuso,lotto'\)\.eq\('elimina',0\)/.test(html) && /🧩 lotto \$\{esc\(c\.lotto\)\}/.test(html) && /ultima visita \$\{esc\(fmtDate\(_uv\.data_visita\)\)\}/.test(html), 'nella ricerca il lotto, con l’ultima visita');
 assert.ok(/<script src="lotti-cantiere\.js\?v=3"><\/script>/.test(html));
 assert.ok(/- 'lotti-cantiere\.js'/.test(yml) && / lotti-cantiere\.js /.test(yml), 'pubblicato (tutte e due le liste del deploy)');
