@@ -81,6 +81,15 @@ assert.ok(/const dove = cartella \|\| FOLDER_ID/.test(_up), 'se l’archivio non
   assert.equal(breve('C.S. Costruzioni'), 'C.S. Costruzioni');
   assert.ok(breve('Costruzioni Edili M F di Botton Mauro e Desolei Fabrizio').length <= 35);
 }
+/* (09/10/2026, chiesto dall'utente) tipo di opera «Altro»: descrizione obbligatoria e riportata sul PDF */
+{
+  assert.ok(html.includes('<label>Specificare tipo opera *</label>'), 'la descrizione di «Altro» ha l’asterisco');
+  assert.ok(/\+d\.tipOpe===16&&!String\(d\.tipOpeAltro\|\|''\)\.trim\(\)/.test(html), 'senza descrizione la scheda non si salva');
+  assert.ok(html.includes('verbale-pdf.js?v=12'), 'il PDF nuovo è servito');
+  const _pdf = fs.readFileSync(path.join(__dirname, '..', 'verbale-pdf.js'), 'utf8');
+  assert.ok(/const opeAltro = \+tipOpe === 16 \? String\(cant\.cantiere_tip_ope_altro/.test(_pdf)
+    && _pdf.includes("TIP_OPE[tipOpe] + (opeAltro ? ' – ' + opeAltro : '')"), 'sul PDF «Altro – descrizione»');
+}
 assert.ok(/cantiere_chiuso,lotto'\)\.eq\('elimina',0\)/.test(html) && /🧩 lotto \$\{esc\(c\.lotto\)\}/.test(html) && /ultima visita \$\{esc\(fmtDate\(_uv\.data_visita\)\)\}/.test(html), 'nella ricerca il lotto, con l’ultima visita');
 assert.ok(/<script src="lotti-cantiere\.js\?v=3"><\/script>/.test(html));
 assert.ok(/- 'lotti-cantiere\.js'/.test(yml) && / lotti-cantiere\.js /.test(yml), 'pubblicato (tutte e due le liste del deploy)');

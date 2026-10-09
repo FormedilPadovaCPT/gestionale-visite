@@ -116,11 +116,15 @@
     fig('CSE', v.cse, v.cse_email, v.cse_tel)
 
     const ncImp = +v.nr_imp_non_censite || 0, ncLav = +v.nr_lav_non_censite || 0, ncAut = +v.nr_ind_non_censite || 0
+    /* (09/10/2026, chiesto dall'utente) con tipo di opera «Altro» (16) il PDF dice anche quale: la descrizione
+       della scheda del cantiere, obbligatoria in quel caso, va accanto ad «Altro» */
+    const tipOpe = v.vis_tip_ope ?? cant.cantiere_tip_ope
+    const opeAltro = +tipOpe === 16 ? String(cant.cantiere_tip_ope_altro || '').trim() : ''
     const cantiere = [
       ['Indirizzo', cant.cantiere_indirizzo || '–', 'N° civico', cant.cantiere_civico || '–'],
       ['Comune', cant.comune_nome || '–', 'CAP', cant.cantiere_cap || '–'],
       // quello che risultava in questa visita (30/09/2026), altrimenti quello del cantiere
-      ['Tipo intervento', TIP_INT[v.vis_tip_int ?? cant.cantiere_tip_int] || '–', 'Tipo opera', TIP_OPE[v.vis_tip_ope ?? cant.cantiere_tip_ope] || '–'],
+      ['Tipo intervento', TIP_INT[v.vis_tip_int ?? cant.cantiere_tip_int] || '–', 'Tipo opera', TIP_OPE[tipOpe] ? TIP_OPE[tipOpe] + (opeAltro ? ' – ' + opeAltro : '') : '–'],
       ['Importo lavori (€)', IMP_LBL[v.vis_importo ?? cant.cantiere_importo] || '–', 'Durata cantiere', DUR_LBL[v.vis_durata ?? cant.cantiere_durata] || '–'],
       ['Codice CNCE', cant.cantiere_cnce || '–', 'Etichetta cantiere', cant.cantiere_etichetta || '–'],   // 06/10/2026: l'etichetta (Osservatorio) al posto del codice univoco
       ['N° imprese in cantiere', String((imps.filter((im) => im.impresa_id).length + ncImp + ncAut) || v.nr_imp || 1), 'Totale lavoratori', String((imps.reduce((s, im) => s + (+im.nr_lav || 0), 0) + ncLav) || v.nr_lavoratori || 0)]
