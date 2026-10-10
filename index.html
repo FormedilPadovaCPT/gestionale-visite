@@ -245,6 +245,12 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 /* menu IPC della mappa in Dashboard: niente triangolino nativo (Safari/iPhone) */
 #dash-map-ipc>summary::-webkit-details-marker{display:none}
 #dash-map-ipc label:hover{background:#f5f5f7}
+/* (10/10/2026) cantiere con serie di visite attiva: anello arancione che si allarga e sfuma sotto il pallino */
+.dm-serie{pointer-events:none}
+.dm-serie span{position:absolute;left:-8px;top:-8px;width:16px;height:16px;box-sizing:border-box;border-radius:50%;border:3px solid #e7500f;animation:dmSerie 2s ease-out infinite}
+@keyframes dmSerie{0%{transform:scale(1);opacity:.95}100%{transform:scale(2.8);opacity:0}}
+.dm-serie-leg{display:inline-block;width:12px;height:12px;box-sizing:border-box;border-radius:50%;border:3px solid #e7500f;box-shadow:0 0 0 3px rgba(231,80,15,.25);vertical-align:middle}
+@media (prefers-reduced-motion:reduce){.dm-serie span{animation:none;transform:scale(1.7);opacity:.85}}
 .tgt-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:8px}
 @media(max-width:720px){.tgt-grid{grid-template-columns:1fr}}
 .save-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:2px solid var(--border)}
@@ -600,7 +606,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <p id="dash-map-spiega" style="font-size:12.5px;color:#555;margin:-4px 0 8px;line-height:1.45">Ogni pallino è un <b>cantiere aperto</b>, colorato con l'IPC della sua <b>ultima visita</b>, chiunque l'abbia fatta: è la situazione attuale dei cantieri che tutti i tecnici stanno seguendo. I cantieri chiusi non compaiono. Tocca un pallino per verbale, data e tecnico.</p>
         <div id="dash-map-filters" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0 10px;font-size:12px"></div>
         <div id="dash-map" style="height:520px;width:100%;border-radius:8px;border:1px solid var(--line,#e3e3e6);position:relative;z-index:0;isolation:isolate"></div>
-        <div id="dash-map-note" style="font-size:11px;color:#999;margin-top:6px">Bordo tratteggiato = posizione al centro del comune (indirizzo non geolocalizzabile con precisione); gli altri sono sull'indirizzo. Contatori, grafici e tabelle sono nella scheda <b>📊 Statistiche</b>.</div>
+        <div id="dash-map-note" style="font-size:11px;color:#999;margin-top:6px"><span style="color:#555;white-space:nowrap"><span class="dm-serie-leg"></span> cantiere con serie di visite attiva</span> &middot; Bordo tratteggiato = posizione al centro del comune (indirizzo non geolocalizzabile con precisione); gli altri sono sull'indirizzo. Contatori, grafici e tabelle sono nella scheda <b>📊 Statistiche</b>.</div>
       </div>
     </section>
 
@@ -6939,6 +6945,7 @@ function _ceivDash(v){
 
 // ── MAPPA CANTIERI (dashboard) ──
 let _dashMap=null, _dashMapLayers=null
+let _dashMapSerie={}, _dashMapSerieErr=false, _dashMapSoloSerie=false, _dashMapSerieLayer=null
 let _dashMapRows=null, _dashMapOrder=['NR','BASSO','MEDIO','ALTO'], _dashMapIpcOn={NR:true,BASSO:true,MEDIO:true,ALTO:true}, _dashMapTec='', _dashMapCom=''
 async function loadDashMap(){
   if(typeof L==='undefined'){console.warn('Leaflet non caricato');return}
@@ -6951,13 +6958,38 @@ async function loadDashMap(){
   // solo i cantieri aperti: e' la situazione dei cantieri in monitoraggio (23/09/2026)
   const rows=(data||[]).filter(r=>r.lat!=null&&r.lng!=null&&!r.cantiere_chiuso)
   const order=['NR','BASSO','MEDIO','ALTO']
+  /* (10/10/2026, chiesto dall'utente) CANTIERI CON SERIE DI VISITE ATTIVA. Una serie è un incarico con più visite
+     previste ancora «aperto»; i suoi cantieri sono quelli delle visite fatte per lei (visite.incarico_id), quindi si
+     accendono anche le serie senza impresa collegata. Se vede tutte le serie o solo le sue dipende dai permessi di
+     chi guarda: per l'utente è indifferente. Se la lettura fallisce lo si dice, non si mostra «nessuna». */
+  _dashMapSerie={};_dashMapSerieErr=false
+  try{
+    const{data:ser,error:eS}=await sb.from('incarichi').select('id,impresa,visite_fatte,visite_previste')
+      .gt('visite_previste',1).eq('stato','aperto').is('chiuso_il',null)
+    if(eS)throw eS
+    const perId={};(ser||[]).forEach(s=>{perId[s.id]=s})
+    const ids=Object.keys(perId).map(Number)
+    if(ids.length){
+      const{data:vs,error:eV}=await sb.from('visite').select('cantiere_id,incarico_id,stato,elimina').in('incarico_id',ids)
+      if(eV)throw eV
+      ;(vs||[]).forEach(v=>{
+        const s=perId[v.incarico_id]
+        if(!s||!v.cantiere_id||v.stato==='bozza'||+v.elimina)return
+        const l=(_dashMapSerie[v.cantiere_id]=_dashMapSerie[v.cantiere_id]||[])
+        if(!l.includes(s))l.push(s)
+      })
+    }
+  }catch(eSer){console.warn('mappa, serie di visite:',eSer);_dashMapSerieErr=true}
 
   if(!_dashMap){
     _dashMap=L.map('dash-map').setView([45.35,11.85],10)
+    // gli anelli delle serie stanno sotto i pallini (overlayPane = 400) e non prendono i tocchi
+    const _ps=_dashMap.createPane('dmSerie');_ps.style.zIndex=390;_ps.style.pointerEvents='none'
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(_dashMap)
   }
   if(_dashMapLayers){order.forEach(k=>{_dashMap.removeLayer(_dashMapLayers[k])})}
   _dashMapLayers={};order.forEach(k=>_dashMapLayers[k]=L.layerGroup().addTo(_dashMap))
+  if(!_dashMapSerieLayer)_dashMapSerieLayer=L.layerGroup().addTo(_dashMap)
 
   // spread a raggiera per i marker a livello comune sovrapposti
   const grp={}
@@ -7037,6 +7069,15 @@ async function loadDashMap(){
     if(_dashMapTec&&!_st.value)_dashMapTec=''
     const _sc=_menu('dash-map-com','🏘️ Comune','Tutti',_conta('comune_nome'),_dashMapCom,v=>{_dashMapCom=v})
     if(_dashMapCom&&!_sc.value)_dashMapCom=''
+    // (10/10/2026) solo i cantieri con una serie di visite attiva
+    const _nSerie=rows.filter(d=>_dashMapSerie[d.cantiere_id]).length
+    const _ls=document.createElement('label')
+    _ls.style.cssText='display:inline-flex;align-items:center;gap:5px;cursor:pointer'
+    _ls.title=_dashMapSerieErr?'Non sono riuscito a leggere le serie di visite: riprova più tardi':'Mostra solo i cantieri con una serie di visite attiva'
+    _ls.innerHTML='<input type="checkbox" id="dash-map-serie"'+(_dashMapSoloSerie&&!_dashMapSerieErr?' checked':'')+(_dashMapSerieErr?' disabled':'')+'> <span class="dm-serie-leg"></span> Solo serie attive ('+(_dashMapSerieErr?'non lette':_nSerie)+')'
+    if(_dashMapSerieErr)_dashMapSoloSerie=false
+    _ls.querySelector('input').addEventListener('change',e=>{_dashMapSoloSerie=e.target.checked;renderDashMapMarkers()})
+    fdiv.appendChild(_ls)
     const cnt=document.createElement('span')
     cnt.id='dash-map-conta';cnt.style.cssText='color:#888;font-size:12px'
     fdiv.appendChild(cnt)
@@ -7049,12 +7090,15 @@ async function loadDashMap(){
 function renderDashMapMarkers(fit=true){
   if(!_dashMap||!_dashMapLayers||!_dashMapRows)return
   _dashMapOrder.forEach(k=>_dashMapLayers[k].clearLayers())
+  if(_dashMapSerieLayer)_dashMapSerieLayer.clearLayers()
   const bounds=[]
   _dashMapRows.forEach(d=>{
     const k=_DM_IPC[d.ipc]?d.ipc:'NR'
     if(!_dashMapIpcOn[k])return
     if(_dashMapTec&&d.tecnico!==_dashMapTec)return
     if(_dashMapCom&&d.comune_nome!==_dashMapCom)return
+    const ser=_dashMapSerie[d.cantiere_id]
+    if(_dashMapSoloSerie&&!ser)return
     const c=_DM_IPC[k].color
     const approx=d.geocode_status==='comune'
     const m=L.circleMarker([d.lat,d.lng],{radius:7,color:approx?'#777':'#fff',weight:2,dashArray:approx?'3 2':null,fillColor:c,fillOpacity:0.9})
@@ -7065,10 +7109,13 @@ function renderDashMapMarkers(fit=true){
       '<b>N. verbale:</b> '+(d.nr_verbale||'-')+'<br>'+
       '<b>Tecnico:</b> '+(d.tecnico||'-')+'<br>'+
       '<b>Data visita:</b> '+dt+
+      (ser?ser.map(s=>'<br><b style="color:#e7500f">Serie di visite:</b> '+(s.visite_fatte||0)+' di '+s.visite_previste+' – '+_cmEsc(s.impresa||'')).join(''):'')+
       (approx?'<br><i style="color:#999">posizione approssimata (comune)</i>':'')+
       (d.cantiere_id?'<br>'+_geoFixBtn(d.cantiere_id,'dash'):'')
     )
     m.addTo(_dashMapLayers[k])
+    if(ser&&_dashMapSerieLayer)L.marker([d.lat,d.lng],{pane:'dmSerie',interactive:false,keyboard:false,
+      icon:L.divIcon({className:'dm-serie',html:'<span></span>',iconSize:[0,0]})}).addTo(_dashMapSerieLayer)
     bounds.push([d.lat,d.lng])
   })
   if(fit&&bounds.length)_dashMap.fitBounds(bounds,{padding:[30,30],maxZoom:15})
