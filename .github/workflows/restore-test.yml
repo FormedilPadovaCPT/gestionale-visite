@@ -43,7 +43,7 @@ permissions:
 
 jobs:
   ripristino:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # (12/10/2026) fisso: pg_dump 17 arriva dal repo PGDG scelto col nome della versione di Ubuntu; su ubuntu-latest = Ubuntu 26 (dal 19/10/2026) quel repo potrebbe mancare e il backup fallirebbe
     timeout-minutes: 40
     services:
       db:
