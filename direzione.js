@@ -623,7 +623,7 @@
     if (tit && tit.nodeType === 3) tit.textContent = (R.presidenza && !R.direttore ? '🏛️ Presidenza — ' : '🏛️ Direzione — ');
     const intro = $('dir-intro');
     if (intro) intro.textContent = R.direttore
-      ? 'Quello che aspetta te: autorizzazioni dei servizi CPT, conferme sui cantieri critici e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
+      ? 'Quello che aspetta te: autorizzazioni dei servizi CPT, preventivi di asseverazione da approvare, conferme sui cantieri critici e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
       : R.presidenza
         ? 'Quello che aspetta te: cantieri critici demandati alla Presidenza e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
         : 'Le questioni che coordinatore e segreteria hanno aperto per la Presidenza. La mappa e le statistiche sono nelle altre due schede.';
@@ -638,6 +638,7 @@
       } catch (e) { boxCritici(cri, [], e.message || String(e)); }
     } else if (cri) cri.innerHTML = '';
     try { await firmeBox(Rv, _come); } catch (e) { console.warn('da firmare:', e); }
+    try { await approvazioniBox(Rv, _come); } catch (e) { console.warn('da approvare:', e); }
     await decisioniBox($('dir-decisioni'), 'direzione');
     badge().catch(() => {});
   }
@@ -747,6 +748,121 @@
     }));
   }
 
+  /* ════════════════════════════════════════════════════════════
+     3-ter. PREVENTIVI DA APPROVARE (12/10/2026, chiesto dall'utente)
+     Il preventivo 5.D.2 dell'asseverazione esce a firma del Direttore: la
+     segreteria glielo manda dall'app asseverazione (funzione
+     approvazione-direttore) e al Direttore arriva la mail. Qui legge la
+     BOZZA — senza firma — e preme «Approvo», oppure «Rimando» con due righe
+     di nota, che tornano alla segreteria. Solo dopo l'approvazione il
+     preventivo prende il numero, il timbro e la firma. «Approvo» si accende
+     solo dopo aver aperto la bozza.
+     Approva solo il Direttore (is_direttore). Nell'anteprima «Vedi come…»
+     la segreteria vede l'elenco senza i pulsanti, che il server le
+     rifiuterebbe.
+     ════════════════════════════════════════════════════════════ */
+  const _lette = new Set();
+  const euroIt = (n) => Number(n || 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  async function approvazioniBox(R, anteprima) {
+    let host = $('dir-approvazioni');
+    const vista = $('view-direzione');
+    if (!host && vista) {
+      host = document.createElement('div'); host.id = 'dir-approvazioni';
+      const prima = $('dir-autorizzazioni');
+      if (prima && prima.parentNode) prima.parentNode.insertBefore(host, prima.nextSibling); else vista.appendChild(host);
+    }
+    if (!host) return;
+    const direttore = !anteprima && R.direttore;
+    const guarda = anteprima === 'direttore' && R.segr;
+    if (!direttore && !guarda) { host.innerHTML = ''; return; }
+    const sb = window.sb;
+    const { data, error } = await sb.from('s_approvazioni_direttore')
+      .select('id, titolo, dettaglio, stato, richiesta_il, decisa_il, nota, file_bozza')
+      .in('stato', ['in_attesa', 'approvata', 'rimandata']).order('richiesta_il', { ascending: false }).limit(60);
+    if (error) {
+      host.innerHTML = `<div class="card" style="border-left:4px solid #c0392b"><h3>📑 Preventivi da approvare</h3><p style="font-size:13px;color:#c0392b;margin:0">Non sono riuscito a leggere i preventivi da approvare: ${esc(error.message)}</p></div>`;
+      return;
+    }
+    const attesa = (data || []).filter((r) => r.stato === 'in_attesa').reverse();
+    const recenti = (data || []).filter((r) => r.stato !== 'in_attesa').slice(0, 5);
+    const sintesi = (d) => {
+      d = d || {};
+      const parti = [];
+      if (d.giornate != null) parti.push(`${String(d.giornate).replace('.', ',')} giornate`);
+      if (d.totale != null) parti.push(`totale ${euroIt(d.totale)} + IVA`);
+      let h = parti.length ? `<br><span style="font-size:12px;color:#555">${esc(parti.join(' · '))}</span>` : '';
+      if (Array.isArray(d.sotto_minimo) && d.sotto_minimo.length) {
+        h += `<br><span style="font-size:12px;color:#b35c00">⚠ Sotto il minimo della norma: ${esc(d.sotto_minimo.join(' '))}</span>`;
+        if (Array.isArray(d.motivazioni) && d.motivazioni.length) h += `<br><span style="font-size:12px;color:#555">Motivazione: ${esc(d.motivazioni.join(' · '))}</span>`;
+      }
+      return h;
+    };
+    const riga = (r) => {
+      const g = giorni(r.richiesta_il);
+      const letta = _lette.has(r.id);
+      return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 0;border-top:1px solid #f0e6dd">
+        <span style="font-size:13px;flex:1;min-width:220px"><strong>${esc(r.titolo)}</strong>${sintesi(r.dettaglio)}<br><span style="font-size:11.5px;color:#888">mandato il ${dIt(r.richiesta_il)}${g ? ' · in attesa da ' + g + ' g' : ''}</span></span>
+        <button class="btn-secondary btn-sm" type="button" data-appr-leggi="${r.id}" data-aiuto="Apre la bozza del preventivo in una scheda nuova. Dopo averla letta si accende «Approvo».">📄 Leggi</button>
+        ${direttore ? `<button class="btn-primary btn-sm" type="button" data-appr-si="${r.id}" ${letta ? '' : 'disabled title="Prima apri la bozza con «Leggi»"'} data-aiuto="Approvi il preventivo così com'è: la segreteria può protocollarlo e generarlo con timbro e firma. Se poi cambia, torna da te.">✅ Approvo</button>
+        <button class="btn-secondary btn-sm" type="button" data-appr-no="${r.id}" data-aiuto="Non approvi: scrivi in due righe che cosa cambiare, e il preventivo torna alla segreteria con la tua nota.">↩ Rimando</button>` : ''}
+      </div>`;
+    };
+    const rigaFatta = (r) => `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid #f4f4f4;font-size:12px;color:#666">
+        <span style="flex:1;min-width:220px">${r.stato === 'approvata' ? '✅' : '↩'} ${esc(r.titolo)} — ${r.stato === 'approvata' ? 'approvato il ' + oraIt(r.decisa_il) : 'rimandato il ' + dIt(r.decisa_il)}${r.nota ? ': «' + esc(r.nota) + '»' : ''}</span>
+      </div>`;
+    host.innerHTML = `<div class="card" style="border-left:4px solid ${attesa.length ? 'var(--orange,#e7500f)' : '#95C22F'}">
+      <h3>📑 Preventivi da approvare${attesa.length ? ` — <span style="color:#b35c00">${attesa.length} ${attesa.length === 1 ? 'preventivo' : 'preventivi'}</span>` : ''}</h3>
+      ${attesa.length
+        ? `<p style="font-size:12.5px;color:#555;margin:0 0 4px">I preventivi di asseverazione che escono a tua firma. Apri la bozza con «Leggi», poi «Approvo»: solo dopo la segreteria li protocolla e li genera con timbro e firma.${guarda ? ' <em>(anteprima: i pulsanti li vede solo il Direttore)</em>' : ''}</p>${attesa.map(riga).join('')}`
+        : '<p style="font-size:13px;color:#555;margin:0">Niente da approvare.</p>'}
+      ${recenti.length ? `<div style="font-size:11px;color:#999;margin-top:10px">Ultimi approvati o rimandati:</div>${recenti.map(rigaFatta).join('')}` : ''}
+    </div>`;
+    const apri = async (percorso) => {
+      /* la scheda si apre subito (sul telefono una finestra aperta dopo un'attesa viene bloccata), poi prende l'indirizzo */
+      const w = window.open('', '_blank');
+      const { data: u, error: e } = await sb.storage.from('approvazioni-direttore').createSignedUrl(percorso, 600);
+      if (e || !u?.signedUrl) { if (w) w.close(); avviso('Non riesco ad aprire la bozza: ' + (e?.message || ''), 'err'); return false; }
+      if (w) w.location.href = u.signedUrl; else window.location.href = u.signedUrl;
+      return true;
+    };
+    const di = (id) => (data || []).find((r) => r.id === id);
+    const chiama = async (corpo) => {
+      const { data: out, error: e } = await sb.functions.invoke('approvazione-direttore', { body: corpo });
+      if (e || out?.error) {
+        let msg = out?.error; try { msg = msg || (await e.context.json()).error; } catch (_x) { /* niente */ }
+        return msg || e?.message || 'errore';
+      }
+      return null;
+    };
+    host.querySelectorAll('[data-appr-leggi]').forEach((b) => b.addEventListener('click', async () => {
+      const r = di(Number(b.dataset.apprLeggi)); if (!r) return;
+      if (await apri(r.file_bozza)) {
+        _lette.add(r.id);
+        const si = host.querySelector(`[data-appr-si="${r.id}"]`);
+        if (si) { si.disabled = false; si.removeAttribute('title'); }
+      }
+    }));
+    host.querySelectorAll('[data-appr-si]').forEach((b) => b.addEventListener('click', async () => {
+      const r = di(Number(b.dataset.apprSi)); if (!r) return;
+      if (!confirm(`Approvo «${r.titolo}»?\n\nLa segreteria potrà protocollarlo e generarlo con il timbro e la tua firma. Se il preventivo viene cambiato, torna da te.`)) return;
+      b.disabled = true; b.textContent = 'Approvo…';
+      const err = await chiama({ azione: 'approva', id: r.id });
+      if (err) { b.disabled = false; b.textContent = '✅ Approvo'; avviso('Approvazione non riuscita: ' + err, 'err'); return; }
+      avviso('Approvato. La segreteria lo protocolla e lo manda all\'impresa.', 'ok');
+      approvazioniBox(R, anteprima); badge().catch(() => {});
+    }));
+    host.querySelectorAll('[data-appr-no]').forEach((b) => b.addEventListener('click', async () => {
+      const r = di(Number(b.dataset.apprNo)); if (!r) return;
+      const nota = prompt(`Non approvi «${r.titolo}».\n\nScrivi in due righe che cosa va cambiato: lo legge la segreteria.`);
+      if (nota === null) return;
+      if (nota.trim().length < 3) { avviso('Scrivi che cosa cambiare: torna alla segreteria.', 'err'); return; }
+      const err = await chiama({ azione: 'rimanda', id: r.id, nota: nota.trim() });
+      if (err) { avviso('Non riuscito: ' + err, 'err'); return; }
+      avviso('Rimandato alla segreteria con la tua nota.', 'ok');
+      approvazioniBox(R, anteprima); badge().catch(() => {});
+    }));
+  }
+
   /* il numero sul pulsante «Direzione»: tutto ciò che aspetta chi è collegato */
   async function badge() {
     const b = $('nav-dir-badge'); if (!b) return;
@@ -758,6 +874,10 @@
       const { data } = await window.sb.from('s_decisioni').select('id,stato,rinviata_al,decisore').in('stato', ['aperta', 'rinviata']);
       n += (data || []).filter((r) => (r.stato === 'aperta' || (r.rinviata_al && r.rinviata_al <= T)) && ((r.decisore === 'direttore' && R.direttore) || (r.decisore === 'presidenza' && R.presidenza))).length;
       if (R.direttore) { const a = await inAttesa(); n += (a.autorizzazioni || []).length + (a.critici || []).length; }
+      if (R.direttore) {
+        const { count } = await window.sb.from('s_approvazioni_direttore').select('id', { count: 'exact', head: true }).eq('stato', 'in_attesa');
+        n += count || 0;
+      }
       else if (R.presidenza) { const a = await inAttesa(); n += (a.critici || []).length; }
       if (R.presidente) {
         const { count } = await window.sb.from('s_firme_presidente').select('id', { count: 'exact', head: true }).eq('stato', 'in_attesa');
@@ -954,7 +1074,7 @@
   (function stileDirezione() {
     const st = document.createElement('style');
     st.textContent = '#view-direzione,#adm-decisioni{max-width:100%;overflow-x:hidden}'
-      + '#dir-autorizzazioni,#dir-critici,#dir-decisioni,#adm-decisioni,#dir-finestra{overflow-wrap:anywhere;word-break:break-word}'
+      + '#dir-autorizzazioni,#dir-approvazioni,#dir-critici,#dir-decisioni,#adm-decisioni,#dir-finestra{overflow-wrap:anywhere;word-break:break-word}'
       + '#dir-decisioni .card>div,#adm-decisioni .card>div,#dir-critici .card>div{max-width:100%}'
       + '#dir-decisioni [style*="flex:1"],#adm-decisioni [style*="flex:1"],#dir-critici [style*="flex:1"]{min-width:0!important}'
       + '#dir-decisioni details,#adm-decisioni details{max-width:100%;overflow:hidden}'
