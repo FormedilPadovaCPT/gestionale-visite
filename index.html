@@ -1825,6 +1825,17 @@ tr.row-detail-hover:hover td{background:#fff3ed}
   <div class="modal-box" style="max-width:480px">
     <h3>&#128205; Segnala cantiere</h3>
     <div id="segn-gps" style="font-size:13px;padding:8px 10px;border-radius:8px;background:#f4f6f8;margin-bottom:8px">&#8987; Rilevamento posizione GPS&#8230;</div>
+    <!-- (12/10/2026) dal PC (da casa): comune, via e civico mettono il segnaposto; poi lo si sistema a mano -->
+    <details id="segn-cerca" style="margin-bottom:8px;border:1px solid #e3e6ea;border-radius:8px;padding:6px 10px">
+      <summary style="cursor:pointer;font-size:13px;font-weight:600">&#128270; Cerca un indirizzo</summary>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:flex-end">
+        <div class="field" style="flex:1 1 140px;margin:0"><label>Comune</label><input type="text" id="segn-comune" list="segn-comuni-dl" autocomplete="off" placeholder="es. Piove di Sacco"><datalist id="segn-comuni-dl"></datalist></div>
+        <div class="field" style="flex:2 1 170px;margin:0"><label>Via</label><input type="text" id="segn-via" autocomplete="off" placeholder="es. Via Amerigo Vespucci"></div>
+        <div class="field" style="flex:0 0 70px;margin:0"><label>Civico</label><input type="text" id="segn-civico" autocomplete="off" placeholder="4"></div>
+        <button type="button" class="btn-primary btn-sm" id="segn-trova" style="padding:7px 12px" data-aiuto="Cerca l'indirizzo sulla mappa (OpenStreetMap) e ci mette il segnaposto: poi, se serve, lo sposti a mano.">&#128270; Trova</button>
+      </div>
+      <div id="segn-trova-esito" style="font-size:11.5px;color:#666;margin-top:6px"></div>
+    </details>
     <!-- (12/10/2026) il cantiere visto dalla strada: il segnaposto si sposta sul punto giusto -->
     <div id="segn-mappa" style="height:240px;border-radius:8px;border:1px solid #e3e6ea;margin-bottom:4px"></div>
     <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:11.5px;color:#666;margin-bottom:10px">
@@ -8204,7 +8215,9 @@ function _cmPopupSegn(s){
     '<b>Quando:</b> '+dt+'<br>'+
     '<b>Da:</b> '+_cmEsc(s.tecnico_nome||s.segnalata_da||'')+
     (s.note?'<br><i style="color:#555">'+_cmEsc(s.note)+'</i>':'')+'<br>'+ph+_nav+
-    (s.posizione_da==='mappa'?'<span style="color:#999;font-size:11px">posizione scelta sulla mappa da chi ha segnalato'+(s.gps_lat!=null&&s.gps_lng!=null?' (era a '+(()=>{const d=Math.round(_segnDist(s.lat,s.lng,s.gps_lat,s.gps_lng)*1000);return d>=1000?(d/1000).toFixed(1).replace('.',',')+' km':d+' m'})()+')':'')+'</span>'
+    (s.indirizzo?'<b>Indirizzo scritto:</b> '+_cmEsc(s.indirizzo)+'<br>':'')+
+    (s.posizione_da==='indirizzo'?'<span style="color:#999;font-size:11px">posizione trovata dall\'indirizzo</span>'
+      :s.posizione_da==='mappa'?'<span style="color:#999;font-size:11px">posizione scelta sulla mappa da chi ha segnalato'+(s.gps_lat!=null&&s.gps_lng!=null?' (era a '+(()=>{const d=Math.round(_segnDist(s.lat,s.lng,s.gps_lat,s.gps_lng)*1000);return d>=1000?(d/1000).toFixed(1).replace('.',',')+' km':d+' m'})()+')':'')+'</span>'
       :s.accuracy_m?'<span style="color:#999;font-size:11px">precisione GPS ±'+Math.round(s.accuracy_m)+' m</span>':'')+btns
 }
 
@@ -8268,7 +8281,9 @@ function _segnScrivi(){
   g.style.color=''
   if(!_segnPos){g.innerHTML=_segnGps===false?'⚠ Posizione GPS non disponibile: <b>tocca la mappa</b> sul cantiere per segnalarlo.':'⌛ Rilevamento posizione GPS…';if(_segnGps===false)g.style.color='#b35c00';return}
   const xy=_segnPos.lat.toFixed(6)+', '+_segnPos.lng.toFixed(6)
-  if(_segnPos.da==='mappa'){
+  if(_segnPos.da==='indirizzo'){
+    g.innerHTML='🔎 Segnaposto messo dall\'indirizzo: '+xy+' <span style="color:#888">— se non è proprio lì, spostalo</span>'
+  }else if(_segnPos.da==='mappa'){
     const d=_segnGps?_segnDistM(_segnPos,_segnGps):null
     g.innerHTML='📍 Cantiere segnato sulla mappa: '+xy+(d!=null?' <span style="color:#888">— a '+(d>=1000?(d/1000).toFixed(1).replace('.',',')+' km':d+' m')+' da dove sei</span>':'')
   }else g.innerHTML='✅ Posizione rilevata: '+xy+' <span style="color:#888">(±'+Math.round(_segnPos.acc||0)+' m)</span> — se il cantiere è altrove, sposta il segnaposto'
@@ -8301,8 +8316,11 @@ function apriSegnalaCantiere(){
   const pv=$('segn-foto-prev');pv.style.display='none';pv.src=''
   show('modal-segn')
   _segnPreparaMappa()
+  ;['segn-comune','segn-via','segn-civico'].forEach(id=>{const e=$(id);if(e)e.value=''})
+  {const es=$('segn-trova-esito');if(es)es.textContent=''}
+  {const d=$('segn-cerca');if(d)d.open=!!(window.matchMedia&&window.matchMedia('(pointer: fine)').matches)}   // dal computer si parte dall'indirizzo
   _segnScrivi()
-  if(!navigator.geolocation){_segnGps=false;_segnScrivi();return}
+  if(!navigator.geolocation){_segnGps=false;_segnScrivi();const d=$('segn-cerca');if(d)d.open=true;return}
   navigator.geolocation.getCurrentPosition(p=>{
     _segnGps={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy}
     if(_segnMap){
@@ -8313,9 +8331,63 @@ function apriSegnalaCantiere(){
     if(!_segnPos)_segnMetti(_segnGps.lat,_segnGps.lng,'gps');else _segnScrivi()
   },err=>{
     _segnGps=false;_segnScrivi()
+    {const d=$('segn-cerca');if(d)d.open=true}   // senza GPS la strada più comoda è l'indirizzo
     console.warn('segnalazione, GPS:',err&&err.message)
   },{enableHighAccuracy:true,timeout:15000,maximumAge:0})
 }
+/* (12/10/2026) ricerca dell'indirizzo: Nominatim (OpenStreetMap), come gli Appunti cantiere e il
+   geocodificatore dei cantieri. Prima via e civico, poi la sola via, infine il centro del comune (e lo dice).
+   Una richiesta alla volta, partita dal tecnico: è dentro le regole d'uso del servizio. */
+async function _segnNominatim(par){
+  const u='https://nominatim.openstreetmap.org/search?'+new URLSearchParams({format:'jsonv2',limit:'1',countrycodes:'it','accept-language':'it',...par})
+  const r=await fetch(u,{headers:{'Accept':'application/json'}})
+  if(!r.ok)throw new Error('servizio mappe: risposta '+r.status)
+  const j=await r.json()
+  /* addresstype dice che cosa ha trovato davvero: col civico sconosciuto Nominatim risponde con la strada */
+  return Array.isArray(j)&&j.length?{lat:+j[0].lat,lng:+j[0].lon,nome:j[0].display_name||'',tipo:j[0].addresstype||j[0].type||''}:null
+}
+function _segnIndirizzoScritto(){
+  const via=($('segn-via')?.value||'').trim(),civ=($('segn-civico')?.value||'').trim(),com=($('segn-comune')?.value||'').trim()
+  const strada=[via,civ].filter(Boolean).join(' ')
+  return [strada,com].filter(Boolean).join(', ')
+}
+async function _segnTrova(){
+  const via=($('segn-via')?.value||'').trim(),civ=($('segn-civico')?.value||'').trim(),com=($('segn-comune')?.value||'').trim()
+  const es=$('segn-trova-esito'),b=$('segn-trova')
+  if(!com){toast('Scrivi almeno il comune.','warn');$('segn-comune')?.focus();return}
+  b.disabled=true;es.style.color='#666';es.textContent='⌛ Cerco l\'indirizzo…'
+  const pausa=()=>new Promise(r=>setTimeout(r,1100))
+  try{
+    let t=null,livello='civico'
+    if(via){
+      t=await _segnNominatim({street:[civ,via].filter(Boolean).join(' '),city:com,country:'Italia'})
+      if(!t&&civ){await pausa();t=await _segnNominatim({street:via,city:com,country:'Italia'});livello='via'}
+      if(!t){await pausa();t=await _segnNominatim({q:[via,civ,com].filter(Boolean).join(' ')+', Italia'});livello=t?'via':livello}
+    }
+    if(t&&livello==='civico'&&civ&&!['house','building','place'].includes(t.tipo))livello='via'   // ha trovato la strada, non il numero
+    if(!t){if(via)await pausa();t=await _segnNominatim({city:com,country:'Italia'});livello='comune'}
+    if(!t){es.style.color='#c0392b';es.textContent='Non ho trovato «'+_segnIndirizzoScritto()+'». Controlla il comune, oppure tocca la mappa nel punto giusto.';return}
+    _segnMetti(t.lat,t.lng,'indirizzo')
+    if(_segnMap)_segnMap.setView([t.lat,t.lng],livello==='comune'?14:18)
+    es.style.color=livello==='civico'&&civ?'#2d7a06':'#b35c00'
+    es.textContent=livello==='comune'?'⚠ Via non trovata: il segnaposto è al centro di '+com+'. Spostalo sul cantiere.'
+      :(livello==='via'&&civ?'⚠ Civico non trovato: il segnaposto è sulla via. Spostalo sul cantiere se serve.'
+      :'✓ Trovato: '+t.nome.split(',').slice(0,3).join(',')+'. Se il cantiere non è proprio lì, sposta il segnaposto.')
+  }catch(e){es.style.color='#c0392b';es.textContent='Ricerca non riuscita ('+(e.message||e)+'): tocca la mappa nel punto giusto.'}
+  finally{b.disabled=false}
+}
+if($('segn-trova'))$('segn-trova').onclick=_segnTrova
+;['segn-comune','segn-via','segn-civico'].forEach(id=>{const e=$(id);if(e)e.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();_segnTrova()}})})
+if($('segn-comune'))$('segn-comune').addEventListener('input',async function(){
+  const q=this.value.trim().toLowerCase(),dl=$('segn-comuni-dl');if(!dl)return
+  if(q.length<2||typeof loadComuniIT!=='function'){dl.innerHTML='';return}
+  const lista=await loadComuniIT()
+  /* prima i comuni della provincia di Padova (COMUNI_PD), poi gli altri d'Italia: «Pio» deve dare Piove di Sacco, non Piobbico */
+  const pd=(typeof COMUNI_PD!=='undefined'?COMUNI_PD:[]).filter(c=>c.toLowerCase().startsWith(q))
+  const vist=new Set(pd.map(c=>c.toLowerCase()))
+  const tutti=[...pd,...lista.filter(c=>c.toLowerCase().startsWith(q)&&!vist.has(c.toLowerCase()))]
+  dl.innerHTML=tutti.slice(0,40).map(c=>'<option value="'+String(c).replace(/"/g,'&quot;')+'">').join('')
+})
 if($('segn-qui'))$('segn-qui').onclick=()=>{
   if(!_segnGps){toast('Posizione GPS non disponibile: attiva il GPS e riapri, oppure tocca la mappa sul cantiere.','warn',7000);return}
   _segnMetti(_segnGps.lat,_segnGps.lng,'gps')
@@ -8371,8 +8443,9 @@ async function salvaSegnalazione(){
     const tecNome=S.tecnico?`${S.tecnico.tecnico_nome||''} ${S.tecnico.tecnico_cognome||''}`.trim():(S.viewerNome||null)
     const{data:row,error}=await sb.from('segnalazioni_cantiere').insert({
       lat:_segnPos.lat,lng:_segnPos.lng,
-      accuracy_m:_segnPos.da==='mappa'?null:Math.round(_segnPos.acc||0),   // un punto scelto a mano non ha la precisione del GPS
-      posizione_da:_segnPos.da==='mappa'?'mappa':'gps',
+      accuracy_m:_segnPos.da==='gps'?Math.round(_segnPos.acc||0):null,   // un punto scelto a mano o dall'indirizzo non ha la precisione del GPS
+      posizione_da:['mappa','indirizzo'].includes(_segnPos.da)?_segnPos.da:'gps',
+      indirizzo:_segnIndirizzoScritto()||null,
       gps_lat:_segnGps?_segnGps.lat:null,gps_lng:_segnGps?_segnGps.lng:null,
       note:$('segn-note').value.trim()||null,
       tecnico_nome:tecNome

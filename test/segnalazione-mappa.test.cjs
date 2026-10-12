@@ -17,10 +17,20 @@ assert.ok(/invalidateSize\(\)/.test(html), 'la mappa nella finestra si ridimensi
 assert.ok(/if\(!_segnPos\)_segnMetti\(_segnGps\.lat,_segnGps\.lng,'gps'\);else _segnScrivi\(\)/.test(html), 'se il tecnico ha già toccato la mappa, il GPS arrivato dopo non gli sposta il punto');
 assert.ok(/_segnGps=false;_segnScrivi\(\)/.test(html) && /tocca la mappa<\/b> sul cantiere per segnalarlo/.test(html), 'senza GPS (dal PC) si segna toccando la mappa');
 /* il salvataggio */
-assert.ok(/accuracy_m:_segnPos\.da==='mappa'\?null:Math\.round\(_segnPos\.acc\|\|0\)/.test(html), 'un punto scelto a mano non porta la precisione del GPS');
-assert.ok(/posizione_da:_segnPos\.da==='mappa'\?'mappa':'gps'/.test(html), 'si salva da dove viene la posizione');
+assert.ok(/accuracy_m:_segnPos\.da==='gps'\?Math\.round\(_segnPos\.acc\|\|0\):null/.test(html), 'un punto scelto a mano o dall’indirizzo non porta la precisione del GPS');
+assert.ok(/posizione_da:\['mappa','indirizzo'\]\.includes\(_segnPos\.da\)\?_segnPos\.da:'gps'/.test(html), 'si salva da dove viene la posizione');
+assert.ok(/indirizzo:_segnIndirizzoScritto\(\)\|\|null,/.test(html), 'si salva l’indirizzo scritto');
 assert.ok(/gps_lat:_segnGps\?_segnGps\.lat:null,gps_lng:_segnGps\?_segnGps\.lng:null/.test(html), 'si salva dov’era il tecnico');
 /* nella mappa dei cantieri */
 assert.ok(/s\.posizione_da==='mappa'\?'<span style="color:#999;font-size:11px">posizione scelta sulla mappa da chi ha segnalato'/.test(html), 'il fumetto dice che il punto è stato scelto a mano');
 
+/* (12/10/2026) la ricerca per indirizzo, per chi segnala dal computer */
+assert.ok(/<details id="segn-cerca"/.test(html) && /id="segn-comune" list="segn-comuni-dl"/.test(html) && /id="segn-via"/.test(html) && /id="segn-civico"/.test(html), 'comune, via e civico nel modulo');
+assert.ok(/matchMedia\('\(pointer: fine\)'\)/.test(html), 'dal computer la ricerca è aperta subito');
+assert.ok(/nominatim\.openstreetmap\.org\/search\?/.test(html), 'la ricerca usa OpenStreetMap, come il resto del gestionale');
+assert.ok(/_segnMetti\(t\.lat,t\.lng,'indirizzo'\)/.test(html), 'l’indirizzo trovato mette il segnaposto, con la sua provenienza');
+assert.ok(/Via non trovata: il segnaposto è al centro di/.test(html) && /Civico non trovato: il segnaposto è sulla via/.test(html), 'quando trova meno di quanto chiesto, lo dice');
+assert.ok(/Ricerca non riuscita \('/.test(html), 'un errore del servizio si dice');
+assert.ok(/if\(t&&livello==='civico'&&civ&&!\['house','building','place'\]\.includes\(t\.tipo\)\)livello='via'/.test(html), 'col civico sconosciuto Nominatim dà la strada: non si dice «trovato»');
+assert.ok(/const pd=\(typeof COMUNI_PD!=='undefined'\?COMUNI_PD:\[\]\)\.filter/.test(html), 'fra i comuni suggeriti prima quelli della provincia di Padova');
 console.log('segnalazione-mappa: ok');
