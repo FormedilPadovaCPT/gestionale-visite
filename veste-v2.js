@@ -589,7 +589,20 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     }
     const h = wrap.querySelector('.adm-header h2'); if (h) h.textContent = 'Ufficio';
     ufficioFiltra();
-    // l'obiettivo dell'esercizio e altri riquadri si disegnano dopo: si rifà il filtro quando arrivano
+    /* l'obiettivo dell'esercizio e altri riquadri si disegnano dopo. (12/10/2026, l'utente: «vedo una
+       specie di flash sulla schermata obiettivo visite») Prima il filtro si rifaceva solo dopo 1,5 e 4,5
+       secondi, e nel frattempo il riquadro appena arrivato si vedeva sopra la Scrivania e poi spariva.
+       Ora chi osserva la pagina smista ogni riquadro nuovo appena entra: la richiamata parte prima che il
+       browser disegni, quindi non si vede. I due ritardi restano come rete. */
+    if (!wrap.dataset.v2Osserva && typeof MutationObserver === 'function') {
+      wrap.dataset.v2Osserva = '1';
+      const nuovaSezione = (n) => n.nodeType === 1 && (n.classList.contains('adm-section') || !!n.querySelector('.adm-section'));
+      new MutationObserver((cambi) => {
+        if (cambi.some((c) => [...c.addedNodes].some(nuovaSezione))) {
+          try { ufficioFiltra(); } catch (e) { console.warn('veste v2 (filtro ufficio):', e); }
+        }
+      }).observe(wrap, { childList: true, subtree: true });
+    }
     setTimeout(ufficioFiltra, 1500); setTimeout(ufficioFiltra, 4500);
     if (_gruppo === 'scrivania') scrivania().catch((e) => console.warn('scrivania:', e));
   }
