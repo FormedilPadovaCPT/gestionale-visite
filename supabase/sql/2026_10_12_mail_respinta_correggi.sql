@@ -93,6 +93,15 @@ begin
   insert into public.mail_correzioni (respinta_id, visita_id, nr_verbale, vecchia, nuova, dove, fatta_da)
   values (v_r.id, v_r.visita_id, v_r.nr_verbale, v_r.destinatario, v_new, v_dove, v_chi);
 
+  -- (12/10/2026, dai dati veri: il verbale 0030 ha due rimbalzi dello stesso indirizzo) gli altri
+  -- rimbalzi aperti dello stesso indirizzo sullo stesso verbale sono la stessa cosa: si chiudono qui
+  update public.s_mail_respinte
+     set stato = 'risolta', risolta_il = now(), risolta_da = v_chi,
+         risolta_note = left(format('Stesso indirizzo del rimbalzo n° %s, corretto in %s.', v_r.id, v_new), 500)
+   where id <> v_r.id and stato in ('nuova', 'avvisato')
+     and lower(btrim(destinatario)) = v_old
+     and visita_id is not distinct from v_r.visita_id;
+
   return jsonb_build_object('vecchia', v_r.destinatario, 'nuova', v_new, 'dove', v_dove,
     'visita_id', v_r.visita_id, 'nr_verbale', v_r.nr_verbale, 'ruolo', v_r.ruolo);
 end $$;
