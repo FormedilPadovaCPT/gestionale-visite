@@ -46,7 +46,7 @@ const invia = pezzo(/\$\('btn-ev-invia'\)\.onclick=async\(\)=>\{[\s\S]*?\n\}\n/,
 assert.ok(/const emails=_evScelti\(\)\.map\(\(\{escluso,\.\.\.e\}\)=>e\)/.test(invia), 'parte solo ai destinatari spuntati');
 assert.ok(/to: emails\.map\(e=>e\.email\)/.test(invia), 'a send-verbale vanno solo loro');
 assert.ok(/email_dest:emails\.map\(e=>e\.email\),\n\s*dest:emails,/.test(invia), 'nel registro degli invii resta chi l’ha ricevuto davvero');
-assert.ok(/if\(!emails\.some\(_evImpresa\)&&tutti\.some\(_evImpresa\)\)\{toast\('Hai tolto la spunta a tutte le imprese/.test(invia), 'senza imprese spuntate l’invio non parte');
+assert.ok(/if\(!_reinvio&&!emails\.some\(_evImpresa\)&&tutti\.some\(_evImpresa\)\)\{toast\('Hai tolto la spunta a tutte le imprese/.test(invia), 'senza imprese spuntate l’invio non parte (tranne la ritrasmissione all’indirizzo corretto, 12/10/2026)');
 
 /* ── «+ Aggiungi» di un indirizzo già in elenco ma senza spunta lo rimette ── */
 assert.ok(/if\(gia&&gia\.escluso\)\{gia\.escluso=false;/.test(html));

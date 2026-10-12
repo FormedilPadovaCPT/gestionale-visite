@@ -8908,7 +8908,7 @@ function _evRenderList(){
   const box=$('email-verbale-list');if(!box)return
   const scelti=emails.filter(e=>!e.escluso)
   // (03/10/2026, regola dell'utente) almeno un'impresa deve ricevere il verbale
-  const _senzaImpresa=!scelti.some(_evImpresa)
+  const _senzaImpresa=!window._evReinvio&&!scelti.some(_evImpresa)
   const _tolte=_senzaImpresa&&emails.some(_evImpresa)
   const avviso=_tolte
     ?`<div style="background:#fdecea;border-left:3px solid #c0392b;padding:8px 10px;border-radius:4px;margin-bottom:6px;font-size:13px;color:#7b241c">⚠ <b>Hai tolto la spunta a tutte le imprese</b>: il verbale arriverebbe solo alle figure del cantiere. Rimetti la spunta ad almeno un’impresa, o aggiungi un altro indirizzo con <b>+ Aggiungi</b>: senza, l’invio non parte.</div>`
@@ -9257,7 +9257,22 @@ window.admToggleCampagna=admToggleCampagna
 window.admEliminaCampagna=admEliminaCampagna
 
 // ── EMAIL VERBALE DA ELENCO ──
+/* (12/10/2026, chiesto dall'utente) Ritrasmissione dopo un «verbale non consegnato»: il tecnico ha
+   corretto l'indirizzo dal riquadro (mail-respinte-tec.js → mail_respinta_correggi) e il verbale riparte
+   SOLO a quello, più la copia all'ufficio. La finestra è quella di sempre (testo, anteprima, «Invia ora»):
+   la manda il tecnico. Nel registro degli invii la riga è «reinvio», e il rimbalzo si chiude da solo. */
+window.reinviaVerbaleA=async function(vid,dest,opz){
+  window._evReinvio=null
+  await inviEmailVerbaleFromList(vid)
+  if(!window._evContext||window._evContext.vid!==vid)return
+  const cpt=(window._evEmails||[]).find(e=>e.ruolo==='CPT')
+  window._evEmails=[{ruolo:dest.ruolo||'Destinatario',nome:dest.nome||'',email:dest.email},...(cpt?[cpt]:[])]
+  window._evReinvio={vid,respintaId:opz?.respintaId||null,vecchia:opz?.vecchia||'',nuova:dest.email,nota:opz?.nota||''}
+  _evRenderList()
+  const t=$('email-verbale-title');if(t)t.textContent='📧 Ritrasmetti il verbale all’indirizzo corretto'
+}
 async function inviEmailVerbaleFromList(vid){
+  window._evReinvio=null
   window._evRettifica=null
   _setEvModalRett(false)
   toast('Caricamento dati visita…')
@@ -9432,8 +9447,10 @@ function _setEvModalRett(isRett,infoTxt){
   }
 }
 async function checkRettifica(vid){
+  /* (12/10/2026) la ritrasmissione a un solo indirizzo corretto («reinvio») non è l'invio da rettificare:
+     ha un destinatario solo, e la rettifica deve andare a tutti */
   const{data:invii,error:eInv}=await sb.from('verbali').select('id,tipo,inviato_at,dest,email_dest,oggetto,snapshot')
-    .eq('visita_id',vid).eq('inviato_email',true)
+    .eq('visita_id',vid).eq('inviato_email',true).or('tipo.is.null,tipo.neq.reinvio')
     .order('inviato_at',{ascending:false}).limit(1)
   /* lettura fallita ≠ mai inviato: senza saperlo non si propone la rettifica
      e non si lascia partire un invio che sembrerebbe il primo (vedi btn-ev-invia) */
@@ -9472,6 +9489,14 @@ function apriEmailRettifica(p){
     (p.last.email_dest||[]).map(e=>({ruolo:'',nome:'',email:e}))
   emails=emails.filter(e=>e.email)
   if(!emails.length){toast('Nessun destinatario registrato per il precedente invio','warn');return}
+  /* (12/10/2026) un indirizzo respinto e poi corretto non si rimanda a quello sbagliato */
+  const _vidR=S.savedId||S.fd?.visita_id||null
+  if(_vidR){sb.from('mail_correzioni').select('vecchia,nuova').eq('visita_id',_vidR).order('fatta_il').then(({data:cor,error:eCor})=>{
+    if(eCor){toast('Non sono riuscito a leggere gli indirizzi corretti di questo verbale ('+eCor.message+'): controlla i destinatari prima di inviare.','warn',9000);return}
+    let cambiati=0
+    ;(cor||[]).forEach(c=>(window._evEmails||[]).forEach(e=>{if(String(e.email||'').trim().toLowerCase()===String(c.vecchia||'').trim().toLowerCase()){e.email=c.nuova;cambiati++}}))
+    if(cambiati){_evRenderList();toast('Indirizzi corretti dopo una mancata consegna: la rettifica va a quelli nuovi.','ok')}
+  })}
 
   const nrVerb=vGet('f-verbale')||''
   const cant=vGet('f-cant-search')||''
@@ -9541,6 +9566,7 @@ URL: www.formedilpadova.it`
 // ── EMAIL VERBALE ──
 async function inviEmailVerbale(){
   window._evContext=null
+  window._evReinvio=null
   window._evRettifica=null
   _setEvModalRett(false)
   const emails=[]
@@ -9679,7 +9705,7 @@ Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle per
 $('btn-email-verbale').onclick=inviEmailVerbale
 $('btn-ev-extra').onclick=_evAggiungi
 $('ev-extra').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_evAggiungi()}}
-$('btn-ev-close').onclick=()=>{hide('modal-email-verbale');window._evRettifica=null;_setEvModalRett(false)}
+$('btn-ev-close').onclick=()=>{hide('modal-email-verbale');window._evRettifica=null;window._evReinvio=null;_setEvModalRett(false)}
 $('btn-ev-invia').onclick=async()=>{
   // (06/10/2026) solo i destinatari spuntati; nel registro degli invii resta chi l'ha ricevuto davvero
   const tutti=window._evEmails||[]
@@ -9698,9 +9724,11 @@ $('btn-ev-invia').onclick=async()=>{
      console.error('invio verbale fermato: allegato',_vChk.nr_verbale,'≠ mail',_nrMail,vid)
      toast('Invio FERMATO: il verbale da allegare ('+(_vChk.nr_verbale||'?')+') non è quello della mail ('+(_nrMail||'?')+'). Chiudi questa finestra e riapri l\'invio dal verbale giusto.','err',15000)
      return}}
+  /* (12/10/2026) la ritrasmissione all'indirizzo corretto va a quello solo: gli altri il verbale l'hanno già */
+  const _reinvio=window._evReinvio&&window._evReinvio.vid===vid?window._evReinvio:null
   // (03/10/2026, regola dell'utente) almeno un'impresa deve ricevere il verbale: senza, arriverebbe solo alle figure
-  if(!emails.some(_evImpresa)&&tutti.some(_evImpresa)){toast('Hai tolto la spunta a tutte le imprese: il verbale arriverebbe solo alle figure del cantiere. Rimetti la spunta ad almeno un\'impresa e poi invia.','err',9000);return}
-  if(!emails.some(_evImpresa)){toast('Nessuna impresa fra i destinatari: il verbale arriverebbe solo alle figure del cantiere. Aggiungi l\'indirizzo dell\'impresa con «+ Aggiungi» e poi invia.','err',9000);const _x=$('ev-extra');if(_x)_x.focus();return}
+  if(!_reinvio&&!emails.some(_evImpresa)&&tutti.some(_evImpresa)){toast('Hai tolto la spunta a tutte le imprese: il verbale arriverebbe solo alle figure del cantiere. Rimetti la spunta ad almeno un\'impresa e poi invia.','err',9000);return}
+  if(!_reinvio&&!emails.some(_evImpresa)){toast('Nessuna impresa fra i destinatari: il verbale arriverebbe solo alle figure del cantiere. Aggiungi l\'indirizzo dell\'impresa con «+ Aggiungi» e poi invia.','err',9000);const _x=$('ev-extra');if(_x)_x.focus();return}
   if(window._evInviiNonLetti===vid&&!window._evRettifica){toast('Non sono riuscito a verificare se questo verbale è già stato inviato: invio fermato. Ricarica e riapri la visita, così si capisce se è un primo invio o una rettifica.','err',9000);return}
 
   const btn=$('btn-ev-invia')
@@ -9808,14 +9836,23 @@ $('btn-ev-invia').onclick=async()=>{
         email_dest:emails.map(e=>e.email),
         dest:emails,
         oggetto:_oggettoUfficioVerbale(),
-        tipo:_ret?'rettifica':'invio',
-        motivo:_ret?.note||null,
+        tipo:_ret?'rettifica':_reinvio?'reinvio':'invio',
+        motivo:_ret?.note||(_reinvio?`ritrasmesso all'indirizzo corretto dopo la mancata consegna (${_reinvio.vecchia} → ${_reinvio.nuova})`:null),
         modifiche:_ret?.modifiche||null,
         snapshot:snapRow?.snapshot||null,
         inviato_da:session?.user?.email||null
       })
       if(eLog)throw eLog
     }catch(logErr){console.warn('Log invio verbale non salvato:',logErr);toast('Il verbale è stato inviato, ma l\u2019invio NON è stato registrato ('+(logErr?.message||logErr)+'): avvisa la segreteria, altrimenti una rettifica sembrerà un primo invio.','err',10000)}
+    if(_reinvio&&_reinvio.respintaId){
+      try{
+        const{error:eCh}=await sb.rpc('s_mail_respinta_chiudi',{p_id:_reinvio.respintaId,p_stato:'risolta',
+          p_note:`${_reinvio.nota} Verbale ritrasmesso a ${_reinvio.nuova} il ${new Date().toLocaleDateString('it-IT')}.`})
+        if(eCh)throw eCh
+        if(typeof window.respinteBox==='function')window.respinteBox().catch(()=>{})
+      }catch(eCh){toast('Verbale ritrasmesso, ma la riga «non consegnato» è rimasta aperta ('+(eCh?.message||eCh)+'): chiudila con «Sistemato».','warn',9000)}
+    }
+    window._evReinvio=null
     window._evRettifica=null
     _setEvModalRett(false)
     setTimeout(()=>hide('modal-email-verbale'), 2000)
@@ -16191,7 +16228,7 @@ document.addEventListener('input',function(ev){
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
 <script src="aiuto.js?v=24"></script>
-<script src="mail-respinte-tec.js?v=2"></script>
+<script src="mail-respinte-tec.js?v=3"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=2"></script>
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->

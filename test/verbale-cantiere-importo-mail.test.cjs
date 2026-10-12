@@ -53,8 +53,8 @@ assert.ok(/if\(_eIa\)_anagErr=_eIa\.message/.test(inv), 'l’errore di lettura s
 // nessuna impresa fra i destinatari: avviso nella finestra e invio fermo
 // (06/10/2026) conta fra i destinatari SPUNTATI: il tecnico può togliere la spunta a qualcuno
 assert.ok(/const _evImpresa=e=>e\.ruolo==='Impresa'\|\|!!e\.extra/.test(html))
-assert.ok(/const _senzaImpresa=!scelti\.some\(_evImpresa\)/.test(html))
-assert.ok(/if\(!emails\.some\(_evImpresa\)\)\{toast\('Nessuna impresa fra i destinatari/.test(html), 'senza impresa l’invio non parte')
+assert.ok(/const _senzaImpresa=!window\._evReinvio&&!scelti\.some\(_evImpresa\)/.test(html))
+assert.ok(/if\(!_reinvio&&!emails\.some\(_evImpresa\)\)\{toast\('Nessuna impresa fra i destinatari/.test(html), 'senza impresa l’invio non parte (tranne la ritrasmissione all’indirizzo corretto)')
 // l'indirizzo scritto nel verbale entra in anagrafica solo se lì è vuoto
 assert.ok(/update\(\{impresa_email_ref:_ev\}\)\.eq\('impresa_id',_id\)\.or\('impresa_email_ref\.is\.null,impresa_email_ref\.eq\.'\)/.test(html))
 
