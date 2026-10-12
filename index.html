@@ -1824,7 +1824,13 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 <div class="modal-overlay hidden" id="modal-segn">
   <div class="modal-box" style="max-width:480px">
     <h3>&#128205; Segnala cantiere</h3>
-    <div id="segn-gps" style="font-size:13px;padding:8px 10px;border-radius:8px;background:#f4f6f8;margin-bottom:10px">&#8987; Rilevamento posizione GPS&#8230;</div>
+    <div id="segn-gps" style="font-size:13px;padding:8px 10px;border-radius:8px;background:#f4f6f8;margin-bottom:8px">&#8987; Rilevamento posizione GPS&#8230;</div>
+    <!-- (12/10/2026) il cantiere visto dalla strada: il segnaposto si sposta sul punto giusto -->
+    <div id="segn-mappa" style="height:240px;border-radius:8px;border:1px solid #e3e6ea;margin-bottom:4px"></div>
+    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:11.5px;color:#666;margin-bottom:10px">
+      <span>Non sei davanti al cantiere? <b>Trascina il segnaposto</b> &#128205; o <b>tocca la mappa</b> nel punto giusto.</span>
+      <button type="button" class="btn-outline btn-sm" id="segn-qui" style="padding:3px 9px" data-aiuto="Rimette il segnaposto dove sei adesso, sulla posizione del GPS.">&#128205; Torna dove sono</button>
+    </div>
     <div class="field"><label>Foto (facoltativa)</label>
       <input type="file" id="segn-foto" accept="image/*" capture="environment">
       <img id="segn-foto-prev" style="display:none;max-width:100%;max-height:180px;border-radius:8px;margin-top:6px">
@@ -8198,7 +8204,8 @@ function _cmPopupSegn(s){
     '<b>Quando:</b> '+dt+'<br>'+
     '<b>Da:</b> '+_cmEsc(s.tecnico_nome||s.segnalata_da||'')+
     (s.note?'<br><i style="color:#555">'+_cmEsc(s.note)+'</i>':'')+'<br>'+ph+_nav+
-    (s.accuracy_m?'<span style="color:#999;font-size:11px">precisione GPS ±'+Math.round(s.accuracy_m)+' m</span>':'')+btns
+    (s.posizione_da==='mappa'?'<span style="color:#999;font-size:11px">posizione scelta sulla mappa da chi ha segnalato'+(s.gps_lat!=null&&s.gps_lng!=null?' (era a '+(()=>{const d=Math.round(_segnDist(s.lat,s.lng,s.gps_lat,s.gps_lng)*1000);return d>=1000?(d/1000).toFixed(1).replace('.',',')+' km':d+' m'})()+')':'')+'</span>'
+      :s.accuracy_m?'<span style="color:#999;font-size:11px">precisione GPS ±'+Math.round(s.accuracy_m)+' m</span>':'')+btns
 }
 
 function _cmRender(fit){
@@ -8248,21 +8255,71 @@ function _cmRender(fit){
 // ── SEGNALAZIONI CANTIERE DA MOBILE (GPS + foto + note) ──
 // ══════════════════════════════════════════════════════════════
 let _segnPos=null,_segnFotoFile=null,_segnAggId=null
-
+/* (12/10/2026, chiesto dall'utente) Il cantiere non sempre si segnala da davanti: lo si vede dalla strada,
+   anche a qualche chilometro, e il GPS dà la posizione del tecnico. Nel modulo c'è una mappa: il segnaposto
+   arancione parte dal GPS e si trascina (o si tocca la mappa) sul cantiere; il pallino blu resta dove si è.
+   _segnPos = la posizione del CANTIERE che si salva (lat/lng), _segnGps = dov'è il tecnico.
+   Se il GPS non risponde si può comunque toccare la mappa: la segnalazione non si perde per questo. */
+let _segnGps=null,_segnMap=null,_segnPin=null,_segnIo=null
+const _SEGN_PADOVA=[45.4064,11.8768]
+function _segnDistM(a,b){return Math.round(_segnDist(a.lat,a.lng,b.lat,b.lng)*1000)}
+function _segnScrivi(){
+  const g=$('segn-gps');if(!g)return
+  g.style.color=''
+  if(!_segnPos){g.innerHTML=_segnGps===false?'⚠ Posizione GPS non disponibile: <b>tocca la mappa</b> sul cantiere per segnalarlo.':'⌛ Rilevamento posizione GPS…';if(_segnGps===false)g.style.color='#b35c00';return}
+  const xy=_segnPos.lat.toFixed(6)+', '+_segnPos.lng.toFixed(6)
+  if(_segnPos.da==='mappa'){
+    const d=_segnGps?_segnDistM(_segnPos,_segnGps):null
+    g.innerHTML='📍 Cantiere segnato sulla mappa: '+xy+(d!=null?' <span style="color:#888">— a '+(d>=1000?(d/1000).toFixed(1).replace('.',',')+' km':d+' m')+' da dove sei</span>':'')
+  }else g.innerHTML='✅ Posizione rilevata: '+xy+' <span style="color:#888">(±'+Math.round(_segnPos.acc||0)+' m)</span> — se il cantiere è altrove, sposta il segnaposto'
+}
+function _segnMetti(lat,lng,da){
+  _segnPos={lat,lng,acc:da==='gps'?(_segnGps&&_segnGps.acc):null,da}
+  if(_segnMap){
+    if(!_segnPin){
+      _segnPin=L.marker([lat,lng],{draggable:true,autoPan:true,title:'Il cantiere: trascinami nel punto giusto'}).addTo(_segnMap)
+      _segnPin.on('dragend',()=>{const q=_segnPin.getLatLng();_segnPos={lat:q.lat,lng:q.lng,acc:null,da:'mappa'};_segnScrivi()})
+    }else _segnPin.setLatLng([lat,lng])
+  }
+  _segnScrivi()
+}
+function _segnPreparaMappa(){
+  const el=$('segn-mappa');if(!el||typeof L==='undefined')return
+  if(!_segnMap){
+    _segnMap=L.map(el,{zoomControl:true}).setView(_SEGN_PADOVA,12)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(_segnMap)
+    _segnMap.on('click',e=>_segnMetti(e.latlng.lat,e.latlng.lng,'mappa'))
+  }
+  if(_segnPin){_segnMap.removeLayer(_segnPin);_segnPin=null}
+  if(_segnIo){_segnMap.removeLayer(_segnIo);_segnIo=null}
+  _segnMap.setView(_SEGN_PADOVA,12)
+  setTimeout(()=>{try{_segnMap.invalidateSize()}catch(_e){}},60)   // la finestra era nascosta: Leaflet ricalcola le misure
+}
 function apriSegnalaCantiere(){
-  _segnPos=null;_segnFotoFile=null
+  _segnPos=null;_segnGps=null;_segnFotoFile=null
   $('segn-note').value='';$('segn-foto').value=''
   const pv=$('segn-foto-prev');pv.style.display='none';pv.src=''
-  const g=$('segn-gps');g.style.color='';g.textContent='⌛ Rilevamento posizione GPS…'
   show('modal-segn')
-  if(!navigator.geolocation){g.textContent='⚠ GPS non disponibile su questo dispositivo';g.style.color='#c0392b';return}
+  _segnPreparaMappa()
+  _segnScrivi()
+  if(!navigator.geolocation){_segnGps=false;_segnScrivi();return}
   navigator.geolocation.getCurrentPosition(p=>{
-    _segnPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy}
-    g.innerHTML='✅ Posizione rilevata: '+p.coords.latitude.toFixed(6)+', '+p.coords.longitude.toFixed(6)+' <span style="color:#888">(±'+Math.round(p.coords.accuracy)+' m)</span>'
+    _segnGps={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy}
+    if(_segnMap){
+      _segnIo=L.circleMarker([_segnGps.lat,_segnGps.lng],{radius:7,color:'#fff',weight:2,fillColor:'#1a73e8',fillOpacity:1}).addTo(_segnMap).bindTooltip('Sei qui')
+      _segnMap.setView([_segnGps.lat,_segnGps.lng],17)
+    }
+    // se nel frattempo il tecnico ha già toccato la mappa, il suo punto resta
+    if(!_segnPos)_segnMetti(_segnGps.lat,_segnGps.lng,'gps');else _segnScrivi()
   },err=>{
-    g.textContent='⚠ Posizione non disponibile: '+err.message+'. Attiva il GPS e riapri.'
-    g.style.color='#c0392b'
+    _segnGps=false;_segnScrivi()
+    console.warn('segnalazione, GPS:',err&&err.message)
   },{enableHighAccuracy:true,timeout:15000,maximumAge:0})
+}
+if($('segn-qui'))$('segn-qui').onclick=()=>{
+  if(!_segnGps){toast('Posizione GPS non disponibile: attiva il GPS e riapri, oppure tocca la mappa sul cantiere.','warn',7000);return}
+  _segnMetti(_segnGps.lat,_segnGps.lng,'gps')
+  if(_segnMap)_segnMap.setView([_segnGps.lat,_segnGps.lng],17)
 }
 $('btn-segnala-cant').onclick=apriSegnalaCantiere
 if($('btn-segnala-dash'))$('btn-segnala-dash').onclick=apriSegnalaCantiere
@@ -8308,12 +8365,15 @@ function _segnComprimiFoto(file){
 }
 
 async function salvaSegnalazione(){
-  if(!_segnPos){toast('Posizione GPS non ancora rilevata','warn');return}
+  if(!_segnPos){toast(_segnGps===false?'Tocca la mappa nel punto del cantiere: senza una posizione la segnalazione non si salva.':'Posizione GPS non ancora rilevata: aspetta un attimo, o tocca la mappa sul cantiere.','warn',7000);return}
   const btn=$('segn-salva');btn.disabled=true;btn.textContent='⏳ Salvataggio…'
   try{
     const tecNome=S.tecnico?`${S.tecnico.tecnico_nome||''} ${S.tecnico.tecnico_cognome||''}`.trim():(S.viewerNome||null)
     const{data:row,error}=await sb.from('segnalazioni_cantiere').insert({
-      lat:_segnPos.lat,lng:_segnPos.lng,accuracy_m:Math.round(_segnPos.acc||0),
+      lat:_segnPos.lat,lng:_segnPos.lng,
+      accuracy_m:_segnPos.da==='mappa'?null:Math.round(_segnPos.acc||0),   // un punto scelto a mano non ha la precisione del GPS
+      posizione_da:_segnPos.da==='mappa'?'mappa':'gps',
+      gps_lat:_segnGps?_segnGps.lat:null,gps_lng:_segnGps?_segnGps.lng:null,
       note:$('segn-note').value.trim()||null,
       tecnico_nome:tecNome
     }).select('id,created_at').single()
@@ -16227,7 +16287,7 @@ document.addEventListener('input',function(ev){
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
-<script src="aiuto.js?v=24"></script>
+<script src="aiuto.js?v=25"></script>
 <script src="mail-respinte-tec.js?v=3"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=2"></script>
@@ -16240,7 +16300,7 @@ document.addEventListener('input',function(ev){
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="direzione.js?v=10"></script>
 <script src="rientri-giorni.js?v=6"></script>
-<script src="veste-v2.js?v=38"></script>
+<script src="veste-v2.js?v=39"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

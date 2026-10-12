@@ -74,7 +74,7 @@
      sulla Mappa restano quelli di sempre, sopra i cantieri in monitoraggio; sulla pagina Direzione/Presidenza la veste ne
      mette tre uguali, che premono quelli di sempre. */
   const PULSANTI_LETTURA = [
-    { preme: 'btn-segnala-dash', testo: '📍 Segnala un cantiere attivo', stile: 'flex:2;min-width:220px;background:#e7500f;border:1px solid #e7500f;color:#fff', aiuto: 'Apre il modulo per segnalare all’ufficio un cantiere attivo: indirizzo, comune e due righe. La segnalazione arriva alla segreteria.' },
+    { preme: 'btn-segnala-dash', testo: '📍 Segnala un cantiere attivo', stile: 'flex:2;min-width:220px;background:#e7500f;border:1px solid #e7500f;color:#fff', aiuto: 'Apre il modulo per segnalare all’ufficio un cantiere attivo: la posizione (dal GPS, o spostando il segnaposto sulla mappa se il cantiere è più in là), una foto e due righe. La segnalazione arriva alla segreteria.' },
     { preme: 'btn-qr-servizi', testo: '📱 QR servizi CPT', stile: 'flex:1;min-width:160px;background:#fff;border:2px solid #e7500f;color:#e7500f', aiuto: 'Mostra sullo schermo il codice QR del portale servizi, da far inquadrare a chi hai davanti.' },
     { preme: 'btn-servizi-cpt', testo: 'Vai ai servizi CPT ↗', stile: 'flex:1;min-width:180px;background:#95C22F;border:1px solid #7aa527;color:#fff', aiuto: 'Apre in un’altra scheda il portale servizi pubblico, quello che vedono le imprese.' },
   ];

@@ -125,6 +125,8 @@ assert.ok(/'visita spostata sul lotto ' \|\| a\.lotto \|\| ' dalla divisione in 
 
 /* ── aiuto e versioni ── */
 assert.ok(/'t:dividi le visite in lotti':/.test(aiuto) && /'t:unisci e riconosci i lotti':/.test(aiuto) && /'t:sposta le visite':/.test(aiuto), 'le nuvolette dei pulsanti nuovi');
-assert.ok(/<script src="lotti-cantiere\.js\?v=3"><\/script>/.test(html) && /<script src="aiuto\.js\?v=24"><\/script>/.test(html), 'versioni alzate');
+// (12/10/2026) «almeno», non «esattamente»: una versione esatta rompe il test al primo ritocco di un'altra funzione
+const ver = (f) => { const i = html.indexOf('<script src="' + f + '?v='); return i < 0 ? NaN : parseInt(html.slice(i + f.length + 16), 10); };
+assert.ok(ver('lotti-cantiere.js') >= 3 && ver('aiuto.js') >= 24, 'versioni alzate');
 
 console.log('ok — il complesso a lotti: elenco, scheda, unione, divisione, CEIV');

@@ -56,7 +56,7 @@ window.AIUTO_TESTI = {
   'btn-logout': 'Esci dall\'app su questo dispositivo. Le bozze salvate restano; quello che stavi scrivendo senza salvare no.',
 
   /* ── dashboard ── */
-  'btn-segnala-dash': 'Segnala alla segreteria un cantiere attivo che hai visto passando: prende la posizione dal GPS e apre una scheda breve. Non è un verbale.',
+  'btn-segnala-dash': 'Segnala alla segreteria un cantiere attivo che hai visto passando: parte dalla posizione del GPS e, se il cantiere è più in là, sposti il segnaposto sulla mappa. Funziona anche dal computer. Non è un verbale.',
   'btn-dove-sono': 'Legge il GPS e ti dice indirizzo, comune e quartiere di Padova in cui sei. Non salva niente: da lì puoi prendere un appunto sul posto.',
   'btn-appunti': 'I tuoi appunti di cantiere, con l\'indirizzo preso dal GPS: li vedi solo tu, e li rileggi a casa quando scrivi il verbale.',
   'ap-salva': 'Salva l\'appunto a tuo nome: lo vedi solo tu. Se manca la linea non si perde: il testo resta nel telefono e riprovi.',
