@@ -59,9 +59,25 @@
     };
     prova();
   }
+  /* (13/10/2026) dal promemoria «verbali da inviare»: ?vista=lista&dainviare=1 accende il filtro
+     «✉️ Da inviare» quando l'elenco l'ha disegnato (compare solo se ce n'è almeno uno) */
+  function accendiDaInviare() {
+    let tentativi = 0;
+    const prova = () => {
+      const b = document.getElementById('q-dainviare');
+      if (window.S && window.S.user && b && b.style.display !== 'none') { if (!b.classList.contains('on')) b.click(); return; }
+      if (++tentativi < 240) setTimeout(prova, 500);   /* aspetta l'accesso e l'elenco, fino a due minuti */
+    };
+    prova();
+  }
   try {
-    const v = new URLSearchParams(location.search).get('vista');
-    if (v) { apriVista(v); history.replaceState(null, '', location.pathname + location.hash); }
+    const qs = new URLSearchParams(location.search);
+    const v = qs.get('vista');
+    if (v) {
+      apriVista(v);
+      if (v === 'lista' && qs.get('dainviare') === '1') accendiDaInviare();
+      history.replaceState(null, '', location.pathname + location.hash);
+    }
   } catch (e) { /* un indirizzo strano non ferma l'app */ }
 
   const daB64u = (t) => {
