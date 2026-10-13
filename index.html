@@ -1130,7 +1130,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th>Etichetta / Indirizzo</th><th>Comune</th><th>Committente</th><th>Cod. univoco</th><th>CNCE</th><th>Visite</th><th></th></tr></thead>
+            <thead><tr><th style="width:30px" title="Seleziona per giro a tappe">🧭</th><th>Etichetta</th><th>Indirizzo</th><th>Comune</th><th>Committente</th><th>CNCE</th><th>Visite</th><th></th></tr></thead>
             <tbody id="tbody-cantieri"></tbody>
           </table>
         </div>
@@ -1939,7 +1939,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="field hidden" id="mc-cap-wrap"><label>CAP</label><input type="text" id="mc-cap" maxlength="5" placeholder="scrivilo: il comune non lo dà"></div>
       <div class="field"><label>Cod. ISTAT <span style="font-weight:400;font-size:11px;color:#aaa">(per XML, 6 cifre)</span></label><input type="text" id="mc-comune-cod" maxlength="6" placeholder="es. 028001" style="font-family:monospace"></div>
     </div>
-    <div class="field"><label>Etichetta cantiere <span style="font-weight:400;font-size:11px;color:#aaa">(va all'Osservatorio; negli elenchi si vede al posto dell'indirizzo)</span></label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="mc-etich" placeholder="es. Via Roma 12 – ROSSI" maxlength="50" style="flex:1 1 120px;min-width:0"><button type="button" class="btn-outline btn-sm" id="btn-mc-etich-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
+    <div class="field"><label>Etichetta cantiere <span style="font-weight:400;font-size:11px;color:#aaa">(va all'Osservatorio; negli elenchi si vede al posto dell'indirizzo)</span></label><div style="display:flex;gap:6px;align-items:center"><input type="text" id="mc-etich" placeholder="es. GIUSEPPE_CAMSANMAR_L1_CAVESTRO_COMM" maxlength="50" style="flex:1 1 120px;min-width:0"><button type="button" class="btn-outline btn-sm" id="btn-mc-etich-proponi" style="white-space:nowrap">💡 Proponi</button></div></div>
     </div>
     <div class="mc-col">
       <div class="sect-title">Dati per l'Osservatorio</div>
@@ -7886,9 +7886,9 @@ function _clRender(){
     return`<tr class="row-detail-hover cl-complesso" data-cl-grp="${esc(u.k)}" style="cursor:pointer;background:#fbfbfb" title="${aperto?'Chiudi':'Apri'} i lotti del complesso">
       <td onclick="event.stopPropagation()"></td>
       <td><span class="cl-chev" style="display:inline-block;width:14px;color:#888;font-size:12px">${aperto?'▾':'▸'}</span><strong>${esc(nome)}</strong> <span style="font-size:11px;color:#888;white-space:nowrap">· complesso, ${righe.length} lotti</span>${quartiereBadge(c0.cantiere_indirizzo||'',c0.comune_nome||'')}</td>
+      <td style="font-size:12px">${esc(`${c0.cantiere_indirizzo||''} ${c0.cantiere_civico||''}`.trim()||'–')}</td>
       <td>${esc(c0.comune_nome||'–')}</td>
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${esc(comm)}">${comm?esc(comm):'–'}</td>
-      <td>–</td>
       <td>${esc(cnce)}</td>
       <td><span class="badge badge-bozza" title="Visite su tutti i lotti">${tot}</span></td>
       <td><div class="tbl-actions"><button class="btn-outline btn-sm" data-act="detail-cantiere" data-id="${esc(c0.cantiere_id)}" title="Scheda del complesso, coi suoi lotti">👁</button><span style="font-size:11px;color:#888;white-space:nowrap;align-self:center">visita su un lotto ↓</span></div></td>
@@ -7913,9 +7913,9 @@ function _clRender(){
     return`<tr class="row-detail-hover${inLotto?' cl-lotto':''}" data-act="detail-cantiere" data-id="${c.cantiere_id}"${inLotto?` data-cl-of="${esc(inLotto.k)}" style="background:#fafafa${inLotto.aperto?'':';display:none'}"`:''}>
       <td onclick="event.stopPropagation()" ondblclick="event.stopPropagation()"><input type="checkbox" class="giro-chk" data-id="${c.cantiere_id}" data-lat="${c.lat??''}" data-lng="${c.lng??''}" data-addr="${esc(((c.cantiere_indirizzo||'')+' '+(c.cantiere_civico||'')).trim()+(c.comune_nome?', '+c.comune_nome:''))}" data-label="${esc(label)}" ${_giroSel.has(c.cantiere_id)?'checked':''} onchange="_giroToggle(this)" style="width:17px;height:17px;cursor:pointer"></td>
       <td${inLotto?' style="padding-left:28px"':''}>${inLotto?_pill(c)+' ':''}<strong>${label}</strong>${inLotto?'':_pill(c)}${c.cantiere_chiuso?' <span title="Cantiere chiuso">\uD83D\uDD12</span>':''}${quartiereBadge(c.cantiere_indirizzo||'',c.comune_nome||'')}</td>
+      <td style="font-size:12px">${esc(`${c.cantiere_indirizzo||''} ${c.cantiere_civico||''}`.trim()||'–')}</td>
       <td>${c.comune_nome||'–'}</td>
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${esc(c.committente_nome||'')}">${c.committente_nome?esc(c.committente_nome):'–'}</td>
-      <td>${c.nodo_id||'–'}</td>
       <td>${c.cantiere_cnce||'–'}</td>
       <td><span class="badge badge-bozza">${nVisite}</span></td>
       <td><div class="tbl-actions">
@@ -16400,9 +16400,9 @@ document.addEventListener('input',function(ev){
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=2"></script>
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
-<script src="codice-univoco.js?v=4"></script>
+<script src="codice-univoco.js?v=5"></script>
 <script src="lotti-cantiere.js?v=3"></script>
-<script src="elenco-cantieri-tel.js?v=1"></script>
+<script src="elenco-cantieri-tel.js?v=2"></script>
 <script src="esito-incarico.js?v=2"></script>
 <!-- visite fuori procedura: avviso al tecnico, motivo, decisione del Coordinatore (13/10/2026) -->
 <script src="fuori-procedura.js?v=2"></script>

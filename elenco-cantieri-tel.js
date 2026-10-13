@@ -66,6 +66,7 @@
     return `<article class="ct-card${inLotto ? ' ct-lotto' : ''}">
       <div class="ct-head">${inLotto ? pillLotto(c) : `<span class="ct-com">${esc(c.comune_nome || 'Comune non indicato')}</span>${quartiere(c)}`}${giro(c, o.giroSel, addr, label)}</div>
       <h3 class="ct-tit">${esc(label)}${inLotto ? '' : pillLotto(c)}${chiuso(c)}</h3>
+      ${c.cantiere_etichetta && indirizzo(c) ? `<div class="ct-comm"><span class="ct-lab">Indirizzo</span>${esc(indirizzo(c))}</div>` : ''}
       ${c.committente_nome ? `<div class="ct-comm"><span class="ct-lab">Committente</span>${esc(c.committente_nome)}</div>` : ''}
       <div class="ct-chips">${chips}</div>
       <div class="ct-act"><button type="button" class="btn-outline" data-act="detail-cantiere" data-id="${esc(c.cantiere_id)}">Apri scheda</button><button type="button" class="btn-primary" data-cant-id="${esc(c.cantiere_id)}" data-cant-label="${esc(label)}" data-cant-detail="${esc(det)}">+ Visita</button></div>

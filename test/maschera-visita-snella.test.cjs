@@ -54,17 +54,28 @@ assert.strictEqual(vis('Castelfranco Veneto', { Padova: '35100' }), true, 'comun
 assert.strictEqual(vis('__altro__', { Padova: '35100' }), true, 'fuori provincia: si scrive');
 assert.strictEqual(vis('', { Padova: '35100' }), false, 'comune non ancora scelto: aspetta');
 assert.ok((html.match(/mcCapAggiorna\(\)/g) || []).length >= 4, 'si aggiorna scegliendo il comune, su nuovo e in modifica');
-assert.ok(/id="mc-etich" placeholder="es\. Via Roma 12 – ROSSI"/.test(html) && /id="btn-mc-etich-proponi"/.test(html), '«Proponi» anche sull’etichetta della scheda');
+assert.ok(/id="mc-etich" placeholder="es\. GIUSEPPE_CAMSANMAR_L1_CAVESTRO_COMM"/.test(html) && /id="btn-mc-etich-proponi"/.test(html), '«Proponi» anche sull’etichetta della scheda');
 
 /* ── la proposta: etichetta leggibile, senza le iniziali del tecnico ── */
 const ctx = { window: {}, document: { getElementById: () => null, addEventListener() {} } };
 ctx.window = ctx; vm.createContext(ctx); vm.runInContext(cu, ctx);
 const E = ctx.EtichettaCantiere;
 assert.ok(E && !ctx.CodiceUnivoco, 'il file propone l’etichetta, non più il codice');
-assert.strictEqual(E.componi({ indirizzo: 'Via della Zuanna', civ: '5', impresa: 'Vettorazzo Costruzioni S.r.l.' }), 'Via della Zuanna 5 – VETTORAZZO');
-assert.strictEqual(E.componi({ indirizzo: 'Via Roma', civ: 'snc', impresa: 'Impresa Edile F.lli Rossi' }), 'Via Roma – ROSSI', 'senza civico, senza parole generiche');
-assert.strictEqual(E.componi({ indirizzo: 'Via Roma', civ: '12', impresa: '' }), 'Via Roma 12', 'senza impresa resta il luogo');
-assert.ok(E.componi({ indirizzo: 'Via Lunghissima Dei Santi Martiri Della Resistenza Padovana', civ: '123', impresa: 'Costruzioni Bellunesi' }).length <= 50, 'mai oltre i 50 caratteri dell’Osservatorio');
+// (13/10/2026) schema dell'utente: VIA_COMUNE_Lnn_COMMITTENTE_OPERA
+assert.strictEqual(E.componi({ indirizzo: 'via Giuseppe', comune: 'Campo San Martino', lotto: '1', committente: 'CAVESTRO PASQUALINA', cfCommittente: 'CVSPQL62D41I799X', personaCommittente: true, tipoOpera: '3' }), 'GIUSEPPE_CAMSANMAR_L1_CAVESTRO_COMM', 'l’esempio dell’utente');
+assert.strictEqual(E.committenteBreve('Geom. Pasqualina Cavestro', 'CVSPQL62D41I799X', true), 'CAVESTRO', 'il cognome si riconosce dal codice fiscale anche col nome davanti');
+assert.strictEqual(E.committenteBreve('Mario De Marco', 'DMRMRA70A01G224X', true), 'DEMARCO', 'cognome di due parole');
+assert.strictEqual(E.committenteBreve('Vettorazzo Costruzioni S.r.l.', '01234567890', false), 'VETTORAZZO', 'società: la parola che distingue');
+assert.strictEqual(E.viaBreve('Via della Zuanna'), 'ZUANNA');
+assert.strictEqual(E.viaBreve('Via Giuseppe Garibaldi'), 'GARIBALDI', 'oltre 12 lettere si tiene l’ultima parola');
+assert.strictEqual(E.viaBreve("Piazza dell'Insurrezione"), 'INSURREZIONE');
+assert.strictEqual(E.comuneBreve('Piove di Sacco'), 'PIOSAC');
+assert.strictEqual(E.comuneBreve('Padova'), 'PADOVA');
+assert.strictEqual(E.comuneBreve('Albignasego'), 'ALBIGN');
+assert.strictEqual(E.lottoBreve('Lotto 2'), 'L2');
+assert.strictEqual(E.lottoBreve(''), '');
+assert.strictEqual(E.componi({ indirizzo: 'Via Roma', comune: 'Padova' }), 'ROMA_PADOVA', 'le parti mancanti si saltano');
+assert.ok(E.componi({ indirizzo: 'Via Lunghissima Dei Santi Martiri Della Resistenza Padovana', comune: "Sant'Angelo di Piove di Sacco", lotto: 'Lotto 12', committente: 'Costruzioni Bellunesi Generali', tipoOpera: 14 }).length <= 50, 'mai oltre i 50 caratteri dell’Osservatorio');
 assert.ok(!/iniziali\(/.test(cu.replace(/\/\*[\s\S]*?\*\//g, '')), 'niente iniziali del tecnico');
 assert.ok(/update\(\{ cantiere_etichetta: finale \}\)[\s\S]*\.or\('cantiere_etichetta\.is\.null,cantiere_etichetta\.eq\.'\)/.test(cu), 'si scrive solo se il cantiere non ha ancora un’etichetta');
 assert.ok(!/nodo_id/.test(cu), 'il codice univoco non si tocca più');
