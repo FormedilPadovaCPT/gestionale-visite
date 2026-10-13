@@ -64,7 +64,8 @@ assert.strictEqual(doppia([G, B], '09999999999', 1), null);
 assert.strictEqual(manca({ giaDefinitivo: true, oraA: '10:00', lavorazioni: 1, imprese: [G, { ...G }] })[0].cosa, 'impresa-doppia');
 assert.ok(/due volte/.test(manca({ giaDefinitivo: false, importo: '1', oraA: '10:00', lavorazioni: 1, imprese: [{ ...G, tipo_imp: 1 }, { ...G, tipo_imp: 1 }] })[0].testo));
 assert.ok(/impresaDoppia\(S\.imprese,item\.id,idx\)/.test(html), 'la ricerca nella riga deve rifiutare un’impresa già presente');
-assert.ok(/function _useImpresaEsistente\(c,idx\)\{\r?\n  const _gia=impresaDoppia\(S\.imprese,c\.impresa_id,idx\)/.test(html), '«usa l’impresa esistente» deve rifiutare un doppione');
+// (13/10/2026) prima del controllo sul doppione può stare quello sull'impresa cessata nel Registro Imprese
+assert.ok(/function _useImpresaEsistente\(c,idx\)\{\r?\n(?:  [^\n]*\r?\n){0,2}  const _gia=impresaDoppia\(S\.imprese,c\.impresa_id,idx\)/.test(html), '«usa l’impresa esistente» deve rifiutare un doppione');
 const IMP = [{ impresa_id: '01234567890', impresa_nome: 'Rossi Costruzioni', tipo_imp: '2' }, { impresa_id: '09999999999', impresa_nome: 'Bianchi', tipo_imp: '' }];
 
 // tutto a posto: niente da completare

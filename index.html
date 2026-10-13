@@ -2961,6 +2961,32 @@ const _ceivDa=(cassa,stato)=>{const c=String(cassa||'').toLowerCase(),s=String(s
   if(c==='si'||c==='sì'||c==='true'||/attiv/.test(s))return 'si'
   if(c==='no'||c==='false'||/cess|sospes/.test(s))return 'no'
   return 'da_verificare'}
+/* (13/10/2026, chiesto dall'utente) LO STATO DELL'IMPRESA, due fatti diversi:
+   - stato_cassa: che cosa dice la lista della Cassa Edile. Una «cessata C.E.I.V.» può
+     ancora entrare in un verbale (lavora, magari con un'altra Cassa);
+   - cessata_il: cessata nel Registro Imprese, la scrive la segreteria. È «la cessata a tutti
+     gli effetti, che deve sparire»: non si sceglie per una visita fatta da quel giorno in poi. */
+function impresaCessataPer(r,data){
+  const c=String((r&&r.cessata_il)||'').slice(0,10)
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(c))return false
+  const d=String(data||'').slice(0,10)||new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Rome'})
+  return c<=d
+}
+function _dataItBreve(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));return m?m[3]+'/'+m[2]+'/'+m[1]:''}
+function statoImpresaBadge(r){
+  r=r||{}
+  const pill=(t,bg,fg,tit)=>`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${bg};color:${fg};white-space:nowrap;margin-right:4px" title="${esc(tit)}">${esc(t)}</span>`
+  const s=String(r.stato_cassa||'').trim().toLowerCase()
+  const ceiv=!!r.cod_ceiv||String(r.cassa_edile||'').replace(/\./g,'').toUpperCase()==='CEIV'
+  let h=''
+  if(s==='attiva')h+=pill('C.E.I.V. attiva','#e3f1fb','#2471a3','Iscritta alla Cassa Edile C.E.I.V., attiva nella lista della Cassa')
+  else if(s==='sospesa')h+=pill('C.E.I.V. sospesa','#fff4e0','#b35c00','Sospesa nella lista della Cassa: conta comunque come iscritta')
+  else if(s==='cessata')h+=pill('C.E.I.V. cessata','#eeeeee','#666','Cessata nella lista della Cassa Edile: non è più iscritta, ma l’impresa può lavorare ancora')
+  else if(s==='non iscritta')h+=pill('Non iscritta C.E.I.V.','#eeeeee','#666','La lista della Cassa la dà come non iscritta')
+  else if(ceiv)h+=pill('C.E.I.V.','#e3f1fb','#2471a3','Codice C.E.I.V. presente, stato nella lista della Cassa non noto')
+  if(r.cessata_il)h+=pill('CESSATA dal '+_dataItBreve(r.cessata_il),'#c0392b','#fff','Cessata nel Registro Imprese'+(r.cessata_fonte?' (fonte: '+r.cessata_fonte+')':'')+': non si sceglie per le visite fatte da quel giorno. Non è lo stato in Cassa Edile.')
+  return h
+}
 /* nell'anteprima della mail: che cosa aggiungerà l'app (le date e le quote le legge dal calendario corsi) */
 function _evFormazioneTesto(){
   const f=window._evFormazione;if(!f)return []
@@ -3746,11 +3772,15 @@ function renderImpreseAccordion(){
   S.imprese.forEach((_,idx)=>{
     setupAC(`im-search-${idx}`,`im-list-${idx}`, async q=>{
       // (03/10/2026) parola per parola, e fino a AC_MAX righe: con «basso» le imprese sono 37 e la tendina ne dava 20
-      let qb=sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva').eq('elimina',0).order('impresa_nome').limit(AC_MAX+1)
+      let qb=sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,cessata_il').eq('elimina',0).order('impresa_nome').limit(AC_MAX+1)
       if(q)qb=_perParole(qb,q,['impresa_nome','impresa_cf','piva'])
       const{data,error}=await qb
       if(error)throw new Error(error.message)
-      return _acTaglia((data||[]).map(i=>({id:i.impresa_id,label:`${i.impresa_nome}${i.impresa_cf?' – '+i.impresa_cf:''}`,piva:i.piva||'',cf:i.impresa_cf||''})))
+      // (13/10/2026) le cessate nel Registro Imprese dalla data della visita non compaiono (decisione dell'utente)
+      const _dv=vGet('f-data'),_tutte=data||[],_vive=_tutte.filter(i=>!impresaCessataPer(i,_dv))
+      const _it=_acTaglia(_vive.map(i=>({id:i.impresa_id,label:`${i.impresa_nome}${i.impresa_cf?' – '+i.impresa_cf:''}`,piva:i.piva||'',cf:i.impresa_cf||''})))
+      _it.cessate=_tutte.length-_vive.length
+      return _it
     },item=>{
       /* la stessa impresa non entra due volte (02/10/2026) */
       const _gia=impresaDoppia(S.imprese,item.id,idx)
@@ -4115,7 +4145,8 @@ async function aggiungiImpresaProposta(r){
   const cf=String(r.impresa_cf||'').trim()
   if(!cf)return
   if(S.imprese.some(im=>String(im.impresa_id||'').toUpperCase()===cf.toUpperCase())){toast('Impresa gia presente nella scheda','warn');return}
-  let{data:imp}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,tipo_iscrizione_ccia,contratto_ccnl').eq('impresa_id',cf).eq('elimina',0).maybeSingle()
+  let{data:imp}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,tipo_iscrizione_ccia,contratto_ccnl,cessata_il').eq('impresa_id',cf).eq('elimina',0).maybeSingle()
+  if(imp&&impresaCessataPer(imp,vGet('f-data'))){toast('«'+(imp.impresa_nome||cf)+'» è cessata nel Registro Imprese dal '+_dataItBreve(imp.cessata_il)+': non si sceglie per una visita.','err',9000);return}
   if(!imp){
     const nuova={impresa_id:cf,impresa_nome:r.impresa_nome||cf,impresa_cf:cf,piva:/^\d{11}$/.test(cf)?cf:null,elimina:0}
     const{error}=await sb.from('imprese').insert(nuova)
@@ -4565,7 +4596,7 @@ async function miControllaEsistente(){
   if(piva.length===11)filtri.push(`piva.eq.${piva}`,`impresa_cf.eq.${piva}`,`impresa_id.eq.${piva}`)
   if(cf.length>=11)filtri.push(`impresa_cf.eq.${cf}`,`impresa_id.eq.${cf}`,`piva.eq.${cf}`)
   if(!filtri.length){miEsisteAzzera();return}
-  const{data,error}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,stato_cassa,cod_ceiv,tipo_iscrizione_ccia,contratto_ccnl').eq('elimina',0).or(filtri.join(',')).limit(3)
+  const{data,error}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,stato_cassa,cod_ceiv,tipo_iscrizione_ccia,contratto_ccnl,cessata_il').eq('elimina',0).or(filtri.join(',')).limit(3)
   if(error){box.classList.remove('hidden');box.innerHTML='⚠ Non sono riuscito a controllare l\'anagrafica ('+esc(error.message)+'): prima di salvare, cerca l\'impresa per P.IVA.';return}
   if(!data||!data.length){miEsisteAzzera();return}
   window._miEsistenti=data
@@ -4573,7 +4604,7 @@ async function miControllaEsistente(){
   box.classList.remove('hidden')
   box.innerHTML='<b>Questa impresa è già in anagrafica</b>: non serve crearla di nuovo.'+data.map((x,i)=>{
     const iscr=_ceivDa(x.cassa_edile,x.stato_cassa)==='si'
-    const cassa=x.cod_ceiv?('C.E.I.V. '+(x.stato_cassa||'')+(iscr?' ✅':' (non conta come iscritta)')):(x.cassa_edile||'non nella lista della Cassa')
+    const cassa=(x.cod_ceiv?('C.E.I.V. '+(x.stato_cassa||'')+(iscr?' ✅':' (non conta come iscritta)')):(x.cassa_edile||'non nella lista della Cassa'))+(x.cessata_il?' · CESSATA nel Registro Imprese dal '+_dataItBreve(x.cessata_il):'')
     return`<div style="display:flex;align-items:center;gap:10px;margin-top:6px"><div style="flex:1"><div style="font-weight:600">${esc(x.impresa_nome||'')}</div><div style="font-size:12px;color:#666">${[x.piva?'P.IVA '+x.piva:'',x.impresa_cf&&x.impresa_cf!==x.piva?'CF '+x.impresa_cf:'',[x.indirizzo,x.comune].filter(Boolean).join(' '),cassa].filter(Boolean).map(esc).join(' · ')}</div></div><button type="button" class="btn-primary btn-sm" data-mi-usa="${i}" style="white-space:nowrap">Usa questa</button></div>`}).join('')
   box.querySelectorAll('[data-mi-usa]').forEach(b=>b.onclick=()=>{const x=(window._miEsistenti||[])[+b.dataset.miUsa];if(x)_useImpresaEsistente(x,_modalImpIdx)})
 }
@@ -4766,7 +4797,7 @@ async function findSimiliImprese(nome,piva,cf){
   if(cf){filters.push(`impresa_cf.eq.${cf}`,`impresa_id.eq.${cf}`)}
   if(key){filters.push(`impresa_nome.ilike.%${key}%`)}
   if(!filters.length)return[]
-  const{data}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,tipo_iscrizione_ccia,contratto_ccnl').eq('elimina',0).or(filters.join(',')).limit(25)
+  const{data}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,tipo_iscrizione_ccia,contratto_ccnl,cessata_il').eq('elimina',0).or(filters.join(',')).limit(25)
   return data||[]
 }
 async function findSimiliCommittenti(nome,cf,piva){
@@ -4827,6 +4858,8 @@ function _confirmSimiliCommittenti(simili){
 }
 // Usa un'impresa gia esistente al posto di crearne una nuova
 function _useImpresaEsistente(c,idx){
+  // (13/10/2026) cessata nel Registro Imprese dalla data della visita: non entra nel verbale
+  if(impresaCessataPer(c,vGet('f-data'))){hide('modal-imp');toast('«'+(c.impresa_nome||c.impresa_id)+'» è cessata nel Registro Imprese dal '+_dataItBreve(c.cessata_il)+': non si sceglie per una visita. Se ha ripreso l\'attività, la segreteria toglie la data di cessazione dalla scheda.','err',9000);return}
   const _gia=impresaDoppia(S.imprese,c.impresa_id,idx)
   if(_gia){hide('modal-imp');toast('«'+(c.impresa_nome||c.impresa_id)+'» è già nel verbale, alla riga '+(_gia.prima+1)+': un\'impresa si mette una volta sola.','warn',8000);return}
   Object.assign(S.imprese[idx],{
@@ -5006,14 +5039,16 @@ function setupAC(inId,listId,fetchFn,onSel){
       lst.innerHTML='<div class="ac-nota" style="color:#c0392b">Non sono riuscito a cercare ('+String(e&&e.message||e).replace(/[<>&]/g,'')+'). Riprova.</div>'
       lst.classList.remove('hidden');return
     }
+    // (13/10/2026) imprese cessate nel Registro Imprese tolte dall'elenco: si dice quante, perché non sembri un'impresa mancante
+    const _notaCess=items.cessate?'<div class="ac-nota">'+(items.cessate===1?'1 impresa cessata':items.cessate+' imprese cessate')+' nel Registro Imprese non '+(items.cessate===1?'compare':'compaiono')+': non si scelgono per una visita. Se ha ripreso l\'attività, lo dice la segreteria.</div>':''
     if(!items.length){
-      lst.innerHTML='<div style="color:#aaa;font-style:italic">Nessun risultato</div>'
+      lst.innerHTML='<div style="color:#aaa;font-style:italic">Nessun risultato</div>'+_notaCess
       lst.classList.remove('hidden')
-      setTimeout(()=>lst.classList.add('hidden'),1500)
+      if(!_notaCess)setTimeout(()=>lst.classList.add('hidden'),1500)
       return
     }
     lst.innerHTML=items.map((it,i)=>`<div data-i="${i}">${it.label}</div>`).join('')
-      +(items.troppi?'<div class="ac-nota">Ce ne sono altre: queste sono le prime '+AC_MAX+' in ordine alfabetico. Aggiungi una parola (un nome, la partita IVA) per restringere.</div>':'')
+      +(items.troppi?'<div class="ac-nota">Ce ne sono altre: queste sono le prime '+AC_MAX+' in ordine alfabetico. Aggiungi una parola (un nome, la partita IVA) per restringere.</div>':'')+_notaCess
     lst.classList.remove('hidden')
     lst.querySelectorAll('div[data-i]').forEach((d,i)=>{
       d.onclick=()=>{inp.value=items[i].label;lst.classList.add('hidden');onSel(items[i])}
@@ -13647,8 +13682,9 @@ async function loadRubrica(){
         r.tipo_iscrizione_ccia?`CCIA: ${esc(_CCIA_LBL[r.tipo_iscrizione_ccia]||r.tipo_iscrizione_ccia)}`:'',
         r.cassa_edile?`Cassa edile: ${esc(r.cassa_edile)}`:'',
       ].filter(Boolean)
-      const _isCeiv=(r.cassa_edile||'').replace(/\./g,'').toUpperCase()==='CEIV'||!!r.cod_ceiv
-      cards.push(rubCard('🏢','impresa',r.impresa_id,esc(r.impresa_nome||'–'),sub,extra,_isCeiv?'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#e3f1fb;color:#2471a3;white-space:nowrap;margin-right:4px" title="Impresa iscritta C.E.I.V.">C.E.I.V.</span>':''))
+      // (13/10/2026) prima il bollino «C.E.I.V.» usciva per ogni codice della Cassa, anche cessata o non iscritta:
+      // ora dice lo stato nella lista della Cassa e, a parte, la cessazione nel Registro Imprese
+      cards.push(rubCard('🏢','impresa',r.impresa_id,esc(r.impresa_nome||'–'),sub,extra,statoImpresaBadge(r)))
     })
   }
 
@@ -16083,7 +16119,7 @@ async function incMettiImpresa(r,idx,sostituisce){
   if(!S.imprese||!S.imprese[idx]) return
   if(sostituisce) Object.assign(S.imprese[idx],{impresa_id:'',impresa_nome:'',piva:'',cf_imp:'',ind_imp:'',com_imp:'',ceiv:'',tipo_ccia:'',ccnl:''})
   if(r.impresa_id&&typeof _useImpresaEsistente==='function'){
-    const{data:c}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,tipo_iscrizione_ccia,contratto_ccnl').eq('impresa_id',r.impresa_id).maybeSingle()
+    const{data:c}=await sb.from('imprese').select('impresa_id,impresa_nome,impresa_cf,piva,indirizzo,comune,cassa_edile,tipo_iscrizione_ccia,contratto_ccnl,cessata_il').eq('impresa_id',r.impresa_id).maybeSingle()
     if(c){ _useImpresaEsistente(c,idx); return }
   }
   if(r.impresa){

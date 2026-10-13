@@ -19,12 +19,13 @@ assert.strictEqual(tanti.length, AC_MAX); assert.strictEqual(tanti.troppi, true,
 
 // le tre tendine chiedono una riga in più del tetto (serve a sapere che ce ne sono altre) e passano da _acTaglia
 assert.strictEqual((html.match(/\.limit\(AC_MAX\+1\)/g) || []).length, 3, 'imprese e i due campi del committente devono usare AC_MAX+1');
-assert.strictEqual((html.match(/return _acTaglia\(/g) || []).length, 3);
+// (13/10/2026) la tendina delle imprese assegna il risultato per contare le cessate tolte: _acTaglia resta in tutte e tre
+assert.strictEqual((html.match(/(?:return |const _it=)_acTaglia\(/g) || []).length, 3);
 assert.ok(!/from\('imprese'\)[^\n]*\.limit\(20\)/.test(html) && !/from\('committenti'\)[^\n]*order\('committente_nome'\)\.limit\(20\)/.test(html), 'il tetto di 20 non deve tornare');
 // le imprese si cercano parola per parola, come i committenti
 assert.ok(html.includes("if(q)qb=_perParole(qb,q,['impresa_nome','impresa_cf','piva'])"), '«basso giovanni» deve trovare «…GIOVANNI CARLO BASSO»');
 // la tendina dice quando ce ne sono altre, e una ricerca fallita non è «nessun risultato»
 assert.ok(html.includes("items.troppi?'<div class=\"ac-nota\">Ce ne sono altre"), 'la lista tagliata deve dirlo');
 assert.ok(html.includes("try{items=await fetchFn(q)}catch(e){") && html.includes('Non sono riuscito a cercare ('), 'una ricerca fallita si dice');
-assert.strictEqual((html.match(/const\{data,error\}=await qb\s+if\(error\)throw new Error\(error\.message\)\s+return _acTaglia/g) || []).length, 3, 'le tre ricerche devono leggere l’errore');
+assert.strictEqual((html.match(/const\{data,error\}=await qb\s+if\(error\)throw new Error\(error\.message\)\s+(?:return _acTaglia|\/\/ \(13\/10\/2026\) le cessate)/g) || []).length, 3, 'le tre ricerche devono leggere l’errore');
 console.log('ricerca-tendine: ok');
