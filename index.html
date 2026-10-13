@@ -783,6 +783,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <div id="cant-detail" style="font-size:12px;color:var(--grey);margin-top:5px"></div>
             <div id="cant-quartiere" style="margin-top:4px"></div>
             <div id="cant-info-card" class="hidden" style="margin-top:10px;padding:10px 14px;background:#f8f8f8;border-radius:8px;border-left:3px solid var(--orange);font-size:12px;line-height:1.8;color:#333"></div>
+            <!-- (13/10/2026) visita fuori procedura: cantiere archiviato o rientro anticipato, col motivo del tecnico (fuori-procedura.js) -->
+            <div id="fp-stato" style="display:none;margin-top:8px;padding:8px 12px;background:#fff8ec;border:1px solid #f39c12;border-radius:8px;font-size:12px;line-height:1.7;color:#333"></div>
           </div>
           <div class="field" style="flex:0 0 auto;align-self:flex-start">
             <label>&nbsp;</label>
@@ -1373,6 +1375,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div id="dash-riepilogo-verbali" style="display:none;margin-bottom:14px"></div>
         <!-- notifica al coordinatore a ogni nuovo verbale: si accende e si spegne qui (notifiche.js, 02/10/2026) -->
         <div id="adm-avviso-verbali" style="display:none;margin-bottom:14px"></div>
+        <!-- visite fuori procedura: da approvare e quadro per tecnico (fuori-procedura.js, 13/10/2026) -->
+        <div id="adm-fuori-procedura" style="display:none;margin-bottom:14px"></div>
 
         <!-- Intervallo cronologico + statistiche -->
         <div class="adm-section">
@@ -4077,6 +4081,8 @@ async function autoAccCant(cantId){
     vSet('f-acc-cant',String(n))
     const el=$('f-acc-cant')
     if(el){el.title='Calcolato automaticamente: '+(count||0)+' visite precedenti su questo cantiere. Modificabile se necessario.';el.style.background='#eef9f0'}
+    /* (13/10/2026) cantiere archiviato dalla procedura, o rientro anticipato: l'avviso col motivo (fuori-procedura.js) */
+    if(window.FuoriProcedura)await FuoriProcedura.controlla(cantId).catch(e2=>console.warn('fuori procedura:',e2))
   }catch(e){console.error('autoAccCant:',e)}
 }
 
@@ -5221,6 +5227,8 @@ async function saveVisita(stato){
 }
 async function _saveVisitaCorpo(stato){
   saveTabData()
+  /* (13/10/2026) visita fuori procedura senza motivo: si riapre l'avviso, non si salva */
+  if(window.FuoriProcedura&&!FuoriProcedura.pronto())return
   const cant_id=vGet('f-cant-id')
   const tec_id=vGet('f-tec-id')
   const tec2_id=vGet('f-tec2-id')
@@ -5376,6 +5384,7 @@ async function _saveVisitaCorpo(stato){
       nr_lavoratori_stranieri:computeImpTotals().nr_lavoratori_stranieri,
       ipc:ipcVal,
       tipo_accesso:+vGet('f-tipo')||null,
+      ...(window.FuoriProcedura?FuoriProcedura.campi():{}),   // (13/10/2026) motivo del rientro fuori procedura e serie proposta; fp_tipo lo mette il database
       elimina:0,
       // estesi Tab 0
       prot_int:vGet('f-prot-int')||null,
@@ -5607,7 +5616,7 @@ async function _saveVisitaCorpo(stato){
     if(_chiudi&&!_eraDefinitivo){
       const{data:_cv,error:_eCv}=await sb.rpc('chiudi_verbale',{p_visita_id:vid})
       if(_eCv)throw new Error('il verbale è salvato come BOZZA, ma non sono riuscito a chiuderlo ('+_eCv.message+'). Riprova con «Definitivo».')
-      if(_cv&&_cv.ok)stato='definitivo'
+      if(_cv&&_cv.ok){stato='definitivo';if(window.FuoriProcedura)FuoriProcedura.dopoChiusura(vid).catch(e2=>console.warn('fuori procedura:',e2))}
       else{stato='bozza';_mancanze=(_cv&&_cv.mancanze)||[]}
     }
 
@@ -5892,6 +5901,7 @@ function applySnap(snap){
   _tipiFormazione().then(()=>{if($('f-note-for-tipi')&&!$('f-note-for-tipi').querySelector('input'))return formTipiInit()}).then(()=>_tipiSet(snap.note_for_tipi||[])).catch(()=>{})
   if(snap.segnalazione!=null)cSet('f-segnalazione',snap.segnalazione)
   if(snap.data_ritorno)vSet('f-data-ritorno',snap.data_ritorno)
+  if(window.FuoriProcedura)FuoriProcedura.daSnap(snap)   // (13/10/2026) il motivo del rientro fuori procedura, se c'è
 
   // ── Foto ──────────────────────────────────────────────────────────────────
   if(snap.privacy!=null)cSet('f-privacy',snap.privacy)
@@ -7429,7 +7439,7 @@ async function loadLista(){
     for(let y=_cur;y>=2023;y--)_oh+='<option value="'+y+'">'+y+'-'+(y+1)+'</option>'
     _qy.innerHTML=_oh;_qy.value=String(_cur);_qy.onchange=loadLista
   }
-  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,created_at,ipc,stato,elimina,ipc_nc_plus,ipc_nc_minus,ipc_oss,acc_cant,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
+  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,created_at,ipc,stato,elimina,ipc_nc_plus,ipc_nc_minus,ipc_oss,acc_cant,fp_tipo,fp_esito,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
   if(!_showElim)qb=qb.eq('elimina',0)
   if(fi)qb=qb.eq('ipc',fi)
   if(fs)qb=qb.eq('stato',fs)
@@ -7541,7 +7551,7 @@ function vtRow(v){
       +(coord?`<button class="btn-outline btn-sm" data-act="softdel" data-id="${v.visita_id}" data-nr="${nr}" title="Metti in eliminata" style="color:#c0392b">🗑</button>`:'')
   }
   return`<tr class="row-detail-hover" data-act="detail-visita" data-id="${v.visita_id}"${isElim?' style="opacity:.55"':''}>
-    <td>${v.nr_verbale||'-'}${isElim?' <span class="badge" style="background:#c0392b;color:#fff">eliminata</span>':''}</td><td>${fmtDate(v.data_visita)}</td>
+    <td>${v.nr_verbale||'-'}${window.FuoriProcedura?FuoriProcedura.badge(v):''}${isElim?' <span class="badge" style="background:#c0392b;color:#fff">eliminata</span>':''}</td><td>${fmtDate(v.data_visita)}</td>
     <td style="text-align:center;font-weight:600">${v.acc_cant?v.acc_cant+'°':'–'}</td>
     <td>${cant}</td><td>${v.imprese?.impresa_nome||'-'}</td>
     <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
@@ -9100,6 +9110,7 @@ function _evAnteprima(){
       'Evidenziamo che la consulenza che è stata resa alla Vostra impresa è per Voi totalmente gratuita, grazie al contributo versato da imprese e lavoratori iscritti a C.E.I.V.','',
       'L\'iscrizione a C.E.I.V. offre molti altri vantaggi, come ad esempio la possibilità di accedere alla formazione obbligatoria ex D.Lgs 81/2008, che Formedil Padova offre a tariffe agevolate.','',
       ..._evFormazioneTesto(),'',
+      ...(window._evSerie?['[Il tecnico propone una serie di visite: l\'app aggiunge qui l\'invito a chiederla dal portale dei servizi (modulo «Richiesta visita in cantiere», voce «Serie di visite»).]','']:[]),
       'Rimanendo a disposizione per ogni eventuale chiarimento porgiamo distinti saluti.','',
       '[Riquadro «Com\'è andata la visita?» con il pulsante «Valuta la visita →»]')
   }
@@ -9424,7 +9435,7 @@ async function inviEmailVerbaleFromList(vid){
   _setEvModalRett(false)
   toast('Caricamento dati visita…')
   const{data:v,error}=await sb.from('visite').select(`
-    visita_id,nr_verbale,data_visita,tecnico2_id,tecnico_id,
+    visita_id,nr_verbale,data_visita,tecnico2_id,tecnico_id,fp_serie_proposta,
     note_for_sn,note_for_m,note_for_tipi,ppre_titolo,ppre_nome,ppre_cog,qual_ppre,tel_ppre,
     comm_nome,comm_cog,comm_rag_soc,comm_tipo_sogg,comm_email,
     resp_lav,rl_email,
@@ -9434,6 +9445,7 @@ async function inviEmailVerbaleFromList(vid){
     tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome)
   `).eq('visita_id',vid).single()
   if(error||!v){toast('Visita non trovata','err');return}
+  window._evSerie=!!v.fp_serie_proposta   // (13/10/2026) il tecnico propone una serie di visite
   const{data:impRows}=await sb.from('visite_imprese_presenti').select('impresa_id,is_principale,imprese(impresa_nome,impresa_email_ref,impresa_telefono,piva,cassa_edile,stato_cassa)').eq('visita_id',vid).order('ordine')
   // formazione mancante (25/09/2026): il pacchetto per la mail all'impresa e la segnalazione all'ufficio corsi
   {const _pr=(impRows||[]).find(x=>x.is_principale)||(impRows||[])[0]||null,_pi=_pr&&_pr.imprese||{}
@@ -9650,6 +9662,7 @@ function apriEmailRettifica(p){
   const _fInd=[S.fd?.cantiere_indirizzo,S.fd?.cantiere_civico].filter(Boolean).join(' ')
   const _fCom=S.fd?.comune_nome||''
   const _fImp=(S.imprese&&S.imprese.length?S.imprese[0]?.impresa_nome:'')||''
+  window._evSerie=!!(window.FuoriProcedura&&FuoriProcedura.serieProposta())   // (13/10/2026) il tecnico propone una serie di visite
   // formazione mancante (25/09/2026): dal modulo appena salvato
   // (la funzione non e' asincrona: si calcola subito con quello che c'e', e la lettura
   //  dell'impresa aggiorna il pacchetto appena arriva, prima che il tecnico prema Invia)
@@ -9774,6 +9787,7 @@ async function inviEmailVerbale(){
   const _fInd=[S.fd?.cantiere_indirizzo,S.fd?.cantiere_civico].filter(Boolean).join(' ')
   const _fCom=S.fd?.comune_nome||''
   const _fImp=(S.imprese&&S.imprese.length?S.imprese[0]?.impresa_nome:'')||''
+  window._evSerie=!!(window.FuoriProcedura&&FuoriProcedura.serieProposta())   // (13/10/2026) il tecnico propone una serie di visite
   // formazione mancante (25/09/2026): dal modulo appena salvato
   // (la funzione non e' asincrona: si calcola subito con quello che c'e', e la lettura
   //  dell'impresa aggiorna il pacchetto appena arriva, prima che il tecnico prema Invia)
@@ -9852,7 +9866,7 @@ Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle per
 $('btn-email-verbale').onclick=inviEmailVerbale
 $('btn-ev-extra').onclick=_evAggiungi
 $('ev-extra').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_evAggiungi()}}
-$('btn-ev-close').onclick=()=>{hide('modal-email-verbale');window._evRettifica=null;window._evReinvio=null;_setEvModalRett(false)}
+$('btn-ev-close').onclick=()=>{hide('modal-email-verbale');window._evSerie=null;window._evRettifica=null;window._evReinvio=null;_setEvModalRett(false)}
 $('btn-ev-invia').onclick=async()=>{
   // (06/10/2026) solo i destinatari spuntati; nel registro degli invii resta chi l'ha ricevuto davvero
   const tutti=window._evEmails||[]
@@ -9951,6 +9965,7 @@ $('btn-ev-invia').onclick=async()=>{
           campagna: await _evCampagnaPayload(),
           rettifica: window._evRettifica||undefined,
           formazione: (!window._evRettifica&&window._evFormazione)?{...window._evFormazione,visita_id:window._evContext?.vid||null}:undefined,   // 25/09/2026: date dei corsi all'impresa + segnalazione all'ufficio corsi
+          serieProposta: !window._evRettifica&&!!window._evSerie,   // 13/10/2026: il tecnico propone una serie di visite, l'impresa trova l'invito a chiederla dal portale
           linkValuta,
           driveFileId: upData.drive_file_id,
           fileName: (function(){const _ev=window._evContext||{};const _c=s=>(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim();const _cd=(_ev.nr_verbale||vGet('f-verbale')||'').replace(/\D/g,'').slice(-4);const _nm=[`Verb_${_cd}`+(window._evRettifica?' RETTIFICA':''),_c(_ev.impresa).slice(0,30).trim(),_c(_ev.comune),_c(_ev.tecnico),(_ev.dataVisita||'').replace(/\//g,'-')].filter(Boolean).join(' - ')+'.pdf';return _cd?_nm:upData.file_name})()
@@ -10486,6 +10501,7 @@ const COORD_EMAIL = 'nicola.demarco@did.formedilpadova.it'
 const COORD_PAGE_EMAILS = [ADMIN_EMAIL, COORD_EMAIL]
 const ASSEV_EMAILS = ['cptpd@did.formedilpadova.it','tommaso.visentini@did.formedilpadova.it','nicola.demarco@did.formedilpadova.it','paolo.balladore@did.formedilpadova.it'];window.__assevEmails=ASSEV_EMAILS
 const isCoordPageUser = () => !!(S.user && COORD_PAGE_EMAILS.includes((S.user.email||'').toLowerCase()))
+window.isCoordPageUser=isCoordPageUser   // (13/10/2026) la usa fuori-procedura.js
 
 function admInit(){
   // Mostra email corrente nella zona admin
@@ -13760,6 +13776,7 @@ async function rebuildSnapFromDB(vid,opt){
     oss_tec:v.oss_tec||null,oss_int:v.oss_tec_int||null,
     note_for_sn:v.note_for_sn||false,note_for_m:v.note_for_m||null,note_for_tipi:v.note_for_tipi||null,
     segnalazione:v.segnalazione||false,data_ritorno:v.data_ritorno||null,
+    fp_tipo:v.fp_tipo||null,fp_motivo_tipo:v.fp_motivo_tipo||null,fp_motivo:v.fp_motivo||null,fp_serie_proposta:!!v.fp_serie_proposta,fp_rif_visita_id:v.fp_rif_visita_id||null,fp_esito:v.fp_esito||null,   // (13/10/2026)
     _rebuilt_from_db:true
   }
   /* per riaprire LO STESSO verbale serve tutto quello che il database tiene: senza, riaprire e
@@ -13843,6 +13860,7 @@ async function nuovaVisitaDaVerbale(vid, mode){
     delete snap.visita_id
     snap.data_visita=null; snap.ora_visita=null; snap.ora_fine=null
     snap.acc_cant=null; snap.data_ritorno=null
+    ;['fp_tipo','fp_motivo_tipo','fp_motivo','fp_serie_proposta','fp_rif_visita_id','fp_esito'].forEach(k=>delete snap[k])   // (13/10/2026) la visita nuova rifà il controllo
     await initForm(snap)     // assegna un nuovo nr_verbale e la data odierna
     navTo('form')
     if(snap.cantiere_id) await autoAccCant(snap.cantiere_id)
@@ -13885,6 +13903,7 @@ async function showVisitaDetail(vid){
         visita_id,nr_verbale,data_visita,ora_visita,ora_fine,ipc,ipc_nc_plus,ipc_nc_minus,ipc_oss,stato,elimina,
         tipo_accesso,acc_cant,nr_lavoratori,nr_lavoratori_stranieri,prescrizioni,oss_tec,
         oss_tec_int,note_for_sn,note_for_m,note_for_tipi,segnalazione,data_ritorno,
+        fp_tipo,fp_motivo_tipo,fp_motivo,fp_serie_proposta,fp_lavorazioni_uguali,fp_esito,fp_esito_il,fp_esito_nota,
         comm_tipo_sogg,comm_titolo,comm_nome,comm_cog,comm_cf,comm_piva,comm_rag_soc,comm_email,comm_tel,
         tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),
         cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,prot_int),
@@ -13907,6 +13926,8 @@ async function showVisitaDetail(vid){
       ['Lavoratori',v.nr_lavoratori!=null?String(v.nr_lavoratori):''],
       ['NC+ / NC- / OSS',[v.ipc_nc_plus,v.ipc_nc_minus,v.ipc_oss].map(x=>x||0).join(' / ')],
     ])
+    /* (13/10/2026) visita fuori procedura: motivo del tecnico e decisione del Coordinatore (interno, mai sul PDF) */
+    if(v.fp_tipo&&window.FuoriProcedura){html+=qdSec('⚠️ Fuori procedura (interno)')+qdDl(FuoriProcedura.dettaglio(v))}
     if(cant){
       html+=qdSec('Cantiere')
       html+=qdDl([
@@ -16383,6 +16404,8 @@ document.addEventListener('input',function(ev){
 <script src="lotti-cantiere.js?v=3"></script>
 <script src="elenco-cantieri-tel.js?v=1"></script>
 <script src="esito-incarico.js?v=2"></script>
+<!-- visite fuori procedura: avviso al tecnico, motivo, decisione del Coordinatore (13/10/2026) -->
+<script src="fuori-procedura.js?v=1"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->

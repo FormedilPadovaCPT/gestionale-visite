@@ -31,6 +31,13 @@ window.AIUTO_TESTI = {
   /* ── cambio password obbligatorio (27/09/2026) ── */
   'btn-pwd-salva': 'Sostituisce subito la tua password con quella nuova e apre l\'app. Da ora entri solo con la nuova: la vecchia non vale più, e la richiesta della segreteria si chiude.',
   'link-pwd-esci': 'Esci senza cambiare la password: torni alla schermata di accesso, e al prossimo ingresso il cambio ti verrà chiesto di nuovo.',
+  /* ── visite fuori procedura (13/10/2026) ── */
+  'fp-ok': 'Tiene il cantiere e registra il motivo del rientro sul verbale. Il motivo è interno: non va sul PDF né nella mail all\'impresa. Il verbale sarà segnato «fuori procedura» e il Coordinatore lo approva o no.',
+  'fp-altro': 'Toglie questo cantiere dal verbale e ti fa scegliere un altro cantiere. Niente viene salvato.',
+  'fp-cambia': 'Riapre l\'avviso per cambiare il motivo del rientro o la proposta di serie di visite.',
+  'fp-serie': 'Con la spunta, nella mail del verbale l\'impresa trova l\'invito a chiedere una serie di visite dal portale dei servizi. La serie poi passa dal Coordinatore e dal Direttore come le altre.',
+  't:approvo': 'Approvi il rientro fuori procedura: il tecnico riceve l\'esito. Resta scritto chi ha approvato e quando.',
+  't:non approvo': 'Non approvi il rientro: scrivi il motivo, il tecnico lo riceve. Il verbale all\'impresa resta com\'è; se ne tiene conto nel controllo dei verbali prima della liquidazione.',
   /* ── menu ── */
   'v:dashboard': 'Torna alla pagina iniziale: pulsanti rapidi, avvisi, il tuo obiettivo del mese e la mappa dei cantieri aperti con l\'IPC dell\'ultima visita.',
   'v:statistiche': 'Contatori, grafici e tabelle delle visite (per esercizio, tecnico, IPC, comuni, imprese ricorrenti). Si calcolano quando apri la scheda.',

@@ -256,6 +256,8 @@
       typeof window.loadFattureCoord === 'function' ? window.loadFattureCoord() : Promise.resolve(),
       carica(),
       window.direzione && typeof window.direzione.zonaCoord === 'function' ? window.direzione.zonaCoord() : Promise.resolve(),
+      /* visite fuori procedura: da approvare e quadro per tecnico (fuori-procedura.js, 13/10/2026) */
+      window.FuoriProcedura && typeof window.FuoriProcedura.boxCoord === 'function' ? window.FuoriProcedura.boxCoord() : Promise.resolve(),
     ]);
     avvisa();
   }

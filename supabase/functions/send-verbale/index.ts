@@ -11,6 +11,8 @@
 //      Ora serve un utente autenticato del personale (is_personale).
 // 25/09/2026 v32: la nota del tecnico sulla formazione mancante NON va all'impresa,
 //      solo all'ufficio corsi (scelta dell'utente: «son utili a noi interni, non all'azienda»).
+// 13/10/2026: serieProposta — il tecnico propone una serie di visite (visita fuori procedura):
+//      l'impresa trova l'invito a chiederla dal portale. Il motivo del rientro resta interno.
 //
 // Secret richiesto: GOOGLE_SERVICE_ACCOUNT_JSON
 // Scopes DWD richiesti:
@@ -259,7 +261,12 @@ serve(async (req) => {
     if (!SA_JSON) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON non configurato')
     const sa = JSON.parse(SA_JSON)
 
-    const { to, subject, nrVerbale, cantiere, impresa, tecnico, tecnico2, comune, cantIndirizzo, dataVisita, driveFileId, fileName, campagna, rettifica, linkValuta, formazione } = await req.json()
+    const { to, subject, nrVerbale, cantiere, impresa, tecnico, tecnico2, comune, cantIndirizzo, dataVisita, driveFileId, fileName, campagna, rettifica, linkValuta, formazione, serieProposta } = await req.json()
+    /* (13/10/2026) il tecnico ha proposto una serie di visite (visita fuori procedura, scelta dell'utente):
+       l'impresa trova l'invito a chiederla dal portale dei servizi. Il motivo del rientro resta interno: qui non arriva. */
+    const serieHtml = serieProposta && !rettifica
+      ? `<p style="line-height:1.7;margin:0 0 14px">Il nostro tecnico ritiene che il Vostro cantiere meriti di essere <strong>seguito nel tempo</strong>: se lo desiderate potete chiedere una <strong>serie di visite</strong>, con periodicità da concordare con i nostri tecnici, compilando il modulo «Richiesta visita in cantiere» (voce «Serie di visite») sul portale dei servizi: <a href="https://formedilpadovacpt.github.io/servizi/?pagina=visita" style="color:#e7500f">formedilpadovacpt.github.io/servizi</a>.</p>`
+      : ''
     /* formazione mancante (25/09/2026): il paragrafo per l'impresa si prepara qui; se la
        lettura fallisce la mail del verbale parte lo stesso, senza il paragrafo */
     let formaz: { html: string; proposte: Proposta[]; cfg: Record<string, string> } | null = null
@@ -381,6 +388,7 @@ serve(async (req) => {
     <p style="line-height:1.7;margin:0 0 14px">Evidenziamo che la consulenza che è stata resa alla Vostra impresa è per Voi totalmente gratuita, grazie al contributo versato da imprese e lavoratori iscritti a C.E.I.V.</p>
     <p style="line-height:1.7;margin:0 0 20px">L'iscrizione a C.E.I.V. offre molti altri vantaggi, come ad esempio la possibilità di accedere alla formazione obbligatoria ex D.Lgs 81/2008, che Formedil Padova offre a tariffe agevolate.</p>
     ${formaz ? formaz.html : ''}
+    ${serieHtml}
     <p style="margin:0 0 24px">Rimanendo a disposizione per ogni eventuale chiarimento porgiamo distinti saluti.</p>`
     }
 

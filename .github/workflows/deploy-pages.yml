@@ -33,6 +33,7 @@ on:
       - 'lotti-cantiere.js'
       - 'elenco-cantieri-tel.js'
       - 'esito-incarico.js'
+      - 'fuori-procedura.js'
       - 'appunti-cantiere.js'
       - 'direzione.js'
       - 'rientri-giorni.js'
