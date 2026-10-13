@@ -128,10 +128,10 @@
     const intro = $('form-intro');
     if (intro) {
       intro.textContent = R.rpf
-        ? 'Sei il responsabile del progetto formativo: qui firmi i documenti dei corsi e scrivi le schede formative delle tipologie (o le deleghi a un docente). Progetto formativo e verbale di verifica arriveranno nei prossimi lotti.'
+        ? 'Sei il responsabile del progetto formativo: qui firmi i documenti dei corsi, scrivi le schede formative delle tipologie (o le deleghi a un docente), dichiari pronti progetto formativo e verbale di verifica, e vedi i corsi come li vede il docente.'
         : R.docente
-          ? 'Qui trovi i documenti dei corsi che aspettano la tua firma e le schede formative che il responsabile del progetto formativo ti ha delegato. La pagina del corso (presenze, allievi, registro) arriverà nei prossimi lotti.'
-          : 'I documenti della formazione che aspettano la tua firma e, se ti sono delegate, le schede formative da compilare. Il resto della pagina arriverà nei prossimi lotti.';
+          ? 'Qui trovi i documenti dei corsi che aspettano la tua firma, le schede formative che il responsabile del progetto formativo ti ha delegato e i tuoi corsi: incarico da accettare, presenze e firme degli allievi dal QR, registro della giornata.'
+          : 'I documenti della formazione che aspettano la tua firma, le schede formative delegate a te e, se sei docente di un corso, la pagina del corso: incarico, presenze, firme dal QR, registro della giornata.';
     }
     if (window.firmeApp) {
       await window.firmeApp.box($('form-firme'), {
@@ -150,6 +150,12 @@
       if (!hc) { hc = document.createElement('div'); hc.id = 'form-corsi'; hc.style.marginBottom = '14px'; const v = $('view-formazione'); if (v) v.appendChild(hc); }
       if (window.formazioneCorsi && hc) await window.formazioneCorsi.box(hc, R);
     } catch (e) { console.warn('corsi:', e); }
+    /* (lotto 5) la pagina del docente per il corso (formazione-docente.js) */
+    try {
+      let hd = $('form-docente');
+      if (!hd) { hd = document.createElement('div'); hd.id = 'form-docente'; hd.style.marginBottom = '14px'; const v = $('view-formazione'); if (v) v.appendChild(hd); }
+      if (window.formazioneDocente && hd) await window.formazioneDocente.box(hd, R);
+    } catch (e) { console.warn('docente:', e); }
     badge().catch(() => {});
   }
 
