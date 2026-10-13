@@ -133,6 +133,11 @@ window.AIUTO_TESTI = {
   't:proponi chiusura alla segreteria': 'Dici alla segreteria che il cantiere è finito, con due parole sul perché. Non chiude niente: decide la segreteria, e fino ad allora il cantiere resta attivo.',
   't:respingi la proposta': 'Il cantiere resta aperto. Ti chiede il motivo, che resta scritto accanto alla proposta per chi l\'ha fatta.',
   't:apri scheda': 'Apre la scheda del cantiere: dati, visite fatte e pulsanti per una nuova visita.',
+  /* schede dei cantieri sul telefono (elenco-cantieri-tel.js, 13/10/2026) */
+  't:giro a tappe': 'Mette il cantiere fra le tappe del giro (la casella diventa arancione); toccala di nuovo per toglierlo. Il percorso parte dalla barra del giro a tappe.',
+  't:+ visita': 'Apre un verbale nuovo con questo cantiere già scelto: indirizzo e codici sono compilati, il committente è proposto.',
+  'p:lotti (': 'Mostra o nasconde i lotti del complesso: la visita si fa in un lotto, col suo «+ Visita».',
+  't:naviga': 'Apre il navigatore fino al punto segnalato.',
   'btn-mc-geo-gps': 'Prende la posizione dal GPS del dispositivo e la mette sul cantiere: fallo quando sei sul posto.',
   'btn-mc-geo-auto': 'Azzera la posizione: l\'app la ricalcola dall\'indirizzo scritto.',
   'btn-mc-geo-open': 'Apre la posizione in Google Maps per controllarla.',

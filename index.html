@@ -7694,6 +7694,13 @@ async function loadCantieri(q=''){
     const cm=vm||{}
     rows.forEach(r=>r.n_visite=cm[r.cantiere_id]||0)
   }catch(_e){rows.forEach(r=>r.n_visite=0)}
+  // data dell'ultima visita (13/10/2026, schede del telefono): null = nessuna visita; se la lettura non riesce resta undefined e non si scrive «mai visitato»
+  try{
+    const{data:um,error:eu}=await sb.rpc('visite_ultima_map')
+    if(eu)throw eu
+    const ul=um||{}
+    rows.forEach(r=>r.ult_visita=ul[r.cantiere_id]||null)
+  }catch(_e){console.warn('ultima visita dei cantieri:',_e)}
   // nome committente (lookup a blocchi sugli id presenti)
   try{
     const _cids=[...new Set(rows.map(r=>r.cantiere_committente_id).filter(Boolean))]
@@ -7742,6 +7749,7 @@ async function loadCantieri(q=''){
   _clRender()
 }
 window.loadCantieri=loadCantieri
+window._clRender=()=>_clRender()  // (13/10/2026) elenco-cantieri-tel.js ridisegna quando cambia la misura dello schermo
 function _clPass(d){
   const s=_clState
   if(d._segn)return !(s.comSel.size||s.ope||s.imp||s.sca||s.vis||s.orig==='cnce')
@@ -7844,7 +7852,7 @@ function _clRender(){
   const info=$('cant-list-count')
   if(info)info.textContent=all.length?(all.length+' cantieri'+(all.length>_shown?' — mostrati i primi '+_shown:'')):''
   _clNascosti(all)
-  if(!all.length){tbody.innerHTML='';empty.classList.remove('hidden');return}
+  if(!all.length){tbody.innerHTML='';if(window.ElencoCantieriTel)ElencoCantieriTel.svuota();empty.classList.remove('hidden');return}
   empty.classList.add('hidden')
   /* (07/10/2026, deciso dall'utente: «apro il CNCE principale e vedo tutti i cantieri suddivisi per lotto»)
      I lotti dello stesso complesso stanno sotto UNA riga del complesso, che si apre con la freccina: stessa
@@ -7907,8 +7915,14 @@ function _clRender(){
       </div></td>
     </tr>`
   }
+  /* (13/10/2026, proposta B scelta dall'utente) sul telefono l'elenco è fatto di schede che si leggono dall'alto
+     (elenco-cantieri-tel.js); sul PC resta la tabella. I pulsanti delle schede hanno gli stessi attributi della
+     tabella e si collegano qui sotto, sul contenitore giusto (_cont). */
+  const _tel=!!(window.ElencoCantieriTel&&ElencoCantieriTel.attivo())
+  const _cont=_tel?ElencoCantieriTel.disegna({tbody,unita:_unita,shown:_shown,all,apertiTutti:_apertiTutti,aperti:window._clAperti,giroSel:_giroSel,ordLotto:_ordLotto,base:_lb}):tbody
+  if(!_tel&&window.ElencoCantieriTel)ElencoCantieriTel.spegni(tbody)
   let _resi=0
-  tbody.innerHTML=_unita.map(u=>{
+  if(!_tel)tbody.innerHTML=_unita.map(u=>{
     if(_resi>=_shown)return ''
     if(u.righe.length<2){_resi+=1;return _rigaCant(u.righe[0],null)}
     _resi+=u.righe.length
@@ -7929,7 +7943,7 @@ function _clRender(){
   const _bm=$('btn-cant-more')
   if(_bm)_bm.onclick=()=>{window._cantShowAll=true;_clRender()}
   // Click "+ Visita": apre nuova visita precompilando il cantiere
-  tbody.querySelectorAll('[data-cant-id]').forEach(btn=>{
+  _cont.querySelectorAll('[data-cant-id]').forEach(btn=>{
     btn.onclick=async e=>{
       e.stopPropagation()
       if(formDaNonPerdere())return
@@ -7961,7 +7975,7 @@ function _clRender(){
     }
   })
   // Pulsante 👁 e doppio clic riga: apre dettaglio cantiere
-  tbody.querySelectorAll('[data-act="detail-cantiere"]').forEach(el=>{
+  _cont.querySelectorAll('[data-act="detail-cantiere"]').forEach(el=>{
     const handler=e=>{e.stopPropagation();showCantiereDetail(el.dataset.id)}
     if(el.tagName==='TR'){el.ondblclick=handler}else{el.onclick=handler}
   })
@@ -16360,13 +16374,14 @@ document.addEventListener('input',function(ev){
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=6"></script>
-<script src="aiuto.js?v=25"></script>
+<script src="aiuto.js?v=26"></script>
 <script src="mail-respinte-tec.js?v=3"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=2"></script>
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
 <script src="codice-univoco.js?v=4"></script>
 <script src="lotti-cantiere.js?v=3"></script>
+<script src="elenco-cantieri-tel.js?v=1"></script>
 <script src="esito-incarico.js?v=2"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
