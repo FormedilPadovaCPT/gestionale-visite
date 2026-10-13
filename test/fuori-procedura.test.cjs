@@ -16,7 +16,9 @@ const sql = fs.readFileSync(path.join(dir, 'supabase', 'sql', '2026_10_13_visite
 const sendv = fs.readFileSync(path.join(dir, 'supabase', 'functions', 'send-verbale', 'index.ts'), 'utf8');
 const critici = fs.readFileSync(path.join(dir, 'cantieri-critici-coord.js'), 'utf8');
 const aiuto = fs.readFileSync(path.join(dir, 'aiuto.js'), 'utf8');
-const seg = fs.readFileSync(path.join(dir, '..', 'segreteria-app', 'js', 'fatture-tecnici.js'), 'utf8');
+/* la segreteria è un altro repo: in locale sta accanto, nel workflow di GitHub no (il primo run del 13/10 è caduto qui) */
+const segPath = path.join(dir, '..', 'segreteria-app', 'js', 'fatture-tecnici.js');
+const seg = fs.existsSync(segPath) ? fs.readFileSync(segPath, 'utf8') : null;
 
 /* ── il modulo ── */
 const finto = () => ({ style: {}, value: '', checked: false, innerHTML: '', remove() {}, focus() {}, querySelector: finto });
@@ -99,10 +101,14 @@ assert.ok(/is_coordinatore\(\) or public\.is_segreteria\(\) as si/.test(sql), 'i
 assert.ok(/fp_controllo_int\(text, date, text\) from public, anon, authenticated/.test(sql), 'la versione interna non si chiama dall\'app');
 assert.ok(/tg_visite_fuori_procedura\(\)\nreturns trigger language plpgsql security definer/.test(sql), 'il trigger è security definer (chiama la versione interna)');
 
-/* ── la segreteria: la colonna dopo «Visite fatte» ── */
-assert.ok(/sb\.rpc\('fp_riepilogo', \{ p_dal: da, p_al: a \}\)/.test(seg), 'la segreteria legge il riepilogo del mese');
-assert.ok(/<th>Visite fatte<\/th><th title="[^"]*">Fuori procedura<\/th>/.test(seg), 'la colonna sta dopo «Visite fatte»');
-assert.ok(/fp\.error \? '<span class="hint" style="color:var\(--rosso,#c0392b\)"/.test(seg), 'se non si legge lo dice');
-assert.ok(/colspan="8"/.test(seg), 'la riga vuota copre la colonna in più');
+/* ── la segreteria: la colonna dopo «Visite fatte» (solo dove il repo c'è) ── */
+if (seg) {
+  assert.ok(/sb\.rpc\('fp_riepilogo', \{ p_dal: da, p_al: a \}\)/.test(seg), 'la segreteria legge il riepilogo del mese');
+  assert.ok(/<th>Visite fatte<\/th><th title="[^"]*">Fuori procedura<\/th>/.test(seg), 'la colonna sta dopo «Visite fatte»');
+  assert.ok(/fp\.error \? '<span class="hint" style="color:var\(--rosso,#c0392b\)"/.test(seg), 'se non si legge lo dice');
+  assert.ok(/colspan="8"/.test(seg), 'la riga vuota copre la colonna in più');
+} else {
+  console.log('fuori-procedura: repo segreteria non presente, colonna non controllata');
+}
 
 console.log('fuori-procedura: ok');
