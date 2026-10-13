@@ -1441,6 +1441,25 @@
         "id": "fc-tipologia"
       },
       "motivo": "elenco delle tipologie del catalogo (s_corsi_tipologie), costruito al momento"
+    },
+    {
+      "id": "segr.fc-origine",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/corsi.js",
+        "nome": "ORIGINI"
+      },
+      "select": "fc-origine",
+      "tabella": "s_corsi",
+      "colonna": "origine_tipo",
+      "voci": [
+        "progetto_finanziato",
+        "richiesta_impresa",
+        "conferenza",
+        "ufficio"
+      ]
     }
   ],
   "segreteria_gia_presenti": [

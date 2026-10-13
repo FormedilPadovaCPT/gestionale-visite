@@ -144,6 +144,12 @@
       if (h) h.innerHTML = '<div class="card" style="border-left:4px solid #c0392b"><p style="font-size:13px;color:#c0392b;margin:0">Il modulo delle firme non si è caricato: ricarica la pagina.</p></div>';
     }
     try { await schedeBox(R); } catch (e) { console.warn('schede:', e); }
+    /* (lotto 3) progetto formativo dell'edizione e verbale di verifica, per l'RPF (formazione-corsi.js) */
+    try {
+      let hc = $('form-corsi');
+      if (!hc) { hc = document.createElement('div'); hc.id = 'form-corsi'; hc.style.marginBottom = '14px'; const v = $('view-formazione'); if (v) v.appendChild(hc); }
+      if (window.formazioneCorsi && hc) await window.formazioneCorsi.box(hc, R);
+    } catch (e) { console.warn('corsi:', e); }
     badge().catch(() => {});
   }
 
