@@ -47,5 +47,9 @@ insert into public.s_tendine_registro (id, app, dove, tabella, colonna, voci) va
   ('segr.segnalazioni.STATI', 'segreteria', 'js/segnalazioni.js STATI', 's_segnalazioni', 'stato', array['ricevuta', 'istruita', 'autorizzata', 'assegnata', 'eseguita', 'riscontrata', 'chiusa', 'scartata']::text[]),
   ('segr.notifiche.STATI', 'segreteria', 'js/notifiche.js STATI', 's_notifiche_cantiere', 'stato', array['ricevuta', 'programmata', 'visitata', 'chiusa', 'scartata']::text[]),
   ('segr.conferenze.STATI', 'segreteria', 'js/conferenze.js STATI', 's_conferenze_cantiere', 'stato', array['ricevuta', 'autorizzata', 'programmata', 'svolta', 'chiusa', 'scartata']::text[]),
-  ('segr.consulenze.STATI', 'segreteria', 'js/consulenze.js STATI', 's_consulenze', 'stato', array['ricevuta', 'girata', 'risposta_pronta', 'autorizzata', 'eseguita', 'chiusa', 'scartata']::text[]);
+  ('segr.consulenze.STATI', 'segreteria', 'js/consulenze.js STATI', 's_consulenze', 'stato', array['ricevuta', 'girata', 'risposta_pronta', 'autorizzata', 'eseguita', 'chiusa', 'scartata']::text[]),
+  ('gest.tp-att', 'gestionale', 'formazione.js TIPI_ATT', 's_corsi_tipologie', 'tipo_attestato', array['partecipazione', 'frequenza', 'frequenza_verifica']::text[]),
+  ('gest.tp-stato', 'gestionale', 'formazione.js tp-stato', 's_corsi_tipologie', 'stato', array['attiva', 'superata']::text[]),
+  ('segr.tp-att', 'segreteria', 'js/corsi-tipologie.js TIPI_ATT', 's_corsi_tipologie', 'tipo_attestato', array['partecipazione', 'frequenza', 'frequenza_verifica']::text[]),
+  ('segr.tp-stato', 'segreteria', 'js/corsi-tipologie.js tp-stato', 's_corsi_tipologie', 'stato', array['attiva', 'superata']::text[]);
 commit;

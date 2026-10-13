@@ -40,7 +40,7 @@ assert.ok(/<section id="view-formazione" class="hidden">/.test(index) && /id="fo
 assert.ok(/<button data-view="formazione" id="nav-formazione"/.test(index), 'il pulsante del menu c\'è');
 assert.ok(/'direzione','formazione','admin'/.test(index), 'navTo conosce la vista formazione');
 assert.ok(/if\(view==='formazione'&&window\.formazione\)window\.formazione\.carica\(\)/.test(index), 'navTo la carica');
-assert.ok(/window\.formazione = \{ carica, badge \}/.test(formazione) && /window\.firmeApp\.box\(\$\('form-firme'\)/.test(formazione), 'formazione.js disegna le mie firme');
+assert.ok(/window\.formazione = \{ carica, badge, VOCI \}/.test(formazione) && /window\.firmeApp\.box\(\$\('form-firme'\)/.test(formazione), 'formazione.js disegna le mie firme');
 assert.ok(/\['is_rpf', 'is_docente', 'is_segreteria'\]/.test(formazione), 'i ruoli li dice il database');
 
 // ── l'accesso del docente ──

@@ -1362,6 +1362,85 @@
         "id": "oss-sis-cosa"
       },
       "motivo": "filtro della tabella «Sistema in tabella» (Osservatorio): non scrive"
+    },
+    {
+      "id": "gest.tp-att",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "formazione.js",
+        "nome": "TIPI_ATT"
+      },
+      "select": "tp-att",
+      "tabella": "s_corsi_tipologie",
+      "colonna": "tipo_attestato",
+      "voci": [
+        "partecipazione",
+        "frequenza",
+        "frequenza_verifica"
+      ]
+    },
+    {
+      "id": "gest.tp-stato",
+      "app": "gestionale",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "formazione.js",
+        "id": "tp-stato"
+      },
+      "tabella": "s_corsi_tipologie",
+      "colonna": "stato",
+      "voci": [
+        "attiva",
+        "superata"
+      ]
+    },
+    {
+      "id": "segr.tp-att",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/corsi-tipologie.js",
+        "nome": "TIPI_ATT"
+      },
+      "select": "tp-att",
+      "tabella": "s_corsi_tipologie",
+      "colonna": "tipo_attestato",
+      "voci": [
+        "partecipazione",
+        "frequenza",
+        "frequenza_verifica"
+      ]
+    },
+    {
+      "id": "segr.tp-stato",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "js/corsi-tipologie.js",
+        "id": "tp-stato"
+      },
+      "tabella": "s_corsi_tipologie",
+      "colonna": "stato",
+      "voci": [
+        "attiva",
+        "superata"
+      ]
+    },
+    {
+      "id": "segr.fc-tipologia",
+      "app": "segreteria",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "js/corsi.js",
+        "id": "fc-tipologia"
+      },
+      "motivo": "elenco delle tipologie del catalogo (s_corsi_tipologie), costruito al momento"
     }
   ],
   "segreteria_gia_presenti": [
