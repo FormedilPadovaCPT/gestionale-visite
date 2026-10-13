@@ -128,15 +128,24 @@
          <p style="font-size:13px;line-height:1.5;margin:0 0 8px">Ultima visita il <b>${esc(dIt(u.data_visita))}</b> (${esc(u.accesso || '?')}° accesso, IPC <b>${esc(u.ipc || 'NR')}</b>${u.tecnico ? ', ' + esc(u.tecnico) : ''}): per la procedura non è previsto un rientro, se non a una <b>nuova fase di lavoro</b> dopo un tempo adeguato — <b>${esc(j.finestra_gg || '?')} giorni</b> ${j.ceiv_attiva ? 'per le imprese iscritte C.E.I.V.' : 'per le imprese non iscritte C.E.I.V. (o sospese, cessate)'}. Ne sono passati <b>${esc(j.giorni_passati)}</b>. Questa sarebbe la visita n. ${esc(j.accesso_nuovo || '?')}.</p>`
       : `<h3 style="color:#b35c00">⚠️ Rientro anticipato</h3>
          <p style="font-size:13px;line-height:1.5;margin:0 0 8px">Ultima visita il <b>${esc(dIt(u.data_visita))}</b> (${esc(u.accesso || '?')}° accesso, IPC <b>${esc(u.ipc || 'NR')}</b>${u.tecnico ? ', ' + esc(u.tecnico) : ''}): il rientro è previsto per il <b>${esc(dIt(j.rientro_dovuto))}</b>${u.data_ritorno ? ' (data scritta nel verbale)' : ' (' + esc(j.rientro_giorni) + ' giorni dalla visita)'} e oggi mancano più di sette giorni. Questa sarebbe la visita n. ${esc(j.accesso_nuovo || '?')}.</p>`;
-    ov.innerHTML = `<div class="modal-box" style="max-width:560px">
+    ov.innerHTML = `<style>
+      #fp-ov .fp-opz{display:flex;align-items:flex-start;gap:10px;margin:0 0 6px;padding:8px 10px;border:1px solid #e3e3e3;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;line-height:1.4;font-weight:400;color:#222;text-transform:none;letter-spacing:0;text-align:left}
+      #fp-ov .fp-opz:hover{border-color:#e7500f}
+      #fp-ov .fp-opz:has(input:checked){border-color:#e7500f;background:#fff3ec}
+      #fp-ov .fp-opz input{width:16px;height:16px;min-width:16px;flex:0 0 auto;margin:2px 0 0;padding:0;accent-color:#e7500f;cursor:pointer}
+      #fp-ov .fp-opz span{flex:1;min-width:0}
+      #fp-ov .fp-opz small{font-size:12px;color:#777}
+      #fp-ov .fp-serie{margin-top:4px;background:#f8f8f8}
+      #fp-ov #fp-testo{font-size:13px;min-height:58px;resize:vertical}
+    </style><div class="modal-box" style="max-width:560px">
       ${testa}
       <div id="fp-rientri" style="font-size:12.5px;background:#f4f6f8;border-radius:8px;padding:8px 10px;margin:0 0 10px">⌛ Guardo i rientri dovuti nella tua zona…</div>
       <div style="font-size:13px;font-weight:600;margin-bottom:6px">Perché torni qui?</div>
-      <div id="fp-motivi" style="display:grid;gap:5px;margin-bottom:8px">
-        ${MOTIVI.map(([c, l, h]) => `<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer;text-transform:none;letter-spacing:0;font-weight:400;text-align:left;margin:0"><input type="radio" name="fp-motivo" value="${c}" ${fp.motivo_tipo === c ? 'checked' : ''} style="margin-top:3px">${esc(l)}${h ? ` <span style="color:#888">(${esc(h)})</span>` : ''}</label>`).join('')}
+      <div id="fp-motivi">
+        ${MOTIVI.map(([c, l, h]) => `<label class="fp-opz"><input type="radio" name="fp-motivo" value="${c}" ${fp.motivo_tipo === c ? 'checked' : ''}><span>${esc(l)}${h ? ` <small>(${esc(h)})</small>` : ''}</span></label>`).join('')}
       </div>
       <div class="field" style="margin-bottom:8px"><textarea id="fp-testo" rows="2" placeholder="Il motivo in due righe: resta interno, lo legge il coordinatore" style="width:100%">${esc(fp.motivo || '')}</textarea></div>
-      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer;margin:0 0 12px;text-transform:none;letter-spacing:0;font-weight:400;text-align:left"><input type="checkbox" id="fp-serie" ${fp.serie ? 'checked' : ''} style="margin-top:3px"><span><b>Questo cantiere va seguito nel tempo: propongo una serie di visite.</b> <span style="color:#666">Nella mail del verbale l'impresa trova l'invito a chiederla dal portale dei servizi.</span></span></label>
+      <label class="fp-opz fp-serie" style="margin:0 0 12px"><input type="checkbox" id="fp-serie" ${fp.serie ? 'checked' : ''}><span><b>Questo cantiere va seguito nel tempo: propongo una serie di visite.</b> <small>Nella mail del verbale l'impresa trova l'invito a chiederla dal portale dei servizi.</small></span></label>
       <p style="font-size:11.5px;color:#666;margin:0 0 10px">Il motivo resta nel gestionale, non sul PDF e non nella mail all'impresa. Il verbale esce come sempre; nell'app è segnato «fuori procedura» e il Coordinatore lo approva o no. L'accesso continua a contare.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
         <button type="button" class="btn-outline" id="fp-altro" data-aiuto="Toglie questo cantiere dal verbale: ne scegli un altro dall'elenco. Niente viene salvato.">↩ Scelgo un altro cantiere</button>
