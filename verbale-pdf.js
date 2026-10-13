@@ -505,6 +505,18 @@
     }
   }
 
+  /* (13/10/2026, chiesto dall'utente) il numero del verbale con le ultime quattro cifre
+     in arancione: «CPT/26_27/» in grigio, «0031» in arancione, per leggerlo a colpo d'occhio */
+  function partiNumero(nr) {
+    const m = /^(.*?)(\d{4})$/.exec(String(nr || ''))
+    return m ? [m[1], m[2]] : [String(nr || ''), '']
+  }
+  function numeroVerbale(doc, nr, x, y) {
+    const [testa, coda] = partiNumero(nr)
+    f(doc, 'bold', 21, C.grigio); doc.text(testa, x, y)
+    if (coda) { const w = testa ? doc.getTextWidth(testa) : 0; f(doc, 'bold', 21, C.arancio); doc.text(coda, x + w, y) }
+  }
+
   function verbale(doc, d, img) {
     doc.addPage()
     const L = S.L, R = S.R, W = R - L
@@ -512,7 +524,7 @@
     const titolo = (t) => { nuovaPaginaSe(doc, st, PH - 40); spaziato(doc, t.toUpperCase(), L, st.y + 3, 7.5, C.arancio, 0.6); st.y += 5.5 }
     logo(doc, img.logo, R, 11, 42)
     spaziato(doc, 'VERBALE DI SOPRALLUOGO IN CANTIERE', L, 16, 7.5, C.arancio, 0.6)
-    f(doc, 'bold', 21, C.grigio); doc.text(d.nrVerbale, L, 25.5)
+    numeroVerbale(doc, d.nrVerbale, L, 25.5)
     f(doc, 'normal', 8, C.tenue); doc.text('Formedil Padova · Ente unico formazione e sicurezza · Area Sicurezza e Salute', L, 31)
     st.y = 37
     if (d.rettBanner) { rettifica(doc, L, st.y, W, d.rettBanner); st.y += 17 }
@@ -634,6 +646,6 @@
     return doc
   }
 
-  root.VerbalePDF = { prepara, crea }
+  root.VerbalePDF = { prepara, crea, partiNumero }
   if (typeof module !== 'undefined' && module.exports) module.exports = root.VerbalePDF
 })(typeof window !== 'undefined' ? window : globalThis)
