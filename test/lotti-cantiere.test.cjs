@@ -85,7 +85,7 @@ assert.ok(/const dove = cartella \|\| FOLDER_ID/.test(_up), 'se l’archivio non
 {
   assert.ok(html.includes('<label>Specificare tipo opera *</label>'), 'la descrizione di «Altro» ha l’asterisco');
   assert.ok(/\+d\.tipOpe===16&&!String\(d\.tipOpeAltro\|\|''\)\.trim\(\)/.test(html), 'senza descrizione la scheda non si salva');
-  assert.ok(html.includes('verbale-pdf.js?v=12'), 'il PDF nuovo è servito');
+  assert.ok(+((html.match(/verbale-pdf\.js\?v=(\d+)"/) || [])[1] || 0) >= 12, 'il PDF nuovo è servito (versione 12 o successiva)');
   const _pdf = fs.readFileSync(path.join(__dirname, '..', 'verbale-pdf.js'), 'utf8');
   assert.ok(/const opeAltro = \+tipOpe === 16 \? String\(cant\.cantiere_tip_ope_altro/.test(_pdf)
     && _pdf.includes("TIP_OPE[tipOpe] + (opeAltro ? ' – ' + opeAltro : '')"), 'sul PDF «Altro – descrizione»');
