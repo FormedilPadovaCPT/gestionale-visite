@@ -558,6 +558,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="statistiche" id="nav-statistiche">📊 Statistiche</button>
     <button data-view="appuntamenti" id="nav-appuntamenti" style="display:none">📅 Prossimi appuntamenti</button>
     <button data-view="direzione" id="nav-direzione" style="display:none">🏛️ Direzione<span id="nav-dir-badge" style="display:none">0</span></button>
+    <button data-view="formazione" id="nav-formazione" style="display:none">📚 Formazione<span id="nav-form-badge" style="display:none;background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px">0</span></button>
     <button id="nav-assev" style="display:none;background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600" onclick="window.open('https://webapp-asseverazione.vercel.app/dashboard','_blank')">✅ Asseverazione</button>
     <button data-view="admin" id="nav-admin" style="display:none">🔐 Coordinatore</button>
     <button data-view="committenti" id="nav-committenti" style="display:none">👤 Committenti</button>
@@ -1257,6 +1258,14 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div id="dir-autorizzazioni" style="margin-bottom:14px"></div>
       <div id="dir-critici" style="margin-bottom:14px"></div>
       <div id="dir-decisioni" style="margin-bottom:14px"></div>
+    </section>
+
+    <!-- FORMAZIONE (13/10/2026, lotto 1 del fascicolo corso digitale): le firme di RPF e docenti; poi scheda
+         formativa, progetto, verbale e la pagina del docente (formazione.js) -->
+    <section id="view-formazione" class="hidden">
+      <h2>📚 Formazione</h2>
+      <p id="form-intro" style="font-size:12.5px;color:#555;margin:0 0 12px;line-height:1.45"></p>
+      <div id="form-firme" style="margin-bottom:14px"></div>
     </section>
 
     <!-- STATISTICHE (23/09/2026): contatori, grafici e tabelle usciti dalla Dashboard -->
@@ -2690,6 +2699,24 @@ async function onLogin(user){
   let _roleRow=null
   try{const _r=await sb.from('app_ruoli').select('ruolo,stato,nome,carica').eq('email',user.email).maybeSingle();_roleRow=_r.data}catch(_e){}
   S.viewer=!!(_roleRow&&_roleRow.ruolo==='viewer'&&_roleRow.stato==='attivo')
+  // ── Accesso DOCENTE (13/10/2026, lotto 1 del fascicolo corso digitale): un docente esterno, col solo ruolo
+  // `docente` in app_ruoli, non è personale (non legge anagrafiche, visite, cantieri) e non ha una scheda tecnico:
+  // vede la sola pagina Formazione (le sue firme; poi i suoi corsi). Prima un account senza scheda tecnico
+  // veniva chiuso qui sotto. I tecnici che fanno i docenti entrano come sempre, con Formazione nel menu.
+  S.docente=!!(_roleRow&&_roleRow.ruolo==='docente'&&_roleRow.stato==='attivo')
+  if(S.docente){
+    if(!(await obbligaCambioPassword()))return
+    S.tecnico=null;S.direttore=false;S.presidenza=false;S.carica=null
+    S.viewerNome=_roleRow.nome||null
+    $('lbl-user').textContent=(_roleRow.nome||user.email)+' · Docente'
+    const _nv=document.querySelector('nav')
+    if(_nv){_nv.classList.remove('hidden');_nv.querySelectorAll('button').forEach(b=>{b.style.display=b.dataset.view==='formazione'?'':'none'})}
+    document.body.classList.add('viewer-mode')
+    showScr('app')
+    navTo('formazione')
+    S.appReady=true
+    return
+  }
   if(S.viewer){
     // cambio password obbligatorio anche per Direzione e Consiglio (27/09/2026)
     if(!(await obbligaCambioPassword()))return
@@ -2728,11 +2755,11 @@ async function onLogin(user){
     S.appReady=true
     return
   }
-  S.direttore=false;S.presidenza=false;S.carica=null
+  S.direttore=false;S.presidenza=false;S.carica=null;S.docente=false
   document.querySelector('nav')?.classList.remove('hidden')
   document.body.classList.remove('viewer-mode')
   // se nella stessa scheda era entrato prima un account di sola lettura, il menu torna quello del tecnico
-  document.querySelectorAll('nav button[data-view]').forEach(b=>{if(['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche'].includes(b.dataset.view))b.style.display=''})
+  document.querySelectorAll('nav button[data-view]').forEach(b=>{if(['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','formazione'].includes(b.dataset.view))b.style.display=''})
   {const _bd=document.querySelector('nav button[data-view="dashboard"]');if(_bd)_bd.textContent='🏠 Dashboard'}
   let{data:tec,error:_tecErr}=await sb.from('tecnici').select('*').eq('email',user.email).maybeSingle()
   /* lettura fallita (rete, server) ≠ scheda mancante: non si esce dall'account,
@@ -2878,7 +2905,7 @@ function navTo(view){
   // il calendario è del solo Direttore (03/10/2026): chi è di sola lettura e non è lui non ci arriva nemmeno per altra via
   if(view==='appuntamenti'&&S.viewer&&!S.direttore)view='dashboard'
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','appuntamenti','direzione','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','appuntamenti','direzione','formazione','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
   if(view==='form'&&typeof incCaricaTendina==='function')incCaricaTendina().catch(e=>console.warn('incCaricaTendina:',e))
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
@@ -2893,6 +2920,7 @@ function navTo(view){
   if(view==='statistiche')loadStat().catch(e=>{console.error('loadStat:',e);toast('Errore caricamento statistiche: '+e.message,'err')})
   if(view==='appuntamenti'){const h=$('app-cal-embed');if(h&&!h.dataset.loaded){h.dataset.loaded='1';h.innerHTML='<iframe src="https://calendar.google.com/calendar/embed?src=c_cf9b7b4f739cc42753f6207d36431da4dc7521c948e2e0135aa96f85e6ce5080%40group.calendar.google.com&ctz=Europe%2FRome&mode=AGENDA&showPrint=0&showCalendars=0&showTz=0&showTitle=0&hl=it" style="border:0;width:100%;height:600px;display:block" frameborder="0" scrolling="no"></iframe>'}}
   if(view==='direzione'&&window.direzione)window.direzione.carica().catch(e=>{console.error('direzione:',e);toast('Errore caricamento Direzione: '+e.message,'err')})
+  if(view==='formazione'&&window.formazione)window.formazione.carica().catch(e=>{console.error('formazione:',e);toast('Errore caricamento Formazione: '+e.message,'err')})
   if(view==='admin'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.avvisoVerbaliBox)window.avvisoVerbaliBox().catch(e=>console.warn('avviso verbali:',e));admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
   if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e));if(window.direzione)window.direzione.obiettivi().catch(e=>console.warn('obiettivi:',e))}
   if(view==='committenti')admLoadCommittenti().catch(e=>console.error('committenti:',e))
@@ -16431,7 +16459,7 @@ document.addEventListener('input',function(ev){
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=7"></script>
-<script src="aiuto.js?v=26"></script>
+<script src="aiuto.js?v=27"></script>
 <script src="mail-respinte-tec.js?v=3"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=2"></script>
@@ -16445,9 +16473,11 @@ document.addEventListener('input',function(ev){
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
-<script src="direzione.js?v=10"></script>
+<script src="firme.js?v=1"></script>
+<script src="direzione.js?v=11"></script>
+<script src="formazione.js?v=1"></script>
 <script src="rientri-giorni.js?v=6"></script>
-<script src="veste-v2.js?v=39"></script>
+<script src="veste-v2.js?v=40"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

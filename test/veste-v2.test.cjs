@@ -95,7 +95,7 @@ assert.deepStrictEqual(s.v2.dopo('lista'), []);
 
 /* ── menu e apertura per ruolo, come decisi dall'utente ── */
 const R = s.v2.RUOLI;
-assert.deepStrictEqual(Object.keys(R), ['segreteria', 'tecnico', 'coordinatore', 'direttore', 'presidenza', 'consigliere']);
+assert.deepStrictEqual(Object.keys(R), ['segreteria', 'tecnico', 'coordinatore', 'docente', 'direttore', 'presidenza', 'consigliere'], 'i ruoli della veste (docente dal 13/10/2026)');
 assert.strictEqual(R.segreteria.apre, 'segreteria');
 assert.strictEqual(R.tecnico.apre, 'dashboard'); assert.strictEqual(R.coordinatore.apre, 'dashboard');
 assert.strictEqual(R.direttore.apre, 'direzione', 'il Direttore apre su Direzione');

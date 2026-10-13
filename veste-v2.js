@@ -62,8 +62,10 @@
      pulsanti sulla pagina che vede per prima. Né tendina «Altre app», né voci-azione nel menu: provate, scartate. */
   const RUOLI = {
     segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'segreteria'], apre: 'segreteria' },
-    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche'], apre: 'dashboard' },
-    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', '|', 'admin'], apre: 'dashboard' },
+    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', 'formazione'], apre: 'dashboard' },
+    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', 'formazione', '|', 'admin'], apre: 'dashboard' },
+    // (13/10/2026) il docente esterno, col solo ruolo «docente»: la sola pagina Formazione (le sue firme, poi i suoi corsi)
+    docente:      { nome: 'Docente',         menu: ['formazione'], apre: 'formazione', lettura: true },
     direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione', lettura: true },
     // il calendario è del solo Direttore (deciso dall'utente il 03/10/2026): la Presidenza vede quello che le compete
     presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard'], apre: 'direzione', lettura: true },
@@ -108,7 +110,7 @@
     vista.insertBefore(el, intro && intro.parentNode === vista ? intro.nextSibling : vista.firstChild);
   }
 
-  const ETICHETTE = { dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti' };
+  const ETICHETTE = { dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti', formazione: '📚 Formazione' };
 
   const CHIAVE_TECNICO = 'gv-v2-tecnico';   // sessionStorage: di quale tecnico si guarda la pagina in «Vedi come: Tecnico»
   let _tecnici = null;       // l'elenco dei tecnici, letto una volta, per la tendina dell'anteprima
@@ -146,6 +148,7 @@
      la sua e-mail, il coordinatore il permesso sulla pagina Coordinamento (window.__isCoordPage, messo all'accesso). */
   const ruoloVero = () => {
     const s = S();
+    if (s.docente) return 'docente';
     if (s.viewer) return s.direttore ? 'direttore' : s.presidenza ? 'presidenza' : 'consigliere';
     if (email() === SEGRETERIA) return 'segreteria';
     return window.__isCoordPage ? 'coordinatore' : 'tecnico';

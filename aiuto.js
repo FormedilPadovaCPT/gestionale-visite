@@ -45,6 +45,8 @@ window.AIUTO_TESTI = {
   'f-note-for-tipi': 'Quale formazione manca: spunta una o più voci. Servono a scegliere i corsi da proporre all\'impresa; la nota qui sotto la legge solo l\'ufficio corsi, non l\'impresa: scrivi liberamente.',
   'v:direzione': 'La pagina della Direzione: autorizzazioni dei servizi CPT in attesa del visto, conferme richieste sui cantieri critici e le questioni aperte da coordinatore e segreteria, con i giorni di attesa. Si risponde da qui.',
   'nav-direzione': 'La pagina della Direzione: autorizzazioni dei servizi CPT in attesa del visto, conferme richieste sui cantieri critici e le questioni aperte da coordinatore e segreteria, con i giorni di attesa. Si risponde da qui.',
+  'v:formazione': 'La pagina della formazione: i documenti dei corsi che aspettano la tua firma (incarichi, registri, verbali), e in seguito la scheda formativa e la pagina del docente per il corso.',
+  'nav-formazione': 'La pagina della formazione: i documenti dei corsi che aspettano la tua firma (incarichi, registri, verbali), e in seguito la scheda formativa e la pagina del docente per il corso.',
   'v:appuntamenti': 'Il calendario d\'ufficio, alimentato dalla segreteria: date di attività, commissioni e altri impegni utili. Lo vede solo il Direttore.',
   'nav-appuntamenti': 'Il calendario d\'ufficio, alimentato dalla segreteria: date di attività, commissioni e altri impegni utili. Lo vede solo il Direttore.',
   'card-k-ceivmin': 'Visite fatte nell\'esercizio scelto (tutti i tecnici) contro il minimo della regola CEIV: 100 visite ogni 50.000 euro di contributi Cassa Edile. Il minimo lo imposta la segreteria nella sua Zona.',
