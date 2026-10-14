@@ -50,7 +50,7 @@
   const SEGRETERIA_URL = 'https://formedilpadovacpt.github.io/segreteria/';
 
   const DECISORI = { direttore: 'Direttore', presidenza: 'Presidenza', commissione: 'Commissione Sicurezza' };
-  const EVENTI = { apertura: 'Aperta', modifica: 'Modificata', decisione: 'Decisione', rinvio: 'Rinvio', incontro_proposto: 'Incontro proposto', presa_in_carico: 'Presa in carico', ritiro: 'Ritirata', riapertura: 'Riaperta', proposta: 'Proposta dal second brain', pubblicazione: 'Resa visibile' };
+  const EVENTI = { apertura: 'Aperta', modifica: 'Modificata', decisione: 'Decisione', rinvio: 'Rinvio', incontro_proposto: 'Incontro proposto', presa_in_carico: 'Presa in carico', seguito: 'Seguito (task nel second brain)', ritiro: 'Ritirata', riapertura: 'Riaperta', proposta: 'Proposta dal second brain', pubblicazione: 'Resa visibile' };
   const EV_CRIT = { apertura: 'Apertura', nota: 'Nota', lettera_impresa: "Comunicazione all'impresa", sollecito: 'Sollecito', pec_richiesta: 'PEC chiesta all\'Amministrazione',
     contatto_impresa: "L'impresa ha ricontattato", visita_riprogrammata: 'Visita riprogrammata', visita_successiva: 'Verbale successivo', decisione: 'Decisione',
     risposta_tecnico: 'Risposta al tecnico', conferenza_proposta: 'Proposta di conferenza', demandata: 'Demandata', decisione_organo: 'Decisione di Presidenza / Commissione',
@@ -66,6 +66,7 @@
      incarichi.) */
   let _ordQ = 'prio';            // prio (alta prima, poi attesa) | n | t | e | g
   let _filtroQ = 'tutte';        // tutte | alta | scadute
+  let _archAperto = false;       // (14/10/2026) il riquadro delle decisioni prese resta aperto quando l'elenco si ridisegna
   async function ruoli() {
     /* la memoria vale per UN utente: se sullo stesso telefono entra un altro
        account (26/09/2026: il Direttore vedeva «Ritira» e la priorità della
@@ -286,6 +287,52 @@
      2. IL REGISTRO DELLE QUESTIONI IN ATTESA DI DECISIONE
      modo: 'direzione' (chi decide risponde) | 'coord' (chi apre gestisce)
      ════════════════════════════════════════════════════════════ */
+  /* L'ARCHIVIO DELLE DECISIONI (14/10/2026, chiesto dall'utente: «sarebbe utile
+     vedere le decisioni prese anche in app, per me e per il coordinatore: così
+     sembra che spariscano, e invece a volte aprono altre cose da fare»). Le
+     questioni chiuse — prese in carico dall'ufficio o chiuse dal second brain
+     insieme alla task — con la decisione, chi l'ha presa e quando, chi l'ha
+     chiusa, e i SEGUITI: le task nuove nate dalla decisione, che il second brain
+     scrive come evento «seguito» della questione. Solo lettura; ognuno vede
+     quello che il registro gli lascia vedere (le riservate no, alla segreteria). */
+  /* raggruppa per giorno (stringa aaaa-mm-gg in testa al valore), in ordine di data */
+  function perData(lista, data, recentiPrima = false) {
+    const m = new Map();
+    lista.forEach((r) => { const d = String(data(r) || '').slice(0, 10); if (!m.has(d)) m.set(d, []); m.get(d).push(r); });
+    return [...m.entries()].sort((a, b) => (recentiPrima ? b[0].localeCompare(a[0]) : a[0].localeCompare(b[0])));
+  }
+
+  async function archivioDecisioni(box, decBadge) {
+    if (!box) return;
+    const sb = window.sb;
+    box.textContent = 'Carico…';
+    const { data, error } = await sb.from('s_decisioni')
+      .select('id, questione, decisione, decisa_da, decisa_il, chiusa_da, chiusa_il, decisore, riservata, aperta_il, aperta_da_nome, aperta_da')
+      .eq('stato', 'chiusa').order('decisa_il', { ascending: false, nullsFirst: false }).limit(150);
+    if (error) { box.innerHTML = `<span style="color:#c0392b">Non sono riuscito a leggere l'archivio: ${esc(error.message)}</span>`; return; }
+    const righe = data || [];
+    if (!righe.length) { box.textContent = 'Ancora nessuna decisione chiusa.'; return; }
+    const { data: ev, error: e2 } = await sb.from('s_decisioni_eventi').select('decisione_id, testo, created_at')
+      .eq('tipo', 'seguito').in('decisione_id', righe.map((r) => r.id)).order('created_at');
+    const seguiti = new Map();
+    (ev || []).forEach((x) => { if (!seguiti.has(x.decisione_id)) seguiti.set(x.decisione_id, []); seguiti.get(x.decisione_id).push(x); });
+    const chiusaDa = (r) => {
+      const c = String(r.chiusa_da || '');
+      if (/second brain/i.test(c)) return 'chiusa insieme alla task nel second brain';
+      return `presa in carico${c ? ' da ' + esc(c) : ''}`;
+    };
+    box.innerHTML = `${e2 ? `<div style="color:#c0392b;margin-bottom:6px">Non sono riuscito a leggere i seguiti: ${esc(e2.message)}</div>` : ''}
+      ${perData(righe, (r) => r.decisa_il || r.chiusa_il, true).map(([d, gruppo]) => `<div style="padding:6px 0 2px;border-top:1px solid #f3ece6;color:#333">
+        <strong>✅ decise il ${dIt(d)}</strong>
+        <ul style="margin:3px 0 0 18px;padding:0">${gruppo.map((r) => {
+          const seg = seguiti.get(r.id) || [];
+          return `<li style="margin:4px 0;line-height:1.4">${esc(r.questione || '')}${r.riservata ? ' 🔒' : ''}<span style="color:#555">: ${esc(r.decisione || '—')}</span>
+            ${seg.map((x) => `<div style="color:#2d5f8a">➡️ seguito: ${esc(x.testo || '')}</div>`).join('')}
+            <div style="font-size:11px;color:#999">${esc(r.decisa_da || '')} · ${decBadge(r.decisore)} · ${chiusaDa(r)}${r.chiusa_il ? ' il ' + dIt(r.chiusa_il) : ''} · <a href="#" data-cron-arch="${r.id}" style="color:#999">cronologia</a></div></li>`;
+        }).join('')}</ul></div>`).join('')}`;
+    box.querySelectorAll('[data-cron-arch]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); cronologia(Number(a.dataset.cronArch)); }));
+  }
+
   async function decisioniBox(host, modo) {
     if (!host) return { attesa: 0, daPrendere: 0 };
     const sb = window.sb;
@@ -423,11 +470,20 @@
       ${vista.map(rigaHtml).join('') || '<p style="font-size:13px;color:#555;margin:6px 0 0">Nessuna questione aperta.</p>'}
       ${decise.length ? `<div style="font-size:12px;font-weight:600;color:#565c66;margin-top:12px">Decise, ${gestisce ? 'da prendere in carico' : 'in attesa che l\'ufficio le prenda in carico'} (${decise.length})</div>${decise.map(rigaDecisa).join('')}` : ''}
       ${incontri.length ? `<div style="font-size:12px;font-weight:600;color:#565c66;margin-top:12px">Incontro proposto (${incontri.length})</div>${incontri.map(rigaIncontro).join('')}` : ''}
-      ${rinviate.length ? `<div style="font-size:12px;font-weight:600;color:#565c66;margin-top:12px">Rinviate (${rinviate.length})</div>${rinviate.map((r) => `<div style="font-size:12.5px;color:#666;padding:5px 0;border-top:1px solid #f0e6dd">⏳ <strong>al ${dIt(r.rinviata_al)}</strong> — ${esc(r.questione)}${r.decisione ? ` <span style="color:#888">(${esc(r.decisione)})</span>` : ''} · ${decBadge(r.decisore)}</div>`).join('')}` : ''}
+      ${rinviate.length ? `<div style="font-size:12px;font-weight:600;color:#565c66;margin-top:12px">Rinviate (${rinviate.length}), con la data e la nota di chi decide</div>${perData(rinviate, (r) => r.rinviata_al).map(([d, gruppo]) => `<div style="font-size:12.5px;color:#444;padding:6px 0 2px;border-top:1px solid #f0e6dd"><strong>⏳ ${dIt(d)}</strong><ul style="margin:3px 0 0 18px;padding:0">${gruppo.map((r) => `<li style="margin:2px 0">${esc(r.questione)}${r.decisione ? `<span style="color:#777">: ${esc(r.decisione)}</span>` : ''} <span style="font-size:10.5px;color:#aaa">· ${esc(DECISORI[r.decisore] || r.decisore || '')}</span></li>`).join('')}</ul></div>`).join('')}` : ''}
+      <details id="dq-archivio"${_archAperto ? ' open' : ''} style="margin-top:14px;border-top:1px solid #f0e6dd;padding-top:8px">
+        <summary style="cursor:pointer;font-size:12.5px;font-weight:600;color:#565c66" data-aiuto="Le questioni già decise e chiuse, dalla più recente: che cosa si è deciso, chi e quando, e che cosa ne è seguito. Non si cambia niente da qui.">📜 Decisioni prese (archivio)</summary>
+        <div id="dq-arch-corpo" style="font-size:12.5px;color:#888;padding:6px 0">…</div>
+      </details>
     </div>`;
 
     host.querySelectorAll('[data-ordq]').forEach((h) => { if (h.dataset.ordq === _ordQ) h.classList.add('on'); h.addEventListener('click', () => { _ordQ = h.dataset.ordq; decisioniBox(host, modo); }); });
     host.querySelectorAll('[data-filtroq]').forEach((b) => b.addEventListener('click', () => { _filtroQ = b.dataset.filtroq; decisioniBox(host, modo); }));
+    const arch = host.querySelector('#dq-archivio');
+    if (arch) {
+      arch.addEventListener('toggle', () => { _archAperto = arch.open; if (arch.open) archivioDecisioni(arch.querySelector('#dq-arch-corpo'), decBadge); });
+      if (arch.open) archivioDecisioni(arch.querySelector('#dq-arch-corpo'), decBadge);
+    }
     host.querySelectorAll('[data-crit-apri]').forEach((b) => b.addEventListener('click', () => apriCritico(Number(b.dataset.critApri))));
     host.querySelectorAll('[data-cron]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); cronologia(Number(a.dataset.cron)); }));
     /* il tocco sulla riga la apre o la chiude; i pulsanti e i link dentro non la chiudono */
