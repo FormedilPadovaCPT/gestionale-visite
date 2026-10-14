@@ -22,6 +22,9 @@ for (const r of ['corso_docente_corsi', 'corso_docente_giornata', 'corso_docente
 }
 assert.ok(!/\.from\('s_corsi/.test(fd) && !/\.from\('persone/.test(fd), 'nessuna lettura diretta delle tabelle');
 assert.ok(/azione: 'accetta_incarico', id: Number\(b\.dataset\.fdAccetta\)/.test(fd), 'l\'accettazione passa da firma-documenti');
+// (14/10/2026) il docente firma la lettera stessa per accettazione: la riga «mia» della catena
+assert.ok(/const mia = k\.mia;/.test(fd) && /mia\.stato === 'in_attesa'/.test(fd) && /«✍️ Le mie firme»/.test(fd), 'la lettera da firmare rimanda al riquadro delle firme');
+assert.ok(/apriLink\(k\.lettera\.file, 'apri la lettera firmata'\)/.test(fd), 'a incarico accettato la lettera firmata si riapre');
 assert.ok(/azione: 'firma_registro', id: gid/.test(fd), 'la firma del registro passa da firma-documenti');
 assert.ok(/corso_docente_registro_pronto', \{ p_giornata: gid \}/.test(fd) && /Il registro non si può ancora firmare/.test(fd), 'prima di firmare si chiede al database che cosa manca');
 // la conferma è per allievo, con le fuori orario una per una

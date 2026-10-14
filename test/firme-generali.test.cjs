@@ -16,7 +16,10 @@ const deploy = leggi('.github/workflows/deploy-pages.yml');
 const aiuto = leggi('aiuto.js');
 
 // ── firme.js: il riquadro condiviso ──
-assert.ok(/window\.firmeApp = \{ box, conta, RUOLI, TIPI \}/.test(firme), 'firme.js espone box e conta');
+assert.ok(/window\.firmeApp = \{ box, conta, archivio, RUOLI, TIPI \}/.test(firme), 'firme.js espone box, conta e archivio');
+// (14/10/2026) l'archivio dei documenti firmati: dalla RPC, con il PDF finale della catena
+assert.ok(/rpc\('mie_firme_archivio'/.test(firme) && /data-arch-apri="\$\{esc\(r\.file_finale\)\}"/.test(firme), 'l\'archivio legge mie_firme_archivio e apre il PDF finale');
+assert.ok(/!o\.ruolo && !o\.email && recenti\.some/.test(firme), 'il pulsante dell\'archivio non compare nelle anteprime della segreteria');
 assert.ok(/\.from\('s_firme'\)/.test(firme) && !/from\('s_firme_presidente'\)/.test(firme), 'firme.js legge s_firme, non il nome vecchio');
 assert.ok(/functions\.invoke\('firma-documenti'/.test(firme) && !/'firma-presidente'/.test(firme), 'firma la funzione firma-documenti');
 assert.ok(/data-firma-si="\$\{r\.id\}" \$\{letto \? '' : 'disabled/.test(firme) && /_letti\.add\(r\.id\)/.test(firme), '«Firmo» si accende solo dopo aver aperto il documento');

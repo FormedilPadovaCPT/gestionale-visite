@@ -4,10 +4,13 @@
 
    Per ogni corso in cui chi è collegato compare come docente (interventi
    o incarico), il riquadro «🧑‍🏫 I miei corsi» mostra:
-     · l'INCARICO: la lettera firmata dal Presidente da leggere e
-       «✅ Accetto l'incarico» (riga accettazione_incarico nel registro
-       delle firme, firmata subito: la fa firma-documenti, che disegna il
-       PDF con documenti-corso, lo carica e firma);
+     · l'INCARICO: dal 14/10/2026 il docente FIRMA LA LETTERA «per
+       accettazione», dopo il Presidente, dal riquadro «✍️ Le mie firme»
+       in cima alla pagina (catena incarico_docenza, ruolo docente): la
+       firma vale come accettazione e la lettera firmata da tutti e due
+       si riapre da qui o da «🗂️ Tutti i miei documenti firmati».
+       Resta «✅ Accetto l'incarico» (foglio a parte, riga
+       accettazione_incarico) per una lettera firmata dal solo Presidente;
      · le GIORNATE: per ciascuna gli iscritti con le firme arrivate dal
        QR (entrata/uscita, ora del server, «fuori orario»), «✓ Confermo»
        PER ALLIEVO (deciso dall'utente), «✗» con una parola, le presenze
@@ -114,7 +117,12 @@
       const k = c.incarico;
       let inc = '';
       if (k) {
-        if (k.accettato_il) inc = `${pill('incarico accettato il ' + dIt(k.accettato_il), 'ok')} ${k.accettazione?.file ? `<a href="#" data-fd-apri="${esc(k.accettazione.file)}" style="font-size:12px;color:var(--orange,#e7500f);font-weight:600">apri l'accettazione</a>` : ''}`;
+        const mia = k.mia;   // la mia riga nella catena della lettera (firma per accettazione)
+        const apriLink = (file, testo) => `<a href="#" data-fd-apri="${esc(file)}" style="font-size:12px;color:var(--orange,#e7500f);font-weight:600">${testo}</a>`;
+        if (k.accettato_il) inc = `${pill('incarico accettato il ' + dIt(k.accettato_il), 'ok')} ${k.lettera?.stato === 'firmata' && k.lettera.file ? apriLink(k.lettera.file, 'apri la lettera firmata') : ''}${k.accettazione?.file ? ' · ' + apriLink(k.accettazione.file, 'apri l\'accettazione') : ''}`;
+        else if (mia && mia.stato === 'in_attesa') inc = `${pill('lettera di incarico da firmare per accettazione', 'att')} <span style="font-size:12px;color:#555">la trovi qui sopra in «✍️ Le mie firme»: «Leggi», poi «Firmo»</span>`;
+        else if (mia && mia.stato === 'in_coda') inc = pill('lettera di incarico in firma al Presidente: poi tocca a te firmarla per accettazione', '');
+        else if (mia && mia.stato === 'rimandata') inc = pill('lettera di incarico rimandata alla segreteria', 'no');
         else if (k.lettera && k.lettera.stato === 'firmata') inc = `${pill('incarico da accettare', 'att')}
           <button class="btn-secondary btn-sm" type="button" data-fd-lettera="${esc(k.lettera.file || '')}" data-aiuto="Apre la lettera di incarico firmata dal Presidente.">📄 Leggi la lettera</button>
           <button class="btn-primary btn-sm" type="button" data-fd-accetta="${k.id}" data-aiuto="Accetti l'incarico di docenza: il documento di accettazione viene generato e firmato con data e ora, e la segreteria lo trova nel fascicolo. Non si torna indietro.">✅ Accetto l'incarico</button>`;

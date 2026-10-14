@@ -19,6 +19,14 @@
    nell'anteprima «Vedi come… Presidenza», vede l'elenco del Presidente
    senza i pulsanti, che il server le rifiuterebbe.
 
+   🗂️ I MIEI DOCUMENTI FIRMATI (14/10/2026, chiesto dall'utente: «ne esce
+   un elenco infinito col tempo»): il riquadro tiene solo gli ultimi
+   cinque firmati; tutti gli altri stanno in una finestra a parte, per
+   anno e tipo, con il PDF FINALE (anche con le firme di chi è venuto
+   dopo: la lettera di docenza firmata dal Presidente e dal docente).
+   RPC mie_firme_archivio; lo storage lo lascia aprire con
+   firme_file_leggibile.
+
    Script classico come direzione.js: usa window.sb, window.S e
    window.toast del modulo principale; espone window.firmeApp.
    ============================================================ */
@@ -92,7 +100,7 @@
     const attesa = (data || []).filter((r) => r.stato === 'in_attesa').reverse();
     const recenti = (data || []).filter((r) => r.stato !== 'in_attesa').slice(0, 5);
     const bottoni = !!o.pulsanti;
-    const catena = (r) => (r.firmatario_ruolo === 'incaricato' ? ' · da firmare per accettazione, sotto il tuo nome: il Presidente ha già firmato'
+    const catena = (r) => (r.firmatario_ruolo === 'incaricato' || (r.firmatario_ruolo === 'docente' && r.tipo === 'incarico_docenza') ? ' · da firmare per accettazione, sotto il tuo nome: il Presidente ha già firmato'
       : r.ordine > 1 ? ` · ${r.ordine}ª firma: il documento porta già ${r.ordine - 1 === 1 ? 'la firma di chi è venuto prima' : 'le firme di chi è venuto prima'}` : '');
     const riga = (r) => {
       const g = giorni(r.richiesta_il);
@@ -114,6 +122,7 @@
         ? `<p style="font-size:12.5px;color:#555;margin:0 0 4px">I documenti a tua firma preparati dalla segreteria. Apri il documento con «Leggi», poi «Firmo»: la firma si appone sul documento che hai letto, con data e ora.${!bottoni ? ' <em>(anteprima: i pulsanti li vede solo chi deve firmare)</em>' : ''}</p>${attesa.map(riga).join('')}`
         : `<p style="font-size:13px;color:#555;margin:0">${esc(o.vuoto)}</p>`}
       ${recenti.length ? `<div style="font-size:11px;color:#999;margin-top:10px">Ultimi firmati o rimandati:</div>${recenti.map(rigaFatta).join('')}` : ''}
+      ${!o.ruolo && !o.email && recenti.some((r) => r.stato === 'firmata') ? `<div style="margin-top:8px"><button class="btn-secondary btn-sm" type="button" data-firma-archivio data-aiuto="Apre l'elenco di tutti i documenti che hai firmato, per anno e tipo, e ne scarichi la copia con tutte le firme.">🗂️ Tutti i miei documenti firmati</button></div>` : ''}
     </div>`;
     const di = (id) => (data || []).find((r) => r.id === id);
     host.querySelectorAll('[data-firma-leggi]').forEach((b) => b.addEventListener('click', async () => {
@@ -125,6 +134,7 @@
       }
     }));
     host.querySelectorAll('[data-firma-apri]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); apri(a.dataset.firmaApri); }));
+    host.querySelectorAll('[data-firma-archivio]').forEach((b) => b.addEventListener('click', () => archivio()));
     host.querySelectorAll('[data-firma-si]').forEach((b) => b.addEventListener('click', async () => {
       const r = di(Number(b.dataset.firmaSi)); if (!r) return;
       if (!confirm(`Firmo «${r.titolo}»?\n\nLa tua firma viene apposta sul documento che hai letto, con la data e l'ora di adesso, e il documento firmato torna alla segreteria.`)) return;
@@ -150,5 +160,42 @@
     }));
   }
 
-  window.firmeApp = { box, conta, RUOLI, TIPI };
+  /* ── 🗂️ I miei documenti firmati: una finestra, un anno alla volta ── */
+  async function archivio(anno, tipo) {
+    const vecchia = $('firme-archivio'); if (vecchia) vecchia.remove();
+    const f = document.createElement('div');
+    f.id = 'firme-archivio';
+    f.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9500;display:flex;align-items:center;justify-content:center;padding:12px';
+    f.innerHTML = `<div style="background:#fff;border-radius:10px;max-width:860px;width:100%;max-height:92vh;overflow:auto;border-top:5px solid #e7500f;box-shadow:0 8px 30px rgba(0,0,0,.25);font-size:14px;color:#222">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px 6px;gap:10px;position:sticky;top:0;background:#fff">
+        <strong style="font-size:16px;color:#565c66">🗂️ I miei documenti firmati</strong>
+        <button type="button" data-chiudi style="background:none;border:0;font-size:20px;cursor:pointer;color:#888" data-aiuto="Chiude la finestra.">✕</button></div>
+      <div id="firme-archivio-corpo" style="padding:6px 18px 16px"><p style="font-size:13px;color:#888">Leggo i documenti…</p></div></div>`;
+    f.addEventListener('click', (e) => { if (e.target === f || e.target.closest('[data-chiudi]')) f.remove(); });
+    document.body.appendChild(f);
+    const corpo = $('firme-archivio-corpo');
+    const { data, error } = await window.sb.rpc('mie_firme_archivio', { p_anno: anno || null, p_tipo: tipo || null });
+    if (error) { corpo.innerHTML = `<p style="font-size:13px;color:#c0392b">Non sono riuscito a leggere i documenti firmati: ${esc(error.message)}</p>`; return; }
+    const d = data || {};
+    const anni = Array.isArray(d.anni) ? d.anni : [];
+    const tipi = Array.isArray(d.tipi) ? d.tipi : [];
+    const righe = Array.isArray(d.righe) ? d.righe : [];
+    if (!anni.length) { corpo.innerHTML = '<p style="font-size:13px;color:#555">Non hai ancora firmato documenti nell\'app.</p>'; return; }
+    const riga = (r) => `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid #f0e6dd">
+        <span style="flex:1;min-width:240px;font-size:13px"><strong>${esc(r.titolo)}</strong><br>
+          <span style="font-size:11.5px;color:#888">${esc(TIPI[r.tipo] || r.tipo)} · firmato da te il ${oraIt(r.firmata_il)}${r.completo ? '' : ' · <span style="color:#b35c00">altre firme ancora in corso</span>'}</span></span>
+        ${r.file_finale ? `<button class="btn-secondary btn-sm" type="button" data-arch-apri="${esc(r.file_finale)}" data-aiuto="Apre il documento con tutte le firme apposte finora: dalla scheda nuova lo salvi o lo stampi.">📄 Apri</button>` : '<span style="font-size:12px;color:#999">PDF non disponibile</span>'}
+      </div>`;
+    corpo.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px;font-size:13px">
+        <label>Anno <select id="arch-anno" style="font-size:13px">${anni.map((a) => `<option value="${a}" ${a === d.anno ? 'selected' : ''}>${a}</option>`).join('')}</select></label>
+        <label>Tipo <select id="arch-tipo" style="font-size:13px"><option value="">tutti</option>${tipi.map((t) => `<option value="${esc(t)}" ${t === tipo ? 'selected' : ''}>${esc(TIPI[t] || t)}</option>`).join('')}</select></label>
+        <span style="color:#888;font-size:12px">${righe.length} ${righe.length === 1 ? 'documento' : 'documenti'}</span></div>
+      ${righe.length ? righe.map(riga).join('') : '<p style="font-size:13px;color:#555">Nessun documento di questo tipo nell\'anno scelto.</p>'}`;
+    const ricarica = () => archivio(Number($('arch-anno').value) || null, $('arch-tipo').value || null);
+    $('arch-anno').addEventListener('change', ricarica);
+    $('arch-tipo').addEventListener('change', ricarica);
+    corpo.querySelectorAll('[data-arch-apri]').forEach((b) => b.addEventListener('click', () => apri(b.dataset.archApri)));
+  }
+
+  window.firmeApp = { box, conta, archivio, RUOLI, TIPI };
 })();

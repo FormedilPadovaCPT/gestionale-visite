@@ -1460,6 +1460,28 @@
         "conferenza",
         "ufficio"
       ]
+    },
+    {
+      "id": "gest.arch-anno",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "firme.js",
+        "id": "arch-anno"
+      },
+      "motivo": "filtro dell'archivio dei documenti firmati: non scrive"
+    },
+    {
+      "id": "gest.arch-tipo",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "firme.js",
+        "id": "arch-tipo"
+      },
+      "motivo": "filtro dell'archivio dei documenti firmati: non scrive"
     }
   ],
   "segreteria_gia_presenti": [
