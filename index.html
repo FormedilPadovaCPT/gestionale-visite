@@ -507,6 +507,24 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <div class="field"><label>Password</label><input type="password" id="l-pwd" autocomplete="current-password"></div>
     <label style="display:flex;align-items:center;gap:6px;margin:-4px 0 12px;font-size:12px;cursor:pointer"><input type="checkbox" id="l-mostra" style="width:auto;margin:0;padding:0"> Mostra la password che sto scrivendo</label>
     <button class="btn-primary" id="btn-login">Accedi</button>
+    <!-- PASSWORD DIMENTICATA (14/10/2026): il codice arriva per mail dalla casella dell'ente
+         (funzione password-dimenticata), qui si scrive con la password nuova -->
+    <div style="margin-top:10px;text-align:center"><a href="#" id="link-pwd-dimenticata" style="font-size:12.5px;color:var(--orange);text-decoration:underline">Password dimenticata?</a></div>
+    <div id="box-recupero" class="hidden" style="margin-top:12px;text-align:left;border:1px solid #f0e6dd;border-radius:8px;padding:12px">
+      <p style="font-size:12.5px;color:#555;margin:0 0 8px">Scrivi l'indirizzo con cui entri: ti mandiamo per mail un codice. Con il codice scegli una password nuova.</p>
+      <div class="field"><label>La tua email</label><input type="email" id="rp-email" autocomplete="email"></div>
+      <button class="btn-primary" id="btn-rp-codice" type="button">Mandami il codice</button>
+      <div id="rp-msg" style="font-size:12.5px;margin-top:8px"></div>
+      <div id="rp-passo2" class="hidden" style="margin-top:12px;border-top:1px solid #eee;padding-top:12px">
+        <div class="login-err" id="rp-err"></div>
+        <div class="field"><label>Codice ricevuto per mail</label><input type="text" id="rp-codice" inputmode="numeric" maxlength="10" autocomplete="one-time-code" style="letter-spacing:.15em"></div>
+        <div class="field"><label>Nuova password</label><input type="password" id="rp-nuova" autocomplete="new-password"></div>
+        <div class="field"><label>Ripeti la nuova password</label><input type="password" id="rp-ripeti" autocomplete="new-password"></div>
+        <label style="display:flex;align-items:center;gap:6px;margin:0 0 10px;font-size:12px;cursor:pointer"><input type="checkbox" id="rp-mostra" style="width:auto;margin:0;padding:0"> Mostra le password che sto scrivendo</label>
+        <p style="font-size:11.5px;color:#777;margin:0 0 8px">Almeno 10 caratteri, con lettere e numeri.</p>
+        <button class="btn-primary" id="btn-rp-salva" type="button">Imposta la password ed entra</button>
+      </div>
+    </div>
     <div style="margin-top:16px;text-align:center;border-top:1px solid #eee;padding-top:12px">
       <a href="#" id="link-richiedi" style="font-size:12px;color:var(--orange);text-decoration:underline">Sei un consigliere? Richiedi l'accesso alla dashboard</a>
     </div>
@@ -2878,6 +2896,62 @@ async function obbligaCambioPassword(){
 }
 $('btn-logout').onclick=()=>sb.auth.signOut()
 $('link-richiedi')?.addEventListener('click',e=>{e.preventDefault();$('box-richiedi')?.classList.toggle('hidden')})
+
+// ── PASSWORD DIMENTICATA (14/10/2026, chiesto dall'utente) ──
+// Il codice lo genera Supabase e lo manda la funzione password-dimenticata dalla casella
+// dell'ente (eccezione 10 del CLAUDE.md): la risposta e' la stessa che l'indirizzo esista o no.
+// Qui: verifyOtp (type recovery) apre la sessione, updateUser cambia la password, si chiude
+// la richiesta di cambio obbligatorio (la password nuova l'ha scelta adesso) e l'app si apre.
+// Mentre S.cambioPwd e' vero onAuthStateChange non apre l'app da solo, come nel cambio obbligatorio.
+$('link-pwd-dimenticata')?.addEventListener('click',e=>{
+  e.preventDefault();$('box-recupero')?.classList.toggle('hidden')
+  if(!vGet('rp-email'))vSet('rp-email',vGet('l-email')||'')
+})
+$('btn-rp-codice')?.addEventListener('click',async()=>{
+  const em=String(vGet('rp-email')||'').trim().toLowerCase(),msg=$('rp-msg'),b=$('btn-rp-codice')
+  const scrivi=(t,ok)=>{msg.textContent=t;msg.style.color=ok?'#2d7d1f':'#c0392b'}
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em))return scrivi('Scrivi l\'indirizzo e-mail con cui entri.',false)
+  b.disabled=true;b.textContent='Invio…'
+  let r;try{r=await sb.functions.invoke('password-dimenticata',{body:{email:em}})}catch(e){r={error:e}}
+  b.disabled=false;b.textContent='Mandami di nuovo il codice'
+  const d=r&&r.data
+  if(r.error||!d)return scrivi('Non riesco a raggiungere il servizio: riprova fra poco.',false)
+  scrivi(d.messaggio||'',!!d.ok)
+  if(d.ok){$('rp-passo2')?.classList.remove('hidden');$('rp-codice')?.focus()}
+})
+$('rp-mostra')?.addEventListener('change',e=>{for(const id of['rp-nuova','rp-ripeti'])$(id).type=e.target.checked?'text':'password'})
+$('btn-rp-salva')?.addEventListener('click',async()=>{
+  const em=String(vGet('rp-email')||'').trim().toLowerCase()
+  const cod=String(vGet('rp-codice')||'').replace(/\D/g,''),p1=vGet('rp-nuova')||'',p2=vGet('rp-ripeti')||''
+  const err=$('rp-err'),btn=$('btn-rp-salva')
+  const errore=t=>{err.textContent=t;err.style.display='block'}
+  err.style.display='none'
+  if(cod.length<6)return errore('Scrivi il codice che hai ricevuto per mail.')
+  if(p1.length<10)return errore('La password deve avere almeno 10 caratteri.')
+  if(!/[A-Za-z]/.test(p1)||!/[0-9]/.test(p1))return errore('La password deve contenere lettere e numeri.')
+  if(p1!==p2)return errore('Le due password non coincidono.')
+  btn.disabled=true;btn.textContent='Controllo il codice…'
+  const ripristina=()=>{btn.disabled=false;btn.textContent='Imposta la password ed entra'}
+  S.cambioPwd=true
+  const v=await sb.auth.verifyOtp({email:em,token:cod,type:'recovery'})
+  if(v.error||!v.data||!v.data.session){S.cambioPwd=false;ripristina();return errore('Codice non valido o scaduto: chiedine un altro con «Mandami di nuovo il codice».')}
+  btn.textContent='Salvo la password…'
+  const u=await sb.auth.updateUser({password:p1})
+  if(u.error){
+    const c=u.error.code||'',m=u.error.message||''
+    S.cambioPwd=false;ripristina();await sb.auth.signOut()
+    if(c==='same_password'||/different from the old/i.test(m))return errore('La nuova password deve essere diversa da quella di prima. Chiedi un altro codice e riprova.')
+    if(c==='weak_password'||/weak|at least/i.test(m))return errore('Password troppo debole: allungala o aggiungi numeri e simboli. Chiedi un altro codice e riprova.')
+    return errore('Password non cambiata: '+m)
+  }
+  const r=await sb.rpc('password_cambiata')
+  if(r.error)console.warn('Password cambiata, ma non sono riuscito a chiudere la richiesta di cambio:',r.error)
+  S.cambioPwd=false;ripristina()
+  for(const id of['rp-codice','rp-nuova','rp-ripeti','l-pwd'])vSet(id,'')
+  $('rp-mostra').checked=false;for(const id of['rp-nuova','rp-ripeti'])$(id).type='password'
+  $('box-recupero')?.classList.add('hidden');$('rp-passo2')?.classList.add('hidden');$('rp-msg').textContent=''
+  await onLogin((u.data&&u.data.user)||v.data.user)
+})
 $('btn-richiedi-invia')?.addEventListener('click',async()=>{
   const email=(vGet('ra-email')||'').trim(),nome=(vGet('ra-nome')||'').trim(),msg=$('ra-msg')
   if(msg){msg.style.color='';msg.textContent=''}
@@ -16459,7 +16533,7 @@ document.addEventListener('input',function(ev){
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=7"></script>
-<script src="aiuto.js?v=27"></script>
+<script src="aiuto.js?v=28"></script>
 <script src="mail-respinte-tec.js?v=3"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=2"></script>

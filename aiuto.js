@@ -29,6 +29,9 @@
 
 window.AIUTO_TESTI = {
   /* ── cambio password obbligatorio (27/09/2026) ── */
+  'link-pwd-dimenticata': 'Se non ricordi la password: ti mandiamo per mail un codice, e con quello ne scegli una nuova. La mail arriva solo all\'indirizzo del tuo account.',
+  'btn-rp-codice': 'Manda all\'indirizzo scritto qui sopra una mail con un codice di 8 cifre. Se l\'indirizzo non è di un account delle app non arriva niente, e la pagina risponde allo stesso modo.',
+  'btn-rp-salva': 'Controlla il codice, sostituisce la tua password con quella nuova e apre l\'app. La password di prima non vale più.',
   'btn-pwd-salva': 'Sostituisce subito la tua password con quella nuova e apre l\'app. Da ora entri solo con la nuova: la vecchia non vale più, e la richiesta della segreteria si chiude.',
   'link-pwd-esci': 'Esci senza cambiare la password: torni alla schermata di accesso, e al prossimo ingresso il cambio ti verrà chiesto di nuovo.',
   /* ── visite fuori procedura (13/10/2026) ── */
