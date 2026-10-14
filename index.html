@@ -2778,6 +2778,8 @@ async function onLogin(user){
   document.body.classList.remove('viewer-mode')
   // se nella stessa scheda era entrato prima un account di sola lettura, il menu torna quello del tecnico
   document.querySelectorAll('nav button[data-view]').forEach(b=>{if(['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','formazione'].includes(b.dataset.view))b.style.display=''})
+  // (14/10/2026) il numero dei documenti da firmare sul menu Formazione già all'accesso: le lettere di incarico da accettare arrivano lì
+  setTimeout(()=>{try{window.formazione?.badge?.().catch(()=>{})}catch(_e){}},1500)
   {const _bd=document.querySelector('nav button[data-view="dashboard"]');if(_bd)_bd.textContent='🏠 Dashboard'}
   let{data:tec,error:_tecErr}=await sb.from('tecnici').select('*').eq('email',user.email).maybeSingle()
   /* lettura fallita (rete, server) ≠ scheda mancante: non si esce dall'account,
@@ -16547,9 +16549,9 @@ document.addEventListener('input',function(ev){
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
-<script src="firme.js?v=1"></script>
+<script src="firme.js?v=2"></script>
 <script src="direzione.js?v=11"></script>
-<script src="formazione.js?v=4"></script>
+<script src="formazione.js?v=5"></script>
 <script src="formazione-corsi.js?v=1"></script>
 <script src="formazione-docente.js?v=2"></script>
 <script src="rientri-giorni.js?v=6"></script>

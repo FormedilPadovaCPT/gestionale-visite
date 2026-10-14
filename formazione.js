@@ -131,7 +131,7 @@
         ? 'Sei il responsabile del progetto formativo: qui firmi i documenti dei corsi, scrivi le schede formative delle tipologie (o le deleghi a un docente), dichiari pronti progetto formativo e verbale di verifica, e vedi i corsi come li vede il docente.'
         : R.docente
           ? 'Qui trovi i documenti dei corsi che aspettano la tua firma, le schede formative che il responsabile del progetto formativo ti ha delegato e i tuoi corsi: incarico da accettare, presenze e firme degli allievi dal QR, registro della giornata.'
-          : 'I documenti della formazione che aspettano la tua firma, le schede formative delegate a te e, se sei docente di un corso, la pagina del corso: incarico, presenze, firme dal QR, registro della giornata.';
+          : 'I documenti che aspettano la tua firma (anche le lettere di incarico dell\'asseverazione, da firmare per accettazione), le schede formative delegate a te e, se sei docente di un corso, la pagina del corso: incarico, presenze, firme dal QR, registro della giornata.';
     }
     if (window.firmeApp) {
       await window.firmeApp.box($('form-firme'), {

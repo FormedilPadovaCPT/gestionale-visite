@@ -32,7 +32,7 @@
   const giorni = (d) => (d ? Math.max(0, Math.floor((new Date(oggi()) - new Date(String(d).slice(0, 10))) / 864e5)) : null);
   const avviso = (msg, tipo) => (window.toast ? window.toast(msg, tipo) : alert(msg));
   const BUCKET = 'firme-presidente';   // il nome del bucket resta quello del 04/10
-  const RUOLI = { presidente: 'Presidente', direttore: 'Direttore', rpf: 'responsabile del progetto formativo', docente: 'docente' };
+  const RUOLI = { presidente: 'Presidente', direttore: 'Direttore', rpf: 'responsabile del progetto formativo', docente: 'docente', incaricato: 'tecnico incaricato, per accettazione' };
   const TIPI = { incarico_assev: 'lettera di incarico (asseverazione)', incarico_docenza: 'lettera di incarico di docenza', accettazione_incarico: 'accettazione dell\'incarico', scheda_formativa: 'scheda formativa', progetto_formativo: 'progetto formativo', registro_giornata: 'registro della giornata', registro_corso: 'registro del corso', verbale_verifica: 'verbale di verifica finale', documento: 'documento' };
 
   const _letti = new Set();   // i documenti aperti con «Leggi» in questa sessione: solo dopo si accende «Firmo»
@@ -91,7 +91,8 @@
     const attesa = (data || []).filter((r) => r.stato === 'in_attesa').reverse();
     const recenti = (data || []).filter((r) => r.stato !== 'in_attesa').slice(0, 5);
     const bottoni = !!o.pulsanti;
-    const catena = (r) => (r.ordine > 1 ? ` · ${r.ordine}ª firma: il documento porta già ${r.ordine - 1 === 1 ? 'la firma di chi è venuto prima' : 'le firme di chi è venuto prima'}` : '');
+    const catena = (r) => (r.firmatario_ruolo === 'incaricato' ? ' · da firmare per accettazione, sotto il tuo nome: il Presidente ha già firmato'
+      : r.ordine > 1 ? ` · ${r.ordine}ª firma: il documento porta già ${r.ordine - 1 === 1 ? 'la firma di chi è venuto prima' : 'le firme di chi è venuto prima'}` : '');
     const riga = (r) => {
       const g = giorni(r.richiesta_il);
       const letto = _letti.has(r.id);
