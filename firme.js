@@ -77,7 +77,8 @@
     if (!host) return;
     const o = Object.assign({ mie: true, pulsanti: true, titolo: '✍️ Da firmare', vuoto: 'Niente da firmare.' }, opzioni || {});
     const sb = window.sb;
-    const email = String((window.S && window.S.user && window.S.user.email) || '').toLowerCase();
+    /* (14/10/2026) o.email: le righe di un altro, per l'anteprima della segreteria (la RLS gliele dà tutte) */
+    const email = String(o.email || (window.S && window.S.user && window.S.user.email) || '').toLowerCase();
     let q = sb.from('s_firme')
       .select('id, tipo, rif, titolo, stato, ordine, firmatario_email, firmatario_ruolo, corso_id, richiesta_il, firmata_il, rimandata_il, rimandata_motivo, file_originale, file_firmato, file_precedente')
       .in('stato', ['in_attesa', 'firmata', 'rimandata']).order('richiesta_il', { ascending: false }).limit(60);

@@ -427,7 +427,11 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
         : '')
       + (att === 'segreteria' ? '' : '<span class="v2-nota">vedi il menu e le pagine di questo ruolo; i dati restano quelli che il database dà a te</span>');
     const qt = $('v2-quale-tec');
-    if (qt) qt.addEventListener('change', () => { scrivi(sessionStorage, CHIAVE_TECNICO, qt.value); oggiDisegna(); bozze().catch(() => {}); });
+    if (qt) qt.addEventListener('change', () => {
+      scrivi(sessionStorage, CHIAVE_TECNICO, qt.value); oggiDisegna(); bozze().catch(() => {});
+      /* (14/10/2026) anche «Le mie firme» della pagina Formazione è del tecnico scelto */
+      try { const vf = $('view-formazione'); if (vf && !vf.classList.contains('hidden') && window.formazione) window.formazione.carica().catch(() => {}); } catch (_e) { /* niente */ }
+    });
     if ((att === 'tecnico' || att === 'coordinatore') && !_tecnici) tecniciLeggi().catch((e) => console.warn('veste v2, tecnici:', e));
   }
 
@@ -1265,5 +1269,5 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }
 
-  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, ruoloVero, simula, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat, luminanza, contrasto, leggibile };
+  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, ruoloVero, simula, diChi, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat, luminanza, contrasto, leggibile };
 })();

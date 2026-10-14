@@ -133,8 +133,22 @@
           ? 'Qui trovi i documenti dei corsi che aspettano la tua firma, le schede formative che il responsabile del progetto formativo ti ha delegato e i tuoi corsi: incarico da accettare, presenze e firme degli allievi dal QR, registro della giornata.'
           : 'I documenti che aspettano la tua firma (anche le lettere di incarico dell\'asseverazione, da firmare per accettazione), le schede formative delegate a te e, se sei docente di un corso, la pagina del corso: incarico, presenze, firme dal QR, registro della giornata.';
     }
+    /* (14/10/2026) nell'anteprima «Vedi come… Tecnico/Coordinatore» della segreteria: le firme del
+       tecnico scelto nella barra, senza pulsanti (firmare può solo lui). Prima si vedevano quelle
+       della segreteria, cioè nessuna, e le lettere in attesa di De Marco sembravano mancare. */
+    let altro = null;
+    try {
+      const v = window.vesteV2;
+      if (v && v.simula && v.simula() && ['tecnico', 'coordinatore'].includes(v.ruolo())) {
+        const d = v.diChi && v.diChi();
+        if (d && d.anteprima && d.email) altro = d;
+      }
+    } catch (_e) { altro = null; }
     if (window.firmeApp) {
-      await window.firmeApp.box($('form-firme'), {
+      await window.firmeApp.box($('form-firme'), altro ? {
+        mie: true, email: altro.email, pulsanti: false, titolo: `✍️ Le firme di ${altro.nome || altro.email} (anteprima)`,
+        vuoto: 'Nessun documento aspetta la sua firma.',
+      } : {
         mie: true, pulsanti: true, titolo: '✍️ Le mie firme',
         vuoto: 'Nessun documento aspetta la tua firma.',
         dopo: () => badge().catch(() => {}),
