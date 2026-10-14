@@ -623,7 +623,7 @@
     if (tit && tit.nodeType === 3) tit.textContent = (R.presidenza && !R.direttore ? '🏛️ Presidenza — ' : '🏛️ Direzione — ');
     const intro = $('dir-intro');
     if (intro) intro.textContent = R.direttore
-      ? 'Quello che aspetta te: autorizzazioni dei servizi CPT, preventivi di asseverazione da approvare, conferme sui cantieri critici e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
+      ? 'Quello che aspetta te: autorizzazioni dei servizi CPT, preventivi, programmi e piani di asseverazione da approvare, conferme sui cantieri critici e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
       : R.presidenza
         ? 'Quello che aspetta te: cantieri critici demandati alla Presidenza e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
         : 'Le questioni che coordinatore e segreteria hanno aperto per la Presidenza. La mappa e le statistiche sono nelle altre due schede.';
@@ -683,6 +683,8 @@
 
   /* ════════════════════════════════════════════════════════════
      3-ter. PREVENTIVI DA APPROVARE (12/10/2026, chiesto dall'utente)
+     Dal 14/10/2026 anche PROGRAMMA 5.D.3 e PIANO 5.D.4, che escono anch'essi
+     a firma del Direttore: il riquadro si chiama «Documenti da approvare».
      Il preventivo 5.D.2 dell'asseverazione esce a firma del Direttore: la
      segreteria glielo manda dall'app asseverazione (funzione
      approvazione-direttore) e al Direttore arriva la mail. Qui legge la
@@ -713,7 +715,7 @@
       .select('id, titolo, dettaglio, stato, richiesta_il, decisa_il, nota, file_bozza')
       .in('stato', ['in_attesa', 'approvata', 'rimandata']).order('richiesta_il', { ascending: false }).limit(60);
     if (error) {
-      host.innerHTML = `<div class="card" style="border-left:4px solid #c0392b"><h3>📑 Preventivi da approvare</h3><p style="font-size:13px;color:#c0392b;margin:0">Non sono riuscito a leggere i preventivi da approvare: ${esc(error.message)}</p></div>`;
+      host.innerHTML = `<div class="card" style="border-left:4px solid #c0392b"><h3>📑 Documenti da approvare</h3><p style="font-size:13px;color:#c0392b;margin:0">Non sono riuscito a leggere i documenti da approvare: ${esc(error.message)}</p></div>`;
       return;
     }
     const attesa = (data || []).filter((r) => r.stato === 'in_attesa').reverse();
@@ -722,6 +724,7 @@
       d = d || {};
       const parti = [];
       if (d.giornate != null) parti.push(`${String(d.giornate).replace('.', ',')} giornate`);
+      if (d.verifica_prevista) parti.push(`verifica prevista dal ${dIt(d.verifica_prevista)}`);
       if (d.totale != null) parti.push(`totale ${euroIt(d.totale)} + IVA`);
       let h = parti.length ? `<br><span style="font-size:12px;color:#555">${esc(parti.join(' · '))}</span>` : '';
       if (Array.isArray(d.sotto_minimo) && d.sotto_minimo.length) {
@@ -735,18 +738,18 @@
       const letta = _lette.has(r.id);
       return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 0;border-top:1px solid #f0e6dd">
         <span style="font-size:13px;flex:1;min-width:220px"><strong>${esc(r.titolo)}</strong>${sintesi(r.dettaglio)}<br><span style="font-size:11.5px;color:#888">mandato il ${dIt(r.richiesta_il)}${g ? ' · in attesa da ' + g + ' g' : ''}</span></span>
-        <button class="btn-secondary btn-sm" type="button" data-appr-leggi="${r.id}" data-aiuto="Apre la bozza del preventivo in una scheda nuova. Dopo averla letta si accende «Approvo».">📄 Leggi</button>
-        ${direttore ? `<button class="btn-primary btn-sm" type="button" data-appr-si="${r.id}" ${letta ? '' : 'disabled title="Prima apri la bozza con «Leggi»"'} data-aiuto="Approvi il preventivo così com'è: la segreteria può protocollarlo e generarlo con timbro e firma. Se poi cambia, torna da te.">✅ Approvo</button>
-        <button class="btn-secondary btn-sm" type="button" data-appr-no="${r.id}" data-aiuto="Non approvi: scrivi in due righe che cosa cambiare, e il preventivo torna alla segreteria con la tua nota.">↩ Rimando</button>` : ''}
+        <button class="btn-secondary btn-sm" type="button" data-appr-leggi="${r.id}" data-aiuto="Apre la bozza del documento in una scheda nuova. Dopo averla letta si accende «Approvo».">📄 Leggi</button>
+        ${direttore ? `<button class="btn-primary btn-sm" type="button" data-appr-si="${r.id}" ${letta ? '' : 'disabled title="Prima apri la bozza con «Leggi»"'} data-aiuto="Approvi il documento così com'è: la segreteria può protocollarlo e generarlo con timbro e firma. Se poi cambia, torna da te.">✅ Approvo</button>
+        <button class="btn-secondary btn-sm" type="button" data-appr-no="${r.id}" data-aiuto="Non approvi: scrivi in due righe che cosa cambiare, e il documento torna alla segreteria con la tua nota.">↩ Rimando</button>` : ''}
       </div>`;
     };
     const rigaFatta = (r) => `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid #f4f4f4;font-size:12px;color:#666">
         <span style="flex:1;min-width:220px">${r.stato === 'approvata' ? '✅' : '↩'} ${esc(r.titolo)} — ${r.stato === 'approvata' ? 'approvato il ' + oraIt(r.decisa_il) : 'rimandato il ' + dIt(r.decisa_il)}${r.nota ? ': «' + esc(r.nota) + '»' : ''}</span>
       </div>`;
     host.innerHTML = `<div class="card" style="border-left:4px solid ${attesa.length ? 'var(--orange,#e7500f)' : '#95C22F'}">
-      <h3>📑 Preventivi da approvare${attesa.length ? ` — <span style="color:#b35c00">${attesa.length} ${attesa.length === 1 ? 'preventivo' : 'preventivi'}</span>` : ''}</h3>
+      <h3>📑 Documenti da approvare${attesa.length ? ` — <span style="color:#b35c00">${attesa.length} ${attesa.length === 1 ? 'documento' : 'documenti'}</span>` : ''}</h3>
       ${attesa.length
-        ? `<p style="font-size:12.5px;color:#555;margin:0 0 4px">I preventivi di asseverazione che escono a tua firma. Apri la bozza con «Leggi», poi «Approvo»: solo dopo la segreteria li protocolla e li genera con timbro e firma.${guarda ? ' <em>(anteprima: i pulsanti li vede solo il Direttore)</em>' : ''}</p>${attesa.map(riga).join('')}`
+        ? `<p style="font-size:12.5px;color:#555;margin:0 0 4px">Preventivi, programmi e piani di asseverazione che escono a tua firma. Apri la bozza con «Leggi», poi «Approvo»: solo dopo la segreteria li protocolla e li genera con timbro e firma.${guarda ? ' <em>(anteprima: i pulsanti li vede solo il Direttore)</em>' : ''}</p>${attesa.map(riga).join('')}`
         : '<p style="font-size:13px;color:#555;margin:0">Niente da approvare.</p>'}
       ${recenti.length ? `<div style="font-size:11px;color:#999;margin-top:10px">Ultimi approvati o rimandati:</div>${recenti.map(rigaFatta).join('')}` : ''}
     </div>`;
@@ -777,7 +780,7 @@
     }));
     host.querySelectorAll('[data-appr-si]').forEach((b) => b.addEventListener('click', async () => {
       const r = di(Number(b.dataset.apprSi)); if (!r) return;
-      if (!confirm(`Approvo «${r.titolo}»?\n\nLa segreteria potrà protocollarlo e generarlo con il timbro e la tua firma. Se il preventivo viene cambiato, torna da te.`)) return;
+      if (!confirm(`Approvo «${r.titolo}»?\n\nLa segreteria potrà protocollarlo e generarlo con il timbro e la tua firma. Se il documento viene cambiato, torna da te.`)) return;
       b.disabled = true; b.textContent = 'Approvo…';
       const err = await chiama({ azione: 'approva', id: r.id });
       if (err) { b.disabled = false; b.textContent = '✅ Approvo'; avviso('Approvazione non riuscita: ' + err, 'err'); return; }

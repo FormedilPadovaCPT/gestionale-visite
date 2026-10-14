@@ -17,7 +17,7 @@ assert.ok(/data-appr-si="\$\{r\.id\}" \$\{letta \? '' : 'disabled/.test(dir) && 
 assert.ok(/createSignedUrl\(percorso, 600\)/.test(dir) && /storage\.from\('approvazioni-direttore'\)/.test(dir), 'la bozza si apre dal bucket privato con un indirizzo a tempo');
 assert.ok(/chiama\(\{ azione: 'approva', id: r\.id \}\)/.test(dir) && /chiama\(\{ azione: 'rimanda', id: r\.id, nota: nota\.trim\(\) \}\)/.test(dir), 'decide la funzione approvazione-direttore');
 assert.ok(/if \(nota\.trim\(\)\.length < 3\)/.test(dir), 'chi rimanda scrive che cosa cambiare');
-assert.ok(/if \(error\) \{\n\s+host\.innerHTML = `<div class="card" style="border-left:4px solid #c0392b"><h3>📑 Preventivi da approvare<\/h3><p[^>]*>Non sono riuscito a leggere/.test(dir),
+assert.ok(/if \(error\) \{\n\s+host\.innerHTML = `<div class="card" style="border-left:4px solid #c0392b"><h3>📑 Documenti da approvare<\/h3><p[^>]*>Non sono riuscito a leggere/.test(dir),
   'un errore di lettura si dice, non diventa «niente da approvare»');
 assert.ok(/if \(R\.direttore\) \{\n\s+const \{ count \} = await window\.sb\.from\('s_approvazioni_direttore'\)\.select\('id', \{ count: 'exact', head: true \}\)\.eq\('stato', 'in_attesa'\);/.test(dir),
   'il numero sul pulsante «Direzione» conta anche i preventivi in attesa');
