@@ -187,12 +187,13 @@
     const miei = (gInfo.interventi || []).filter((i) => i.mio);
     const mio = !!corso.mio || !!R.segr;
     const dis = mio ? '' : 'disabled';
-    const firmaTxt = (f) => `${f.tipo || 'senza momento'}${f.turno ? ' ' + f.turno : ''} ${oraIt(f.ora_server)}${f.fuori_orario ? ' <span style="color:#b35c00">fuori orario</span>' : ''}${f.fonte && f.fonte !== 'qr' ? ' (' + esc(f.fonte) + ')' : ''}`;
+    const firmaTxt = (f) => `${f.tipo || 'senza momento'}${f.turno ? ' ' + f.turno : ''} ${oraIt(f.ora_server)}${f.fuori_orario ? ' <span style="color:#b35c00">fuori orario</span>' : ''}${f.anno_corrisponde === false ? ' <span style="color:#c0392b;font-weight:600" title="L’anno di nascita scritto alla firma non è quello della persona: guarda chi è prima di confermare">anno ≠</span>' : ''}${f.fonte && f.fonte !== 'qr' ? ' (' + esc(f.fonte) + ')' : ''}`;
     const rigaI = (i) => {
       const p = i.presenza;
       const firme = Array.isArray(i.firme) ? i.firme : [];
       const ricevute = firme.filter((f) => f.stato === 'ricevuta');
-      const inOrario = ricevute.filter((f) => !f.fuori_orario).length;
+      /* la conferma di gruppo salta le fuori orario e quelle con l'anno di nascita che non torna (14/10/2026) */
+      const inOrario = ricevute.filter((f) => !f.fuori_orario && f.anno_corrisponde !== false).length;
       const presTxt = !p ? '<span style="color:#b35c00">da segnare</span>' : p.presente === false ? pill('assente', 'no')
         : pill(['presente', p.ingresso1 ? 'in ' + String(p.ingresso1).slice(0, 5) : '', p.uscita1 ? 'out ' + String(p.uscita1).slice(0, 5) : '', p.ingresso2 ? 'in ' + String(p.ingresso2).slice(0, 5) : '', p.uscita2 ? 'out ' + String(p.uscita2).slice(0, 5) : '', p.ore != null ? p.ore + ' h' : ''].filter(Boolean).join(' · '), 'ok');
       return `<tr data-i="${i.id}" style="border-top:1px solid #f0e6dd">
@@ -201,7 +202,7 @@
             ${mio && f.stato === 'ricevuta' ? `<a href="#" data-fd-conf="${f.id}" style="color:#2d7d1f;font-weight:600">✓</a> <a href="#" data-fd-resp="${f.id}" style="color:#c0392b;font-weight:600">✗</a>` : ''}</div>`).join('') : '<span style="color:#aaa">nessuna firma dal QR</span>'}</td>
         <td style="padding:6px 4px;font-size:12px;vertical-align:top">${presTxt}</td>
         <td style="padding:6px 4px;white-space:nowrap;vertical-align:top">
-          ${mio && inOrario ? `<button class="btn-primary btn-sm" type="button" data-fd-conf-all="${i.id}" data-aiuto="Conferma tutte le firme in orario di questo allievo per oggi: diventano presenze. Le fuori orario restano da guardare una per una.">✓ Confermo (${inOrario})</button>` : ''}
+          ${mio && inOrario ? `<button class="btn-primary btn-sm" type="button" data-fd-conf-all="${i.id}" data-aiuto="Conferma tutte le firme in orario di questo allievo per oggi: diventano presenze. Le fuori orario e quelle con l'anno di nascita sbagliato restano da guardare una per una.">✓ Confermo (${inOrario})</button>` : ''}
           <button class="btn-secondary btn-sm" type="button" data-fd-pres="${i.id}" data-modo="carta" ${dis} data-aiuto="L'allievo ha firmato sul registro di carta: la presenza prende gli orari della giornata dove manca una firma dal QR confermata.">su carta</button>
           <button class="btn-secondary btn-sm" type="button" data-fd-pres="${i.id}" data-modo="assente" ${dis} data-aiuto="Segna l'allievo assente per questa giornata.">assente</button>
           ${p ? `<button class="btn-outline btn-sm" type="button" data-fd-pres="${i.id}" data-modo="togli" ${dis} data-aiuto="Toglie la presenza segnata a mano (non si può se ci sono firme dal QR confermate).">↩</button>` : ''}
@@ -214,7 +215,7 @@
       <h4 style="margin:10px 0 4px;font-size:13px;color:#e7500f">Allievi (${(d.iscritti || []).length})</h4>
       <div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:11px;color:#888;text-align:left"><th style="padding:4px">Allievo · codice</th><th style="padding:4px">Firme dal QR</th><th style="padding:4px">Presenza</th><th></th></tr></thead>
       <tbody id="fd-isc">${(d.iscritti || []).map(rigaI).join('') || '<tr><td colspan="4" style="padding:8px;color:#777;font-size:13px">Nessun iscritto.</td></tr>'}</tbody></table></div>
-      ${(d.non_riconosciute || []).length ? `<p style="font-size:12px;color:#b35c00;margin:6px 0 0">⚠ ${d.non_riconosciute.length} firme arrivate oggi con un codice non riconosciuto (${d.non_riconosciute.map((f) => oraIt(f.ora_server)).join(', ')}): chi le ha fatte scriva il codice stampato accanto al suo nome, o va aggiunto prima.</p>` : ''}
+      ${(d.non_riconosciute || []).length ? `<p style="font-size:12px;color:#b35c00;margin:6px 0 0">⚠ ${d.non_riconosciute.length} firme arrivate oggi con un codice non riconosciuto (${d.non_riconosciute.map((f) => oraIt(f.ora_server)).join(', ')}): chi le ha fatte riscriva il codice del suo biglietto (qui lo vedi accanto al nome, se l’ha perso diglielo tu), o va aggiunto prima.</p>` : ''}
       <div style="display:flex;gap:8px;justify-content:space-between;margin-top:12px;flex-wrap:wrap">
         <div>${mio ? '<button type="button" class="btn-secondary btn-sm" id="fd-add" data-aiuto="Aggiunge un allievo che c\'è in aula ma non è in elenco: si cerca per codice fiscale o cognome, o si codifica nuovo. La mansione è obbligatoria; il codice personale per firmare gli viene dato subito.">➕ Aggiungi allievo</button>' : ''}</div>
         <div style="display:flex;gap:8px"><button type="button" class="btn-outline btn-sm" data-chiudi>Chiudi</button>
