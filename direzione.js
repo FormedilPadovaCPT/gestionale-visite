@@ -49,7 +49,8 @@
   const S = () => window.S || {};
   const SEGRETERIA_URL = 'https://formedilpadovacpt.github.io/segreteria/';
 
-  const DECISORI = { direttore: 'Direttore', presidenza: 'Presidenza', commissione: 'Commissione Sicurezza' };
+  /* (15/10/2026) segreteria e coordinatore decidono le questioni che apre il Direttore */
+  const DECISORI = { direttore: 'Direttore', presidenza: 'Presidenza', commissione: 'Commissione Sicurezza', segreteria: 'Segreteria', coordinatore: 'Coordinatore' };
   const EVENTI = { apertura: 'Aperta', modifica: 'Modificata', decisione: 'Decisione', rinvio: 'Rinvio', incontro_proposto: 'Incontro proposto', presa_in_carico: 'Presa in carico', seguito: 'Seguito (task nel second brain)', ritiro: 'Ritirata', riapertura: 'Riaperta', proposta: 'Proposta dal second brain', pubblicazione: 'Resa visibile' };
   const EV_CRIT = { apertura: 'Apertura', nota: 'Nota', lettera_impresa: "Comunicazione all'impresa", sollecito: 'Sollecito', pec_richiesta: 'PEC chiesta all\'Amministrazione',
     contatto_impresa: "L'impresa ha ricontattato", visita_riprogrammata: 'Visita riprogrammata', visita_successiva: 'Verbale successivo', decisione: 'Decisione',
@@ -379,8 +380,13 @@
     const vista = lista.filter((x) => _filtroQ === 'alta' ? altaDi(x) === 0 : _filtroQ === 'scadute' ? scadutaDi(x) : true);
 
     const anteprima = modo === 'direzione' && !!come();   // si guarda la pagina di un altro ruolo: niente pulsanti, per rispondere serve il suo accesso
-    const puoRispondere = (dec) => !anteprima && ((dec === 'direttore' && R.direttore) || (dec === 'presidenza' && R.presidenza) || (dec === 'commissione' && (R.coord || R.segr)));
+    const puoRispondere = (dec) => !anteprima && ((dec === 'direttore' && R.direttore) || (dec === 'presidenza' && R.presidenza) || (dec === 'commissione' && (R.coord || R.segr))
+      || (dec === 'segreteria' && R.segr) || (dec === 'coordinatore' && R.coord));
     const gestisce = !anteprima && (R.coord || R.segr);
+    /* (15/10/2026) il Direttore gestisce le questioni che ha aperto lui: priorità, titolo, ritiro e presa in carico (la RLS fa lo stesso) */
+    const mia = (r) => !!r && String(r.aperta_da || '').toLowerCase() === String(R.email || '').toLowerCase();
+    const gestisceR = (r) => gestisce || (!anteprima && R.direttore && mia(r));
+    const apreQuestioni = !anteprima && ((R.coord || R.segr) ? modo === 'coord' : (R.direttore && modo === 'direzione'));
     const chiCorto = (c) => String(c || '—').replace(/\s*\(dal vault\)/, '').replace(/^Segreteria Area Sicurezza$/, 'Segreteria');
     const decBadge = (d) => `<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:#888">${esc(DECISORI[d] || d)}</span>`;
 
@@ -401,7 +407,7 @@
         azioni.push(`<button type="button" class="btn-primary btn-sm" data-rispondi="${r.id}" data-aiuto="Apre due righe per scrivere la decisione: resta col tuo nome, data e ora, e chi ha aperto la questione riceve un avviso.">✅ Decidi</button>`);
         azioni.push(`<button type="button" class="btn-outline btn-sm" data-rispondi="${r.id}" data-rinvia="1" data-aiuto="Rinvia la questione a una data: fino a quel giorno non compare fra quelle in attesa, poi torna con i giorni contati da quando è stata aperta.">⏳ Rinvia</button>`);
       }
-      if (r && gestisce) azioni.push(`<button type="button" class="btn-outline btn-sm" data-gestisci="${r.id}" data-aiuto="Apre le tre cose che spettano a ufficio e coordinatore: la priorità, il titolo, il ritiro dal registro.">Gestisci ▾</button>`);
+      if (r && gestisceR(r)) azioni.push(`<button type="button" class="btn-outline btn-sm" data-gestisci="${r.id}" data-aiuto="Apre le tre cose che spettano a ufficio e coordinatore: la priorità, il titolo, il ritiro dal registro.">Gestisci ▾</button>`);
       const scad = r && r.entro_il ? (r.entro_il < T ? `<span style="color:#b35c00;font-weight:600">scaduta il ${dIt(r.entro_il)}</span>` : `entro il ${dIt(r.entro_il)}`) : '';
       const rinv = r && r.stato === 'rinviata' ? `<span style="color:#8e44ad">rinviata al ${dIt(r.rinviata_al)}</span>` : '';
       const meta = [alta ? '<span class="dq-chip dq-alta" title="priorità alta, impostata da ufficio o coordinatore">alta</span>' : '', x.k === 'auto' ? '<span class="dq-chip dq-auto" title="riga che il database ricava da sola dalle pratiche">automatica</span>' : '', scad, rinv, x.gg != null ? `${x.gg} g di attesa` : ''].filter(Boolean).join(' · ');
@@ -429,15 +435,15 @@
         <div style="flex:1;min-width:240px;font-size:13px;line-height:1.4"><div>${esc(r.questione)}${r.riservata ? ' 🔒' : ''}</div>
           <div style="white-space:pre-wrap;color:#333;margin-top:2px"><strong>${esc(r.decisa_da || '')}</strong> il ${oraIt(r.decisa_il)}: ${esc(r.decisione || '')}</div>
           <div style="font-size:11.5px;color:#888">${decBadge(r.decisore)} · aperta il ${dIt(r.aperta_il)} da ${esc(r.aperta_da_nome || r.aperta_da)} · <a href="#" data-cron="${r.id}" style="color:#888">cronologia</a></div></div>
-        ${gestisce ? `<button type="button" class="btn-primary btn-sm" data-presa="${r.id}" data-aiuto="Dichiara che la decisione è stata letta e messa in pratica: la riga esce dal registro e resta in cronologia con chi l'ha presa in carico e quando.">✓ Presa in carico</button>` : ''}</div>`;
+        ${gestisceR(r) ? `<button type="button" class="btn-primary btn-sm" data-presa="${r.id}" data-aiuto="Dichiara che la decisione è stata letta e messa in pratica: la riga esce dal registro e resta in cronologia con chi l'ha presa in carico e quando.">✓ Presa in carico</button>` : ''}</div>`;
     const rigaIncontro = (r) => `<div data-dec-incontro="1" style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;padding:8px 0;border-top:1px solid #f0e6dd">
         <span style="background:#f3e8f8;color:#8e44ad;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">📅 INCONTRO PROPOSTO</span>
         <div style="flex:1;min-width:240px;font-size:13px;line-height:1.4"><div>${esc(r.questione)}${r.riservata ? ' 🔒' : ''}${r.priorita === 'alta' ? ' <span style="background:#fdeaea;color:#c0392b;border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:700">⚠️ ALTA</span>' : ''}</div>
           <div style="white-space:pre-wrap;color:#333;margin-top:2px"><strong>${esc(r.decisa_da || '')}</strong> il ${oraIt(r.decisa_il)}${r.incontro_data ? `: propone il <strong>${dIt(r.incontro_data)}</strong>` : ''}${r.decisione ? (r.incontro_data ? ' — ' : ': ') + esc(r.decisione) : ''}</div>
           <div style="font-size:11.5px;color:#888">${decBadge(r.decisore)} · aperta il ${dIt(r.aperta_il)} da ${esc(r.aperta_da_nome || r.aperta_da)} · <a href="#" data-cron="${r.id}" style="color:#888">cronologia</a></div></div>
-        ${gestisce ? `<button type="button" class="btn-primary btn-sm" data-presa="${r.id}" data-aiuto="Segna che l'incontro si è tenuto (o che la questione è comunque chiusa): la riga esce dal registro e resta in cronologia.">✓ Incontro fatto</button>` : ''}</div>`;
+        ${gestisceR(r) ? `<button type="button" class="btn-primary btn-sm" data-presa="${r.id}" data-aiuto="Segna che l'incontro si è tenuto (o che la questione è comunque chiusa): la riga esce dal registro e resta in cronologia.">✓ Incontro fatto</button>` : ''}</div>`;
 
-    const nuova = gestisce && modo === 'coord' ? `<div style="margin:6px 0 10px"><button type="button" class="btn-primary btn-sm" id="dir-nuova" data-aiuto="Apre il modulo per scrivere una questione che aspetta una decisione del Direttore, della Presidenza o della Commissione. Da quel momento conta i giorni di attesa.">➕ Nuova questione</button><div id="dir-nuova-form"></div></div>` : '';
+    const nuova = apreQuestioni ? `<div style="margin:6px 0 10px"><button type="button" class="btn-primary btn-sm" id="dir-nuova" data-aiuto="${R.direttore && !(R.coord || R.segr) ? 'Apre il modulo per scrivere una questione che aspetta una decisione della Presidenza, della Commissione, della segreteria o del coordinatore. Da quel momento conta i giorni di attesa, e chi decide riceve un avviso.' : 'Apre il modulo per scrivere una questione che aspetta una decisione del Direttore, della Presidenza o della Commissione. Da quel momento conta i giorni di attesa.'}">➕ Nuova questione</button><div id="dir-nuova-form"></div></div>` : '';
 
     /* LE PROPOSTE (25/09/2026, chiesto dall'utente): le task del second brain che
        aspettano il Direttore entrano qui come proposte, che vede SOLO la segreteria.
@@ -459,7 +465,7 @@
         ${proposte.map(rigaProposta).join('')}</details>` : (R.segr && modo === 'coord' ? '<p style="font-size:12px;color:#888;margin:4px 0 10px">📥 Nessuna proposta da spuntare: le task del second brain che aspettano il Direttore arrivano qui tre volte al giorno.</p>' : '');
     const intro = modo === 'coord'
       ? 'Quello che aspetta una decisione di Direttore, Presidenza o Commissione Sicurezza. Le righe <em>automatiche</em> vengono dalle pratiche (autorizzazioni, conferme sui cantieri critici); le altre le scrivete voi. Si ordina per giorni di attesa.'
-      : 'Quello che aspetta una tua decisione, ordinato per giorni di attesa. Le righe <em>automatiche</em> vengono dalle pratiche; le altre le hanno scritte coordinatore e segreteria. Rispondi qui: decidi, oppure rinvia a una data.';
+      : 'Quello che aspetta una tua decisione, ordinato per giorni di attesa. Le righe <em>automatiche</em> vengono dalle pratiche; le altre le hanno scritte coordinatore e segreteria, o le hai aperte tu per altri. Rispondi qui: decidi, oppure rinvia a una data. Le questioni che apri tu le gestisci tu, e quando hanno risposta le prendi in carico.';
     host.innerHTML = `<div class="card" style="border-left:4px solid #e7500f">
       <h3>📋 Questioni in attesa di decisione ${lista.length ? `<span style="color:#b35c00">— ${lista.length} in attesa</span>` : '<span style="color:#2d7a06">— niente in attesa</span>'}</h3>
       <p style="font-size:12.5px;color:#555;margin:0 0 6px">${intro}</p>
@@ -632,23 +638,27 @@
       <label style="font-size:12px;margin-top:6px">Contesto (facoltativo)</label><textarea id="dn-d" rows="3" style="width:100%;box-sizing:border-box" placeholder="Quello che serve sapere per decidere: fatti, numeri, alternative."></textarea>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:6px">
         <div><label style="font-size:12px">Riguarda</label><input id="dn-r" maxlength="120" style="width:100%;box-sizing:border-box" placeholder="impresa, tecnico, pratica…"></div>
-        <div><label style="font-size:12px">Decide</label><select id="dn-dec" style="width:100%"><option value="direttore">Direttore</option><option value="presidenza">Presidenza</option><option value="commissione">Commissione Sicurezza</option></select></div>
+        <div><label style="font-size:12px">Decide</label><select id="dn-dec" style="width:100%">${(R.direttore && !(R.coord || R.segr)
+          ? ['presidenza', 'commissione', 'segreteria', 'coordinatore']
+          : ['direttore', 'presidenza', 'commissione']).map((k) => `<option value="${k}">${esc(DECISORI[k])}</option>`).join('')}</select></div>
         <div><label style="font-size:12px">Priorità</label><select id="dn-p" style="width:100%" data-aiuto="Il grado di priorità della questione: lo decide chi la apre o la gestisce, mai chi deve decidere."><option value="normale">normale</option><option value="alta">alta</option></select></div>
         <div><label style="font-size:12px">Entro il (solo se c'è un termine vero)</label><input type="date" id="dn-e" style="width:100%;box-sizing:border-box"></div>
         <div><label style="font-size:12px">Collegamento (facoltativo)</label><input id="dn-l" style="width:100%;box-sizing:border-box" placeholder="link alla pratica"></div>
       </div>
-      ${R.coord ? '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;margin-top:8px;text-transform:none"><input type="checkbox" id="dn-ris" style="width:auto"> 🔒 Riservata (questione sul personale: la vedono solo Direttore e coordinatore)</label>' : ''}
+      ${R.coord || R.direttore ? '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;margin-top:8px;text-transform:none"><input type="checkbox" id="dn-ris" style="width:auto"> 🔒 Riservata (questione sul personale: la vedono solo Direttore e coordinatore)</label>' : ''}
       <div style="display:flex;gap:8px;margin-top:10px"><button type="button" class="btn-primary btn-sm" id="dn-salva" data-aiuto="Mette la questione nel registro: da oggi conta i giorni di attesa e chi decide la vede nella sua pagina.">Apri la questione</button><button type="button" class="btn-outline btn-sm" id="dn-annulla">Annulla</button></div></div>`;
     $('dn-annulla').addEventListener('click', () => { slot.innerHTML = ''; });
     $('dn-salva').addEventListener('click', (ev) => con(ev.currentTarget, async () => {
       const q = ($('dn-q').value || '').trim();
       if (!q) { avviso('Scrivi la questione.', 'warn'); return; }
+      /* la segreteria le riservate non le vede: una riservata non può aspettare la sua decisione */
+      if ($('dn-ris') && $('dn-ris').checked && $('dn-dec').value === 'segreteria') { avviso('Una questione riservata non può andare alla segreteria, che non la vede: scegli un altro decisore o togli «Riservata».', 'warn'); return; }
       const riga = { questione: q, dettaglio: ($('dn-d').value || '').trim() || null, riguarda: ($('dn-r').value || '').trim() || null,
         decisore: $('dn-dec').value, priorita: $('dn-p').value, entro_il: $('dn-e').value || null, link: ($('dn-l').value || '').trim() || null,
         riservata: !!($('dn-ris') && $('dn-ris').checked) };
       const { error } = await window.sb.from('s_decisioni').insert(riga);
       if (error) throw new Error(error.message);
-      avviso('Questione aperta: da oggi conta i giorni.', 'ok');
+      avviso(['segreteria', 'coordinatore', 'presidenza', 'direttore'].includes(riga.decisore) ? 'Questione aperta: da oggi conta i giorni, e chi decide ha ricevuto un avviso.' : 'Questione aperta: da oggi conta i giorni.', 'ok');
       await decisioniBox(host, modo); dopoCambio();
     }));
   }
