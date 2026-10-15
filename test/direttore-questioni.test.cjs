@@ -17,7 +17,9 @@ prova('segreteria e coordinatore rispondono alle questioni rivolte a loro', () =
 prova('il Direttore apre questioni dalla pagina Direzione e gestisce solo le sue', () => {
   assert.match(src, /const apreQuestioni = !anteprima && \(\(R\.coord \|\| R\.segr\) \? modo === 'coord' : \(R\.direttore && modo === 'direzione'\)\);/);
   assert.match(src, /const gestisceR = \(r\) => gestisce \|\| \(!anteprima && R\.direttore && mia\(r\)\);/);
-  assert.match(src, /const nuova = apreQuestioni \?/);
+  assert.match(src, /const nuova = \(apreQuestioni \?/);
+  assert.match(src, /\) \|\| nuovaAnteprima;/, 'in anteprima «come Direttore» il pulsante si vede, spento');
+  assert.match(src, /righe = righe\.filter\(\(r\) => r\.decisore === come\(\) \|\| \(dirEmail && /, 'in anteprima anche le questioni aperte dal Direttore');
 });
 prova('al Direttore il modulo propone Presidenza, Commissione, segreteria e coordinatore', () => {
   assert.match(src, /\? \['presidenza', 'commissione', 'segreteria', 'coordinatore'\]/);

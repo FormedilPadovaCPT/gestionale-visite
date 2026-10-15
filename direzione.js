@@ -346,7 +346,12 @@
       if (R.direttore || R.coord || R.segr) { try { auto = await inAttesa(); } catch (e) { console.warn('in attesa:', e); } }
       // anteprima «Vedi come…»: le sole questioni di quel ruolo; autorizzazioni e conferme sono del Direttore
       if (modo === 'direzione' && come()) {
-        righe = righe.filter((r) => r.decisore === come());
+        /* (15/10/2026) il Direttore vede anche le questioni che ha aperto lui per altri */
+        let dirEmail = '';
+        if (come() === 'direttore') {
+          try { const { data: c } = await sb.from('s_config').select('valore').eq('chiave', 'direttore_email').maybeSingle(); dirEmail = String((c && c.valore) || '').toLowerCase(); } catch (_e) { dirEmail = ''; }
+        }
+        righe = righe.filter((r) => r.decisore === come() || (dirEmail && String(r.aperta_da || '').toLowerCase() === dirEmail));
         if (come() === 'presidenza') auto = { autorizzazioni: [], critici: [] };
       }
     } catch (e) { errore = e.message || String(e); }
@@ -443,7 +448,11 @@
           <div style="font-size:11.5px;color:#888">${decBadge(r.decisore)} · aperta il ${dIt(r.aperta_il)} da ${esc(r.aperta_da_nome || r.aperta_da)} · <a href="#" data-cron="${r.id}" style="color:#888">cronologia</a></div></div>
         ${gestisceR(r) ? `<button type="button" class="btn-primary btn-sm" data-presa="${r.id}" data-aiuto="Segna che l'incontro si è tenuto (o che la questione è comunque chiusa): la riga esce dal registro e resta in cronologia.">✓ Incontro fatto</button>` : ''}</div>`;
 
-    const nuova = apreQuestioni ? `<div style="margin:6px 0 10px"><button type="button" class="btn-primary btn-sm" id="dir-nuova" data-aiuto="${R.direttore && !(R.coord || R.segr) ? 'Apre il modulo per scrivere una questione che aspetta una decisione della Presidenza, della Commissione, della segreteria o del coordinatore. Da quel momento conta i giorni di attesa, e chi decide riceve un avviso.' : 'Apre il modulo per scrivere una questione che aspetta una decisione del Direttore, della Presidenza o della Commissione. Da quel momento conta i giorni di attesa.'}">➕ Nuova questione</button><div id="dir-nuova-form"></div></div>` : '';
+    /* nell'anteprima «come Direttore» il pulsante si vede, spento: aprire spetta al suo accesso
+       (dalla segreteria la questione risulterebbe aperta da cptpd@) */
+    const nuovaAnteprima = anteprima && come() === 'direttore'
+      ? `<div style="margin:6px 0 10px"><button type="button" class="btn-primary btn-sm" disabled data-aiuto="In anteprima il pulsante è spento: la questione la apre il Direttore col suo accesso, e risulta aperta da lui.">➕ Nuova questione</button> <span style="font-size:11.5px;color:#888">(anteprima: col suo accesso il Direttore apre qui le questioni per Presidenza, Commissione, segreteria o coordinatore)</span></div>` : '';
+    const nuova = (apreQuestioni ? `<div style="margin:6px 0 10px"><button type="button" class="btn-primary btn-sm" id="dir-nuova" data-aiuto="${R.direttore && !(R.coord || R.segr) ? 'Apre il modulo per scrivere una questione che aspetta una decisione della Presidenza, della Commissione, della segreteria o del coordinatore. Da quel momento conta i giorni di attesa, e chi decide riceve un avviso.' : 'Apre il modulo per scrivere una questione che aspetta una decisione del Direttore, della Presidenza o della Commissione. Da quel momento conta i giorni di attesa.'}">➕ Nuova questione</button><div id="dir-nuova-form"></div></div>` : '') || nuovaAnteprima;
 
     /* LE PROPOSTE (25/09/2026, chiesto dall'utente): le task del second brain che
        aspettano il Direttore entrano qui come proposte, che vede SOLO la segreteria.

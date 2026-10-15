@@ -166,7 +166,9 @@ assert.ok(!js.includes('#view-incarichi{order') && !js.includes('#view-scadenze{
 
 /* ── «Vedi come: Presidenza»: solo ciò che è della Presidenza (nell'app vera lo fa il database) ── */
 const dir = fs.readFileSync(path.join(radice, 'direzione.js'), 'utf8');
-assert.ok(/if \(modo === 'direzione' && come\(\)\) \{\s+righe = righe\.filter\(\(r\) => r\.decisore === come\(\)\);\s+if \(come\(\) === 'presidenza'\) auto = \{ autorizzazioni: \[\], critici: \[\] \};/.test(dir), 'nell’anteprima il registro deve mostrare le sole questioni del ruolo guardato, e alla Presidenza niente autorizzazioni né conferme del Direttore');
+// (15/10/2026) per il Direttore valgono anche le questioni aperte da lui (dirEmail); per la Presidenza solo le sue
+assert.ok(/if \(modo === 'direzione' && come\(\)\) \{[\s\S]{0,700}?righe = righe\.filter\(\(r\) => r\.decisore === come\(\) \|\| \(dirEmail && String\(r\.aperta_da \|\| ''\)\.toLowerCase\(\) === dirEmail\)\);\s+if \(come\(\) === 'presidenza'\) auto = \{ autorizzazioni: \[\], critici: \[\] \};/.test(dir)
+  && /let dirEmail = '';\s+if \(come\(\) === 'direttore'\)/.test(dir), 'nell’anteprima il registro deve mostrare le sole questioni del ruolo guardato, e alla Presidenza niente autorizzazioni né conferme del Direttore');
 assert.ok(/const anteprima = modo === 'direzione' && !!come\(\);/.test(dir) && /const gestisce = !anteprima && \(R\.coord \|\| R\.segr\);/.test(dir), 'nell’anteprima non si mostrano i pulsanti di un altro ruolo');
 assert.ok(/if \(!v \|\| !v\.simula \|\| !v\.simula\(\)\) return null;/.test(dir), 'fuori da «Vedi come…» «come» deve essere vuoto: il Direttore e la Presidenza veri hanno la pagina intera, coi pulsanti');
 const fn = dir.match(/function criticiDemandati\(casi, eventi, chi\) \{[\s\S]*?\r?\n  \}/);
