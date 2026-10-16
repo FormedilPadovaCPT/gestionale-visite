@@ -40,6 +40,10 @@ window.AIUTO_TESTI = {
   'fp-cambia': 'Riapre l\'avviso per cambiare il motivo del rientro o la proposta di serie di visite.',
   'fp-serie': 'Con la spunta, nella mail del verbale l\'impresa trova l\'invito a chiedere una serie di visite dal portale dei servizi. La serie poi passa dal Coordinatore e dal Direttore come le altre.',
   't:approvo': 'Approvi il rientro fuori procedura: il tecnico riceve l\'esito. Resta scritto chi ha approvato e quando.',
+  /* visite del mese (visite-mese.js, 16/10/2026) */
+  't:aumenta': 'Alza le visite del mese di questo tecnico: chiede il numero nuovo e il motivo. Cambiano la lettera nel database e la scheda del tecnico; tecnico e segreteria ricevono l\'avviso. Da qui non si torna indietro: per abbassare serve la segreteria.',
+  'vm-prec': 'Mostra le lettere di incarico del mese prima.',
+  'vm-succ': 'Mostra le lettere di incarico del mese dopo.',
   't:non approvo': 'Non approvi il rientro: scrivi il motivo, il tecnico lo riceve. Il verbale all\'impresa resta com\'è; se ne tiene conto nel controllo dei verbali prima della liquidazione.',
   /* ── menu ── */
   'v:dashboard': 'Torna alla pagina iniziale: pulsanti rapidi, avvisi, il tuo obiettivo del mese e la mappa dei cantieri aperti con l\'IPC dell\'ultima visita.',

@@ -1404,6 +1404,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div id="adm-avviso-verbali" style="display:none;margin-bottom:14px"></div>
         <!-- visite fuori procedura: da approvare e quadro per tecnico (fuori-procedura.js, 13/10/2026) -->
         <div id="adm-fuori-procedura" style="display:none;margin-bottom:14px"></div>
+        <!-- visite del mese per tecnico: il Coordinatore le aumenta (visite-mese.js, 16/10/2026) -->
+        <div id="adm-visite-mese" style="display:none;margin-bottom:14px"></div>
 
         <!-- Intervallo cronologico + statistiche -->
         <div class="adm-section">
@@ -6706,7 +6708,7 @@ function _esercizioDa(d){if(!d)return null;const y=+d.slice(0,4),m=+d.slice(5,7)
 // in monitoraggio. Contatori, grafici e tabelle sono nella scheda Statistiche (loadStat).
 async function loadDash(){
   // card obiettivo mensile (non blocca la dashboard se fallisce)
-  loadTargetCard&&loadTargetCard().catch(e=>console.warn('loadTargetCard:',e))
+  loadTargetCard&&loadTargetCard().then(()=>window.VisiteMese&&window.VisiteMese.rigaScheda()).catch(e=>console.warn('loadTargetCard:',e))
   loadAvvisi&&loadAvvisi().catch(e=>console.warn('loadAvvisi:',e))
   loadIncarichi&&loadIncarichi().catch(e=>console.warn('loadIncarichi:',e))
   _incApertiCache=null
@@ -16546,6 +16548,8 @@ document.addEventListener('input',function(ev){
 <script src="esito-incarico.js?v=2"></script>
 <!-- visite fuori procedura: avviso al tecnico, motivo, decisione del Coordinatore (13/10/2026) -->
 <script src="fuori-procedura.js?v=2"></script>
+<!-- visite del mese: il Coordinatore le aumenta, con motivo e avvisi (16/10/2026) -->
+<script src="visite-mese.js?v=1"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
