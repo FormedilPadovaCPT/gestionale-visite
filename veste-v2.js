@@ -1169,7 +1169,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     pillole('v2-pill-rub', riga, [...sel.options].map((o) => [o.value, o.value ? o.textContent : 'Tutti']), sel.value, (v) => { sel.value = v; sel.dispatchEvent(new Event('change')); pilloleRubrica(); });
   }
   const GRUPPI_STAT = [
-    ['attivita', 'Attività', ['Visite per esercizio', 'Attività mensile', 'Sopralluoghi per tecnico', 'Produttività', 'Affiancamento', 'Tipologia di visita']],
+    ['attivita', 'Attività', ['Visite per esercizio', 'Attività mensile', 'Sopralluoghi per tecnico', 'Produttività', 'Affiancamento', 'Tipologia di visita', 'Gradimento']],
     ['rischio', 'Rischio', ['IPC', 'NC+', 'Imprese ricorrenti', 'Ruolo impresa', 'Iscrizione', 'inadempienze']],
     ['territorio', 'Territorio e cantieri', ['Top 20 comuni', 'Tipo di intervento', 'Tipologia di opera', 'Importo']],
   ];

@@ -1333,6 +1333,12 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="card"><h3>Andamento dell'IPC mese per mese <span style="font-weight:400;color:#888;font-size:12px">(colonne: visite per IPC · linea: % alto + medio)</span></h3><div class="chbox" style="height:240px"><canvas id="ch-ipcmesi"></canvas></div></div>
         <div class="card"><h3>IPC secondo l'iscrizione alla Cassa Edile <span style="font-weight:400;color:#888;font-size:12px">(impresa principale, dalla lista della Cassa Edile)</span></h3><div class="chbox" style="height:240px"><canvas id="ch-ipcceiv"></canvas></div></div>
       </div>
+      <div id="grad-kpi" class="card" style="padding:10px 14px;font-size:13px;color:#565c66"><h3 style="margin:0 0 4px">Gradimento delle visite <span style="font-weight:400;color:#888;font-size:12px">(questionari del portale, solo i totali)</span></h3><div id="grad-kpi-testo">Carico…</div></div>
+      <div class="dash-row-3">
+        <div class="card"><h3>Gradimento — quanto è stata utile</h3><div class="chbox" style="height:220px"><canvas id="ch-grad-utilita"></canvas></div></div>
+        <div class="card"><h3>Gradimento — che cosa ha contato</h3><div class="chbox" style="height:220px"><canvas id="ch-grad-motivi"></canvas></div></div>
+        <div class="card"><h3>Gradimento — dopo la visita</h3><div class="chbox" style="height:220px"><canvas id="ch-grad-azione"></canvas></div></div>
+      </div>
       <div class="card"><h3>Le inadempienze più frequenti <span style="font-weight:400;color:#888;font-size:12px">(voci della check-list con NC+ o NC−)</span></h3><div id="tbl-voci" style="overflow-x:auto"></div></div>
       <div class="card"><h3>Imprese ricorrenti — cantieri da monitorare</h3><div id="tbl-imprese" style="overflow-x:auto"></div></div>
       <div class="dash-row-2">
@@ -6862,6 +6868,7 @@ function applyDashFilters(){
   _dashRenderIpcCeiv(F)
   _dashRenderMacro(fE,fT,fTy,fI)
   _dashRenderVoci(fE,fT,fTy,fI)
+  _dashRenderGradimento(fE,fT,fTy,fI)
   _dashLoadVer(fE,fT,fTy,fI,F)
   if($('fd-count'))$('fd-count').textContent=F.length+' sopralluoghi mostrati su '+((_dashLite&&_dashLite.length)||_dashRaw.length)+' totali'+(_dashScopeAll?'':' · caricato solo l\'esercizio corrente')
   if($('dash-upd'))$('dash-upd').textContent=F.length+' sopralluoghi · agg. '+new Date().toLocaleDateString('it-IT')+', '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})
@@ -7099,6 +7106,45 @@ async function _dashRenderVoci(fE,fT,fTy,fI){
   ;(data||[]).forEach((r,i)=>{h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px;color:#bbb">'+(i+1)+'</td><td><b>'+esc_(r.descrizione||r.codice)+'</b> <span style="color:#aaa;font-size:11px">'+esc_(r.codice)+'</span></td><td style="color:#565c66">'+esc_(_DASH_MACRO[r.zona]||'')+'</td><td><b style="color:'+(r.nc_plus>0?'#E02B20':'#bbb')+'">'+r.nc_plus+'</b></td><td style="color:'+(r.nc_minus>0?'#ED7D31':'#bbb')+'">'+r.nc_minus+'</td><td>'+r.visite+'</td></tr>'})
   if(!(data||[]).length)h+='<tr><td colspan="6" style="padding:8px;color:#999">Nessuna voce con NC+ o NC\u2212 nel filtro corrente.</td></tr>'
   h+='</tbody></table>';el.innerHTML=h
+}
+/* ── Gradimento delle visite (19/10/2026, chiesto dall'utente) ──
+   Dai questionari del portale (s_questionari_sopralluogo) attraverso dash_questionari, che dà
+   SOLO TOTALI: niente commenti né nomi. Voci e ordine sono quelli del modulo del portale. */
+const GRAD_UTILITA=['Per niente','Poco','Così così','Utile','Molto']
+const GRAD_MOTIVI_SI=['Ci ha mostrato un rischio','Consigli pratici','Chiarezza sulle norme','Il confronto con il tecnico','La conferma che siamo a posto']
+const GRAD_MOTIVI_NO=['Non era chiaro perché eravate lì','Consigli non applicabili da noi','Troppo poco tempo','Solo adempimenti, niente di utile','Avevamo altro da fare']
+const GRAD_AZIONE=['Sì, subito','Lo abbiamo messo in programma','No, non serviva: eravamo a posto','No, non sappiamo come farlo']
+function gradimentoDati(r){
+  r=r||{}
+  const u=r.utilita||{},m=Object.assign({},r.motivi||{}),a=Object.assign({},r.azione||{})
+  const motivi=[...GRAD_MOTIVI_SI.map(l=>({label:l,n:+m[l]||0,positivo:true})),...GRAD_MOTIVI_NO.map(l=>({label:l,n:+m[l]||0,positivo:false}))]
+  ;[...GRAD_MOTIVI_SI,...GRAD_MOTIVI_NO].forEach(l=>{delete m[l]})
+  Object.keys(m).forEach(l=>motivi.push({label:l,n:+m[l]||0,positivo:null}))   // una voce che il modulo non ha più: si conta lo stesso
+  const azione=GRAD_AZIONE.map(l=>({label:l,n:+a[l]||0}))
+  GRAD_AZIONE.forEach(l=>{delete a[l]});Object.keys(a).forEach(l=>azione.push({label:l,n:+a[l]||0}))
+  const ricevuti=+r.ricevuti||0,vp=+r.visite_periodo||0,vc=+r.visite_con_questionario||0
+  const media=r.media==null?null:Math.round(+r.media*10)/10
+  const testo=ricevuti
+    ?ricevuti+' questionari ricevuti'+(vp?' · '+vc+' visite con almeno un questionario su '+vp+' ('+String(Math.round(vc/vp*1000)/10).replace('.',',')+'%)':'')+(media!=null?' · utilità media '+String(media).replace('.',',')+' su 5':'')
+    :'Nessun questionario di gradimento nel filtro corrente.'
+  return{utilita:[1,2,3,4,5].map(k=>+u[k]||0),motivi:motivi.filter(x=>x.n>0),azione:azione.filter(x=>x.n>0),ricevuti,testo,pochi:ricevuti>0&&ricevuti<10}
+}
+/* etichette lunghe su più righe: nelle schede strette Chart.js le taglierebbe */
+function _aCapo(t,max){const out=[];let r='';String(t||'').split(' ').forEach(w=>{if(r&&(r+' '+w).length>max){out.push(r);r=w}else r=r?r+' '+w:w});if(r)out.push(r);return out}
+async function _dashRenderGradimento(fE,fT,fTy,fI){
+  const el=$('grad-kpi-testo');if(!el)return
+  let da=null,a=null
+  if(fE){const y=+fE.slice(0,4);da=y+'-10-01';a=(y+1)+'-09-30'}
+  let data=null,err=null
+  try{const r=await sb.rpc('dash_questionari',{p_da:da,p_a:a,p_tecnico:fT||null,p_tipo:fTy?+fTy:null,p_ipc:fI||null});data=r.data;err=r.error}catch(e){err=e}
+  /* una lettura fallita non è «nessun questionario» */
+  if(err){el.innerHTML='<span style="color:#c0392b">\u26a0 Non sono riuscito a leggere i questionari di gradimento: riprova.</span>';console.warn('dash_questionari:',err);['ch-grad-utilita','ch-grad-motivi','ch-grad-azione'].forEach(id=>{if(_dashCharts[id]){_dashCharts[id].destroy();delete _dashCharts[id]}});return}
+  const g=gradimentoDati(data)
+  el.innerHTML=g.testo+(g.pochi?' <span style="color:#888">— sono pochi: i numeri dicono ancora poco.</span>':'')
+  const colU=['#E02B20','#ED7D31','#FFC000','#95C22F','#5f8f14']
+  _mkChart('ch-grad-utilita',{type:'bar',plugins:[datalabelPlugin],data:{labels:GRAD_UTILITA,datasets:[{data:g.utilita,backgroundColor:colU,borderRadius:3}]},options:{layout:{padding:{top:16}},plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}})
+  _mkChart('ch-grad-motivi',{type:'bar',data:{labels:g.motivi.map(x=>_aCapo(x.label,20)),datasets:[{data:g.motivi.map(x=>x.n),backgroundColor:g.motivi.map(x=>x.positivo===false?'#E02B20':(x.positivo?'#95C22F':'#a9afb8')),borderRadius:3}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}})
+  _mkChart('ch-grad-azione',{type:'bar',data:{labels:g.azione.map(x=>_aCapo(x.label,18)),datasets:[{data:g.azione.map(x=>x.n),backgroundColor:_DASH_C.orange,borderRadius:3}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}}})
 }
 /* le voci con più NC+ e NC− dalle check-list già lette dal Report visite (stesso ordine di dash_voci_nc) */
 function rptVociNc(chkAll,info,limite){
@@ -11943,6 +11989,26 @@ async function admGeneraReport(){
         title:'IPC secondo l\u2019iscrizione alla Cassa Edile dell\u2019impresa (lista della Cassa Edile)',segLabels:ipcEtich,segColors:ipcColori,w:640,h:125})
       chartCard(pcImg,M,y,CW,37);y+=41
     }
+    /* gradimento delle visite (19/10/2026): solo totali, dalla stessa funzione della pagina Statistiche.
+       Sono numeri che diventano ufficiali: se la lettura fallisce il report non esce */
+    const{data:gradRaw,error:eGrad}=await sb.rpc('dash_questionari',{p_da:dal,p_a:al,p_tecnico:null,p_tipo:null,p_ipc:null})
+    if(eGrad)throw new Error('non sono riuscito a leggere i questionari di gradimento ('+eGrad.message+'): il report non e\u2019 stato generato')
+    const grad=gradimentoDati(gradRaw)
+    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(43,47,54)
+    doc.text('Gradimento delle visite (questionari del portale)',M,y+4)
+    doc.setFillColor(231,80,15);doc.rect(M,y+6.2,11,0.9,'F')
+    doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(86,92,102)
+    doc.text(grad.testo+(grad.pochi?' \u2014 sono pochi: i numeri dicono ancora poco.':''),M,y+11,{maxWidth:CW})
+    y+=14
+    if(grad.ricevuti){
+      const guImg=rptBar({data:grad.utilita,labels:GRAD_UTILITA,colors:['#E02B20','#ED7D31','#FFC000','#95C22F','#5f8f14'],title:'Quanto \u00e8 stata utile la visita',w:400,h:175})
+      chartCard(guImg,M,y,half,40)
+      if(grad.motivi.length){
+        const gmImg=rptBar({data:grad.motivi.map(x=>x.n),labels:grad.motivi.map(x=>x.label),colors:grad.motivi.map(x=>x.positivo===false?'#E02B20':'#95C22F'),title:'Che cosa ha contato (verde: servito \u00b7 rosso: non ha funzionato)',w:400,h:175})
+        chartCard(gmImg,M+half+4,y,half,40)
+      }
+      y+=44
+    }
     const voceInfo={};(voceRows||[]).forEach(v=>{voceInfo[v.codice]={descrizione:v.descrizione,zona:v.zona_osserv}})
     const topVoci=rptVociNc(chkAll,voceInfo,10)
     doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(43,47,54)
@@ -16766,7 +16832,7 @@ document.addEventListener('input',function(ev){
 <script src="formazione-corsi.js?v=1"></script>
 <script src="formazione-docente.js?v=3"></script>
 <script src="rientri-giorni.js?v=6"></script>
-<script src="veste-v2.js?v=42"></script>
+<script src="veste-v2.js?v=43"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
