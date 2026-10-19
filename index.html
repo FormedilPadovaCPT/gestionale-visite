@@ -1329,6 +1329,11 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div class="card"><h3>IPC per n° accesso al cantiere</h3><div class="chbox" style="height:240px"><canvas id="ch-accesso"></canvas></div></div>
         <div class="card"><h3>NC+ / NC− / OSS per macroarea (10 aree) <span style="font-weight:400;font-size:11px;color:#999">· clic sui numeri per l'elenco cantieri</span></h3><div id="tbl-macro" style="overflow-x:auto;max-height:265px;overflow-y:auto"></div></div>
       </div>
+      <div class="dash-row-2">
+        <div class="card"><h3>Andamento dell'IPC mese per mese <span style="font-weight:400;color:#888;font-size:12px">(colonne: visite per IPC · linea: % alto + medio)</span></h3><div class="chbox" style="height:240px"><canvas id="ch-ipcmesi"></canvas></div></div>
+        <div class="card"><h3>IPC secondo l'iscrizione alla Cassa Edile <span style="font-weight:400;color:#888;font-size:12px">(impresa principale, dalla lista della Cassa Edile)</span></h3><div class="chbox" style="height:240px"><canvas id="ch-ipcceiv"></canvas></div></div>
+      </div>
+      <div class="card"><h3>Le inadempienze più frequenti <span style="font-weight:400;color:#888;font-size:12px">(voci della check-list con NC+ o NC−)</span></h3><div id="tbl-voci" style="overflow-x:auto"></div></div>
       <div class="card"><h3>Imprese ricorrenti — cantieri da monitorare</h3><div id="tbl-imprese" style="overflow-x:auto"></div></div>
       <div class="dash-row-2">
         <div class="card"><h3>Ruolo impresa visitata</h3><div class="chbox" style="height:260px"><canvas id="ch-ruolo"></canvas></div></div>
@@ -6853,7 +6858,10 @@ function applyDashFilters(){
   _dashRenderTipOpe(F)
   _dashRenderImporto(F)
   _dashRenderCeiv(F)
+  _dashRenderIpcMesi(F)
+  _dashRenderIpcCeiv(F)
   _dashRenderMacro(fE,fT,fTy,fI)
+  _dashRenderVoci(fE,fT,fTy,fI)
   _dashLoadVer(fE,fT,fTy,fI,F)
   if($('fd-count'))$('fd-count').textContent=F.length+' sopralluoghi mostrati su '+((_dashLite&&_dashLite.length)||_dashRaw.length)+' totali'+(_dashScopeAll?'':' · caricato solo l\'esercizio corrente')
   if($('dash-upd'))$('dash-upd').textContent=F.length+' sopralluoghi · agg. '+new Date().toLocaleDateString('it-IT')+', '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})
@@ -7039,6 +7047,66 @@ function _dashRenderImporto(F){
   _mkChart('ch-importo',{type:'bar',data:{labels:L,datasets:[{data:L.map(l=>m[l]),backgroundColor:_DASH_C.orange,borderRadius:3}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}})
 }
 
+/* ── 19/10/2026, chiesti dall'utente: tre grafici che le statistiche non avevano ──
+   (1) l'IPC secondo l'iscrizione alla Cassa Edile dell'impresa principale (stessa regola di
+   ceivStat: attiva, sospesa, non C.E.I.V.); (2) le inadempienze più frequenti, voce per voce
+   della check-list (dash_voci_nc, gemella di dash_macroaree); (3) l'andamento dell'IPC mese per
+   mese. Le due funzioni di conteggio servono alla pagina e al Report visite: una regola sola.
+   Righe: {data:'aaaa-mm-gg', ipc:'ALTO'|'MEDIO'|'BASSO'|'NR', ceiv:<classe di ceivStat>} */
+function ipcPerMese(F){
+  const m={}
+  ;(F||[]).forEach(x=>{if(!x.data)return;const k=String(x.data).slice(0,7);(m[k]=m[k]||{NR:0,BASSO:0,MEDIO:0,ALTO:0})[x.ipc]++})
+  return Object.keys(m).sort().map(k=>{const c=m[k],n=c.NR+c.BASSO+c.MEDIO+c.ALTO
+    return{mese:k,NR:c.NR,BASSO:c.BASSO,MEDIO:c.MEDIO,ALTO:c.ALTO,n,pctAM:n?Math.round((c.ALTO+c.MEDIO)/n*1000)/10:0}})
+}
+function ipcPerCeiv(F){
+  const m={}
+  ;(F||[]).forEach(x=>{const k=x.ceiv||CEIV_STAT_ORD[2];(m[k]=m[k]||{NR:0,BASSO:0,MEDIO:0,ALTO:0})[x.ipc]++})
+  return CEIV_STAT_ORD.filter(k=>m[k]).map(k=>{const c=m[k],n=c.NR+c.BASSO+c.MEDIO+c.ALTO
+    return{classe:k,NR:c.NR,BASSO:c.BASSO,MEDIO:c.MEDIO,ALTO:c.ALTO,n,pctAM:n?Math.round((c.ALTO+c.MEDIO)/n*1000)/10:0}})
+}
+const _maiuscola=t=>String(t||'').charAt(0).toUpperCase()+String(t||'').slice(1)
+const _IPC_SERIE=[['Nessun Rilievo','NR','nr'],['Basso','BASSO','basso'],['Medio','MEDIO','medio'],['Alto','ALTO','alto']]
+function _dashRenderIpcMesi(F){
+  const r=ipcPerMese(F)
+  const N=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
+  const L=r.map(x=>{const p=x.mese.split('-');return N[+p[1]-1]+' '+p[0].slice(2)})
+  _mkChart('ch-ipcmesi',{type:'bar',data:{labels:L,datasets:[
+    ..._IPC_SERIE.map(([lb,k,c])=>({label:lb,data:r.map(x=>x[k]),backgroundColor:_DASH_C[c],stack:'ipc',order:2})),
+    {type:'line',label:'% alto + medio',data:r.map(x=>x.pctAM),yAxisID:'y1',borderColor:'#2b2f36',backgroundColor:'#2b2f36',tension:.3,pointRadius:3,order:1}]},
+    options:{plugins:{legend:{position:'top',labels:{boxWidth:12,font:{size:11}}},tooltip:{callbacks:{label(c){return c.dataset.yAxisID==='y1'?' IPC alto + medio: '+c.raw+'% di '+r[c.dataIndex].n+' visite':' '+c.dataset.label+': '+c.raw}}}},
+      scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'visite'}},y1:{position:'right',min:0,max:100,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}})
+}
+function _dashRenderIpcCeiv(F){
+  const r=ipcPerCeiv(F)
+  const L=r.map(x=>[_maiuscola(x.classe.replace('C.E.I.V. \u2013 ','')),x.n+' visite \u00b7 alto+medio '+x.pctAM+'%'])
+  const pct=(x,k)=>x.n?Math.round(x[k]/x.n*1000)/10:0
+  _mkChart('ch-ipcceiv',{type:'bar',data:{labels:L,datasets:_IPC_SERIE.map(([lb,k,c])=>({label:lb,data:r.map(x=>pct(x,k)),backgroundColor:_DASH_C[c]}))},
+    options:{indexAxis:'y',plugins:{legend:{position:'top',labels:{boxWidth:12,font:{size:11}}},tooltip:{callbacks:{label(c){const x=r[c.dataIndex],k=_IPC_SERIE[c.datasetIndex][1];return' '+c.dataset.label+': '+x[k]+' visite ('+c.raw+'%)'}}}},
+      scales:{x:{stacked:true,min:0,max:100,ticks:{callback:v=>v+'%'}},y:{stacked:true}}}})
+}
+async function _dashRenderVoci(fE,fT,fTy,fI){
+  const el=$('tbl-voci');if(!el)return
+  let da=null,a=null
+  if(fE){const y=+fE.slice(0,4);da=y+'-10-01';a=(y+1)+'-09-30'}
+  el.innerHTML='<div style="color:#999;font-size:12px">Carico…</div>'
+  let data=null,err=null
+  try{const r=await sb.rpc('dash_voci_nc',{p_da:da,p_a:a,p_tecnico:fT||null,p_tipo:fTy?+fTy:null,p_ipc:fI||null,p_limite:10});data=r.data;err=r.error}catch(e){err=e}
+  /* una lettura fallita non è «nessuna inadempienza»: lo si dice */
+  if(err){el.innerHTML='<div style="color:#c0392b;font-size:12px">\u26a0 Non sono riuscito a leggere le inadempienze: riprova.</div>';console.warn('dash_voci_nc:',err);return}
+  const esc_=t=>String(t==null?'':t).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]))
+  let h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee;color:#565c66"><th style="padding:6px 8px">#</th><th>Voce della check-list</th><th>Macroarea</th><th title="Non conformità rilevanti">NC+</th><th title="Non conformità lievi">NC\u2212</th><th title="Visite in cui la voce è risultata non conforme">Visite</th></tr></thead><tbody>'
+  ;(data||[]).forEach((r,i)=>{h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 8px;color:#bbb">'+(i+1)+'</td><td><b>'+esc_(r.descrizione||r.codice)+'</b> <span style="color:#aaa;font-size:11px">'+esc_(r.codice)+'</span></td><td style="color:#565c66">'+esc_(_DASH_MACRO[r.zona]||'')+'</td><td><b style="color:'+(r.nc_plus>0?'#E02B20':'#bbb')+'">'+r.nc_plus+'</b></td><td style="color:'+(r.nc_minus>0?'#ED7D31':'#bbb')+'">'+r.nc_minus+'</td><td>'+r.visite+'</td></tr>'})
+  if(!(data||[]).length)h+='<tr><td colspan="6" style="padding:8px;color:#999">Nessuna voce con NC+ o NC\u2212 nel filtro corrente.</td></tr>'
+  h+='</tbody></table>';el.innerHTML=h
+}
+/* le voci con più NC+ e NC− dalle check-list già lette dal Report visite (stesso ordine di dash_voci_nc) */
+function rptVociNc(chkAll,info,limite){
+  const m={}
+  ;(chkAll||[]).forEach(c=>{if(c.valore!=='NC+'&&c.valore!=='NC-')return;const r=m[c.codice]=m[c.codice]||{codice:c.codice,ncp:0,ncm:0,vis:new Set()};if(c.valore==='NC+')r.ncp++;else r.ncm++;r.vis.add(c.visita_id)})
+  return Object.values(m).map(r=>({codice:r.codice,descrizione:(info[r.codice]&&info[r.codice].descrizione)||r.codice,zona:(info[r.codice]&&info[r.codice].zona)||null,ncp:r.ncp,ncm:r.ncm,visite:r.vis.size}))
+    .sort((a,b)=>(b.ncp+b.ncm)-(a.ncp+a.ncm)||b.ncp-a.ncp||String(a.codice).localeCompare(String(b.codice))).slice(0,limite||10)
+}
 function _dashRenderCeiv(F){
   const m=_grp(F,x=>x.ceiv);const L=CEIV_STAT_ORD.filter(l=>m[l]);const tot=F.length||1
   const _ceivCol=(lb,i)=>CEIV_STAT_COL[lb]||_DASH_PIE[i%_DASH_PIE.length]
@@ -11099,7 +11167,7 @@ function rptBar({data,labels,colors,title,w=460,h}){
 function rptStackedCols({cols,segColors,segLabels,title,w=400,h=280}){
   const{canvas,ctx}=_mkCanvas(w,h)
   const padT=_rptTitle(ctx,title,w)+12
-  const padL=34,padR=10,padB=40
+  const padL=34,padR=10,padB=cols.some(c=>c.nota)?50:40
   const n=cols.length||1
   const ph=h-padT-padB,pw=w-padL-padR
   const tot=c=>c.segs.reduce((a,x)=>a+(x||0),0)
@@ -11126,9 +11194,44 @@ function rptStackedCols({cols,segColors,segLabels,title,w=400,h=280}){
     if(t){ctx.fillStyle=RPT_INK;ctx.font='bold 9px Arial';ctx.textAlign='center';ctx.fillText(String(t),x+bw/2,padT+ph-base-4)}
     ctx.fillStyle='#565c66';ctx.font='9px Arial';ctx.textAlign='center'
     ctx.fillText(String(c.label||''),x+bw/2,padT+ph+13)
+    if(c.nota){ctx.fillStyle=RPT_ORANGE;ctx.font='bold 8.5px Arial';ctx.fillText(String(c.nota),x+bw/2,padT+ph+24)}
   })
   let lx=padL
   const ly=h-10
+  ctx.font='8.5px Arial';ctx.textAlign='left'
+  segLabels.forEach((sl,si)=>{
+    ctx.fillStyle=segColors[si];ctx.fillRect(lx,ly-7,8,8)
+    ctx.fillStyle='#565c66';ctx.fillText(sl,lx+11,ly)
+    lx+=11+ctx.measureText(sl).width+14
+  })
+  return canvas.toDataURL()
+}
+/* Barre orizzontali al 100% (19/10/2026): per confrontare gruppi di dimensioni diverse, come
+   le visite a imprese iscritte e non iscritte alla Cassa. rows=[{label,segs:[…],nota}] → dataURL */
+function rptPercentBars({rows,segColors,segLabels,title,w=640,h=150}){
+  const{canvas,ctx}=_mkCanvas(w,h)
+  const padT=_rptTitle(ctx,title,w)+4
+  const padL=170,padR=110,padB=22
+  const n=rows.length||1
+  const gap=6,barH=Math.max(8,Math.min(20,(h-padT-padB-gap*(n-1))/n))
+  const bw=w-padL-padR
+  rows.forEach((r,i)=>{
+    const y=padT+i*(barH+gap)
+    const tot=r.segs.reduce((a,x)=>a+(x||0),0)||1
+    let x=padL
+    r.segs.forEach((v,si)=>{
+      if(!v)return
+      const len=bw*v/tot
+      ctx.fillStyle=segColors[si];ctx.fillRect(x,y,len,barH)
+      if(len>22){ctx.fillStyle=si>=2?'#fff':'#2b2f36';ctx.font='bold 8px Arial';ctx.textAlign='center';ctx.fillText(Math.round(v/tot*100)+'%',x+len/2,y+barH/2+3)}
+      x+=len
+    })
+    ctx.fillStyle='#565c66';ctx.font='9px Arial';ctx.textAlign='right'
+    ctx.fillText(String(r.label||'').substring(0,34),padL-6,y+barH/2+3.3)
+    if(r.nota){ctx.fillStyle=RPT_INK;ctx.font='bold 9px Arial';ctx.textAlign='left';ctx.fillText(String(r.nota),padL+bw+6,y+barH/2+3.3)}
+  })
+  let lx=padL
+  const ly=h-6
   ctx.font='8.5px Arial';ctx.textAlign='left'
   segLabels.forEach((sl,si)=>{
     ctx.fillStyle=segColors[si];ctx.fillRect(lx,ly-7,8,8)
@@ -11331,7 +11434,7 @@ async function admGeneraReport(){
 
     // ── 2. Mapping codice-prefix → zona_osserv da checklist_voci ──
     // Le prime 3 lettere del codice identificano la macro area (IMP, SOL, ASU, ...)
-    const{data:voceRows,error:eVoci}=await sb.from('checklist_voci').select('codice,zona_osserv')
+    const{data:voceRows,error:eVoci}=await sb.from('checklist_voci').select('codice,zona_osserv,descrizione')
     if(eVoci)throw new Error('non sono riuscito a leggere le voci della checklist ('+eVoci.message+')')
     const prefToZone={}
     ;(voceRows||[]).forEach(v=>{
@@ -11820,6 +11923,43 @@ async function admGeneraReport(){
     }
 
     footer(5)
+
+    // ════ PAGINA 6 – IPC: andamento, iscrizione alla Cassa, inadempienze più frequenti (19/10/2026) ════
+    doc.addPage()
+    rptPageHeader(doc,'IPC NEL TEMPO, CASSA EDILE, INADEMPIENZE',dalFmt,alFmt,notaVecchio)
+    y=28
+    const ipcNorm=v=>(['ALTO','MEDIO','BASSO'].indexOf(v.ipc)>=0?v.ipc:'NR')
+    const ipcColori=['#95C22F','#FFC000','#ED7D31','#E02B20'],ipcEtich=['Nessun Rilievo','Basso','Medio','Alto']
+    const meseLbl=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
+    const andam=ipcPerMese(visite.map(v=>({data:v.data_visita,ipc:ipcNorm(v)})))
+    if(andam.length){
+      const anImg=rptStackedCols({cols:andam.map(x=>{const q=x.mese.split('-');return{label:meseLbl[+q[1]-1]+' '+q[0].slice(2),segs:[x.NR,x.BASSO,x.MEDIO,x.ALTO],nota:x.pctAM+'%'}}),
+        title:'Andamento dell\u2019IPC mese per mese (sotto ogni mese: % di visite con IPC alto + medio)',segLabels:ipcEtich,segColors:ipcColori,w:640,h:230})
+      chartCard(anImg,M,y,CW,66);y+=70
+    }
+    const perCassa=ipcPerCeiv(visite.map(v=>({ceiv:ceivStat(v.imprese),ipc:ipcNorm(v)})))
+    if(perCassa.length){
+      const pcImg=rptPercentBars({rows:perCassa.map(x=>({label:_maiuscola(x.classe.replace('C.E.I.V. \u2013 ',''))+' ('+x.n+')',segs:[x.NR,x.BASSO,x.MEDIO,x.ALTO],nota:'alto+medio '+x.pctAM+'%'})),
+        title:'IPC secondo l\u2019iscrizione alla Cassa Edile dell\u2019impresa (lista della Cassa Edile)',segLabels:ipcEtich,segColors:ipcColori,w:640,h:125})
+      chartCard(pcImg,M,y,CW,37);y+=41
+    }
+    const voceInfo={};(voceRows||[]).forEach(v=>{voceInfo[v.codice]={descrizione:v.descrizione,zona:v.zona_osserv}})
+    const topVoci=rptVociNc(chkAll,voceInfo,10)
+    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(43,47,54)
+    doc.text('Le inadempienze pi\u00f9 frequenti',M,y+4)
+    doc.setFillColor(231,80,15);doc.rect(M,y+6.2,11,0.9,'F')
+    y+=10
+    doc.autoTable(Object.assign({},rptTblStyle,{
+      startY:y,
+      head:[['#','Voce della check-list','Macro area','NC+','NC-','Visite']],
+      pageBreak:'avoid',
+      body:topVoci.length?topVoci.map((r,i)=>[i+1,r.descrizione,(r.zona&&ZONE_LBL[r.zona])||'',r.ncp,r.ncm,r.visite]):[['','Nessuna voce con NC+ o NC- nel periodo','','','','']],
+      columnStyles:{0:{cellWidth:8,halign:'right'},3:{halign:'right',cellWidth:14,textColor:[224,43,32],fontStyle:'bold'},4:{halign:'right',cellWidth:14,textColor:[210,110,40]},5:{halign:'right',cellWidth:16}},
+      margin:{left:M,right:M}
+    }))
+    doc.setFontSize(7.5);doc.setFont('helvetica','italic');doc.setTextColor(150,155,162)
+    doc.text('NC+ = non conformit\u00e0 rilevante \u00b7 NC- = non conformit\u00e0 lieve \u00b7 Visite = visite in cui la voce \u00e8 risultata non conforme.',M,doc.lastAutoTable.finalY+4.5)
+    footer(6)
 
     // ── Salva ──
     const fname=`Report_Visite_${dal}_${al}${vecchio?'_vecchio-parametro':''}.pdf`
@@ -16626,7 +16766,7 @@ document.addEventListener('input',function(ev){
 <script src="formazione-corsi.js?v=1"></script>
 <script src="formazione-docente.js?v=3"></script>
 <script src="rientri-giorni.js?v=6"></script>
-<script src="veste-v2.js?v=41"></script>
+<script src="veste-v2.js?v=42"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

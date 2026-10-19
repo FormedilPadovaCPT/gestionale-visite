@@ -1170,7 +1170,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
   }
   const GRUPPI_STAT = [
     ['attivita', 'Attività', ['Visite per esercizio', 'Attività mensile', 'Sopralluoghi per tecnico', 'Produttività', 'Affiancamento', 'Tipologia di visita']],
-    ['rischio', 'Rischio', ['IPC', 'NC+', 'Imprese ricorrenti', 'Ruolo impresa', 'Iscrizione']],
+    ['rischio', 'Rischio', ['IPC', 'NC+', 'Imprese ricorrenti', 'Ruolo impresa', 'Iscrizione', 'inadempienze']],
     ['territorio', 'Territorio e cantieri', ['Top 20 comuni', 'Tipo di intervento', 'Tipologia di opera', 'Importo']],
   ];
   const gruppoStat = (titolo) => { const g = GRUPPI_STAT.find((x) => x[2].some((c) => String(titolo || '').includes(c))); return g ? g[0] : ''; };
