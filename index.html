@@ -11093,6 +11093,50 @@ function rptBar({data,labels,colors,title,w=460,h}){
   })
   return canvas.toDataURL()
 }
+/* Colonne impilate col totale in cima e la legenda sotto (19/10/2026): è il grafico
+   «IPC per n° accesso al cantiere» della pagina Statistiche, portato nel report.
+   cols = [{label, segs:[…]}], un segmento per colore. → dataURL */
+function rptStackedCols({cols,segColors,segLabels,title,w=400,h=280}){
+  const{canvas,ctx}=_mkCanvas(w,h)
+  const padT=_rptTitle(ctx,title,w)+12
+  const padL=34,padR=10,padB=40
+  const n=cols.length||1
+  const ph=h-padT-padB,pw=w-padL-padR
+  const tot=c=>c.segs.reduce((a,x)=>a+(x||0),0)
+  const raw=Math.max(...cols.map(tot),1)
+  const step=Math.max(1,Math.ceil(raw/4/Math.pow(10,Math.floor(Math.log10(raw/4||1))))*Math.pow(10,Math.floor(Math.log10(raw/4||1))))
+  const ymax=step*Math.ceil(raw/step)
+  ctx.lineWidth=1;ctx.font='8.5px Arial';ctx.textAlign='right'
+  for(let v=0;v<=ymax;v+=step){
+    const gy=padT+ph-ph*v/ymax
+    ctx.strokeStyle=v?RPT_GRID:RPT_AXIS;ctx.beginPath();ctx.moveTo(padL,gy);ctx.lineTo(padL+pw,gy);ctx.stroke()
+    ctx.fillStyle='#8a8f96';ctx.fillText(String(v),padL-4,gy+3)
+  }
+  const slot=pw/n,bw=Math.min(46,slot*.6)
+  cols.forEach((c,i)=>{
+    const x=padL+i*slot+(slot-bw)/2
+    let base=0
+    c.segs.forEach((v,si)=>{
+      if(!v)return
+      const bh=ph*v/ymax
+      ctx.fillStyle=segColors[si];ctx.fillRect(x,padT+ph-base-bh,bw,bh)
+      base+=bh
+    })
+    const t=tot(c)
+    if(t){ctx.fillStyle=RPT_INK;ctx.font='bold 9px Arial';ctx.textAlign='center';ctx.fillText(String(t),x+bw/2,padT+ph-base-4)}
+    ctx.fillStyle='#565c66';ctx.font='9px Arial';ctx.textAlign='center'
+    ctx.fillText(String(c.label||''),x+bw/2,padT+ph+13)
+  })
+  let lx=padL
+  const ly=h-10
+  ctx.font='8.5px Arial';ctx.textAlign='left'
+  segLabels.forEach((sl,si)=>{
+    ctx.fillStyle=segColors[si];ctx.fillRect(lx,ly-7,8,8)
+    ctx.fillStyle='#565c66';ctx.fillText(sl,lx+11,ly)
+    lx+=11+ctx.measureText(sl).width+14
+  })
+  return canvas.toDataURL()
+}
 // Barre orizzontali impilate (per i rilievi delle macro aree) → dataURL
 function rptStacked({rows,segColors,segLabels,title,w=600,h}){
   const n=rows.length||1
@@ -11204,6 +11248,20 @@ function rptAggregateMacro(chkAll, prefToZone){
    di 6 osservazioni = medio; da 1 a 6 osservazioni = basso; solo voci conformi = nessun rilievo.
    Un'area senza voci valutate (tutte «non applicabile») non entra nel grafico: null.
    Verificato sul 2025-26: coincide col foglio su tutte e dieci le aree. */
+/* IPC per n° accesso al cantiere: classi e conteggio come _dashRenderAccesso della pagina
+   Statistiche; un IPC diverso da ALTO/MEDIO/BASSO vale «Nessun Rilievo», come nei KPI */
+function rptIpcPerAccesso(visite){
+  const lab=n=>{n=+n||0;if(n<=0)return'Non ind.';if(n>=5)return'5°+';return n+'°'}
+  const ord=['1°','2°','3°','4°','5°+','Non ind.']
+  const idx={NR:0,BASSO:1,MEDIO:2,ALTO:3}
+  const g={}
+  ;(visite||[]).forEach(v=>{
+    const k=lab(v.acc_cant)
+    const i=idx[['ALTO','MEDIO','BASSO'].indexOf(v.ipc)>=0?v.ipc:'NR']
+    ;(g[k]=g[k]||[0,0,0,0])[i]++
+  })
+  return ord.filter(k=>g[k]).map(k=>({label:k,segs:g[k]}))
+}
 function rptIpcLivello(d){
   if(d.ncp>=1||d.ncm>3)return 'ALTO'
   if(d.ncm>=1||d.oss>6)return 'MEDIO'
@@ -11260,7 +11318,7 @@ async function admGeneraReport(){
     // ── 1. Visite nel periodo ──
     const visite=await sbTutte((da,a)=>sb.from('visite')
       .select([
-        'visita_id','data_visita','ipc','tipo_accesso','rlst_sn',
+        'visita_id','data_visita','ipc','tipo_accesso','rlst_sn','acc_cant',
         'nom_ppre','qual_ppre','cantiere_id','tecnico_id','tecnico2_id',
         'nr_lavoratori','nr_imp','nr_ind','comm_tipo','comm_tipo_sogg',
         'vis_tip_int','vis_tip_ope','vis_durata','vis_importo',
@@ -11630,6 +11688,15 @@ async function admGeneraReport(){
         colors:ctKeys.map(k=>k==='Pubblico'?'#3498db':(k==='Privato'?'#e7500f':'#a9afb8')),
         title:'Tipologia di committente',w:400,h:280,maxLbl:30})
       chartCard(ctImg,M,y,half,66)
+    }
+
+    /* 19/10/2026, chiesto dall'utente: il grafico «IPC per n° accesso al cantiere» della pagina
+       Statistiche anche nel report. Stesse classi (1°…4°, 5°+, non indicato) e stessi colori dell'IPC */
+    const accIpc=rptIpcPerAccesso(visite)
+    if(accIpc.length){
+      const aiImg=rptStackedCols({cols:accIpc,title:'IPC per n° accesso al cantiere',
+        segLabels:['Nessun Rilievo','Basso','Medio','Alto'],segColors:['#95C22F','#FFC000','#ED7D31','#E02B20'],w:400,h:280})
+      chartCard(aiImg,M+half+4,y,half,66)
     }
 
     footer(3)
