@@ -13,6 +13,8 @@ const assert = require('assert')
 
 const html = fs.readFileSync(process.env.INDEX_HTML || path.join(__dirname, '..', 'index.html'), 'utf8')
 const sql = fs.readFileSync(process.env.CASSA_FOTO_SQL || path.join(__dirname, '..', 'supabase', 'sql', '2026_10_20_visite_cassa_foto.sql'), 'utf8')
+// sera del 20/10/2026: per il 2025-26 senza liste conservate, lo stato attuale dichiarato come tale
+const sql2 = fs.readFileSync(process.env.CASSA_FOTO_SQL2 || path.join(__dirname, '..', 'supabase', 'sql', '2026_10_20b_visite_cassa_foto_stato_attuale.sql'), 'utf8')
 
 function estrai(inizio, fine) {
   const a = html.indexOf(inizio)
@@ -27,8 +29,8 @@ const ctx = {}
 vm.createContext(ctx)
 vm.runInContext(estrai('const CEIV_STAT_ORD=', 'function _ceivDash(')
   + '\nthis.ceivStat=ceivStat;this.ceivFoto=ceivFoto;this.ceivStatVisita=ceivStatVisita;this.notaCeivFoto=notaCeivFoto;'
-  + 'this.notaCeivFotoBreve=notaCeivFotoBreve;this.ORD=CEIV_STAT_ORD', ctx)
-const { ceivFoto, ceivStatVisita, notaCeivFoto, notaCeivFotoBreve, ORD } = ctx
+  + 'this.notaCeivFotoBreve=notaCeivFotoBreve;this.ceivFotoRif=ceivFotoRif;this.ORD=CEIV_STAT_ORD', ctx)
+const { ceivFoto, ceivStatVisita, ceivFotoRif, notaCeivFoto, notaCeivFotoBreve, ORD } = ctx
 const [ATT, SOS, NON] = ORD
 const foto = (impresa_id, stato, iscritta_ceiv, fonte) => ({ impresa_id, stato, iscritta_ceiv, fonte: fonte || 'lista' })
 
@@ -54,25 +56,38 @@ assert.strictEqual(ceivStatVisita([foto('B', 'Attiva', true)], 'A', { stato_cass
 assert.strictEqual(ceivFoto([foto('A', 'Cessata', false), foto('A', 'Attiva', true)], 'A'), ATT)
 assert.strictEqual(ceivFoto([foto('A', 'Sospesa', true), foto('A', 'Cessata', false)], 'A'), SOS)
 
-// la pagina dice da dove viene il dato
-assert.strictEqual(notaCeivFoto(10, 10), 'lista della Cassa Edile alla data della visita')
-assert.ok(/di oggi/.test(notaCeivFoto(0, 10)) && /non è conservato/.test(notaCeivFoto(0, 10)), 'senza foto deve dire «di oggi»')
-assert.ok(/per 3 visite su 10/.test(notaCeivFoto(3, 10)) && /per le altre 7, lista di oggi/.test(notaCeivFoto(3, 10)))
-assert.ok(/alla data della visita per 3 su 10, di oggi per le altre/.test(notaCeivFotoBreve(3, 10)))
-assert.strictEqual(notaCeivFotoBreve(0, 5), 'stato in Cassa di oggi')
+// la foto con lo stato attuale (2025-26 senza liste) conta come foto, ma si riconosce
+const att = (impresa_id, stato, iscritta_ceiv) => Object.assign(foto(impresa_id, stato, iscritta_ceiv), { riferimento: 'stato_attuale' })
+assert.strictEqual(ceivStatVisita([att('A', 'Sospesa', true)], 'A', { stato_cassa: 'Attiva' }), SOS, 'la foto con lo stato attuale resta ferma')
+assert.strictEqual(ceivFotoRif([att('A', 'Attiva', true)], 'A'), 'stato_attuale')
+assert.strictEqual(ceivFotoRif([foto('A', 'Attiva', true)], 'A'), 'data_visita', 'senza riferimento = alla data della visita (foto del primo giro)')
+assert.strictEqual(ceivFotoRif([att('A', 'Cessata', false), Object.assign(foto('A', 'Attiva', true), { riferimento: 'data_visita' })], 'A'), 'data_visita')
+assert.strictEqual(ceivFotoRif([], 'A'), null)
+assert.strictEqual(ceivFotoRif([att('B', 'Attiva', true)], 'A'), null)
+
+// la pagina dice da dove viene il dato: tre provenienze, contate a parte
+assert.strictEqual(notaCeivFoto(10, 0, 10), 'lista della Cassa Edile alla data della visita')
+assert.strictEqual(notaCeivFoto(65, 853, 918), 'lista della Cassa Edile, su 918 visite: 65 alla data della visita; 853 con lo stato fotografato dopo, non alla data della visita')
+assert.strictEqual(notaCeivFoto(0, 0, 10), 'lista della Cassa Edile, su 10 visite: 10 con lo stato di oggi')
+assert.ok(/3 alla data della visita; 2 con lo stato fotografato dopo[^;]*; 5 con lo stato di oggi/.test(notaCeivFoto(3, 2, 10)))
+assert.strictEqual(notaCeivFotoBreve(3, 7, 10), 'stato in Cassa alla data della visita per 3 su 10, fotografato dopo per le altre')
+assert.strictEqual(notaCeivFotoBreve(0, 5, 5), 'stato in Cassa fotografato dopo la visita')
+assert.strictEqual(notaCeivFotoBreve(0, 0, 5), 'stato in Cassa di oggi')
 
 // ── 2. I due punti delle statistiche leggono la foto ──
 const dash = estrai('// fetch visite con cantiere + impresa principale', '// Dataset leggero su TUTTO lo storico')
-assert.ok(/visite_cassa_foto\(impresa_id,stato,fonte,iscritta_ceiv\)/.test(dash), 'pagina Statistiche: non scarica la foto')
+assert.ok(/visite_cassa_foto\(impresa_id,stato,fonte,iscritta_ceiv,riferimento\)/.test(dash), 'pagina Statistiche: non scarica la foto col riferimento')
 assert.ok(/ceiv:ceivStatVisita\(r\.visite_cassa_foto,p&&p\.impresa_id,p&&p\.imprese\)/.test(dash), 'pagina Statistiche: non usa la foto')
-assert.ok(/ceivFoto:!!\(p&&ceivFoto\(/.test(dash), 'pagina Statistiche: non sa quante visite hanno la foto')
+assert.ok(/ceivRif:\(p&&ceivFotoRif\(r\.visite_cassa_foto,p\.impresa_id\)\)/.test(dash), 'pagina Statistiche: non sa da dove viene la foto')
 assert.ok(!/ceivStat\(p&&p\.imprese\)/.test(dash), 'pagina Statistiche: legge ancora solo lo stato di oggi')
 const render = estrai('function _dashRenderCeiv(F){', '\n}')
 assert.ok(/notaCeivFoto\(/.test(render) && /\.ceiv-foto-nota/.test(render), 'pagina Statistiche: la nota sulla provenienza non si aggiorna')
+assert.ok(/x\.ceivRif==='data_visita'/.test(render) && /x\.ceivRif==='stato_attuale'/.test(render), 'pagina Statistiche: le provenienze vanno contate a parte')
 assert.strictEqual((html.match(/class="ceiv-foto-nota"/g) || []).length, 2, 'le due schede sulla Cassa devono dire da dove viene il dato')
 
 const rpt = estrai('async function admGeneraReport(){', 'async function admGeneraReportOsservatorio(){')
-assert.ok(/'impresa_id','imprese\(stato_cassa\)','visite_cassa_foto\(impresa_id,stato,fonte,iscritta_ceiv\)'/.test(rpt), 'Report visite: non scarica la foto')
+assert.ok(/'impresa_id','imprese\(stato_cassa\)','visite_cassa_foto\(impresa_id,stato,fonte,iscritta_ceiv,riferimento\)'/.test(rpt), 'Report visite: non scarica la foto col riferimento')
+assert.ok(/ceivFotoRif\(v\.visite_cassa_foto,v\.impresa_id\)==='data_visita'/.test(rpt) && /ceivFotoRif\(v\.visite_cassa_foto,v\.impresa_id\)==='stato_attuale'/.test(rpt), 'Report visite: le provenienze vanno contate a parte')
 assert.strictEqual((rpt.match(/ceivStatVisita\(v\.visite_cassa_foto,v\.impresa_id,v\.imprese\)/g) || []).length, 2, 'Report visite: i due grafici sulla Cassa devono usare la foto')
 assert.ok(!/ceivStat\(v\.imprese\)/.test(rpt), 'Report visite: legge ancora solo lo stato di oggi')
 assert.strictEqual((rpt.match(/\('\+ceivNotaRpt\+'\)'/g) || []).length, 2, 'Report visite: i titoli devono dire da dove viene il dato')
@@ -92,5 +107,14 @@ assert.ok(!/function public\.chiudi_verbale|function public\.verbale_mancanze/.t
 for (const f of ['cassa_stato_al\\(text, date\\)', 'cassa_foto_verbale\\(text, text\\)', 'cassa_foto_recupera\\(date\\)']) {
   assert.ok(new RegExp('revoke all on function public\\.' + f + ' from public, anon, authenticated').test(sql), 'funzione aperta a tutti: ' + f)
 }
+
+// sera del 20/10/2026: lo stato attuale solo per il 2025-26, dichiarato, e anche lui non si riscrive
+assert.ok(/check \(riferimento in \('data_visita', 'stato_attuale'\)\)/.test(sql2), 'riferimento: vocabolario chiuso')
+assert.ok(/p_data < date '2025-10-01'/.test(sql2), 'lo stato attuale vale solo dal 2025-26')
+assert.ok(/if c\.fonte <> 'nessuna' then[\s\S]{0,200}'data_visita'::text, p_data/.test(sql2), 'dove la lista alla data esiste, vale quella')
+assert.ok(/'STATO ATTUALE, NON ALLA DATA DELLA VISITA/.test(sql2), 'la nota deve dire che non è alla data della visita')
+assert.ok(/new\.riferimento, new\.stato_al\)[\s\S]{0,300}old\.riferimento, old\.stato_al\)/.test(sql2), 'riferimento e stato_al non si riscrivono')
+assert.ok(/cross join lateral public\.cassa_stato_foto\(p\.impresa_id, v\.data_visita\)/.test(sql2), 'la foto deve passare da cassa_stato_foto')
+assert.ok(/revoke all on function public\.cassa_stato_foto\(text, date\) from public, anon, authenticated/.test(sql2), 'cassa_stato_foto aperta a tutti')
 
 console.log('ok — stato in Cassa fotografato alla data della visita: la foto vince, senza foto lo stato di oggi detto in pagina, il database la scrive una volta sola')

@@ -6737,7 +6737,7 @@ async function loadStat(){
   // fetch visite con cantiere + impresa principale (paginato).
   // Default: SOLO esercizio corrente per un avvio veloce; lo storico completo
   // viene scaricato solo quando l'utente lo richiede dal menu esercizio.
-  const cols=`visita_id,data_visita,ipc,rlst_sn,acc_cant,tecnico_id,tipo_accesso,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantiere_id,impresa_id,vis_tip_int,vis_tip_ope,vis_importo,cantieri(comune_nome,cantiere_tip_int,cantiere_tip_ope,cantiere_importo),visite_imprese_presenti(is_principale,tipo_imp,ruolo,impresa_id,imprese(impresa_nome,stato_cassa)),visite_cassa_foto(impresa_id,stato,fonte,iscritta_ceiv)`
+  const cols=`visita_id,data_visita,ipc,rlst_sn,acc_cant,tecnico_id,tipo_accesso,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantiere_id,impresa_id,vis_tip_int,vis_tip_ope,vis_importo,cantieri(comune_nome,cantiere_tip_int,cantiere_tip_ope,cantiere_importo),visite_imprese_presenti(is_principale,tipo_imp,ruolo,impresa_id,imprese(impresa_nome,stato_cassa)),visite_cassa_foto(impresa_id,stato,fonte,iscritta_ceiv,riferimento)`
   let rows=[],from=0
   for(;;){
     let _q=sb.from('visite').select(cols).eq('elimina',0).order('data_visita',{ascending:true}).range(from,from+999)
@@ -6762,7 +6762,7 @@ async function loadStat(){
          visite, nel report Osservatorio e nel file per il nazionale (datiCantiereStat) */
       comune:comuneStat(c.comune_nome)||null, tipint:dc.tipint, tipope:dc.tipope, importo:dc.importo,
       ruolo:(p&&tipoImpDaRiga(p))||null, ceiv:ceivStatVisita(r.visite_cassa_foto,p&&p.impresa_id,p&&p.imprese),
-      ceivFoto:!!(p&&ceivFoto(r.visite_cassa_foto,p.impresa_id)),
+      ceivRif:(p&&ceivFotoRif(r.visite_cassa_foto,p.impresa_id))||null,
       impnome:(p&&p.imprese&&p.imprese.impresa_nome)||null, impid:(p&&p.impresa_id)||null,
       eserc:_esercizioDa(r.data_visita)
     }
@@ -7155,7 +7155,7 @@ function rptVociNc(chkAll,info,limite){
     .sort((a,b)=>(b.ncp+b.ncm)-(a.ncp+a.ncm)||b.ncp-a.ncp||String(a.codice).localeCompare(String(b.codice))).slice(0,limite||10)
 }
 function _dashRenderCeiv(F){
-  const _nf=notaCeivFoto((F||[]).filter(x=>x.ceivFoto).length,(F||[]).length)
+  const _nf=notaCeivFoto((F||[]).filter(x=>x.ceivRif==='data_visita').length,(F||[]).filter(x=>x.ceivRif==='stato_attuale').length,(F||[]).length)
   document.querySelectorAll('.ceiv-foto-nota').forEach(el=>{el.textContent=_nf})
   const m=_grp(F,x=>x.ceiv);const L=CEIV_STAT_ORD.filter(l=>m[l]);const tot=F.length||1
   const _ceivCol=(lb,i)=>CEIV_STAT_COL[lb]||_DASH_PIE[i%_DASH_PIE.length]
@@ -7185,7 +7185,10 @@ function ceivStat(imp){
    scritta dal database quando il verbale diventa definitivo, mai riscritta) vince sullo stato di oggi.
    Senza foto (verbali prima della prima lista conservata, 30/08/2026) vale lo stato di oggi, e la pagina
    lo dice. Stessa regola di ceivStat: attiva o sospesa = iscritta; cessata, non iscritta, non in lista no.
-   Due righe per la stessa impresa (unione di schede): vale la migliore. */
+   Due righe per la stessa impresa (unione di schede): vale la migliore.
+   (sera del 20/10/2026, decisione dell'utente) Per il 2025-26, che nessuna lista conservata copre, la foto
+   è lo stato del giorno in cui è stata scritta, NON alla data della visita (riferimento 'stato_attuale'):
+   conta come la foto, ma la pagina lo dice a parte. */
 function ceivFoto(foto,impresaId){
   const r=(foto||[]).filter(f=>f&&impresaId&&f.impresa_id===impresaId&&f.fonte&&f.fonte!=='nessuna')
   if(!r.length)return null
@@ -7193,16 +7196,25 @@ function ceivFoto(foto,impresaId){
   return CEIV_STAT_ORD[Math.min.apply(null,r.map(cl))]
 }
 function ceivStatVisita(foto,impresaId,imp){return ceivFoto(foto,impresaId)||ceivStat(imp)}
-function notaCeivFoto(n,tot){
-  if(!tot)return 'lista della Cassa Edile'
-  if(n>=tot)return 'lista della Cassa Edile alla data della visita'
-  if(!n)return 'lista della Cassa Edile di oggi: lo stato alla data della visita non \u00e8 conservato per questo periodo'
-  return 'lista della Cassa Edile alla data della visita per '+n+' visite su '+tot+'; per le altre '+(tot-n)+', lista di oggi'
+function ceivFotoRif(foto,impresaId){
+  const r=(foto||[]).filter(f=>f&&impresaId&&f.impresa_id===impresaId&&f.fonte&&f.fonte!=='nessuna')
+  if(!r.length)return null
+  return r.some(f=>(f.riferimento||'data_visita')==='data_visita')?'data_visita':'stato_attuale'
 }
-function notaCeivFotoBreve(n,tot){
-  if(!tot||n>=tot)return 'stato in Cassa alla data della visita'
-  if(!n)return 'stato in Cassa di oggi'
-  return 'stato in Cassa alla data della visita per '+n+' su '+tot+', di oggi per le altre'
+function notaCeivFoto(nData,nAtt,tot){
+  if(!tot)return 'lista della Cassa Edile'
+  if(nData>=tot)return 'lista della Cassa Edile alla data della visita'
+  const nOggi=tot-nData-nAtt,p=[]
+  if(nData)p.push(nData+' alla data della visita')
+  if(nAtt)p.push(nAtt+' con lo stato fotografato dopo, non alla data della visita')
+  if(nOggi>0)p.push(nOggi+' con lo stato di oggi')
+  return 'lista della Cassa Edile, su '+tot+' visite: '+p.join('; ')
+}
+function notaCeivFotoBreve(nData,nAtt,tot){
+  if(!tot||nData>=tot)return 'stato in Cassa alla data della visita'
+  if(!nData&&!nAtt)return 'stato in Cassa di oggi'
+  if(!nData)return 'stato in Cassa fotografato dopo la visita'
+  return 'stato in Cassa alla data della visita per '+nData+' su '+tot+', fotografato dopo per le altre'
 }
 /* Comune per le statistiche: maiuscole unificate e quartiere di Padova tolto («PADOVA - Q1 (Centro
    storico)» e «Padova» sono PADOVA). */
@@ -11499,7 +11511,7 @@ async function admGeneraReport(){
         'nr_lavoratori','nr_imp','nr_ind','comm_tipo','comm_tipo_sogg',
         'vis_tip_int','vis_tip_ope','vis_durata','vis_importo',
         'tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome)',
-        'impresa_id','imprese(stato_cassa)','visite_cassa_foto(impresa_id,stato,fonte,iscritta_ceiv)',
+        'impresa_id','imprese(stato_cassa)','visite_cassa_foto(impresa_id,stato,fonte,iscritta_ceiv,riferimento)',
         'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_durata,cantiere_importo,comune_nome,committenti(committente_tipo))'
       ].join(','))
       .gte('data_visita',dal).lte('data_visita',al).eq('elimina',0).order('visita_id').range(da,a))
@@ -11540,7 +11552,8 @@ async function admGeneraReport(){
     const ceivMap={}
     visite.forEach(v=>{const k=ceivStatVisita(v.visite_cassa_foto,v.impresa_id,v.imprese);ceivMap[k]=(ceivMap[k]||0)+1})
     // 20/10/2026: quante visite hanno lo stato in Cassa fotografato alla data della visita
-    const ceivNotaRpt=notaCeivFotoBreve(visite.filter(v=>ceivFoto(v.visite_cassa_foto,v.impresa_id)).length,visite.length)
+    const ceivNotaRpt=notaCeivFotoBreve(visite.filter(v=>ceivFotoRif(v.visite_cassa_foto,v.impresa_id)==='data_visita').length,
+      visite.filter(v=>ceivFotoRif(v.visite_cassa_foto,v.impresa_id)==='stato_attuale').length,visite.length)
 
     // ── 5. Aggregazioni ──
     const nV=visite.length
