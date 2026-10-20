@@ -203,6 +203,9 @@ window.AIUTO_TESTI = {
   't:excel imprese': 'Scarica l\'Excel per la Cassa Edile: una riga per ogni impresa o autonomo trovato in cantiere, con P.IVA o codice fiscale e lavoratori.',
   't:pdf imprese': 'Scarica il PDF per la Cassa Edile: una scheda per sopralluogo con le imprese presenti e il totale dei lavoratori.',
   't:invia imprese a ceiv': 'Genera i due file delle imprese presenti e li spedisce subito all\'indirizzo «Email CEIV». Chiede conferma; la mail non si richiama: prima guarda i file.',
+  /* ── statistiche per la Commissione (20/10/2026) ── */
+  't:per la commissione': 'Apre la sottopagina con le statistiche chieste dalla Commissione Salute e Sicurezza: non conformità per dimensione dell’impresa, committente, subappalto, imprese C.E.I.V. e servizi, aree del territorio, imprese sospese. Conta solo l’esercizio scelto; niente dati per tecnico.',
+  't:quali comuni stanno in ogni area': 'Mostra quali comuni della provincia stanno in ciascuna area. Le aree le decide la segreteria nel database: questo è solo l’elenco.',
   't:genera report pdf': 'Genera il report delle statistiche in PDF, quello che va alla Commissione. Cinque pagine: l\'ultima ha l\'IPC di ogni macroarea della checklist.',
   'p:report osservatorio': 'Genera il report per l\'Osservatorio nazionale, nel formato richiesto da FORMEDIL.',
   'btn-adm-load-xlsx': 'Apre nel modulo la visita letta dal file Excel, per controllarla prima di salvarla.',

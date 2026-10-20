@@ -1172,6 +1172,9 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     ['attivita', 'Attività', ['Visite per esercizio', 'Attività mensile', 'Sopralluoghi per tecnico', 'Produttività', 'Affiancamento', 'Tipologia di visita', 'Gradimento']],
     ['rischio', 'Rischio', ['IPC', 'NC+', 'Imprese ricorrenti', 'Ruolo impresa', 'Iscrizione', 'inadempienze']],
     ['territorio', 'Territorio e cantieri', ['Top 20 comuni', 'Tipo di intervento', 'Tipologia di opera', 'Importo']],
+    /* (20/10/2026) la sottopagina per la Commissione Salute e Sicurezza (statistiche-commissione.js): da sola,
+       senza i contatori e gli altri grafici; non compare in «Tutti i grafici» */
+    ['commissione', '🏛️ Per la Commissione', ['Per la Commissione']],
   ];
   const gruppoStat = (titolo) => { const g = GRUPPI_STAT.find((x) => x[2].some((c) => String(titolo || '').includes(c))); return g ? g[0] : ''; };
   let _statGruppo = '';
@@ -1180,7 +1183,10 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     const carte = [...sez.querySelectorAll('.card')].filter((c) => c.querySelector(':scope > h3'));
     const prima = carte.find((c) => gruppoStat(c.querySelector(':scope > h3').textContent));
     if (!prima) return;
-    carte.forEach((c) => { const g = gruppoStat(c.querySelector(':scope > h3').textContent); c.classList.toggle('v2-nasc', !!g && !!_statGruppo && g !== _statGruppo); });
+    const com = _statGruppo === 'commissione';
+    carte.forEach((c) => { const g = gruppoStat(c.querySelector(':scope > h3').textContent); c.classList.toggle('v2-nasc', g === 'commissione' ? !com : com || (!!g && !!_statGruppo && g !== _statGruppo)); });
+    const kpi = $('dash-kpi'); if (kpi) kpi.classList.toggle('v2-nasc', com);
+    if (window.statCommissione) { if (com) window.statCommissione.mostra(); else window.statCommissione.nascondi(); }
     pillole('v2-pill-stat', prima.parentNode === sez ? prima : (prima.closest('#view-statistiche > *') || prima), [['', 'Tutti i grafici']].concat(GRUPPI_STAT.map((g) => [g[0], g[1]])), _statGruppo,
       (v) => { _statGruppo = v; pilloleStatistiche(); window.dispatchEvent(new Event('resize')); });
   }
