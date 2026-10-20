@@ -1175,7 +1175,12 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     /* (20/10/2026) la sottopagina per la Commissione Salute e Sicurezza (statistiche-commissione.js): da sola,
        senza i contatori e gli altri grafici; non compare in «Tutti i grafici» */
     ['commissione', '🏛️ Per la Commissione', ['Per la Commissione']],
+    /* (20/10/2026) i cicli di visita (statistiche-cicli.js): due sottopagine dello stesso modulo, dopo la Commissione */
+    ['cicli', '🔁 Cicli di visita', ['Cicli di visita']],
+    ['miglioramento', '📈 Miglioramento e serie', ['Miglioramento e serie']],
   ];
+  /* le sottopagine: gruppo → il modulo che le disegna (mostra(gruppo) / nascondi()) */
+  const SOTTOPAGINE = { commissione: () => window.statCommissione, cicli: () => window.statCicli, miglioramento: () => window.statCicli };
   const gruppoStat = (titolo) => { const g = GRUPPI_STAT.find((x) => x[2].some((c) => String(titolo || '').includes(c))); return g ? g[0] : ''; };
   let _statGruppo = '';
   function pilloleStatistiche() {
@@ -1183,10 +1188,11 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     const carte = [...sez.querySelectorAll('.card')].filter((c) => c.querySelector(':scope > h3'));
     const prima = carte.find((c) => gruppoStat(c.querySelector(':scope > h3').textContent));
     if (!prima) return;
-    const com = _statGruppo === 'commissione';
-    carte.forEach((c) => { const g = gruppoStat(c.querySelector(':scope > h3').textContent); c.classList.toggle('v2-nasc', g === 'commissione' ? !com : com || (!!g && !!_statGruppo && g !== _statGruppo)); });
+    const com = !!SOTTOPAGINE[_statGruppo];
+    carte.forEach((c) => { const g = gruppoStat(c.querySelector(':scope > h3').textContent); c.classList.toggle('v2-nasc', SOTTOPAGINE[g] ? g !== _statGruppo : com || (!!g && !!_statGruppo && g !== _statGruppo)); });
     const kpi = $('dash-kpi'); if (kpi) kpi.classList.toggle('v2-nasc', com);
-    if (window.statCommissione) { if (com) window.statCommissione.mostra(); else window.statCommissione.nascondi(); }
+    const attivo = com ? SOTTOPAGINE[_statGruppo]() : null;
+    Object.keys(SOTTOPAGINE).forEach((k) => { const m = SOTTOPAGINE[k](); if (!m) return; if (k === _statGruppo) m.mostra(k); else if (m !== attivo) m.nascondi(); });
     pillole('v2-pill-stat', prima.parentNode === sez ? prima : (prima.closest('#view-statistiche > *') || prima), [['', 'Tutti i grafici']].concat(GRUPPI_STAT.map((g) => [g[0], g[1]])), _statGruppo,
       (v) => { _statGruppo = v; pilloleStatistiche(); window.dispatchEvent(new Event('resize')); });
   }

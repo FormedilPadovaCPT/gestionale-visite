@@ -85,6 +85,16 @@
 
   /* regola Formedil: stessa tabella di calcRientroFormedil in index.html
      (e della RPC ricontrolli_pendenti) — chi la cambia lì la cambia qui */
+  /* (20/10/2026) la stessa regola letta sulla VISITA DEL CICLO (ciclo_regola nel database, regola() in cicli-visita.js):
+     alla 3ª con IPC medio il ciclo si ferma (nessun rientro, decide il Coordinatore), 4ª-5ª solo autorizzate, dopo la 5ª critico */
+  function giorniCiclo(n, ipc, autorizzata) {
+    n = Math.max(+n || 1, 1);
+    const i = ipc || 'NR';
+    if (i === 'ALTO') return 3;
+    if (i === 'MEDIO') return n <= 2 ? 22 : (n >= 5 ? null : (autorizzata ? 22 : null));
+    if (i === 'BASSO') return n === 1 ? 22 : null;
+    return null;
+  }
   function giorniFormedil(acc, ipc) {
     const n = +acc || 1;
     const i = ipc || 'NR';
@@ -138,16 +148,17 @@
     /* 3. visita di ritorno */
     const dv = giorno(d.dataVisita);
     const dr = giorno(d.dataRitorno);
-    const gg = giorniFormedil(d.accCant, ipc);
+    const gg = d.cicloVisita != null ? giorniCiclo(d.cicloVisita, ipc, !!d.cicloAutorizzata) : giorniFormedil(d.accCant, ipc);
+    const dove = d.cicloVisita != null ? `alla ${d.cicloVisita}ª visita del ciclo` : `al ${+d.accCant || 1}° accesso`;
     if (dv && dr) {
       if (dr < dv) {
         avvisi.push({ chi: 'ritorno-prima', testo: `La visita di ritorno (${fmt(dr)}) è prima della visita stessa (${fmt(dv)}): lo scadenzario la ignora.` });
       } else if (gg == null) {
-        avvisi.push({ chi: 'ritorno-non-dovuto', testo: `È indicata una visita di ritorno (${fmt(dr)}), ma con IPC ${ipc === 'NR' ? 'Nessun Rilievo' : ipc} al ${+d.accCant || 1}° accesso la regola Formedil non prevede rientro: il cantiere non comparirà nello scadenzario.` });
+        avvisi.push({ chi: 'ritorno-non-dovuto', testo: `È indicata una visita di ritorno (${fmt(dr)}), ma con IPC ${ipc === 'NR' ? 'Nessun Rilievo' : ipc} ${dove} la regola Formedil non prevede rientro: il cantiere non comparirà nello scadenzario.` });
       } else {
         const limite = new Date(dv); limite.setDate(limite.getDate() + gg);
         if (dr > limite) {
-          avvisi.push({ chi: 'ritorno-tardi', testo: `La visita di ritorno (${fmt(dr)}) è oltre il termine Formedil: con IPC ${ipc} al ${+d.accCant || 1}° accesso il rientro va fatto entro ${gg} giorni, cioè entro il ${fmt(limite)}.` });
+          avvisi.push({ chi: 'ritorno-tardi', testo: `La visita di ritorno (${fmt(dr)}) è oltre il termine Formedil: con IPC ${ipc} ${dove} il rientro va fatto entro ${gg} giorni, cioè entro il ${fmt(limite)}.` });
         }
       }
     }
@@ -272,7 +283,7 @@
     return chiedi(avvisi);
   }
 
-  const api = { analizza, verifica, giorniFormedil, ipcDa };
+  const api = { analizza, verifica, giorniFormedil, giorniCiclo, ipcDa };
   radice.ControlloVerbale = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

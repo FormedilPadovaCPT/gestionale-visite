@@ -258,6 +258,8 @@
       window.direzione && typeof window.direzione.zonaCoord === 'function' ? window.direzione.zonaCoord() : Promise.resolve(),
       /* visite fuori procedura: da approvare e quadro per tecnico (fuori-procedura.js, 13/10/2026) */
       window.FuoriProcedura && typeof window.FuoriProcedura.boxCoord === 'function' ? window.FuoriProcedura.boxCoord() : Promise.resolve(),
+      /* cicli di visita: fermi alla 3ª, in percorso, critici, scelte contro la proposta (cicli-visita.js, 20/10/2026) */
+      window.CicliVisita && typeof window.CicliVisita.boxCoord === 'function' ? window.CicliVisita.boxCoord() : Promise.resolve(),
     ]);
     avvisa();
   }

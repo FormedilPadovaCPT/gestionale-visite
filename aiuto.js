@@ -204,6 +204,10 @@ window.AIUTO_TESTI = {
   't:pdf imprese': 'Scarica il PDF per la Cassa Edile: una scheda per sopralluogo con le imprese presenti e il totale dei lavoratori.',
   't:invia imprese a ceiv': 'Genera i due file delle imprese presenti e li spedisce subito all\'indirizzo «Email CEIV». Chiede conferma; la mail non si richiama: prima guarda i file.',
   /* ── statistiche per la Commissione (20/10/2026) ── */
+  /* (20/10/2026) cicli di visita: sottopagine delle statistiche e Zona Coordinatore */
+  't:cicli di visita': 'Apre la sottopagina con gli esiti dei cicli di visita (risolto, superato, in percorso, critico, non risolto, aperti), le visite per ciclo e i seguiti decisi dal Coordinatore. Un ciclo è il percorso di una-tre visite su una fase del lotto, dal 1° ottobre 2026. Conta solo l’esercizio scelto; niente dati per tecnico.',
+  't:miglioramento e serie': 'Apre la sottopagina con l’IPC alla prima e all’ultima visita di ogni ciclo (migliorati, uguali, peggiorati) e il riquadro delle serie di visite: accessi fatti sui previsti, cicli contenuti, IPC all’inizio e alla fine.',
+  't:decido': 'Registra il seguito scelto per il ciclo fermo: le visite 4ª e 5ª e le serie autorizzano i ritorni, la Commissione apre una questione nel registro delle decisioni, «nessun seguito» chiude il ciclo come non risolto. Il tecnico riceve l’esito.',
   't:per la commissione': 'Apre la sottopagina con le statistiche chieste dalla Commissione Salute e Sicurezza: non conformità per dimensione dell’impresa, committente, subappalto, imprese C.E.I.V. e servizi, aree del territorio, imprese sospese. Conta solo l’esercizio scelto; niente dati per tecnico.',
   't:quali comuni stanno in ogni area': 'Mostra quali comuni della provincia stanno in ciascuna area. Le aree le decide la segreteria nel database: questo è solo l’elenco.',
   't:genera report pdf': 'Genera il report delle statistiche in PDF, quello che va alla Commissione. Cinque pagine: l\'ultima ha l\'IPC di ogni macroarea della checklist.',

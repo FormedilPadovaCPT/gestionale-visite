@@ -1065,6 +1065,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
             <div class="ipc-counters" id="rp-ipc-cnt">NC+: 0 &nbsp; NC-: 0 &nbsp; OSS: 0</div>
           </div>
           <div class="riepilogo-grid" id="rp-dati"></div>
+          <!-- (20/10/2026) ciclo di visita: numero, visita del ciclo, proposta del programma e risposta del tecnico (cicli-visita.js) -->
+          <div id="ciclo-box" style="display:none;margin:10px 0 4px;padding:8px 12px;background:#f6f6f7;border:1px solid #e3e5e8;border-radius:8px;font-size:12.5px;line-height:1.6;color:#333"></div>
           <div id="rp-zone"></div>
           <div class="field" style="max-width:460px;margin:14px 0 6px">
             <label>Ora di fine della visita *</label>
@@ -1415,6 +1417,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div id="adm-avviso-verbali" style="display:none;margin-bottom:14px"></div>
         <!-- visite fuori procedura: da approvare e quadro per tecnico (fuori-procedura.js, 13/10/2026) -->
         <div id="adm-fuori-procedura" style="display:none;margin-bottom:14px"></div>
+        <!-- cicli di visita: fermi alla 3ª, in percorso, critici proposti, scelte contro la proposta (cicli-visita.js, 20/10/2026) -->
+        <div id="adm-cicli" style="display:none;margin-bottom:14px"></div>
         <!-- visite del mese per tecnico: il Coordinatore le aumenta (visite-mese.js, 16/10/2026) -->
         <div id="adm-visite-mese" style="display:none;margin-bottom:14px"></div>
 
@@ -3422,6 +3426,8 @@ function activateTab(n){
   if(n===2)renderImpreseAccordion()
   if(n===14)initFotoTab()
   if(n===13)suggerisciDataRientro()
+  /* (20/10/2026) ciclo di visita: la proposta del database (imprese e fasi della maschera contro il ciclo aperto) e, se cambia, la data di ritorno */
+  if((n===13||n===15)&&window.CicliVisita)CicliVisita.proponi().then(agg=>{if(!agg)return;if(n===13)suggerisciDataRientro();else buildRiepilogo()}).catch(e=>console.warn('ciclo di visita:',e))
   if(window.mappaEvento)window.mappaEvento('tab',n)
 }
 
@@ -3433,16 +3439,18 @@ function suggerisciDataRientro(){
   const dataVisita=vGet('f-data')
   const accCant=vGet('f-acc-cant')||'1'
   const ipc=(calcIPC(S.checklist)||{}).ipc||'NR'
-  const calc=calcRientroFormedil(dataVisita, accCant, ipc)
+  /* (20/10/2026) dal 1° ottobre la regola si legge sulla VISITA DEL CICLO (cicli-visita.js); sullo storico resta l'accesso */
+  const calcC=window.CicliVisita&&CicliVisita.attivo()?CicliVisita.calcRitorno(dataVisita,ipc):null
+  const calc=calcC||calcRientroFormedil(dataVisita, accCant, ipc)
   if(!calc.date){
     hint.style.display='block'
-    hint.innerHTML='⚙ Procedura Formedil: <strong>archiviazione</strong> — nessun rientro necessario per questo IPC e numero di accesso.'
+    hint.innerHTML=calcC?('⚙ Ciclo di visita: <strong>'+esc(calcC.nota)+'</strong>'+(calcC.esito==='fermo'?' — nessuna data di ritorno: il seguito lo decide il Coordinatore.':calcC.esito==='critico'?' — i ritorni si decidono nella gestione del cantiere critico.':' — nessun rientro necessario.')):'⚙ Procedura Formedil: <strong>archiviazione</strong> — nessun rientro necessario per questo IPC e numero di accesso.'
     return
   }
   const dStr=calc.date.toISOString().slice(0,10)
   const TIPO_DESC={ordinaria:'pianificazione ordinaria (15-30 gg)',urgente:'pianificazione urgente (1-5 gg)',immediata:'segnalazione — immediata'}
   hint.style.display='block'
-  hint.innerHTML=`⚙ Suggerimento Formedil: <strong>${TIPO_DESC[calc.tipo]||calc.tipo}</strong> — data proposta: <strong>${fmtDate(dStr)}</strong>`
+  hint.innerHTML=(calcC?`⚙ Ciclo di visita (${esc(calcC.nota)}): `:'⚙ Suggerimento Formedil: ')+`<strong>${TIPO_DESC[calc.tipo]||calc.tipo}</strong> — data proposta: <strong>${fmtDate(dStr)}</strong>`
   // Pre-compila solo se il campo è vuoto
   if(!campo.value){
     campo.value=dStr
@@ -3669,6 +3677,7 @@ function _formAzzera(){
 async function initForm(snap=null){
   _tipiOrig=null
   S.fd={}; S.checklist={}; S.noteChk={}; S.imprese=[]; S.lavorazioni=[]; S.savedId=null; S.foto={}; S._impOpen=0
+  if(window.CicliVisita)CicliVisita.azzera()   // (20/10/2026) proposta e risposta del ciclo ripartono da zero
   S._formBase=null
   try{_formAzzera()}catch(_e){console.warn('azzeramento della maschera:',_e)}
   hide('btn-pdf')
@@ -5381,6 +5390,8 @@ async function _saveVisitaCorpo(stato){
   saveTabData()
   /* (13/10/2026) visita fuori procedura senza motivo: si riapre l'avviso, non si salva */
   if(window.FuoriProcedura&&!FuoriProcedura.pronto())return
+  /* (20/10/2026) ciclo di visita: con «Definitivo» serve la risposta alla proposta, se il programma l'ha chiesta */
+  if(window.CicliVisita&&!CicliVisita.pronto(stato))return
   const cant_id=vGet('f-cant-id')
   const tec_id=vGet('f-tec-id')
   const tec2_id=vGet('f-tec2-id')
@@ -5447,6 +5458,7 @@ async function _saveVisitaCorpo(stato){
         ossTec:vGet('f-oss-tec'), noteLav:vGet('f-note-lav'),
         dataVisita:data_v, oraDa:vGet('f-da'), oraA:vGet('f-a'),
         dataRitorno:vGet('f-data-ritorno'), accCant:vGet('f-acc-cant'),
+        cicloVisita:window.CicliVisita&&CicliVisita.attivo()?CicliVisita.numeroVisita():null, cicloAutorizzata:!!(window.CicliVisita&&CicliVisita.autorizzata()),   // (20/10/2026) la regola si giudica sulla visita del ciclo
         ppreNome:[vGet('f-ppre-nome'),vGet('f-ppre-cog')].map(x=>(x||'').trim()).filter(Boolean).join(' '),
         ppreQual:vGet('f-qual-ppre'),
         oggi:new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Rome'}),
@@ -5537,6 +5549,7 @@ async function _saveVisitaCorpo(stato){
       ipc:ipcVal,
       tipo_accesso:+vGet('f-tipo')||null,
       ...(window.FuoriProcedura?FuoriProcedura.campi():{}),   // (13/10/2026) motivo del rientro fuori procedura e serie proposta; fp_tipo lo mette il database
+      ...(window.CicliVisita?CicliVisita.campi():{}),   // (20/10/2026) la scelta del tecnico sul ciclo; ciclo, visita del ciclo e rientro li scrive il database
       elimina:0,
       // estesi Tab 0
       prot_int:vGet('f-prot-int')||null,
@@ -6054,6 +6067,7 @@ function applySnap(snap){
   if(snap.segnalazione!=null)cSet('f-segnalazione',snap.segnalazione)
   if(snap.data_ritorno)vSet('f-data-ritorno',snap.data_ritorno)
   if(window.FuoriProcedura)FuoriProcedura.daSnap(snap)   // (13/10/2026) il motivo del rientro fuori procedura, se c'è
+  if(window.CicliVisita)CicliVisita.daSnap(snap)   // (20/10/2026) la risposta sul ciclo, se c'è
 
   // ── Foto ──────────────────────────────────────────────────────────────────
   if(snap.privacy!=null)cSet('f-privacy',snap.privacy)
@@ -6600,7 +6614,9 @@ function buildRiepilogo(){
   // (allinea il riepilogo alla logica della scheda Note, così la proposta è
   //  sempre visibile e applicata anche se l'utente non si è fermato sul tab 13)
   const accCant=vGet('f-acc-cant')||'1'
-  const calcRit=calcRientroFormedil(vGet('f-data'),accCant,ipc)
+  /* (20/10/2026) regola sulla visita del ciclo quando il ciclo vale (cicli-visita.js); sullo storico l'accesso */
+  const calcC=window.CicliVisita&&CicliVisita.attivo()?CicliVisita.calcRitorno(vGet('f-data'),ipc):null
+  const calcRit=calcC||calcRientroFormedil(vGet('f-data'),accCant,ipc)
   let ritornoTxt
   if(vGet('f-data-ritorno')){
     ritornoTxt=esc(fmtDate(vGet('f-data-ritorno')))
@@ -6608,9 +6624,13 @@ function buildRiepilogo(){
   }else if(calcRit.date){
     const dStr=calcRit.date.toISOString().slice(0,10)
     vSet('f-data-ritorno',dStr)   // compila automaticamente il campo
-    ritornoTxt=fmtDate(dStr)+' <span style="font-size:11px;color:#27ae60">(proposta Formedil compilata)</span>'
+    ritornoTxt=fmtDate(dStr)+' <span style="font-size:11px;color:#27ae60">(proposta '+(calcC?'sulla visita del ciclo':'Formedil')+' compilata)</span>'
+  }else if(calcC&&calcC.esito==='fermo'){
+    ritornoTxt='<span style="color:#b35c00">'+esc(calcC.nota)+': nessuna data di ritorno, il seguito lo decide il Coordinatore</span>'
+  }else if(calcC&&calcC.esito==='critico'){
+    ritornoTxt='<span style="color:#c0392b">'+esc(calcC.nota)+'</span>'
   }else{
-    ritornoTxt='<span style="color:#888">Archiviazione — nessun rientro previsto per questo IPC / n° accesso</span>'
+    ritornoTxt='<span style="color:#888">'+(calcC?esc(calcC.nota):'Archiviazione — nessun rientro previsto per questo IPC / n° accesso')+'</span>'
   }
 
   $('rp-dati').innerHTML=[
@@ -6625,6 +6645,7 @@ function buildRiepilogo(){
   ].map(([k,v])=>`<div class="rp-item"><div class="rp-k">${k}</div><div class="rp-v">${esc(v||'-')}</div></div>`).join('')
     +`<div class="rp-item"><div class="rp-k">Visita di ritorno</div><div class="rp-v">${ritornoTxt}</div></div>`
   rpAccessoComplesso(accCant).catch(e=>console.warn('accesso sul complesso:',e))
+  if(window.CicliVisita)CicliVisita.render()   // (20/10/2026) il riquadro del ciclo, con la domanda se il programma l'ha posta
 
   let zoneHtml=''
   for(let z=1;z<=10;z++){
@@ -7479,7 +7500,7 @@ async function loadScadenze(){
     const PAGE=1000
     for(let off=0;;off+=PAGE){
       const{data:vs,error:ev}=await sb.from('visite')
-        .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,acc_cant,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_civico,cantiere_etichetta,comune_nome,lat,lng,geocode_status,cantiere_chiuso)')
+        .select('visita_id,nr_verbale,data_visita,data_ritorno,ipc,acc_cant,ciclo_visita,ciclo_esito,ciclo_rientro_giorni,tecnico_id,cantiere_id,cantieri(cantiere_indirizzo,cantiere_civico,cantiere_etichetta,comune_nome,lat,lng,geocode_status,cantiere_chiuso)')
         .eq('elimina',0).order('data_visita',{ascending:false}).order('nr_verbale',{ascending:false}).range(off,off+PAGE-1)
       if(ev){_scadErrore=ev.message||String(ev);console.error('loadScadenze visite',ev);toast('Non sono riuscito a leggere tutte le visite ('+ev.message+'): lo scadenzario è incompleto, ricarica prima di fidarti.','err');break}
       if(!vs||!vs.length)break
@@ -7523,8 +7544,9 @@ async function loadScadenze(){
     // rilievo, 2° accesso con IPC basso, ecc.) nessun rientro è dovuto → fuori dallo
     // scadenziario, anche se in precedenza era stata impostata a mano una data di ritorno
     // poi superata da un ritorno anticipato del tecnico.
-    const calc=calcRientroFormedil(v.data_visita, v.acc_cant, ipc)
-    if(!calc.date)return // archiviazione: nessun rientro previsto
+    /* (20/10/2026) dal 1° ottobre la regola si legge sulla visita del ciclo (giorni scritti dal database); sullo storico sull'accesso */
+    const calc=(window.CicliVisita&&v.ciclo_visita!=null)?CicliVisita.rientro(v):calcRientroFormedil(v.data_visita, v.acc_cant, ipc)
+    if(!calc.date)return // archiviazione, ciclo fermo o critico: nessun rientro previsto
     // La data del tecnico (se presente) stabilisce solo QUANDO; altrimenti si usa quella calcolata.
     let dr, isCalcolata=false, tipoCalc=calc.tipo||null   // il tipo (ordinaria/urgente/immediata) serve anche alla lista per giorni
     if(v.data_ritorno){
@@ -7733,7 +7755,7 @@ async function loadLista(){
     for(let y=_cur;y>=2023;y--)_oh+='<option value="'+y+'">'+y+'-'+(y+1)+'</option>'
     _qy.innerHTML=_oh;_qy.value=String(_cur);_qy.onchange=loadLista
   }
-  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,created_at,ipc,stato,elimina,ipc_nc_plus,ipc_nc_minus,ipc_oss,acc_cant,fp_tipo,fp_esito,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
+  let qb=sb.from('visite').select(`visita_id,nr_verbale,data_visita,created_at,ipc,stato,elimina,ipc_nc_plus,ipc_nc_minus,ipc_oss,ciclo_visita,ciclo_esito,ciclo_divergente,visite_cicli(numero,stato,esito),acc_cant,fp_tipo,fp_esito,cantieri(cantiere_indirizzo,cantiere_etichetta),imprese(impresa_nome)`).order('data_visita',{ascending:false}).limit(2000)
   if(!_showElim)qb=qb.eq('elimina',0)
   if(fi)qb=qb.eq('ipc',fi)
   if(fs)qb=qb.eq('stato',fs)
@@ -7845,7 +7867,7 @@ function vtRow(v){
       +(coord?`<button class="btn-outline btn-sm" data-act="softdel" data-id="${v.visita_id}" data-nr="${nr}" title="Metti in eliminata" style="color:#c0392b">🗑</button>`:'')
   }
   return`<tr class="row-detail-hover" data-act="detail-visita" data-id="${v.visita_id}"${isElim?' style="opacity:.55"':''}>
-    <td>${v.nr_verbale||'-'}${window.FuoriProcedura?FuoriProcedura.badge(v):''}${isElim?' <span class="badge" style="background:#c0392b;color:#fff">eliminata</span>':''}</td><td>${fmtDate(v.data_visita)}</td>
+    <td>${v.nr_verbale||'-'}${window.FuoriProcedura?FuoriProcedura.badge(v):''}${window.CicliVisita?CicliVisita.badge(v):''}${isElim?' <span class="badge" style="background:#c0392b;color:#fff">eliminata</span>':''}</td><td>${fmtDate(v.data_visita)}</td>
     <td style="text-align:center;font-weight:600">${v.acc_cant?v.acc_cant+'°':'–'}</td>
     <td>${cant}</td><td>${v.imprese?.impresa_nome||'-'}</td>
     <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
@@ -14234,6 +14256,7 @@ async function rebuildSnapFromDB(vid,opt){
     note_for_sn:v.note_for_sn||false,note_for_m:v.note_for_m||null,note_for_tipi:v.note_for_tipi||null,
     segnalazione:v.segnalazione||false,data_ritorno:v.data_ritorno||null,
     fp_tipo:v.fp_tipo||null,fp_motivo_tipo:v.fp_motivo_tipo||null,fp_motivo:v.fp_motivo||null,fp_serie_proposta:!!v.fp_serie_proposta,fp_rif_visita_id:v.fp_rif_visita_id||null,fp_esito:v.fp_esito||null,   // (13/10/2026)
+    ciclo_scelta:v.ciclo_scelta||null,ciclo_motivo_tipo:v.ciclo_motivo_tipo||null,ciclo_motivo:v.ciclo_motivo||null,   // (20/10/2026) la risposta del tecnico sul ciclo
     _rebuilt_from_db:true
   }
   /* per riaprire LO STESSO verbale serve tutto quello che il database tiene: senza, riaprire e
@@ -14318,6 +14341,7 @@ async function nuovaVisitaDaVerbale(vid, mode){
     snap.data_visita=null; snap.ora_visita=null; snap.ora_fine=null
     snap.acc_cant=null; snap.data_ritorno=null
     ;['fp_tipo','fp_motivo_tipo','fp_motivo','fp_serie_proposta','fp_rif_visita_id','fp_esito'].forEach(k=>delete snap[k])   // (13/10/2026) la visita nuova rifà il controllo
+    ;['ciclo_scelta','ciclo_motivo_tipo','ciclo_motivo'].forEach(k=>delete snap[k])   // (20/10/2026) la visita nuova rifà la proposta del ciclo
     await initForm(snap)     // assegna un nuovo nr_verbale e la data odierna
     navTo('form')
     if(snap.cantiere_id) await autoAccCant(snap.cantiere_id)
@@ -14361,6 +14385,7 @@ async function showVisitaDetail(vid){
         tipo_accesso,acc_cant,nr_lavoratori,nr_lavoratori_stranieri,prescrizioni,oss_tec,
         oss_tec_int,note_for_sn,note_for_m,note_for_tipi,segnalazione,data_ritorno,
         fp_tipo,fp_motivo_tipo,fp_motivo,fp_serie_proposta,fp_lavorazioni_uguali,fp_esito,fp_esito_il,fp_esito_nota,
+        ciclo_visita,ciclo_esito,ciclo_rientro_giorni,ciclo_scelta,ciclo_motivo_tipo,ciclo_motivo,ciclo_proposta,ciclo_divergente,ciclo_fonte,visite_cicli(numero,stato,esito,n_visite,chiuso_il,percorso,percorso_esito),
         comm_tipo_sogg,comm_titolo,comm_nome,comm_cog,comm_cf,comm_piva,comm_rag_soc,comm_email,comm_tel,
         tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),
         cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,prot_int),
@@ -14385,6 +14410,8 @@ async function showVisitaDetail(vid){
     ])
     /* (13/10/2026) visita fuori procedura: motivo del tecnico e decisione del Coordinatore (interno, mai sul PDF) */
     if(v.fp_tipo&&window.FuoriProcedura){html+=qdSec('⚠️ Fuori procedura (interno)')+qdDl(FuoriProcedura.dettaglio(v))}
+    /* (20/10/2026) ciclo di visita: numero, visita del ciclo, proposta e scelta (interno, mai sul PDF) */
+    if(v.ciclo_visita!=null&&window.CicliVisita){html+=qdSec('🔁 Ciclo di visita (interno)')+qdDl(CicliVisita.dettaglio(v))}
     if(cant){
       html+=qdSec('Cantiere')
       html+=qdDl([
@@ -16875,6 +16902,9 @@ document.addEventListener('input',function(ev){
 <script src="formazione-docente.js?v=3"></script>
 <script src="rientri-giorni.js?v=6"></script>
 <script src="statistiche-commissione.js?v=2"></script>
+<!-- cicli di visita (20/10/2026): proposta alla chiusura del verbale, regola sulla visita del ciclo, Zona Coordinatore; statistiche dei cicli -->
+<script src="cicli-visita.js?v=1"></script>
+<script src="statistiche-cicli.js?v=1"></script>
 <script src="veste-v2.js?v=44"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
