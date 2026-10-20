@@ -597,6 +597,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div id="dash-stage-sr" style="display:none;margin-bottom:14px"></div>
       <!-- i verbali la cui mail e' tornata indietro (mail-respinte-tec.js, 21/09/2026) -->
       <div id="dash-respinte" style="display:none;margin-bottom:14px"></div>
+      <!-- i verbali che il Coordinatore chiede di sistemare (questioni-verbali.js, 20/10/2026) -->
+      <div id="dash-questioni" style="display:none;margin-bottom:14px"></div>
       <!-- cantieri che un tecnico propone di chiudere: lo vede la segreteria (proposte-chiusura.js, 23/09/2026) -->
       <div id="dash-prop-chiusura" style="display:none;margin-bottom:14px"></div>
       
@@ -3004,7 +3006,7 @@ function navTo(view){
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
   if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
   if(view==='dashboard')loadAutorizzazioni().catch(e=>console.warn('autorizzazioni:',e))
-  if(view==='dashboard'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.notificheBox)window.notificheBox().catch(e=>console.warn('notifiche:',e));if(window.respinteBox)window.respinteBox().catch(e=>console.warn('mail respinte:',e));if(window.propChius)window.propChius.box().catch(e=>console.warn('proposte chiusura:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))}
+  if(view==='dashboard'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.notificheBox)window.notificheBox().catch(e=>console.warn('notifiche:',e));if(window.respinteBox)window.respinteBox().catch(e=>console.warn('mail respinte:',e));if(window.QuestioniVerbali)window.QuestioniVerbali.boxTecnico().catch(e=>console.warn('verbali da sistemare:',e));if(window.propChius)window.propChius.box().catch(e=>console.warn('proposte chiusura:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))}
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
@@ -3225,6 +3227,15 @@ async function loadFattureCoord(){
     if(ePP)throw ePP
     ;(pp||[]).forEach(p=>{const k=nPrest[p.fattura_id]||(nPrest[p.fattura_id]={n:0,netto:0});k.n++;k.netto+=Number(p.importo||0)})
   }catch(_e){errPrest=_e?.message||String(_e)}
+  /* (20/10/2026) i verbali con una questione aperta fermano il pagamento: lo dice il database
+     (fattura_questioni_aperte, e il trigger che rifiuta l'approvazione) */
+  const blocchi={}
+  let errBlocchi=''
+  try{
+    const{data:bb,error:eBB}=await sb.rpc('fattura_questioni_aperte',{p_fatture:righe.map(r=>r.id)})
+    if(eBB)throw eBB
+    ;(bb||[]).forEach(b=>(blocchi[b.fattura_id]=blocchi[b.fattura_id]||[]).push(b))
+  }catch(_e){errBlocchi=_e?.message||String(_e)}
   const dIt=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):''
   const eur=n=>Number(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})
   const esc_=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
@@ -3236,7 +3247,8 @@ async function loadFattureCoord(){
     return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid #f0e6dd">
       <strong style="font-size:12px">${esc_(r.tecnico_nome)}</strong>${badge(r.stato)}
       <span style="font-size:12px;color:#444;flex:1;min-width:220px">fattura n&deg; <strong>${esc_(r.numero||'?')}</strong>${r.data_fattura?' del '+dIt(r.data_fattura):''} &middot; ricevuta ${dIt(r.data_ricevimento)} &middot; <strong>${eur(r.importo)} &euro;</strong> &middot; ${errPrest?'<span style="color:#c0392b">prestazioni non lette</span>':`${k.n} prestazioni (netto ${eur(k.netto)})`}${r.stato==='standby'&&r.standby_motivo?`<br><span style="color:#c0392b">Stand-by: ${esc_(r.standby_motivo)}</span>`:''}${r.note?`<br><span style="color:#888">${esc_(r.note)}</span>`:''}</span>
-      <button class="btn-primary btn-sm" onclick="fattDecidi(${r.id},'approvata')">&#9989; Approva</button>
+      ${(blocchi[r.id]||[]).length?`<span style="flex-basis:100%;font-size:12px;color:#c0392b">&#9940; Non pu&ograve; andare in pagamento: ${(blocchi[r.id]||[]).map(b=>`<strong>${esc_(b.nr_verbale||'')}</strong> (${esc_(b.motivo)})`).join(', ')}. Si chiude dal riepilogo &laquo;Verbali da sistemare&raquo; qui sotto.</span>`:''}
+      <button class="btn-primary btn-sm" onclick="fattDecidi(${r.id},'approvata')"${(blocchi[r.id]||[]).length?' disabled':''}>&#9989; Approva</button>
       ${r.stato!=='standby'?`<button class="btn-outline btn-sm" onclick="fattDecidi(${r.id},'standby')">&#9208; Stand-by</button>`:''}
       <a href="https://formedilpadovacpt.github.io/segreteria/#fattura-${r.id}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:var(--orange,#e7500f);text-decoration:none">dettaglio &#8599;</a>
     </div>`
@@ -3244,6 +3256,7 @@ async function loadFattureCoord(){
   box.innerHTML=`<div class="card" style="border-left:4px solid var(--orange,#e7500f)">
     <h3>&#128182; Fatture dei tecnici da approvare <span style="color:#b35c00">&mdash; ${righe.length}</span></h3>
     <p style="font-size:12px;color:#666;margin:4px 0 6px">Si approva solo se tutte le attivita' del mese sono a posto; altrimenti stand-by con il motivo, e il mandato non parte finche' non si risolve col tecnico.</p>
+    ${errBlocchi?`<p style="font-size:12px;color:#c0392b;margin:4px 0 6px">Non sono riuscito a leggere i verbali con questioni aperte (${esc_(errBlocchi)}): se una fattura ne ha, l'approvazione verr&agrave; rifiutata.</p>`:''}
     ${errPrest?`<p style="font-size:12px;color:#c0392b;margin:4px 0 6px">Non sono riuscito a leggere le prestazioni collegate (${esc_(errPrest)}): il numero di prestazioni e il netto non sono disponibili, controllali nel dettaglio prima di approvare.</p>`:''}
     ${righe.map(riga).join('')}
   </div>`
@@ -3255,6 +3268,16 @@ async function fattDecidi(id,esito){
     motivo=prompt('Motivo dello stand-by (anomalia da risolvere col tecnico):');if(motivo===null)return
     motivo=motivo.trim()
     if(motivo.length<5){toast('Scrivi il motivo dello stand-by: e\u2019 la riga che rileggeranno il tecnico e la segreteria','warn');return}
+  }
+  /* (20/10/2026) prima di approvare: ogni verbale che il controllo segnala deve avere una decisione
+     del Coordinatore (fatto passare o segnalato), e nessuna segnalazione dev'essere aperta */
+  if(esito==='approvata'){
+    if(!window.QuestioniVerbali){toast('Pagina non aggiornata: ricarica prima di approvare','err');return}
+    let k
+    try{k=await window.QuestioniVerbali.controllaFattura(id)}
+    catch(e){toast('Non sono riuscito a controllare i verbali della fattura ('+(e.message||e)+'): riprova prima di approvare','err',9000);return}
+    if(k.aperte.length){alert('La fattura non può ancora andare in pagamento: questi verbali hanno una segnalazione aperta.\n\n'+k.aperte.map(q=>'• '+(q.nr_verbale||'')).join('\n')+'\n\nChiudila dal riepilogo «Verbali da sistemare» (Risolta o Fai passare).');return}
+    if(k.nonDecisi.length){alert('Prima di approvare decidi su questi verbali, che il controllo segnala: falli passare o segnalali al tecnico dal riepilogo «Verbali da sistemare».\n\n'+k.nonDecisi.map(x=>'• '+(x.visita.nr_verbale||'')+' — '+x.avvisi.map(a=>a.testo).join(' / ')).join('\n'));return}
   }
   if(esito==='approvata'&&!confirm('Approvi la fattura per il pagamento? Vuol dire che tutte le attivita\' del mese sono a posto.'))return
   const{error}=await sb.rpc('s_fattura_decisione',{p_id:id,p_esito:esito,p_motivo:motivo||null})
@@ -16873,13 +16896,15 @@ document.addEventListener('input',function(ev){
 <script src="cantieri-critici-coord.js?v=4"></script>
 <script src="controllo-verbale.js?v=2"></script>
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
-<script src="riepilogo-verbali.js?v=2"></script>
+<script src="riepilogo-verbali.js?v=3"></script>
+<!-- che cosa ne fa il Coordinatore: segnala al tecnico o fa passare; il tecnico risponde in Oggi (20/10/2026) -->
+<script src="questioni-verbali.js?v=1"></script>
 <script src="scheda-impresa.js?v=2"></script>
 <script src="imprese-anagrafica.js?v=1"></script>
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=7"></script>
-<script src="aiuto.js?v=28"></script>
+<script src="aiuto.js?v=29"></script>
 <script src="mail-respinte-tec.js?v=3"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=2"></script>

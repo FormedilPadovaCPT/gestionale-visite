@@ -148,10 +148,31 @@
   async function leggi(ym) {
     const da = primoGiorno(ym), a = ultimoGiorno(ym);
     const { data: visite, error } = await radice.sb.from('visite')
-      .select('visita_id, nr_verbale, data_visita, ora_visita, ora_fine, data_ritorno, acc_cant, ipc, oss_tec, note_lav, ppre_nome, ppre_cog, nom_ppre, qual_ppre, cantiere_id, impresa_id, tecnico_id, elimina, stato')
+      .select(CAMPI)
       .gte('data_visita', da).lte('data_visita', a).limit(2000);
     if (error) throw error;
-    const vive = (visite || []).filter((v) => !v.elimina);
+    return completa((visite || []).filter((v) => !v.elimina));
+  }
+
+  const CAMPI = 'visita_id, nr_verbale, data_visita, ora_visita, ora_fine, data_ritorno, acc_cant, ipc, oss_tec, note_lav, ppre_nome, ppre_cog, nom_ppre, qual_ppre, cantiere_id, impresa_id, tecnico_id, elimina, stato';
+
+  /* (20/10/2026) gli stessi controlli su un elenco di verbali, non su un mese: li usa la Zona
+     Coordinatore prima di approvare una fattura (questioni-verbali.js, controllaFattura) */
+  async function analizzaVisite(ids) {
+    const unici = [...new Set((ids || []).filter(Boolean))];
+    const visite = [];
+    for (let i = 0; i < unici.length; i += 100) {
+      const { data, error } = await radice.sb.from('visite').select(CAMPI).in('visita_id', unici.slice(i, i + 100));
+      if (error) throw error;
+      visite.push(...(data || []));
+    }
+    const dati = await completa(visite.filter((v) => !v.elimina));
+    const analizza = radice.ControlloVerbale && radice.ControlloVerbale.analizza;
+    if (!analizza) throw new Error('manca il modulo dei controlli (controllo-verbale.js)');
+    return riepiloga(dati.visite, dati.righeChk, dati.descrizioni, analizza, oggiIt());
+  }
+
+  async function completa(vive) {
     if (!vive.length) return { visite: [], righeChk: [], descrizioni: {} };
 
     const ids = vive.map((v) => v.visita_id);
@@ -179,13 +200,14 @@
      scrivere «nessuno» dove la ricerca era semplicemente fallita). */
   async function nomiTecnici(ids) {
     const unici = [...new Set(ids.filter(Boolean))];
-    if (!unici.length) return { nomi: {}, errore: null };
+    if (!unici.length) return { nomi: {}, propri: {}, errore: null };
     try {
       const { data, error } = await radice.sb.from('tecnici')
         .select('tecnico_id, tecnico_cognome, tecnico_nome').in('tecnico_id', unici);
       if (error) throw error;
-      return { nomi: Object.fromEntries((data || []).map((t) => [t.tecnico_id, [t.tecnico_cognome, t.tecnico_nome].filter(Boolean).join(' ')])), errore: null };
-    } catch (e) { return { nomi: {}, errore: e.message || String(e) }; }
+      return { nomi: Object.fromEntries((data || []).map((t) => [t.tecnico_id, [t.tecnico_cognome, t.tecnico_nome].filter(Boolean).join(' ')])),
+        propri: Object.fromEntries((data || []).map((t) => [t.tecnico_id, t.tecnico_nome || ''])), errore: null };
+    } catch (e) { return { nomi: {}, propri: {}, errore: e.message || String(e) }; }
   }
 
   async function mostra(ym) {
@@ -209,7 +231,33 @@
       return;
     }
     const r = riepiloga(dati.visite, dati.righeChk, dati.descrizioni, analizza, oggiIt());
-    const { nomi, errore: erroreNomi } = await nomiTecnici(r.daSistemare.map((x) => x.visita.tecnico_id));
+
+    /* (20/10/2026) che cosa ne ha fatto il Coordinatore (questioni-verbali.js). Anche i verbali con una
+       segnalazione ancora aperta che il controllo non segnala più (corretti nel frattempo) restano in
+       elenco: aperti e invisibili bloccherebbero il pagamento senza che nessuno li veda. */
+    const QV = radice.QuestioniVerbali;
+    let perVisita = {}, erroreQ = null, puoDecidere = false;
+    if (QV) {
+      try {
+        const [qq, aperte, c] = await Promise.all([
+          QV.leggi(r.daSistemare.map((x) => x.visita.visita_id)),
+          QV.aperteDelMese(primoGiorno(ym), ultimoGiorno(ym)),
+          QV.sonoCoordinatore(),
+        ]);
+        perVisita = QV.ultimePerVisita([...qq, ...aperte]);
+        puoDecidere = c;
+        const gia = new Set(r.daSistemare.map((x) => x.visita.visita_id));
+        for (const q of aperte) {
+          if (gia.has(q.visita_id)) continue;
+          const v = dati.visite.find((x) => x.visita_id === q.visita_id);
+          if (v) { r.daSistemare.push({ visita: v, avvisi: [{ chi: 'questione', testo: 'Il controllo non segnala più niente su questo verbale: se è sistemato, chiudi la segnalazione come risolta.' }] }); gia.add(q.visita_id); }
+        }
+        r.daSistemare.sort((a, b) => String(a.visita.nr_verbale || '').localeCompare(String(b.visita.nr_verbale || ''), 'it', { numeric: true }));
+      } catch (e) { erroreQ = e.message || String(e); }
+    }
+    righeCorrenti = r.daSistemare; meseCorrente = ym;
+    const { nomi, propri, errore: erroreNomi } = await nomiTecnici(r.daSistemare.map((x) => x.visita.tecnico_id));
+    for (const x of r.daSistemare) x.nome = propri[x.visita.tecnico_id] || '';
 
     if (!r.daSistemare.length) {
       corpo.innerHTML = `<p style="font-size:13px;color:#27ae60">Tutti i <strong>${r.esaminati}</strong> verbali del mese sono a posto rispetto ai controlli.</p>`;
@@ -224,9 +272,34 @@
           <ul style="margin:4px 0 0 18px;padding:0;font-size:12px;color:#555">
             ${avvisi.map((a) => `<li style="margin:2px 0">${esc(a.testo)}</li>`).join('')}
           </ul>
+          ${QV && !erroreQ ? QV.htmlRiga({ visita: v, avvisi }, perVisita[v.visita_id], puoDecidere) : ''}
         </div>`).join('')}
+      ${erroreQ ? `<p style="font-size:11px;color:#c0392b;margin:8px 0 0">Non sono riuscito a leggere le segnalazioni ai tecnici (${esc(erroreQ)}): ricarica prima di decidere.</p>` : ''}
       ${erroreNomi ? `<p style="font-size:11px;color:#c0392b;margin:8px 0 0">Non sono riuscito a leggere i nomi dei tecnici (${esc(erroreNomi)}): l'elenco dei verbali è completo lo stesso.</p>` : ''}
       <p style="font-size:11px;color:#888;margin:10px 0 0">Sono gli stessi avvisi che il tecnico ha visto salvando il verbale e che può aver scelto di salvare comunque. L'elenco è per verbale: non si contano né si confrontano i tecnici.</p>`;
+  }
+
+  /* i pulsanti delle righe (questioni-verbali.js): dopo ogni decisione si ridisegna il mese */
+  let righeCorrenti = [], meseCorrente = null;
+  if (haDom) {
+    document.addEventListener('click', async (e) => {
+      const QV = radice.QuestioniVerbali;
+      const el = e.target.closest('[data-vq-segnala],[data-vq-passa],[data-vq-risolta]');
+      if (!el || !QV || !el.closest('#dash-riepilogo-verbali')) return;
+      const vid = el.dataset.vqSegnala || el.dataset.vqPassa || el.dataset.vqRisolta;
+      const riga = righeCorrenti.find((x) => x.visita.visita_id === vid);
+      if (!riga) return;
+      let fatto = false;
+      try {
+        if (el.dataset.vqSegnala) fatto = await QV.segnala(riga);
+        else if (el.dataset.vqPassa) fatto = await QV.passa(riga);
+        else {
+          const q = QV.ultimePerVisita(await QV.leggi([vid]))[vid];
+          if (q) fatto = await QV.risolta(q);
+        }
+      } catch (err) { avviso('Non riuscito: ' + (err.message || err), 'err'); }
+      if (fatto && meseCorrente) mostra(meseCorrente);
+    });
   }
 
   async function monta() {
@@ -279,7 +352,7 @@
     };
   }
 
-  const api = { riepiloga, monta, mesePredefinito, ultimoGiorno };
+  const api = { riepiloga, monta, mesePredefinito, ultimoGiorno, analizzaVisite };
   radice.RiepilogoVerbali = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

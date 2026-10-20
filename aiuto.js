@@ -191,7 +191,7 @@ window.AIUTO_TESTI = {
   'qr-servizi-invia': 'Manda all\'impresa il link del portale servizi per mail, invece di far inquadrare il QR.',
 
   /* ── coordinatore ── */
-  't:approva': 'Approva la fattura del tecnico: passa all\'Amministrazione per il mandato di pagamento. Prima controlla i verbali del mese.',
+  't:approva': 'Approva la fattura del tecnico: passa all\'Amministrazione per il mandato di pagamento. Prima l\'app controlla i verbali della fattura: non si approva se uno ha una segnalazione aperta, o se il controllo lo segnala e non hai ancora deciso.',
   't:stand-by': 'Ferma la fattura: il mandato non viene generato finché non risolvi con il tecnico. Il motivo resta scritto.',
   't:aggiorna statistiche': 'Ricalcola i contatori sul periodo scelto.',
   't:pubblica': 'Pubblica l\'avviso in bacheca: tutti i tecnici lo vedono in cima alla Dashboard, e chi ha le notifiche riceve un avviso.',
@@ -220,7 +220,14 @@ window.AIUTO_TESTI = {
   'ccc-salva-dec': 'Salva la decisione del coordinatore sul caso: la segreteria la vede e prepara la lettera o la segnalazione.',
   'ccc-salva-merito': 'Salva la valutazione nel merito del caso.',
   'ccc-salva-risposta': 'Salva la risposta al caso.',
-  'rv-vai': 'Apre il verbale da sistemare.',
+  'rv-vai': 'Rifà il controllo sui verbali del mese scelto. Non cambia niente.',
+  /* verbali da sistemare: decisione del Coordinatore e risposta del tecnico (questioni-verbali.js, 20/10/2026) */
+  't:segnala al tecnico': 'Apre il messaggio già scritto per il tecnico, da correggere prima di mandarlo. Lui lo trova nella pagina Oggi, con la notifica; finché la segnalazione è aperta la sua fattura non va in pagamento.',
+  't:segnala di nuovo': 'Riapre la questione con un messaggio nuovo al tecnico: la fattura che copre il verbale torna bloccata finché non la chiudi.',
+  't:fai passare': 'Chiude la questione così com\'è, senza scrivere al tecnico: il verbale non blocca più il pagamento. Resta scritto che l\'hai fatto passare.',
+  't:risolta': 'Chiude la segnalazione come risolta: il verbale non blocca più il pagamento.',
+  't:sistemo': 'Dici al Coordinatore che sistemi tu. Se il verbale è fra le tue bozze, correggilo e richiudilo con «Definitivo».',
+  't:va bene così': 'Spieghi al Coordinatore perché il verbale va bene così: decide lui se farlo passare.',
 };
 
 (function () {
