@@ -49,12 +49,14 @@ const dash = estrai('// fetch visite con cantiere + impresa principale', '// Dat
 assert.ok(/vis_tip_int,vis_tip_ope,vis_importo/.test(dash), 'pagina Statistiche: mancano i dati dichiarati nella visita')
 assert.ok(/const dc=datiCantiereStat\(r,r\.cantieri\)/.test(dash), 'pagina Statistiche: non passa da datiCantiereStat')
 assert.ok(/comune:comuneStat\(/.test(dash), 'pagina Statistiche: comuni non unificati')
-assert.ok(/ceiv:ceivStat\(/.test(dash), 'pagina Statistiche: Cassa Edile non letta dalla lista')
+// dal 20/10/2026 la classe passa da ceivStatVisita: la foto alla data della visita, lo stato di oggi solo se manca
+// (dettaglio in test/stato-cassa-fotografato.test.cjs)
+assert.ok(/ceiv:ceivStatVisita\(r\.visite_cassa_foto,/.test(dash), 'pagina Statistiche: Cassa Edile non letta dalla lista')
 
 const rpt = estrai('async function admGeneraReport(){', 'async function admGeneraReportOsservatorio(){')
 assert.ok(/'imprese\(stato_cassa\)'/.test(rpt), 'Report visite: non legge lo stato in lista')
 assert.ok(!/imprese\(cassa_edile\)/.test(rpt), 'Report visite: conta ancora dal campo cassa_edile')
-assert.ok(/ceivStat\(v\.imprese\)/.test(rpt), 'Report visite: Cassa Edile non per visita')
+assert.ok(/ceivStatVisita\(v\.visite_cassa_foto,v\.impresa_id,v\.imprese\)/.test(rpt), 'Report visite: Cassa Edile non per visita')
 assert.ok(/comuneStat\(v\.cantieri\?\.comune_nome\)/.test(rpt), 'Report visite: comuni non unificati')
 assert.ok(/\[0,0,'nessuna'\],\[1,1,'1'\]/.test(rpt), 'Report visite: manca la classe «nessuna impresa»')
 // le letture a lotti guardano error: un lotto non letto non deve dare un totale più basso in silenzio

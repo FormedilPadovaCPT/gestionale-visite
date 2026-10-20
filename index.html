@@ -1331,7 +1331,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       </div>
       <div class="dash-row-2">
         <div class="card"><h3>Andamento dell'IPC mese per mese <span style="font-weight:400;color:#888;font-size:12px">(colonne: visite per IPC · linea: % alto + medio)</span></h3><div class="chbox" style="height:240px"><canvas id="ch-ipcmesi"></canvas></div></div>
-        <div class="card"><h3>IPC secondo l'iscrizione alla Cassa Edile <span style="font-weight:400;color:#888;font-size:12px">(impresa principale, dalla lista della Cassa Edile)</span></h3><div class="chbox" style="height:240px"><canvas id="ch-ipcceiv"></canvas></div></div>
+        <div class="card"><h3>IPC secondo l'iscrizione alla Cassa Edile <span style="font-weight:400;color:#888;font-size:12px">(impresa principale, <span class="ceiv-foto-nota">lista della Cassa Edile alla data della visita</span>)</span></h3><div class="chbox" style="height:240px"><canvas id="ch-ipcceiv"></canvas></div></div>
       </div>
       <div id="grad-kpi" class="card" style="padding:10px 14px;font-size:13px;color:#565c66"><h3 style="margin:0 0 4px">Gradimento delle visite <span style="font-weight:400;color:#888;font-size:12px">(questionari del portale, solo i totali)</span></h3><div id="grad-kpi-testo">Carico…</div></div>
       <div class="dash-row-3">
@@ -1343,7 +1343,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <div class="card"><h3>Imprese ricorrenti — cantieri da monitorare</h3><div id="tbl-imprese" style="overflow-x:auto"></div></div>
       <div class="dash-row-2">
         <div class="card"><h3>Ruolo impresa visitata</h3><div class="chbox" style="height:260px"><canvas id="ch-ruolo"></canvas></div></div>
-        <div class="card"><h3>Iscrizione C.E.I.V. dell'impresa principale <span style="font-weight:400;color:#888;font-size:12px">(dalla lista della Cassa Edile)</span></h3><div class="chbox" style="height:260px"><canvas id="ch-ceiv"></canvas></div></div>
+        <div class="card"><h3>Iscrizione C.E.I.V. dell'impresa principale <span style="font-weight:400;color:#888;font-size:12px">(<span class="ceiv-foto-nota">lista della Cassa Edile alla data della visita</span>)</span></h3><div class="chbox" style="height:260px"><canvas id="ch-ceiv"></canvas></div></div>
       </div>
       <div class="dash-row-2">
         <div class="card"><h3>Tipologia di visita</h3><div class="chbox" style="height:260px"><canvas id="ch-tipovis"></canvas></div></div>
@@ -6737,7 +6737,7 @@ async function loadStat(){
   // fetch visite con cantiere + impresa principale (paginato).
   // Default: SOLO esercizio corrente per un avvio veloce; lo storico completo
   // viene scaricato solo quando l'utente lo richiede dal menu esercizio.
-  const cols=`visita_id,data_visita,ipc,rlst_sn,acc_cant,tecnico_id,tipo_accesso,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantiere_id,impresa_id,vis_tip_int,vis_tip_ope,vis_importo,cantieri(comune_nome,cantiere_tip_int,cantiere_tip_ope,cantiere_importo),visite_imprese_presenti(is_principale,tipo_imp,ruolo,impresa_id,imprese(impresa_nome,stato_cassa))`
+  const cols=`visita_id,data_visita,ipc,rlst_sn,acc_cant,tecnico_id,tipo_accesso,ipc_nc_plus,ipc_nc_minus,ipc_oss,cantiere_id,impresa_id,vis_tip_int,vis_tip_ope,vis_importo,cantieri(comune_nome,cantiere_tip_int,cantiere_tip_ope,cantiere_importo),visite_imprese_presenti(is_principale,tipo_imp,ruolo,impresa_id,imprese(impresa_nome,stato_cassa)),visite_cassa_foto(impresa_id,stato,fonte,iscritta_ceiv)`
   let rows=[],from=0
   for(;;){
     let _q=sb.from('visite').select(cols).eq('elimina',0).order('data_visita',{ascending:true}).range(from,from+999)
@@ -6761,7 +6761,8 @@ async function loadStat(){
       /* 01/10/2026: intervento, opera e importo sono quelli della scheda del cantiere, come nel Report
          visite, nel report Osservatorio e nel file per il nazionale (datiCantiereStat) */
       comune:comuneStat(c.comune_nome)||null, tipint:dc.tipint, tipope:dc.tipope, importo:dc.importo,
-      ruolo:(p&&tipoImpDaRiga(p))||null, ceiv:ceivStat(p&&p.imprese),
+      ruolo:(p&&tipoImpDaRiga(p))||null, ceiv:ceivStatVisita(r.visite_cassa_foto,p&&p.impresa_id,p&&p.imprese),
+      ceivFoto:!!(p&&ceivFoto(r.visite_cassa_foto,p.impresa_id)),
       impnome:(p&&p.imprese&&p.imprese.impresa_nome)||null, impid:(p&&p.impresa_id)||null,
       eserc:_esercizioDa(r.data_visita)
     }
@@ -7154,6 +7155,8 @@ function rptVociNc(chkAll,info,limite){
     .sort((a,b)=>(b.ncp+b.ncm)-(a.ncp+a.ncm)||b.ncp-a.ncp||String(a.codice).localeCompare(String(b.codice))).slice(0,limite||10)
 }
 function _dashRenderCeiv(F){
+  const _nf=notaCeivFoto((F||[]).filter(x=>x.ceivFoto).length,(F||[]).length)
+  document.querySelectorAll('.ceiv-foto-nota').forEach(el=>{el.textContent=_nf})
   const m=_grp(F,x=>x.ceiv);const L=CEIV_STAT_ORD.filter(l=>m[l]);const tot=F.length||1
   const _ceivCol=(lb,i)=>CEIV_STAT_COL[lb]||_DASH_PIE[i%_DASH_PIE.length]
   _mkChart('ch-ceiv',{type:'doughnut',data:{labels:L,datasets:[{data:L.map(l=>m[l]),backgroundColor:L.map((lb,i)=>_ceivCol(lb,i)),borderWidth:2}]},options:{plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:14,generateLabels(ch){return ch.data.labels.map((lb,i)=>({text:lb+' – '+ch.data.datasets[0].data[i]+' ('+Math.round(ch.data.datasets[0].data[i]/tot*100)+'%)',fillStyle:_ceivCol(lb,i),strokeStyle:'#fff',lineWidth:1,index:i}))}}}}}})
@@ -7176,6 +7179,30 @@ function ceivStat(imp){
   if(st==='Attiva')return CEIV_STAT_ORD[0]
   if(st==='Sospesa')return CEIV_STAT_ORD[1]
   return CEIV_STAT_ORD[2]
+}
+/* 20/10/2026 (chiesto dall'utente: «nei verbali questo dato dovrebbe essere fotografato e cristallizzato al
+   momento della visita») — Lo stato in Cassa FOTOGRAFATO alla data della visita (tabella visite_cassa_foto,
+   scritta dal database quando il verbale diventa definitivo, mai riscritta) vince sullo stato di oggi.
+   Senza foto (verbali prima della prima lista conservata, 30/08/2026) vale lo stato di oggi, e la pagina
+   lo dice. Stessa regola di ceivStat: attiva o sospesa = iscritta; cessata, non iscritta, non in lista no.
+   Due righe per la stessa impresa (unione di schede): vale la migliore. */
+function ceivFoto(foto,impresaId){
+  const r=(foto||[]).filter(f=>f&&impresaId&&f.impresa_id===impresaId&&f.fonte&&f.fonte!=='nessuna')
+  if(!r.length)return null
+  const cl=f=>f.iscritta_ceiv===true&&f.stato==='Attiva'?0:(f.iscritta_ceiv===true&&f.stato==='Sospesa'?1:2)
+  return CEIV_STAT_ORD[Math.min.apply(null,r.map(cl))]
+}
+function ceivStatVisita(foto,impresaId,imp){return ceivFoto(foto,impresaId)||ceivStat(imp)}
+function notaCeivFoto(n,tot){
+  if(!tot)return 'lista della Cassa Edile'
+  if(n>=tot)return 'lista della Cassa Edile alla data della visita'
+  if(!n)return 'lista della Cassa Edile di oggi: lo stato alla data della visita non \u00e8 conservato per questo periodo'
+  return 'lista della Cassa Edile alla data della visita per '+n+' visite su '+tot+'; per le altre '+(tot-n)+', lista di oggi'
+}
+function notaCeivFotoBreve(n,tot){
+  if(!tot||n>=tot)return 'stato in Cassa alla data della visita'
+  if(!n)return 'stato in Cassa di oggi'
+  return 'stato in Cassa alla data della visita per '+n+' su '+tot+', di oggi per le altre'
 }
 /* Comune per le statistiche: maiuscole unificate e quartiere di Padova tolto («PADOVA - Q1 (Centro
    storico)» e «Padova» sono PADOVA). */
@@ -11472,7 +11499,7 @@ async function admGeneraReport(){
         'nr_lavoratori','nr_imp','nr_ind','comm_tipo','comm_tipo_sogg',
         'vis_tip_int','vis_tip_ope','vis_durata','vis_importo',
         'tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome)',
-        'imprese(stato_cassa)',
+        'impresa_id','imprese(stato_cassa)','visite_cassa_foto(impresa_id,stato,fonte,iscritta_ceiv)',
         'cantieri(cantiere_tip_int,cantiere_tip_ope,cantiere_durata,cantiere_importo,comune_nome,committenti(committente_tipo))'
       ].join(','))
       .gte('data_visita',dal).lte('data_visita',al).eq('elimina',0).order('visita_id').range(da,a))
@@ -11511,7 +11538,9 @@ async function admGeneraReport(){
        che vale «C.E.I.V.» anche per sospese, cessate e non iscritte, e non era confrontabile col
        foglio del modulo, che conta le visite */
     const ceivMap={}
-    visite.forEach(v=>{const k=ceivStat(v.imprese);ceivMap[k]=(ceivMap[k]||0)+1})
+    visite.forEach(v=>{const k=ceivStatVisita(v.visite_cassa_foto,v.impresa_id,v.imprese);ceivMap[k]=(ceivMap[k]||0)+1})
+    // 20/10/2026: quante visite hanno lo stato in Cassa fotografato alla data della visita
+    const ceivNotaRpt=notaCeivFotoBreve(visite.filter(v=>ceivFoto(v.visite_cassa_foto,v.impresa_id)).length,visite.length)
 
     // ── 5. Aggregazioni ──
     const nV=visite.length
@@ -11746,7 +11775,7 @@ async function admGeneraReport(){
         data:ceivEntries.map(([,n])=>n),
         labels:ceivEntries.map(([k])=>k),
         colors:ceivEntries.map(([k])=>CEIV_STAT_COL[k]||'#999999'),
-        title:'Iscrizione C.E.I.V. dell\u2019impresa principale, per visita (lista della Cassa Edile)',
+        title:'Iscrizione C.E.I.V. dell\u2019impresa principale, per visita ('+ceivNotaRpt+')',
         w:640,h:200,maxLbl:26
       })
       chartCard(ceivImg,M,y,CW,52)
@@ -11983,10 +12012,10 @@ async function admGeneraReport(){
         title:'Andamento dell\u2019IPC mese per mese (sotto ogni mese: % di visite con IPC alto + medio)',segLabels:ipcEtich,segColors:ipcColori,w:640,h:230})
       chartCard(anImg,M,y,CW,66);y+=70
     }
-    const perCassa=ipcPerCeiv(visite.map(v=>({ceiv:ceivStat(v.imprese),ipc:ipcNorm(v)})))
+    const perCassa=ipcPerCeiv(visite.map(v=>({ceiv:ceivStatVisita(v.visite_cassa_foto,v.impresa_id,v.imprese),ipc:ipcNorm(v)})))
     if(perCassa.length){
       const pcImg=rptPercentBars({rows:perCassa.map(x=>({label:_maiuscola(x.classe.replace('C.E.I.V. \u2013 ',''))+' ('+x.n+')',segs:[x.NR,x.BASSO,x.MEDIO,x.ALTO],nota:'alto+medio '+x.pctAM+'%'})),
-        title:'IPC secondo l\u2019iscrizione alla Cassa Edile dell\u2019impresa (lista della Cassa Edile)',segLabels:ipcEtich,segColors:ipcColori,w:640,h:125})
+        title:'IPC secondo l\u2019iscrizione alla Cassa Edile dell\u2019impresa ('+ceivNotaRpt+')',segLabels:ipcEtich,segColors:ipcColori,w:640,h:125})
       chartCard(pcImg,M,y,CW,37);y+=41
     }
     /* gradimento delle visite (19/10/2026): solo totali, dalla stessa funzione della pagina Statistiche.
