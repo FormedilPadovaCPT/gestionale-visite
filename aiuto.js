@@ -226,8 +226,8 @@ window.AIUTO_TESTI = {
   't:segnala di nuovo': 'Riapre la questione con un messaggio nuovo al tecnico: la fattura che copre il verbale torna bloccata finché non la chiudi.',
   't:fai passare': 'Chiude la questione così com\'è, senza scrivere al tecnico: il verbale non blocca più il pagamento. Resta scritto che l\'hai fatto passare.',
   't:risolta': 'Chiude la segnalazione come risolta: il verbale non blocca più il pagamento.',
-  't:sistemo': 'Dici al Coordinatore che sistemi tu. Se il verbale è fra le tue bozze, correggilo e richiudilo con «Definitivo».',
-  't:va bene così': 'Spieghi al Coordinatore perché il verbale va bene così: decide lui se farlo passare.',
+  't:sistemo': 'Dici all\'ufficio che sistemi tu. Se il verbale è fra le tue bozze, correggilo e richiudilo con «Definitivo».',
+  't:va bene così': 'Spieghi perché il verbale va bene così: chi ti ha scritto (Coordinatore o segreteria) decide se farlo passare.',
 };
 
 (function () {

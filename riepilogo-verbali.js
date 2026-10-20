@@ -242,7 +242,7 @@
         const [qq, aperte, c] = await Promise.all([
           QV.leggi(r.daSistemare.map((x) => x.visita.visita_id)),
           QV.aperteDelMese(primoGiorno(ym), ultimoGiorno(ym)),
-          QV.sonoCoordinatore(),
+          QV.possoDecidere(),
         ]);
         perVisita = QV.ultimePerVisita([...qq, ...aperte]);
         puoDecidere = c;

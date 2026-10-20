@@ -14,7 +14,11 @@
      · il tecnico risponde «🛠 Sistemo» oppure «💬 Va bene così, perché…».
      · il Coordinatore chiude: «✅ Risolta» o «✔ Fai passare».
    Il messaggio lo scrive e lo manda una persona: non è una mail
-   automatica (la mail resta facoltativa, dalla posta del Coordinatore).
+   automatica (la mail resta facoltativa, dalla posta di chi scrive).
+
+   (20/10/2026 sera, deciso dall'utente) Le stesse decisioni le prende
+   anche la SEGRETERIA, nello stesso elenco: il Coordinatore vede tutto,
+   e ogni riga dice chi ha segnalato e chi ha chiuso.
 
    ⚠️ NIENTE PAGAMENTO CON UNA QUESTIONE APERTA: lo impedisce il
    database (trigger su s_fatture_tecnici, 2026_10_20_questioni_verbali.sql).
@@ -54,11 +58,12 @@
   /* lo stato di un verbale rispetto alle questioni: l'ultima riga decide */
   function stato(q) {
     if (!q) return { codice: 'nessuna', aperta: false, testo: '' };
-    if (q.esito === 'segnalata') return { codice: 'segnalata', aperta: true, testo: `Segnalato al tecnico il ${dIt(q.aperta_il)}${q.riaperto ? ', verbale rimesso fra le sue bozze' : ''}: attende la risposta.` };
+    const da = (x) => (x ? ` (${x})` : '');
+    if (q.esito === 'segnalata') return { codice: 'segnalata', aperta: true, testo: `Segnalato al tecnico il ${dIt(q.aperta_il)}${da(q.aperta_da)}${q.riaperto ? ', verbale rimesso fra le sue bozze' : ''}: attende la risposta.` };
     if (q.esito === 'risposta') return { codice: 'risposta', aperta: true,
-      testo: `Il tecnico ha risposto il ${dIt(q.risposta_il)}: ${q.risposta_tipo === 'sistemo' ? '«Sistemo»' : '«Va bene così»'}${q.risposta ? ' — ' + q.risposta : ''}. Manca la tua decisione.` };
-    if (q.esito === 'risolta') return { codice: 'risolta', aperta: false, testo: `Risolto il ${dIt(q.chiusa_il)}${q.nota_chiusura && q.nota_chiusura !== 'Risolta' ? ' — ' + q.nota_chiusura : ''}.` };
-    if (q.esito === 'passata') return { codice: 'passata', aperta: false, testo: `Fatto passare il ${dIt(q.chiusa_il)}${q.nota_chiusura && !/^Fatt[oa] passare dal Coordinatore$/.test(q.nota_chiusura) ? ' — ' + q.nota_chiusura : ''}.` };
+      testo: `Il tecnico ha risposto il ${dIt(q.risposta_il)}: ${q.risposta_tipo === 'sistemo' ? '«Sistemo»' : '«Va bene così»'}${q.risposta ? ' — ' + q.risposta : ''}. Segnalato${da(q.aperta_da)}: manca la decisione.` };
+    if (q.esito === 'risolta') return { codice: 'risolta', aperta: false, testo: `Risolto il ${dIt(q.chiusa_il)}${da(q.chiusa_da)}${q.nota_chiusura && q.nota_chiusura !== 'Risolta' ? ' — ' + q.nota_chiusura : ''}.` };
+    if (q.esito === 'passata') return { codice: 'passata', aperta: false, testo: `Fatto passare il ${dIt(q.chiusa_il)}${da(q.chiusa_da)}${q.nota_chiusura && !/^Fatt[oa] passare( dal Coordinatore)?$/.test(q.nota_chiusura) ? ' — ' + q.nota_chiusura : ''}.` };
     return { codice: q.esito || '?', aperta: false, testo: '' };
   }
 
@@ -79,11 +84,15 @@
 
   /* ---------- da qui in giù serve il browser ---------- */
 
-  let coord = null;
-  async function sonoCoordinatore() {
-    if (coord !== null) return coord;
-    try { const { data } = await radice.sb.rpc('is_coordinatore'); coord = !!data; } catch (e) { coord = false; }
-    return coord;
+  /* decidono il Coordinatore e la segreteria (20/10/2026 sera); il database lo ricontrolla */
+  let puo = null;
+  async function possoDecidere() {
+    if (puo !== null) return puo;
+    try {
+      const [c, s] = await Promise.all([radice.sb.rpc('is_coordinatore'), radice.sb.rpc('is_segreteria')]);
+      puo = !!(c.data || s.data);
+    } catch (e) { puo = false; }
+    return puo;
   }
 
   async function leggi(ids) {
@@ -159,7 +168,7 @@
   /* ── il Coordinatore fa passare (prima o dopo aver segnalato) ── */
   async function passa(riga) {
     const { visita: v, avvisi } = riga;
-    const nota = prompt(`Fai passare il verbale ${v.nr_verbale || ''} così com'è?\n\nNon parte niente al tecnico e il verbale non blocca più il pagamento.\nSe vuoi, scrivi due parole sul perché (facoltativo):`, '');
+    const nota = prompt(`Fai passare il verbale ${v.nr_verbale || ''} così com'è?\n\nNon parte niente al tecnico e il verbale non blocca più il pagamento. Resta scritto chi l'ha fatto passare.\nSe vuoi, scrivi due parole sul perché (facoltativo):`, '');
     if (nota === null) return false;
     const { error } = await radice.sb.rpc('vq_passa', { p_visita_id: v.visita_id, p_problemi: (avvisi || []).map((a) => a.testo).join('\n'), p_nota: nota.trim() || null });
     if (error) { avviso('Non riuscito: ' + error.message, 'err', 8000); return false; }
@@ -222,19 +231,19 @@
       .select('id, visita_id, nr_verbale, esito, messaggio, riaperto, risposta_tipo, risposta, risposta_il, aperta_il')
       .eq('tecnico_id', tec.tecnico_id).in('esito', APERTE).order('aperta_il', { ascending: false }).limit(30);
     if (error) {
-      box.innerHTML = `<div class="card" style="border-left:4px solid #c0392b"><h3>&#128203; Verbali da sistemare</h3><p style="font-size:12px;color:#c0392b;margin:4px 0">Non sono riuscito a leggere le segnalazioni del Coordinatore: ${esc(error.message)}</p></div>`;
+      box.innerHTML = `<div class="card" style="border-left:4px solid #c0392b"><h3>&#128203; Verbali da sistemare</h3><p style="font-size:12px;color:#c0392b;margin:4px 0">Non sono riuscito a leggere le segnalazioni dell'ufficio: ${esc(error.message)}</p></div>`;
       box.style.display = ''; return;
     }
     mie = data || [];
     if (!mie.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
     box.innerHTML = `<div class="card" style="border-left:4px solid #2980b9">
       <h3>&#128203; Verbali da sistemare <span style="color:#2980b9">&mdash; ${mie.length}</span></h3>
-      <p style="font-size:12px;color:#666;margin:4px 0 6px">Il Coordinatore ti chiede di guardare questi verbali. Rispondi qui: <strong>Sistemo</strong>, oppure <strong>Va bene così</strong> con il perché. Finché la segnalazione è aperta il verbale non va in pagamento.</p>
+      <p style="font-size:12px;color:#666;margin:4px 0 6px">Il Coordinatore o la segreteria ti chiedono di guardare questi verbali. Rispondi qui: <strong>Sistemo</strong>, oppure <strong>Va bene così</strong> con il perché. Finché la segnalazione è aperta il verbale non va in pagamento.</p>
       ${mie.map((q) => `<div style="padding:8px 0;border-top:1px solid #eee">
         <div style="font-size:13px"><strong>${esc(q.nr_verbale || '')}</strong> <span style="color:#888">&mdash; segnalato il ${dIt(q.aperta_il)}${q.riaperto ? ' &middot; <b style="color:#b35c00">è fra le tue bozze: correggilo e richiudilo</b>' : ''}</span></div>
         <div style="font-size:12px;color:#333;white-space:pre-wrap;background:#f6f8fb;border-radius:6px;padding:6px 8px;margin:4px 0">${esc(q.messaggio || '')}</div>
         ${q.esito === 'risposta'
-          ? `<div style="font-size:12px;color:#2d7a06">Hai risposto il ${dIt(q.risposta_il)}: ${q.risposta_tipo === 'sistemo' ? '«Sistemo»' : '«Va bene così»'}${q.risposta ? ' — ' + esc(q.risposta) : ''}. Ora decide il Coordinatore.</div>`
+          ? `<div style="font-size:12px;color:#2d7a06">Hai risposto il ${dIt(q.risposta_il)}: ${q.risposta_tipo === 'sistemo' ? '«Sistemo»' : '«Va bene così»'}${q.risposta ? ' — ' + esc(q.risposta) : ''}. Ora decide chi ti ha scritto.</div>`
           : `<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn-primary btn-sm" data-vq-sistemo="${q.id}">&#128736; Sistemo</button>
              <button type="button" class="btn-outline btn-sm" data-vq-vabene="${q.id}">&#128172; Va bene così</button></div>`}
       </div>`).join('')}
@@ -246,16 +255,16 @@
     const q = mie.find((x) => x.id === id);
     let testo = null;
     if (tipo === 'va_bene') {
-      testo = prompt(`Verbale ${q ? q.nr_verbale : ''}\n\nPerché va bene così? Il Coordinatore lo legge per decidere:`, '');
+      testo = prompt(`Verbale ${q ? q.nr_verbale : ''}\n\nPerché va bene così? Chi ti ha scritto lo legge per decidere:`, '');
       if (testo === null) return;
-      if (testo.trim().length < 5) { avviso('Scrivi il perché: è quello che legge il Coordinatore.', 'warn'); return; }
+      if (testo.trim().length < 5) { avviso('Scrivi il perché: è quello che legge chi ti ha scritto.', 'warn'); return; }
     } else {
-      testo = prompt(`Verbale ${q ? q.nr_verbale : ''}\n\nSistemi tu. Vuoi aggiungere una nota per il Coordinatore? (facoltativa)${q && q.riaperto ? '\nRicordati di correggere il verbale fra le bozze e di richiuderlo con «Definitivo».' : ''}`, '');
+      testo = prompt(`Verbale ${q ? q.nr_verbale : ''}\n\nSistemi tu. Vuoi aggiungere una nota per chi ti ha scritto? (facoltativa)${q && q.riaperto ? '\nRicordati di correggere il verbale fra le bozze e di richiuderlo con «Definitivo».' : ''}`, '');
       if (testo === null) return;
     }
     const { error } = await radice.sb.rpc('vq_rispondi', { p_id: id, p_tipo: tipo, p_testo: (testo || '').trim() || null });
     if (error) { avviso('Risposta non inviata: ' + error.message, 'err', 8000); return; }
-    avviso('Risposta inviata al Coordinatore.', 'ok');
+    avviso('Risposta inviata: la vedono il Coordinatore e chi ti ha scritto.', 'ok');
     boxTecnico().catch(() => {});
   }
 
@@ -268,7 +277,7 @@
     });
   }
 
-  const api = { testoProposto, stato, ultimePerVisita, nonDecisi, leggi, aperteDelMese, sonoCoordinatore, segnala, passa, risolta, htmlRiga, controllaFattura, boxTecnico, APERTE };
+  const api = { testoProposto, stato, ultimePerVisita, nonDecisi, leggi, aperteDelMese, possoDecidere, segnala, passa, risolta, htmlRiga, controllaFattura, boxTecnico, APERTE };
   radice.QuestioniVerbali = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

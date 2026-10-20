@@ -68,6 +68,17 @@ assert.ok(/revoke all on public\.visite_questioni from anon, authenticated/.test
 assert.ok(!/group by[^;]*tecnico/i.test(sql), 'nessun totale per tecnico nel database');
 assert.ok(!/tecnico_id\]\s*=\s*\(?[^;]*\+\s*1/.test(js) && !/perTecnico|totali?Tecnic/i.test(js), 'nessun totale per tecnico nel modulo');
 
+/* ── (20/10/2026 sera) anche la segreteria decide, nello stesso elenco, e si vede chi ── */
+const sqlSeg = leggi(path.join('supabase', 'sql', '2026_10_20_questioni_verbali_segreteria.sql'));
+for (const f of ['vq_segnala', 'vq_passa', 'vq_chiudi']) {
+  const corpo = sqlSeg.slice(sqlSeg.indexOf('function public.' + f + '('));
+  assert.ok(/is_coordinatore\(\), false\) or coalesce\(public\.is_segreteria\(\), false\)/.test(corpo.slice(0, 1200)), f + ': Coordinatore o segreteria');
+}
+assert.ok(/unnest\(array\[coord, lower\(q\.aperta_da\)\]\)/.test(sqlSeg), 'la risposta del tecnico avvisa anche chi ha aperto la questione');
+assert.ok(/rpc\('is_coordinatore'\), radice\.sb\.rpc\('is_segreteria'\)/.test(js) && /QV\.possoDecidere\(\)/.test(rv), 'i pulsanti li vedono Coordinatore e segreteria');
+assert.ok(Q.stato({ esito: 'segnalata', aperta_il: '2026-10-21', aperta_da: 'cptpd@did.formedilpadova.it' }).testo.includes('(cptpd@did.formedilpadova.it)'), 'si vede chi ha segnalato');
+assert.ok(Q.stato({ esito: 'passata', chiusa_il: '2026-10-21', chiusa_da: 'nicola.demarco@did.formedilpadova.it', nota_chiusura: 'Fatto passare' }).testo === 'Fatto passare il 21/10/2026 (nicola.demarco@did.formedilpadova.it).', 'e chi ha chiuso');
+
 /* ── le nuvolette ── */
 for (const k of ['t:segnala al tecnico', 't:fai passare', 't:risolta', 't:sistemo', 't:va bene così']) {
   assert.ok(aiuto.includes(`'${k}':`), 'nuvoletta per ' + k);
