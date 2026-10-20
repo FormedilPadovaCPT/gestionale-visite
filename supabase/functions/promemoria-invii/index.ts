@@ -120,7 +120,8 @@ serve(async (req) => {
         errori++
         const msg = String((e as Error).message || e).slice(0, 500)
         await sb.from('promemoria_invii_giri').update({ esito: 'errore', errore: msg }).eq('giorno', giorno).eq('tecnico_email', g.email)
-        esiti[g.email] = 'errore: ' + msg
+        /* il testo dell'errore resta nel registro, non nella risposta (avviso CodeQL n. 32, 20/10/2026) */
+        esiti[g.email] = 'errore (il dettaglio è in promemoria_invii_giri)'
       }
     }
     // il battito del giro, anche quando non è partito niente
@@ -135,6 +136,9 @@ serve(async (req) => {
   } catch (e) {
     const msg = String((e as Error).message || e)
     await sb.from('promemoria_invii_giri').upsert({ giorno, tecnico_email: '*', esito: 'giro-errori', errore: msg.slice(0, 500), prenotato_il: new Date().toISOString() }, { onConflict: 'giorno,tecnico_email' }).then(() => {}, () => {})
-    return json({ error: msg }, 500)
+    /* (20/10/2026, avviso CodeQL n. 32) il messaggio dell'eccezione non esce nella risposta: può portare
+       dettagli interni. Resta nella riga '*' del giorno in promemoria_invii_giri, dove lo legge la segreteria. */
+    console.error('promemoria-invii:', msg)
+    return json({ error: 'giro non riuscito: il motivo è nella riga del giorno in promemoria_invii_giri' }, 500)
   }
 })

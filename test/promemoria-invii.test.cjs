@@ -37,6 +37,9 @@ const leggi = (f) => fs.readFileSync(path.join(dir, f), 'utf8');
   assert.ok(!/^\s*['`](Cc|Bcc):/m.test(fn), 'nessuna copia: è un promemoria per il tecnico');
   assert.ok(!/coordinatore_email|nicola\.demarco/.test(fn), 'il coordinatore non c’entra');
   assert.ok(/x-promemoria-invii/.test(fn) && /promemoria_invii_token/.test(fn), 'chiamata solo col token del giro');
+  /* (20/10/2026, avviso CodeQL n. 32) il testo delle eccezioni resta nel registro, non nella risposta */
+  assert.ok(!/json\(\{\s*error:\s*msg\s*\}/.test(fn) && !/'errore: ' \+ msg/.test(fn), 'la risposta non riporta il messaggio delle eccezioni');
+  assert.ok(/errore: msg\.slice\(0, 500\)/.test(fn), 'il messaggio resta scritto in promemoria_invii_giri');
   assert.ok(/oraRoma\(\) < 8/.test(fn), 'non prima delle 8 italiane');
   assert.ok(/giro-ok/.test(fn) && /tecnico_email: '\*'/.test(fn), 'battito del giro e niente doppioni');
   assert.ok(/promemoria_invii_attivo/.test(fn), 'interruttore');
