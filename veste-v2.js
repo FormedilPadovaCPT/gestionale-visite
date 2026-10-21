@@ -567,7 +567,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       rim.innerHTML = (g && g.rimandi || []).map(([v, t, s]) => `<div class="v2-card" style="padding:10px 16px"><div class="v2-riga"><div class="v2-t"><b>${t}</b><small>${esc(s)}</small></div><button type="button" class="btn-outline btn-sm" data-v2-az="vai:${v}">Apri</button></div></div>`).join('');
     }
   }
-  function ufficioApri(g) { _gruppo = g; ufficioFiltra(); if (g === 'scrivania') scrivania().catch((e) => console.warn('scrivania:', e)); window.scrollTo(0, 0); }
+  function ufficioApri(g) { _gruppo = g; ufficioFiltra(); if (g === 'scrivania') scrivaniaUnaVolta().catch((e) => console.warn('scrivania:', e)); window.scrollTo(0, 0); }
 
   function ufficio() {
     const vista = $('view-segreteria'); if (!vista) return;
@@ -614,7 +614,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       }).observe(wrap, { childList: true, subtree: true });
     }
     setTimeout(ufficioFiltra, 1500); setTimeout(ufficioFiltra, 4500);
-    if (_gruppo === 'scrivania') scrivania().catch((e) => console.warn('scrivania:', e));
+    if (_gruppo === 'scrivania') scrivaniaUnaVolta().catch((e) => console.warn('scrivania:', e));
   }
 
   /* 04/10/2026: i conteggi partono due alla volta, non tutti insieme. Otto letture in parallelo, sommate a
@@ -628,6 +628,33 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     return esiti;
   }
 
+  /* (21/10/2026) I DUE CONTEGGI DI «QUALITÀ DATI» SI TENGONO 10 MINUTI. imprese_senza_cf e imprese_mail_di_altri
+     costano 1 e 2 secondi di database (misurati il 21/10 con l'accesso della segreteria) e la Scrivania ne usa solo
+     il numero, a ogni apertura dell'Ufficio. Il numero resta nel browser per 10 minuti (sessionStorage: vale anche
+     dopo un ricaricamento della pagina), con l'ora in cui è stato contato scritta sotto il titolo. Si rinnova da sé
+     quando si carica l'elenco in «Qualità dati» (ricordaConteggio, chiamata da index.html). Una lettura fallita
+     non si ricorda: alla prossima apertura si riprova. */
+  const RICORDA_MS = 10 * 60 * 1000;
+  const chiaveConteggio = (nome) => 'gv-scrivania-' + nome + '-' + email();
+  function ricordaConteggio(nome, n) {
+    try { sessionStorage.setItem(chiaveConteggio(nome), JSON.stringify({ n: Number(n) || 0, t: Date.now() })); } catch (_e) { /* archivio del browser non disponibile: si riconta la prossima volta */ }
+  }
+  async function ricordato(nome, contaFn) {
+    try {
+      const v = JSON.parse(sessionStorage.getItem(chiaveConteggio(nome)) || 'null');
+      if (v && typeof v.n === 'number' && Date.now() - v.t < RICORDA_MS) return { n: v.n, t: v.t };
+    } catch (_e) { /* archivio del browser non disponibile o valore rovinato: si conta */ }
+    const c = await contaFn();
+    if (c.errore) return c;
+    ricordaConteggio(nome, c.n);
+    return { n: c.n, t: Date.now() };
+  }
+  const contateAlle = (c) => (c.t ? ' · contate alle ' + new Date(c.t).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '');
+
+  /* (21/10/2026) un giro della Scrivania alla volta: se l'Ufficio si riapre mentre i conteggi sono ancora in corso,
+     non ne parte un secondo giro (un-giro.js) */
+  function scrivaniaUnaVolta() { return window.UnGiro ? window.UnGiro.fai('scrivania', scrivania) : scrivania(); }
+
   async function scrivania() {
     const el = $('v2-scrivania'); if (!el) return;
     const sb = window.sb; if (!sb) return;
@@ -635,11 +662,14 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     const [esOra, esPrima] = esercizi();
     const rpc = async (f, a) => { const { data, error } = await sb.rpc(f, a); if (error) throw new Error(error.message); return data; };
     const righe = async (q) => { const { count, error } = await q; if (error) throw new Error(error.message); return count || 0; };
+    /* (21/10/2026) il controllo dell'Osservatorio è lo stesso della tessera della Segreteria: una lettura sola per
+       esercizio (ossControlloBreve, osservatorio.js); senza quella funzione si chiede direttamente */
+    const oss = async (es) => (window.ossControlloBreve ? await window.ossControlloBreve(es.dal, es.al) : await rpc('osservatorio_controllo', { p_dal: es.dal, p_al: es.al, p_dettaglio: false })).ferme;
     const [ossPrima, ossOra, senzaCf, mailAltri, proposte, incarichi, bozze, questioni] = await aScaglioni([
-      () => conta(async () => (await rpc('osservatorio_controllo', { p_dal: esPrima.dal, p_al: esPrima.al, p_dettaglio: false })).ferme, 'Osservatorio esercizio precedente'),
-      () => conta(async () => (await rpc('osservatorio_controllo', { p_dal: esOra.dal, p_al: esOra.al, p_dettaglio: false })).ferme, 'Osservatorio esercizio in corso'),
-      () => conta(async () => ((await rpc('imprese_senza_cf')) || []).length, 'Imprese senza codice fiscale'),
-      () => conta(async () => ((await rpc('imprese_mail_di_altri')) || []).filter((r) => !r.stessa_della_cassa).length, 'Imprese con l\'indirizzo di un\'altra impresa'),
+      () => conta(() => oss(esPrima), 'Osservatorio esercizio precedente'),
+      () => conta(() => oss(esOra), 'Osservatorio esercizio in corso'),
+      () => ricordato('senza-cf', () => conta(async () => ((await rpc('imprese_senza_cf')) || []).length, 'Imprese senza codice fiscale')),
+      () => ricordato('mail-altri', () => conta(async () => ((await rpc('imprese_mail_di_altri')) || []).filter((r) => !r.stessa_della_cassa).length, 'Imprese con l\'indirizzo di un\'altra impresa')),
       () => conta(async () => { if (!window.propChius || !window.propChius.aperte) throw new Error('funzione non disponibile'); return (await window.propChius.aperte()).size; }, 'Cantieri proposti per la chiusura'),
       () => conta(() => righe(sb.from('incarichi').select('id', { count: 'exact', head: true }).eq('stato', 'aperto')), 'Incarichi aperti'),
       () => conta(() => righe(sb.from('visite').select('visita_id', { count: 'exact', head: true }).eq('elimina', 0).eq('stato', 'bozza')), 'Verbali in bozza'),
@@ -652,8 +682,8 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       + rigaScr(questioni, 'Questioni in attesa di decisione', 'aperte da coordinatore e segreteria per Direzione e Presidenza', 'vai:admin', 'Apri')
       + rigaScr(incarichi, 'Incarichi aperti', 'da assegnare, da evadere o con la visita fatta e da chiudere', 'vai:incarichi', 'Apri')
       + rigaScr(bozze, 'Verbali ancora in bozza', 'di tutti i tecnici: restano fuori da statistiche e Osservatorio finché non si chiudono', 'vai:lista', 'Apri')
-      + rigaScr(senzaCf, 'Imprese visitate senza codice fiscale', 'per le società «= P.IVA» lo copia: resta da confermare', 'gruppo:qualita', 'Apri')
-      + rigaScr(mailAltri, 'Imprese con l\'indirizzo di un\'altra impresa', 'i loro verbali partono verso l\'indirizzo sbagliato: si decide riga per riga', 'gruppo:qualita', 'Apri');
+      + rigaScr(senzaCf, 'Imprese visitate senza codice fiscale', 'per le società «= P.IVA» lo copia: resta da confermare' + contateAlle(senzaCf), 'gruppo:qualita', 'Apri')
+      + rigaScr(mailAltri, 'Imprese con l\'indirizzo di un\'altra impresa', 'i loro verbali partono verso l\'indirizzo sbagliato: si decide riga per riga' + contateAlle(mailAltri), 'gruppo:qualita', 'Apri');
   }
 
   /* ── OGGI: le bozze aperte di chi è collegato ── */
@@ -1294,5 +1324,5 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }
 
-  window.vesteV2 = { rimenu: menu, azioni: azioniDisegna, prima, dopo, pronto, verso, accesa, ruolo, ruoloVero, simula, diChi, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat, luminanza, contrasto, leggibile };
+  window.vesteV2 = { ricordaConteggio, rimenu: menu, azioni: azioniDisegna, prima, dopo, pronto, verso, accesa, ruolo, ruoloVero, simula, diChi, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat, luminanza, contrasto, leggibile };
 })();

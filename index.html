@@ -2526,6 +2526,8 @@ window.onunhandledrejection = function(e) {
 </script>
 
 <script src="app-data.js?v=14"></script>
+<!-- un giro alla volta: i caricamenti delle pagine non partono due volte insieme (21/10/2026) -->
+<script src="un-giro.js?v=1"></script>
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
@@ -3015,9 +3017,17 @@ function navTo(view){
   const navBar=$('form-nav-bar')
   if(view==='form'&&typeof incCaricaTendina==='function')incCaricaTendina().catch(e=>console.warn('incCaricaTendina:',e))
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
-  if(view==='dashboard')loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')})
-  if(view==='dashboard')loadAutorizzazioni().catch(e=>console.warn('autorizzazioni:',e))
-  if(view==='dashboard'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.notificheBox)window.notificheBox().catch(e=>console.warn('notifiche:',e));if(window.respinteBox)window.respinteBox().catch(e=>console.warn('mail respinte:',e));if(window.QuestioniVerbali)window.QuestioniVerbali.boxTecnico().catch(e=>console.warn('verbali da sistemare:',e));if(window.propChius)window.propChius.box().catch(e=>console.warn('proposte chiusura:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))}
+  /* (21/10/2026) OGGI IN UN GIRO SOLO. Il 21/10 fra le 14:51 e le 14:53 Oggi riaperto una decina di volte ha messo in coda
+     il database: ogni apertura faceva 40-85 letture, e lo stesso giro partiva due volte a due secondi di distanza. Ora
+     (un-giro.js) se Oggi si riapre mentre sta ancora caricando, o entro 10 secondi dalla fine, non riparte niente;
+     e per il riquadro «Nella Zona Coordinatore ti aspettano» si contano tre numeri (contaZonaCoord) invece di
+     riempire tutta la Zona, che si carica quando la si apre. */
+  if(view==='dashboard')unGiro('pagina-oggi',()=>Promise.allSettled([
+    loadDash().catch(e=>{console.error('loadDash:',e);toast('Errore caricamento dashboard: '+e.message,'err')}),
+    loadAutorizzazioni().catch(e=>console.warn('autorizzazioni:',e)),
+    (window.contaZonaCoord?window.contaZonaCoord():Promise.resolve()).catch(e=>console.warn('zona coordinatore, conteggi:',e)),
+    (async()=>{if(window.notificheBox)window.notificheBox().catch(e=>console.warn('notifiche:',e));if(window.respinteBox)window.respinteBox().catch(e=>console.warn('mail respinte:',e));if(window.QuestioniVerbali)window.QuestioniVerbali.boxTecnico().catch(e=>console.warn('verbali da sistemare:',e));if(window.propChius)window.propChius.box().catch(e=>console.warn('proposte chiusura:',e));loadStageSr().catch(e=>console.warn('stage-sr:',e))})()
+  ]),10000).catch(e=>console.warn('pagina Oggi:',e))
   if(view==='lista')loadLista().catch(e=>{console.error('loadLista:',e);toast('Errore caricamento lista: '+e.message,'err')})
   if(view==='cantieri')loadCantieri().catch(e=>{console.error('loadCantieri:',e);toast('Errore caricamento cantieri: '+e.message,'err')})
   if(view==='rubrica')loadRubrica().catch(e=>{console.error('loadRubrica:',e)})
@@ -3029,17 +3039,21 @@ function navTo(view){
   if(view==='formazione'&&window.formazione)window.formazione.carica().catch(e=>{console.error('formazione:',e);toast('Errore caricamento Formazione: '+e.message,'err')})
   if(view==='chat'&&window.chatTeam)window.chatTeam.apri().catch(e=>{console.error('chat:',e);toast('Errore caricamento Chat: '+e.message,'err')})
   if(view==='documenti'&&window.documenti)window.documenti.apri().catch(e=>{console.error('documenti:',e);toast('Errore caricamento Documenti: '+e.message,'err')})
-  if(view==='admin'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.avvisoVerbaliBox)window.avvisoVerbaliBox().catch(e=>console.warn('avviso verbali:',e));admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
+  if(view==='admin'){unGiro('zona-coordinatore',()=>(window.aggiornaZonaCoord||loadFattureCoord)(),0).catch(e=>console.warn('zona coordinatore:',e));if(window.avvisoVerbaliBox)window.avvisoVerbaliBox().catch(e=>console.warn('avviso verbali:',e));admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
   if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e));if(window.direzione)window.direzione.obiettivi().catch(e=>console.warn('obiettivi:',e))}
   if(view==='committenti')admLoadCommittenti().catch(e=>console.error('committenti:',e))
   /* veste v2: il riepilogo «Oggi» chiede i rientri e gli incarichi. Li calcolano le funzioni di sempre
      (loadScadenze, loadIncarichi: nessuna regola riscritta) e la veste riceve il risultato già pronto. */
   if(window.vesteV2){for(const _v of(window.vesteV2.dopo(view)||[])){
-    if(_v==='dati:scadenze')loadScadenze().then(()=>window.vesteV2.pronto('scadenze',_scadErrore?null:_scadData)).catch(e=>{console.warn('veste v2, scadenze:',e);window.vesteV2.pronto('scadenze',null,e)})
-    if(_v==='dati:incarichi'&&typeof loadIncarichi==='function')loadIncarichi().then(()=>window.vesteV2.pronto('incarichi',_incErrore?null:_incCache)).catch(e=>{console.warn('veste v2, incarichi:',e);window.vesteV2.pronto('incarichi',null,e)})
+    if(_v==='dati:scadenze')unGiro('scadenze-oggi',loadScadenze,0).then(()=>window.vesteV2.pronto('scadenze',_scadErrore?null:_scadData)).catch(e=>{console.warn('veste v2, scadenze:',e);window.vesteV2.pronto('scadenze',null,e)})
+    if(_v==='dati:incarichi'&&typeof loadIncarichi==='function')unGiro('incarichi',loadIncarichi,15000).then(()=>window.vesteV2.pronto('incarichi',_incErrore?null:_incCache)).catch(e=>{console.warn('veste v2, incarichi:',e);window.vesteV2.pronto('incarichi',null,e)})
   }}
 }
 window.navTo=navTo
+/* (21/10/2026) i caricamenti che partono dalle PAGINE passano di qui (un-giro.js): uno alla volta, e un risultato
+   di meno di `fresco` millisecondi si riusa. Dopo un cambio (approvo, completo, chiudo) si chiamano le funzioni
+   vere: lì serve il dato di adesso. Senza un-giro.js tutto va come prima. */
+function unGiro(nome,fn,fresco){return window.UnGiro?window.UnGiro.fai(nome,fn,{fresco:fresco||0}):Promise.resolve().then(fn)}
 document.querySelectorAll('nav button[data-view]').forEach(b=>{
   b.onclick=()=>{if(b.dataset.view==='form'){if(formDaNonPerdere()){navTo('form');return}initForm()}navTo(b.dataset.view)}
 })
@@ -6778,7 +6792,7 @@ async function loadDash(){
   // card obiettivo mensile (non blocca la dashboard se fallisce)
   loadTargetCard&&loadTargetCard().then(()=>window.VisiteMese&&window.VisiteMese.rigaScheda()).catch(e=>console.warn('loadTargetCard:',e))
   loadAvvisi&&loadAvvisi().catch(e=>console.warn('loadAvvisi:',e))
-  loadIncarichi&&loadIncarichi().catch(e=>console.warn('loadIncarichi:',e))
+  loadIncarichi&&unGiro('incarichi',loadIncarichi,15000).catch(e=>console.warn('loadIncarichi:',e))   // (21/10/2026) stesso giro della veste
   _incApertiCache=null
   if(window.appuntiCantiere)window.appuntiCantiere.elenco().catch(e=>console.warn('appunti:',e))   // «I miei appunti» sotto la mappa
   await loadDashMap()
@@ -13316,6 +13330,7 @@ async function admImpSenzaCf(){
     return
   }
   _impSenzaCf=data||[]
+  if(window.vesteV2&&window.vesteV2.ricordaConteggio)window.vesteV2.ricordaConteggio('senza-cf',_impSenzaCf.length)   // (21/10/2026) Scrivania
   _impSenzaCfDisegna()
 }
 function _impSenzaCfDisegna(){
@@ -13395,6 +13410,7 @@ async function admImpMailAltri(){
     return
   }
   _impMail=data||[]
+  if(window.vesteV2&&window.vesteV2.ricordaConteggio)window.vesteV2.ricordaConteggio('mail-altri',_impMail.filter(r=>!r.stessa_della_cassa).length)   // (21/10/2026) Scrivania
   _impMailDisegna()
 }
 function admImpMailTutte(si){_impMailTutteLeRighe=!!si;_impMailDisegna()}
@@ -16906,7 +16922,7 @@ document.addEventListener('input',function(ev){
 <script src="stage-relazione.js?v=3"></script>
 <!-- accesso negato al cantiere: il tecnico segnala, la segreteria gestisce -->
 <script src="diniego-accesso.js?v=5"></script>
-<script src="cantieri-critici-coord.js?v=4"></script>
+<script src="cantieri-critici-coord.js?v=5"></script>
 <script src="controllo-verbale.js?v=2"></script>
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
 <script src="riepilogo-verbali.js?v=3"></script>
@@ -16938,7 +16954,7 @@ document.addEventListener('input',function(ev){
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
 <script src="firme.js?v=6"></script>
-<script src="direzione.js?v=16"></script>
+<script src="direzione.js?v=17"></script>
 <script src="formazione.js?v=6"></script>
 <script src="formazione-corsi.js?v=1"></script>
 <script src="formazione-docente.js?v=3"></script>
@@ -16947,7 +16963,7 @@ document.addEventListener('input',function(ev){
 <!-- cicli di visita (20/10/2026): proposta alla chiusura del verbale, regola sulla visita del ciclo, Zona Coordinatore; statistiche dei cicli -->
 <script src="cicli-visita.js?v=1"></script>
 <script src="statistiche-cicli.js?v=1"></script>
-<script src="veste-v2.js?v=47"></script>
+<script src="veste-v2.js?v=48"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

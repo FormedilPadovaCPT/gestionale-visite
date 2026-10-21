@@ -719,6 +719,15 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
     const es=y=>({nome:y+'-'+String(y+1).slice(2),dal:y+'-10-01',al:(y+1)+'-09-30'})
     return[es(a),es(a-1)]
   }
+  /* (21/10/2026) il controllo «breve» (senza dettaglio) di un esercizio lo chiedono, all'apertura della
+     Segreteria, sia questa tessera sia la Scrivania della veste: il 21/10 partiva quattro volte per due
+     esercizi. Ora una lettura sola per esercizio, condivisa; il risultato vale un minuto (UnGiro, un-giro.js).
+     I pulsanti «Controlla» ed «Esporta» leggono sempre il dettaglio di adesso, non questo. */
+  function ossControlloBreve(dal,al){
+    const leggi=()=>_ossLeggiControllo(dal,al,false)
+    return window.UnGiro?window.UnGiro.fai('osservatorio_controllo:'+dal+':'+al,leggi,{fresco:60000}):leggi()
+  }
+  window.ossControlloBreve=ossControlloBreve
   async function admOssTessera(){
     const box=$('oss-tessera');if(!box)return
     if(!S.user||S.user.email!==ADMIN_EMAIL){box.innerHTML='';return}
@@ -727,7 +736,7 @@ export function creaOsservatorio({ sb, S, ADMIN_EMAIL, $, vGet, vSet, toast }) {
     const righe=[]
     for(const es of ossEsercizi()){
       try{
-        const c=await _ossLeggiControllo(es.dal,es.al,false)
+        const c=await ossControlloBreve(es.dal,es.al)
         let r=`<b>Esercizio ${es.nome}</b>: ${c.definitive} visite definitive`
         if(c.definitive){
           r+=` · <b style="color:#95C22F">${c.pronte} pronte</b>`

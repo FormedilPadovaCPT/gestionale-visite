@@ -56,13 +56,19 @@
     segnalazione_organi: 'Segnalazione a SPISAL / ITL', riscontro_organo: "Riscontro dell'organo di vigilanza" };
 
   let abilitato = null;   /* coordinatore o segreteria: lo dice il database, non un elenco di indirizzi */
+  let _chiedo = null;     /* (21/10/2026) due richieste insieme aspettano la stessa domanda, non ne fanno due */
   async function possoVedere() {
     if (abilitato !== null) return abilitato;
-    try {
-      const [c, s] = await Promise.all([window.sb.rpc('is_coordinatore'), window.sb.rpc('is_segreteria')]);
-      abilitato = !!(c.data || s.data);
-    } catch (e) { abilitato = false; }
-    return abilitato;
+    if (!_chiedo) {
+      _chiedo = (async () => {
+        try {
+          const [c, s] = await Promise.all([window.sb.rpc('is_coordinatore'), window.sb.rpc('is_segreteria')]);
+          abilitato = !!(c.data || s.data);
+        } catch (e) { abilitato = false; }
+        return abilitato;
+      })().finally(() => { _chiedo = null; });
+    }
+    return _chiedo;
   }
 
   const pill = (stato) => { const [col, l] = STATI[stato] || ['#888', stato]; return `<span style="background:${col};color:#fff;border-radius:10px;padding:1px 8px;font-size:11px">${esc(l)}</span>`; };
@@ -228,14 +234,26 @@
       decise: d ? d.querySelectorAll('[data-dec-decisa]').length : 0 };   /* decisioni da prendere in carico (direzione.js, 25/09/2026) */
   }
 
-  function avvisa() {
-    const { fatture, critici, decise } = conta();
-    const tot = fatture + critici + decise;
+  /* `numeri`: quelli contati da contaPerOggi; senza, si contano dai riquadri della Zona già riempiti */
+  function avvisa(numeri) {
     const nav = $('nav-admin');
+    const box = $('dash-coord-avviso');
+    if (numeri && numeri.errore) {
+      /* una lettura fallita si dice: mai «niente in attesa» al posto di «non contato» */
+      if (nav) nav.innerHTML = '&#128272; Coordinatore';
+      if (!box || !nav || nav.style.display === 'none') return;
+      box.innerHTML = `<div class="card" style="border-left:4px solid #c0392b;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:pointer" id="dash-coord-vai">
+      <span style="font-size:13px;flex:1;min-width:220px">&#128272; Non sono riuscito a contare che cosa aspetta nella <strong>Zona Coordinatore</strong> (${esc(numeri.errore)}): aprila per vederlo.</span>
+      <button class="btn-primary btn-sm">Apri</button></div>`;
+      box.style.display = '';
+      $('dash-coord-vai').onclick = () => nav.click();
+      return;
+    }
+    const { fatture, critici, decise } = numeri || conta();
+    const tot = fatture + critici + decise;
     if (nav) {
       nav.innerHTML = '&#128272; Coordinatore' + (tot ? ` <span style="background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700">${tot}</span>` : '');
     }
-    const box = $('dash-coord-avviso');
     if (!box) return;
     if (!tot || !nav || nav.style.display === 'none') { box.style.display = 'none'; return; }
     const pezzi = [];
@@ -264,6 +282,37 @@
     avvisa();
   }
 
+  /* (21/10/2026) SU OGGI SI CONTA, NON SI RIEMPIE LA ZONA. Prima Oggi chiamava aggiorna(): fatture, critici,
+     questioni, fuori procedura, cicli, chat, visite del mese e riepilogo dei verbali (circa 20 letture, sei blocchi
+     della check-list compresi) solo per scrivere i tre numeri del riquadro «Nella Zona Coordinatore ti aspettano».
+     Il 21/10 quella raffica, ripetuta a ogni apertura, ha messo in coda il database. Qui gli stessi tre numeri con
+     tre conteggi e le stesse regole dei riquadri: fatture ricevute, verificate o in stand-by (loadFattureCoord, al
+     massimo 40), casi critici non chiusi né annullati (carica, al massimo 40), questioni decise da prendere in
+     carico (direzione.js, decisioniBox). La Zona si riempie quando la si apre. */
+  async function contaPerOggi() {
+    const nav = $('nav-admin');
+    if (!nav || nav.style.display === 'none' || !window.sb || !window.S?.user) return null;
+    if (typeof window.isCoordPageUser !== 'function' || !window.isCoordPageUser()) return null;
+    const sb = window.sb;
+    const quanti = async (q, tetto) => {
+      const { count, error } = await q;
+      if (error) throw new Error(error.message);
+      return tetto ? Math.min(count || 0, tetto) : (count || 0);
+    };
+    const testa = { count: 'exact', head: true };
+    const vede = await possoVedere();
+    const r = await Promise.allSettled([
+      quanti(sb.from('s_fatture_tecnici').select('id', testa).in('stato', ['ricevuta', 'verificata', 'standby']), 40),
+      vede ? quanti(sb.from('s_cantieri_critici').select('id', testa).not('stato', 'in', '(chiuso,annullato)'), 40) : 0,
+      vede ? quanti(sb.from('s_decisioni').select('id', testa).eq('stato', 'decisa')) : 0,
+    ]);
+    const ko = r.find((x) => x.status === 'rejected');
+    const numeri = ko ? { errore: (ko.reason && ko.reason.message) || String(ko.reason) }
+      : { fatture: r[0].value, critici: r[1].value, decise: r[2].value };
+    avvisa(numeri);
+    return numeri;
+  }
+
   /* la Zona Coordinatore ha fondo scuro e testo chiaro: dentro i riquadri bianchi
      il testo deve tornare scuro, altrimenti le righe non si leggono */
   (function coloriZona() {
@@ -274,4 +323,5 @@
   })();
 
   window.aggiornaZonaCoord = aggiorna;
+  window.contaZonaCoord = contaPerOggi;
 })();

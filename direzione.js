@@ -74,14 +74,23 @@
        segreteria, e non «Rispondi») si rilegge */
     const email = (window.S && window.S.user && window.S.user.email) || '';
     if (_ruoli && _ruoli.email === email) return _ruoli;
+    /* (21/10/2026) due riquadri che chiedono i ruoli insieme aspettano la STESSA lettura: prima partivano
+       due volte le cinque is_*, e il 21/10 erano dentro la raffica che ha messo in coda il database */
+    if (_ruoliInCorso && _ruoliInCorso.email === email) return _ruoliInCorso.p;
     const sb = window.sb;
     const chiedi = async (f) => { try { const { data, error } = await sb.rpc(f); return !error && data === true; } catch (_e) { return false; } };
-    // presidente (04/10/2026): solo lui firma i documenti nell'app, non il Vicepresidente
-    const [direttore, presidenza, coord, segr, presidente] = await Promise.all(['is_direttore', 'is_presidenza', 'is_coordinatore', 'is_segreteria', 'is_presidente'].map(chiedi));
-    _ruoli = { email, direttore, presidenza, coord, segr, presidente };
-    return _ruoli;
+    const p = (async () => {
+      // presidente (04/10/2026): solo lui firma i documenti nell'app, non il Vicepresidente
+      const [direttore, presidenza, coord, segr, presidente] = await Promise.all(['is_direttore', 'is_presidenza', 'is_coordinatore', 'is_segreteria', 'is_presidente'].map(chiedi));
+      const r = { email, direttore, presidenza, coord, segr, presidente };
+      if (_ruoliInCorso && _ruoliInCorso.p === p) _ruoli = r;   // un'uscita nel frattempo non lascia ruoli vecchi in memoria
+      return r;
+    })();
+    _ruoliInCorso = { email, p };
+    try { return await p; } finally { if (_ruoliInCorso && _ruoliInCorso.p === p) _ruoliInCorso = null; }
   }
-  window.addEventListener('gestionale-logout', () => { _ruoli = null; });
+  let _ruoliInCorso = null;
+  window.addEventListener('gestionale-logout', () => { _ruoli = null; _ruoliInCorso = null; });
 
   /* ── piccola finestra sovrapposta (per il caso critico e la cronologia) ── */
   function finestra(titolo, html) {

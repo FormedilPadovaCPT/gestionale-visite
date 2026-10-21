@@ -155,7 +155,8 @@ assert.strictEqual(s.v2.esercizi().length, 2);
 assert.ok(/id="v2-bozze"><\/div><div id="v2-rientri"><\/div><div id="v2-incarichi"><\/div>/.test(js), 'colonna principale di «Oggi»: bozze, rientri, incarichi');
 assert.ok(/id="v2-azioni"><\/div><div id="v2-posto-obiettivo"><\/div><div id="v2-posto-avvisi"><\/div>/.test(js), 'colonna laterale di «Oggi»: azioni, obiettivo, avvisi');
 // rientri e incarichi li calcolano le funzioni di sempre, e la veste riceve il risultato
-assert.ok(html.includes("loadScadenze().then(()=>window.vesteV2.pronto('scadenze',_scadErrore?null:_scadData))") && html.includes("loadIncarichi().then(()=>window.vesteV2.pronto('incarichi',_incErrore?null:_incCache))"), 'i dati di «Oggi» devono venire da loadScadenze e loadIncarichi, e una lettura fallita deve arrivare come fallita');
+// (21/10/2026) passano da unGiro (un-giro.js): se lo stesso caricamento è già in corso si aspetta quello (test/un-giro.test.cjs)
+assert.ok(html.includes("unGiro('scadenze-oggi',loadScadenze,0).then(()=>window.vesteV2.pronto('scadenze',_scadErrore?null:_scadData))") && html.includes("unGiro('incarichi',loadIncarichi,15000).then(()=>window.vesteV2.pronto('incarichi',_incErrore?null:_incCache))"), 'i dati di «Oggi» devono venire da loadScadenze e loadIncarichi, e una lettura fallita deve arrivare come fallita');
 assert.ok(js.includes('Non sono riuscito a leggere i rientri') && js.includes('Non sono riuscito a leggere gli incarichi'), 'una lettura fallita si dice: mai «nessun rientro» o «nessun incarico» al posto di un errore');
 assert.ok(js.includes('window.chiediNuovaVisitaRitorno(') && js.includes('window.incNuovaVisita('), '«Avvia visita» deve usare le funzioni di sempre');
 assert.ok(js.includes("data-v2-mio=\"${suo ? 1 : 0}\"") && js.includes("b.dataset.v2Mio === '1'"), 'l’incarico si accetta solo se è di chi preme');
@@ -300,7 +301,8 @@ assert.ok(js.includes('>Parti da un tuo incarico</div>') && !js.includes('>Perch
   const aScaglioni = new Function('return (' + corpo[0] + ')')();
   const scr = js.match(/async function scrivania\(\) \{[\s\S]*?\n  \}/)[0];
   assert.ok(/= await aScaglioni\(\[[\s\S]*\], 2\);/.test(scr) && !/Promise\.all/.test(scr), 'i conteggi della Scrivania partono a scaglioni di due, non con Promise.all');
-  assert.strictEqual((scr.match(/^\s+\(\) => conta\(/gm) || []).length, 8, 'ogni conteggio è una funzione che parte quando c’è posto');
+  // (21/10/2026) i due conteggi di «Qualità dati» passano da ricordato(): restano 10 minuti (test/un-giro.test.cjs)
+  assert.strictEqual((scr.match(/^\s+\(\) => (conta|ricordato)\(/gm) || []).length, 8, 'ogni conteggio è una funzione che parte quando c’è posto');
   let aperti = 0, massimo = 0;
   const lavoro = (v, ms) => async () => { aperti++; massimo = Math.max(massimo, aperti); await new Promise((r) => setTimeout(r, ms)); aperti--; return v; };
   aScaglioni([lavoro('a', 30), lavoro('b', 5), lavoro('c', 10), lavoro('d', 1), lavoro('e', 20)], 2).then((esiti) => {
