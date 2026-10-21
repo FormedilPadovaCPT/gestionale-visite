@@ -131,6 +131,7 @@
     ascolta();
     nonLetti().catch((e) => console.warn('chat, non letti:', e));
     if (radice.vesteV2 && typeof radice.vesteV2.rimenu === 'function') radice.vesteV2.rimenu();
+    if (radice.vesteV2 && typeof radice.vesteV2.azioni === 'function') radice.vesteV2.azioni();   // il riquadro in Oggi
   }
 
   /* ── tempo reale: arriva la busta, il contenuto lo si chiede a chat_elenco ── */
@@ -208,6 +209,8 @@
       b.classList.toggle('inc-lampeggia', n > 0);
       b.title = n ? `${n} ${n === 1 ? 'messaggio' : 'messaggi'} da leggere nella chat` : '';
     }
+    /* lo stesso numero sul riquadro «💬 Chat del team» della pagina Oggi */
+    if (haDom) document.querySelectorAll('[data-v2-preme="nav-chat"] .ct-num').forEach((x) => { x.textContent = n > 99 ? '99+' : String(n); x.style.display = n ? '' : 'none'; });
     try {
       const nav = radice.navigator;
       if (nav && n > 0 && typeof nav.setAppBadge === 'function') nav.setAppBadge(n).catch(() => {});

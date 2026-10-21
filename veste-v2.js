@@ -682,7 +682,10 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
      nascosto nel menu: compare solo a chi è asseveratore, cioè a chi quel pulsante l'aveva già (dataset.v2Mostra). */
   const AZIONI = [['btn-segnala-dash', '📍', 'Segnala cantiere', 'v2-arancio'], ['btn-diniego-dash', '🚫', 'Accesso negato'], ['btn-qr-servizi', '📱', 'QR servizi CPT'],
     ['btn-servizi-cpt', '↗', 'Servizi CPT', 'v2-verde'], ['nav-assev', '✅', 'Asseverazione', 'v2-blu'],
-    ['btn-dove-sono', '📡', 'Dove sono?'], ['btn-appunti', '📝', 'Appunti cantiere']];
+    ['btn-dove-sono', '📡', 'Dove sono?'], ['btn-appunti', '📝', 'Appunti cantiere'],
+    /* (21/10/2026, chiesto dall'utente) la Chat del team subito dopo gli Appunti: c'è solo se la voce del menu è visibile,
+       cioè se il database dice che la chat la vedi; il numero dei messaggi da leggere lo aggiorna chat-team.js */
+    ['nav-chat', '💬', 'Chat del team']];
   const azioneVisibile = (id) => {
     const o = $(id); if (!o) return false;
     if (id === 'nav-assev') {
@@ -695,7 +698,12 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
   function azioniDisegna() {
     const el = $('v2-azioni'); if (!el) return;
     el.innerHTML = AZIONI.filter(([id]) => azioneVisibile(id))
-      .map(([id, icona, testo, classe]) => `<button type="button" data-v2-preme="${id}"${classe ? ' class="' + classe + '"' : ''}><span>${icona}</span>${esc(testo)}</button>`).join('');
+      .map(([id, icona, testo, classe]) => `<button type="button" data-v2-preme="${id}"${classe ? ' class="' + classe + '"' : ''}><span>${icona}</span>${esc(testo)}${id === 'nav-chat' ? numeroChat() : ''}</button>`).join('');
+  }
+  function numeroChat() {
+    const b = $('nav-chat-badge');
+    const n = b && b.style.display !== 'none' ? String(b.textContent || '').trim() : '';
+    return `<b class="ct-num inc-lampeggia" style="${n ? '' : 'display:none;'}background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px">${esc(n)}</b>`;
   }
   const _dati = { scadenze: undefined, incarichi: undefined, quando: 0 };
   const gg = (d) => { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] : ''; };
@@ -1283,5 +1291,5 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }
 
-  window.vesteV2 = { rimenu: menu, prima, dopo, pronto, verso, accesa, ruolo, ruoloVero, simula, diChi, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat, luminanza, contrasto, leggibile };
+  window.vesteV2 = { rimenu: menu, azioni: azioniDisegna, prima, dopo, pronto, verso, accesa, ruolo, ruoloVero, simula, diChi, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat, luminanza, contrasto, leggibile };
 })();

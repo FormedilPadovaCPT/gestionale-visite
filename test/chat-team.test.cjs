@@ -106,6 +106,9 @@ assert.ok(R, 'la veste espone i ruoli');
 for (const k of ['segreteria', 'tecnico', 'coordinatore']) assert.ok(R[k].menu.includes('chat'), k + ' ha la Chat nel menu');
 for (const k of ['direttore', 'presidenza', 'consigliere', 'docente']) assert.ok(!R[k].menu.includes('chat'), k + ' non ha la Chat (il Direttore non partecipa)');
 assert.ok(veste.includes("if (!o || (v === 'chat' && b.dataset.chatVisibile !== '1')) { b.style.display = 'none'; return; }"), 'senza il via del database la voce resta nascosta');
+// (21/10/2026, chiesto dall'utente) in Oggi il riquadro «💬 Chat del team» subito dopo gli Appunti, col numero dei messaggi da leggere
+assert.ok(veste.includes("['btn-appunti', '📝', 'Appunti cantiere'],") && /\['btn-appunti'[^\]]*\],\s*\n(?:\s*\/\*[\s\S]*?\*\/\s*\n)?\s*\['nav-chat', '💬', 'Chat del team'\]\];/.test(veste), 'Chat subito dopo gli Appunti in Oggi');
+assert.ok(/\[data-v2-preme="nav-chat"\] \.ct-num/.test(js) && /radice\.vesteV2\.azioni\(\)/.test(js), 'il numero anche sul riquadro, che si ridisegna quando la chat si accende');
 for (const k of ['v:chat', 'ct-invia', 'ct-allega', 'ct-scatta', 't:cancella', 't:ammetti', 't:togli', 'ct-conf-si', 'ct-conf-no']) assert.ok(aiuto.includes(`'${k}':`), 'nuvoletta ' + k);
 
 /* ── il database: le regole ci sono, e i controlli sanno fallire ── */
