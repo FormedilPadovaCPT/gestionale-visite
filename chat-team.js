@@ -157,9 +157,11 @@
   /* rete di sicurezza: se il tempo reale non c'è, si guarda ogni 30 secondi (solo a pagina aperta) */
   function sorveglia() {
     if (_giro) return;
+    let volte = 0;
     _giro = setInterval(() => {
-      if (_vivo || !aperta() || document.hidden) return;
-      nuovi().catch((e) => console.warn('chat, giro:', e));
+      if (_vivo || document.hidden) return;
+      if (aperta()) { nuovi().catch((e) => console.warn('chat, giro:', e)); return; }
+      if (++volte % 2 === 0) nonLetti().catch((e) => console.warn('chat, non letti:', e));   // a chat chiusa: ogni minuto
     }, 30000);
   }
   function statoCanale() {
@@ -193,13 +195,29 @@
     const r = await radice.sb.rpc('chat_elenco', { p_prima_di: null, p_dopo_di: letto, p_limite: 200 });
     if (r.error) { if (/Non sei nella chat/.test(r.error.message)) fuori(); return; }
     const n = (r.data || []).filter((m) => !m.mio).length;
-    b.textContent = n > 99 ? '99+' : String(n);
-    b.style.display = n ? '' : 'none';
+    mostraNumero(n);
+  }
+  /* (21/10/2026, chiesto dall'utente) il numero dei messaggi da leggere: lampeggia come quello degli Incarichi e,
+     se l'app è installata e il sistema lo permette, sta anche sull'icona (come WhatsApp). Conta solo i messaggi
+     degli altri, arrivati dopo l'ultimo letto su questo dispositivo. */
+  function mostraNumero(n) {
+    const b = $('nav-chat-badge');
+    if (b) {
+      b.textContent = n > 99 ? '99+' : String(n);
+      b.style.display = n ? '' : 'none';
+      b.classList.toggle('inc-lampeggia', n > 0);
+      b.title = n ? `${n} ${n === 1 ? 'messaggio' : 'messaggi'} da leggere nella chat` : '';
+    }
+    try {
+      const nav = radice.navigator;
+      if (nav && n > 0 && typeof nav.setAppBadge === 'function') nav.setAppBadge(n).catch(() => {});
+      else if (nav && !n && typeof nav.clearAppBadge === 'function') nav.clearAppBadge().catch(() => {});
+    } catch (_e) { /* il sistema non lo permette: resta il numero nel menu */ }
   }
   function letti() {
     const ult = _msg.length ? _msg[_msg.length - 1].id : 0;
     if (ult > leggiLetto()) scriviLetto(ult);
-    const b = $('nav-chat-badge'); if (b) b.style.display = 'none';
+    mostraNumero(0);
   }
 
   /* ════════ la pagina ════════ */

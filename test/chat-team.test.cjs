@@ -75,6 +75,11 @@ assert.ok(/addEventListener\('beforeunload'/.test(js) && !/onbeforeunload\s*=/.t
 
 assert.ok(/\.ct-wrap\{max-width:780px;margin:0 auto;/.test(js), 'sul PC la chat è una colonna centrale, non tutta la larghezza (21/10/2026)');
 
+// (21/10/2026, chiesto dall'utente) il numero dei messaggi da leggere lampeggia come gli Incarichi, e va sull'icona dell'app
+assert.ok(/b\.classList\.toggle\('inc-lampeggia', n > 0\)/.test(js) && /setAppBadge\(n\)/.test(js) && /clearAppBadge\(\)/.test(js), 'numero che lampeggia e sull\'icona');
+assert.ok(/const n = \(r\.data \|\| \[\]\)\.filter\(\(m\) => !m\.mio\)\.length;/.test(js), 'contano solo i messaggi degli altri');
+assert.ok(/function letti\(\) \{[\s\S]*?mostraNumero\(0\);/.test(js), 'aperta la chat, il numero si azzera');
+
 // niente confirm() (scelta dell'utente): le conferme sono nella pagina
 assert.ok(!/\bconfirm\(/.test(js), 'niente confirm(): conferma nella pagina');
 assert.ok(/Cancellare per tutti\?/.test(js) && /data-azione="cancella-si"/.test(js), 'conferma della cancellazione dentro la nuvoletta');
