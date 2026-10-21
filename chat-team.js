@@ -601,7 +601,8 @@
     const st = document.createElement('style'); st.id = 'ct-stile';
     st.textContent = `
 #view-chat{padding:0}
-.ct-wrap{display:flex;flex-direction:column;height:calc(100dvh - 150px);min-height:420px;background:#fff;border:1px solid #e3e4e6;border-radius:12px;overflow:hidden;font-family:Barlow,'Segoe UI',system-ui,sans-serif;color:#2b2f35}
+/* (21/10/2026, dall'utente) sul PC la chat era troppo larga: colonna centrale come una conversazione */
+.ct-wrap{max-width:780px;margin:0 auto;display:flex;flex-direction:column;height:calc(100dvh - 150px);min-height:420px;background:#fff;border:1px solid #e3e4e6;border-radius:12px;overflow:hidden;font-family:Barlow,'Segoe UI',system-ui,sans-serif;color:#2b2f35}
 .ct-testa{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #e3e4e6}
 .ct-nome{font:700 16px/1.15 Barlow,sans-serif}
 .ct-sotto{font-size:12px;color:#6b7078;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

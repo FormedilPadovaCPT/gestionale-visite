@@ -73,6 +73,8 @@ assert.ok(/navigator\.onLine === false/.test(js) && /'online'/.test(js), 'senza 
 assert.ok(/Non chiudere l'app finché non arriva al 100%/.test(js) && /Sto caricando il video: \$\{c\.perc\}%/.test(js), 'barra e avviso mentre il video parte');
 assert.ok(/addEventListener\('beforeunload'/.test(js) && !/onbeforeunload\s*=/.test(js), 'chiudere a metà chiede conferma, senza togliere l\'avviso del verbale non salvato');
 
+assert.ok(/\.ct-wrap\{max-width:780px;margin:0 auto;/.test(js), 'sul PC la chat è una colonna centrale, non tutta la larghezza (21/10/2026)');
+
 // niente confirm() (scelta dell'utente): le conferme sono nella pagina
 assert.ok(!/\bconfirm\(/.test(js), 'niente confirm(): conferma nella pagina');
 assert.ok(/Cancellare per tutti\?/.test(js) && /data-azione="cancella-si"/.test(js), 'conferma della cancellazione dentro la nuvoletta');
