@@ -42,6 +42,16 @@ assert.ok(!l.includes('<script>') && l.includes('&lt;script&gt;'), 'niente HTML 
 assert.ok(!C.linkifica('javascript:alert(1)').includes('<a '), 'javascript: non diventa un link');
 assert.ok(!C.linkifica('"><img src=x onerror=alert(1)>').includes('<img'), 'le virgolette non escono dall\'attributo');
 
+// (21/10/2026, chiesto dall'utente) i link di YouTube hanno l'anteprima; il video parte nella chat solo al tocco
+assert.strictEqual(C.youtubeId('guarda https://youtu.be/dQw4w9WgXcQ, poi dimmi'), 'dQw4w9WgXcQ');
+assert.strictEqual(C.youtubeId('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=30s'), 'dQw4w9WgXcQ');
+assert.strictEqual(C.youtubeId('https://m.youtube.com/watch?feature=share&v=dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+assert.strictEqual(C.youtubeId('https://youtube.com/shorts/dQw4w9WgXcQ?si=abc'), 'dQw4w9WgXcQ');
+assert.strictEqual(C.youtubeId('https://www.youtube.com/@formedilpadova_areasicurezza'), null, 'un canale non è un video');
+assert.strictEqual(C.youtubeId('https://vimeo.com/123456789'), null, 'solo YouTube');
+assert.strictEqual(C.youtubeId('https://youtu.be/dQw4w9WgXcQxyz'), null, 'l\'ID è di 11 caratteri, non uno di più');
+assert.ok(/data-azione="youtube"/.test(js) && /youtube-nocookie\.com\/embed\//.test(js) && /\^\[A-Za-z0-9_-\]\{11\}\$/.test(js), 'il video parte nella chat solo al tocco, e solo con un ID valido');
+
 // file: foto sì, video fino a 100 MB, oltre si condivide un link di Drive
 const MB = 1024 * 1024;
 assert.strictEqual(C.valutaFile({ type: 'image/jpeg', size: 9 * MB }).tipo, 'foto');

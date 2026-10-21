@@ -62,6 +62,14 @@
     out += esc(s.slice(ultimo));
     return out.replace(/\n/g, '<br>');
   }
+  /* (21/10/2026, chiesto dall'utente) un link di YouTube mostra l'anteprima, come su WhatsApp: l'immagine la dà
+     YouTube (i.ytimg.com), il video parte nella chat solo quando lo si tocca. Riconosce youtu.be/ID,
+     youtube.com/watch?v=ID, /shorts/ID, /live/ID, /embed/ID; l'ID è di 11 caratteri, niente altro passa. */
+  function youtubeId(testo) {
+    const s = String(testo || '');
+    const m = /(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?(?:[^\s#]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/i.exec(s);
+    return m ? m[1] : null;
+  }
   /* che cosa fare di un file scelto */
   function valutaFile(f) {
     const tipo = String(f && f.type || '');
@@ -322,6 +330,8 @@
       if (m.tipo === 'foto') dentro += media(m, 'foto');
       if (m.tipo === 'video') dentro += media(m, 'video');
       if (m.testo) dentro += `<p>${linkifica(m.testo)}</p>`;
+      const yt = m.tipo === 'testo' && youtubeId(m.testo);
+      if (yt) dentro += `<button type="button" class="ct-video ct-yt" data-azione="youtube" data-yt="${esc(yt)}" title="Guarda il video qui nella chat"><img src="https://i.ytimg.com/vi/${esc(yt)}/hqdefault.jpg" alt="Anteprima del video di YouTube" loading="lazy"><span class="ct-play">▶</span><span class="ct-durata">YouTube</span></button>`;
     }
     const conferma = _confermaCancella === m.id
       ? `<div class="ct-conferma">Cancellare per tutti? Resterà «messaggio cancellato». <button type="button" data-azione="cancella-si" data-id="${m.id}">Cancella</button> <button type="button" data-azione="cancella-no">No</button></div>` : '';
@@ -358,6 +368,17 @@
     if (az === 'cancella') { _confermaCancella = id; disegna(false); }
     if (az === 'cancella-no') { _confermaCancella = null; disegna(false); }
     if (az === 'cancella-si') cancella(id).catch((er) => avviso('Non cancellato: ' + er.message, 'err'));
+    if (az === 'youtube') {
+      const id = String(t.dataset.yt || '');
+      if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return;
+      const f = document.createElement('iframe');
+      f.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`;
+      f.className = 'ct-yt-vero'; f.title = 'Video di YouTube';
+      f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen'; f.allowFullscreen = true;
+      f.referrerPolicy = 'strict-origin-when-cross-origin';
+      t.replaceWith(f);
+      return;
+    }
     if (az === 'guarda') {
       const b = _biglietti[id] || {};
       if (!b.file) return;
@@ -612,6 +633,8 @@
 .ct-play{position:absolute;inset:0;margin:auto;width:46px;height:46px;border-radius:50%;background:rgba(20,20,20,.55);color:#fff;display:grid;place-items:center;font-size:18px}
 .ct-durata{position:absolute;right:6px;bottom:6px;background:rgba(20,20,20,.6);color:#fff;font:500 11px ui-monospace,Consolas,monospace;border-radius:4px;padding:2px 5px}
 .ct-video-vero{display:block;max-width:100%;max-height:360px;border-radius:8px;background:#000}
+.ct-yt img{display:block;width:320px;max-width:100%;aspect-ratio:16/9;object-fit:cover}
+.ct-yt-vero{display:block;width:320px;max-width:100%;aspect-ratio:16/9;border:0;border-radius:8px;background:#000}
 .ct-carica{font-size:13px;color:#565c66;display:grid;gap:4px}.ct-carica.ko{color:#c0392b}
 .ct-barra{height:6px;background:#e3e4e6;border-radius:3px;overflow:hidden;min-width:180px}.ct-barra span{display:block;height:100%;background:#e7500f}
 .ct-piccolo{font-size:11px;color:#6b7078}
@@ -661,7 +684,7 @@
     };
   }
 
-  const api = { avvia, apri, box, iniziali, classeRuolo, linkifica, valutaFile, pezzo, giaRicevuti, giorno, visibile: () => !!(_stato && _stato.visibile) };
+  const api = { avvia, apri, box, iniziali, classeRuolo, linkifica, youtubeId, valutaFile, pezzo, giaRicevuti, giorno, visibile: () => !!(_stato && _stato.visibile) };
   radice.chatTeam = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
