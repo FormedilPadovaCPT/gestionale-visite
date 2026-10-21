@@ -1494,6 +1494,17 @@
         "id": "la-tec"
       },
       "motivo": "elenco dei tecnici in servizio (tecnici), costruito al momento: sceglie chi è affiancato, non scrive una colonna"
+    },
+    {
+      "id": "gest.doc-f-cosa",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "documenti.js",
+        "id": "doc-f-cosa"
+      },
+      "motivo": "documento nuovo o nuova versione di uno in vigore: elenco costruito dai documenti pubblicati, non scrive una colonna"
     }
   ],
   "segreteria_gia_presenti": [

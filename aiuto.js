@@ -55,6 +55,13 @@ window.AIUTO_TESTI = {
   't:togli': 'Toglie il tecnico dalla chat, dopo la conferma qui sotto: da subito non vede più messaggi, foto e video, nemmeno quelli vecchi. I suoi messaggi restano col suo nome. Resta scritto chi l\'ha tolto e quando.',
   'ct-conf-si': 'Esegue l\'ammissione o la rimozione scritta qui accanto. Si può sempre fare il contrario dopo: resta la traccia dei due movimenti.',
   'ct-conf-no': 'Non cambia niente: chi è nella chat resta com\'era.',
+  /* ── documenti con presa visione (21/10/2026) ── */
+  'v:documenti': 'I documenti che l’ufficio ti chiede di leggere, come le informative sui tuoi dati: li apri, li scarichi e ne prendi visione. Il numero dice quanti aspettano la tua presa visione.',
+  't:ho letto e preso visione': 'Registra che hai letto questa versione del documento, con data e ora. Si attiva dopo che l’hai aperto e non si toglie; se il documento cambia, ti viene chiesto di nuovo.',
+  't:pubblica…': 'Controlla i dati e chiede conferma qui sotto: non pubblica ancora niente.',
+  't:sì, pubblica': 'Carica il PDF su Drive (non condiviso con nessuno), lo mette fra i documenti di chi lo riceve e manda a ciascuno una notifica. Se è una nuova versione, quella prima si ritira e la presa visione si chiede di nuovo.',
+  't:ritira…': 'Chiede conferma qui sotto per togliere questa versione senza sostituirla.',
+  't:sì, ritira': 'Toglie la versione dall’elenco di chi la riceve. Le prese visione già date restano registrate, e il file resta su Drive.',
   't:non approvo': 'Non approvi il rientro: scrivi il motivo, il tecnico lo riceve. Il verbale all\'impresa resta com\'è; se ne tiene conto nel controllo dei verbali prima della liquidazione.',
   /* ── menu ── */
   'v:dashboard': 'Torna alla pagina iniziale: pulsanti rapidi, avvisi, il tuo obiettivo del mese e la mappa dei cantieri aperti con l\'IPC dell\'ultima visita.',

@@ -61,9 +61,9 @@
      riquadri di «Oggi» (blu e verde, come i pulsanti di sempre); per chi è di sola lettura Segnala, QR e Servizi sono
      pulsanti sulla pagina che vede per prima. Né tendina «Altre app», né voci-azione nel menu: provate, scartate. */
   const RUOLI = {
-    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', 'chat', '|', 'segreteria'], apre: 'segreteria' },
-    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'statistiche', 'formazione'], apre: 'dashboard' },
-    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'statistiche', 'formazione', '|', 'admin'], apre: 'dashboard' },
+    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', 'chat', 'documenti', '|', 'segreteria'], apre: 'segreteria' },
+    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'documenti', 'statistiche', 'formazione'], apre: 'dashboard' },
+    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'documenti', 'statistiche', 'formazione', '|', 'admin'], apre: 'dashboard' },
     // (13/10/2026) il docente esterno, col solo ruolo «docente»: la sola pagina Formazione (le sue firme, poi i suoi corsi)
     docente:      { nome: 'Docente',         menu: ['formazione'], apre: 'formazione', lettura: true },
     direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione', lettura: true },
@@ -111,8 +111,9 @@
   }
 
   /* (21/10/2026) la Chat del team è nel menu solo di chi ci partecipa e la vede: lo dice il database a chat-team.js,
-     che segna la voce con data-chat-visibile="1". Senza quel segno la voce resta nascosta anche se è nel menu del ruolo. */
-  const ETICHETTE = { chat: '💬 Chat', dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti', formazione: '📚 Formazione' };
+     che segna la voce con data-chat-visibile="1". Senza quel segno la voce resta nascosta anche se è nel menu del ruolo.
+     Lo stesso per i Documenti (documenti.js, data-doc-visibile="1"): tecnici in servizio, Coordinatore e segreteria. */
+  const ETICHETTE = { chat: '💬 Chat', documenti: '📄 Documenti', dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti', formazione: '📚 Formazione' };
 
   const CHIAVE_TECNICO = 'gv-v2-tecnico';   // sessionStorage: di quale tecnico si guarda la pagina in «Vedi come: Tecnico»
   let _tecnici = null;       // l'elenco dei tecnici, letto una volta, per la tendina dell'anteprima
@@ -394,7 +395,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       const v = b.dataset.view;
       if (b.dataset.v2Etichetta === undefined) { b.dataset.v2Etichetta = b.firstChild && b.firstChild.nodeType === 3 ? b.firstChild.textContent : ''; b.dataset.v2Mostra = b.style.display; }
       const o = v && ordine[v];
-      if (!o || (v === 'chat' && b.dataset.chatVisibile !== '1')) { b.style.display = 'none'; return; }
+      if (!o || (v === 'chat' && b.dataset.chatVisibile !== '1') || (v === 'documenti' && b.dataset.docVisibile !== '1')) { b.style.display = 'none'; return; }
       b.style.display = ''; b.style.order = String(o.n); b.style.marginLeft = o.primoADestra ? 'auto' : '';
       b.classList.toggle('v2-cta', v === 'form');
       let et = ETICHETTE[v];
@@ -685,7 +686,9 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     ['btn-dove-sono', '📡', 'Dove sono?'], ['btn-appunti', '📝', 'Appunti cantiere'],
     /* (21/10/2026, chiesto dall'utente) la Chat del team subito dopo gli Appunti: c'è solo se la voce del menu è visibile,
        cioè se il database dice che la chat la vedi; il numero dei messaggi da leggere lo aggiorna chat-team.js */
-    ['nav-chat', '💬', 'Chat del team']];
+    ['nav-chat', '💬', 'Chat del team'],
+    /* (21/10/2026, chiesto dall'utente) i Documenti da leggere, col numero di quelli senza presa visione (documenti.js) */
+    ['nav-documenti', '📄', 'Documenti']];
   const azioneVisibile = (id) => {
     const o = $(id); if (!o) return false;
     if (id === 'nav-assev') {
@@ -698,10 +701,10 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
   function azioniDisegna() {
     const el = $('v2-azioni'); if (!el) return;
     el.innerHTML = AZIONI.filter(([id]) => azioneVisibile(id))
-      .map(([id, icona, testo, classe]) => `<button type="button" data-v2-preme="${id}"${classe ? ' class="' + classe + '"' : ''}><span>${icona}</span>${esc(testo)}${id === 'nav-chat' ? numeroChat() : ''}</button>`).join('');
+      .map(([id, icona, testo, classe]) => `<button type="button" data-v2-preme="${id}"${classe ? ' class="' + classe + '"' : ''}><span>${icona}</span>${esc(testo)}${id === 'nav-chat' ? numeroChat() : id === 'nav-documenti' ? numeroChat('nav-documenti-badge') : ''}</button>`).join('');
   }
-  function numeroChat() {
-    const b = $('nav-chat-badge');
+  function numeroChat(badge) {
+    const b = $(badge || 'nav-chat-badge');
     const n = b && b.style.display !== 'none' ? String(b.textContent || '').trim() : '';
     return `<b class="ct-num inc-lampeggia" style="${n ? '' : 'display:none;'}background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px">${esc(n)}</b>`;
   }

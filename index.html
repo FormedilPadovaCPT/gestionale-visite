@@ -576,6 +576,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="statistiche" id="nav-statistiche">📊 Statistiche</button>
     <!-- chat del team (chat-team.js, 21/10/2026): la mostra il modulo solo a chi ci partecipa e la vede -->
     <button data-view="chat" id="nav-chat" style="display:none">💬 Chat<span id="nav-chat-badge" style="display:none;background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px">0</span></button>
+    <!-- documenti con presa visione (documenti.js, 21/10/2026): la mostra il modulo a tecnici, Coordinatore e segreteria -->
+    <button data-view="documenti" id="nav-documenti" style="display:none">📄 Documenti<span id="nav-documenti-badge" style="display:none;background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px">0</span></button>
     <button data-view="appuntamenti" id="nav-appuntamenti" style="display:none">📅 Prossimi appuntamenti</button>
     <button data-view="direzione" id="nav-direzione" style="display:none">🏛️ Direzione<span id="nav-dir-badge" style="display:none">0</span></button>
     <button data-view="formazione" id="nav-formazione" style="display:none">📚 Formazione<span id="nav-form-badge" style="display:none;background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px">0</span></button>
@@ -588,6 +590,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 
     <!-- CHAT DEL TEAM (chat-team.js, 21/10/2026): la pagina la disegna il modulo; i permessi li fa rispettare il database -->
     <section id="view-chat" class="hidden"></section>
+    <!-- DOCUMENTI CON PRESA VISIONE (documenti.js, 21/10/2026): la pagina la disegna il modulo; i permessi li fanno rispettare il database e la funzione documenti-personale -->
+    <section id="view-documenti" class="hidden"></section>
 
     <!-- DASHBOARD -->
     <section id="view-dashboard">
@@ -3007,7 +3011,7 @@ function navTo(view){
   // il calendario è del solo Direttore (03/10/2026): chi è di sola lettura e non è lui non ci arriva nemmeno per altra via
   if(view==='appuntamenti'&&S.viewer&&!S.direttore)view='dashboard'
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','appuntamenti','direzione','formazione','admin','segreteria','committenti','chat'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','appuntamenti','direzione','formazione','admin','segreteria','committenti','chat','documenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
   if(view==='form'&&typeof incCaricaTendina==='function')incCaricaTendina().catch(e=>console.warn('incCaricaTendina:',e))
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
@@ -3024,6 +3028,7 @@ function navTo(view){
   if(view==='direzione'&&window.direzione)window.direzione.carica().catch(e=>{console.error('direzione:',e);toast('Errore caricamento Direzione: '+e.message,'err')})
   if(view==='formazione'&&window.formazione)window.formazione.carica().catch(e=>{console.error('formazione:',e);toast('Errore caricamento Formazione: '+e.message,'err')})
   if(view==='chat'&&window.chatTeam)window.chatTeam.apri().catch(e=>{console.error('chat:',e);toast('Errore caricamento Chat: '+e.message,'err')})
+  if(view==='documenti'&&window.documenti)window.documenti.apri().catch(e=>{console.error('documenti:',e);toast('Errore caricamento Documenti: '+e.message,'err')})
   if(view==='admin'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.avvisoVerbaliBox)window.avvisoVerbaliBox().catch(e=>console.warn('avviso verbali:',e));admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
   if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e));if(window.direzione)window.direzione.obiettivi().catch(e=>console.warn('obiettivi:',e))}
   if(view==='committenti')admLoadCommittenti().catch(e=>console.error('committenti:',e))
@@ -16927,6 +16932,8 @@ document.addEventListener('input',function(ev){
 <script src="visite-mese.js?v=1"></script>
 <!-- chat del team al posto del gruppo WhatsApp (21/10/2026): dopo cantieri-critici-coord.js, che crea aggiornaZonaCoord -->
 <script src="chat-team.js?v=5"></script>
+<!-- documenti con presa visione: informative e altri documenti al personale (21/10/2026) -->
+<script src="documenti.js?v=1"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->

@@ -93,7 +93,7 @@ assert.ok(/data-chat-membro/.test(js) && /if \(!coord\)|!coord \?/.test(js), 'Am
 /* ── pagina, menu, Zona Coordinatore, pubblicazione ── */
 assert.ok(/<button data-view="chat" id="nav-chat" style="display:none">💬 Chat<span id="nav-chat-badge"/.test(html), 'voce di menu nascosta finché il database non dice che la vedi');
 assert.ok(/<section id="view-chat" class="hidden"><\/section>/.test(html), 'la pagina');
-assert.ok(/'committenti','chat'\]\.forEach/.test(html) && /if\(view==='chat'&&window\.chatTeam\)window\.chatTeam\.apri\(\)/.test(html), 'navTo apre la chat');
+assert.ok(/'committenti','chat'(,'documenti')?\]\.forEach/.test(html) && /if\(view==='chat'&&window\.chatTeam\)window\.chatTeam\.apri\(\)/.test(html), 'navTo apre la chat');
 assert.ok(/id="adm-chat-membri"/.test(html), 'riquadro «Chi è nella chat» nella Zona Coordinatore');
 assert.ok(/<script src="chat-team\.js\?v=\d+"><\/script>/.test(html), 'lo script è incluso');
 assert.ok(html.indexOf('src="cantieri-critici-coord.js') < html.indexOf('src="chat-team.js'), 'e dopo cantieri-critici-coord.js, che crea aggiornaZonaCoord');
@@ -105,9 +105,10 @@ const R = ctxV.vesteV2 && ctxV.vesteV2.RUOLI;
 assert.ok(R, 'la veste espone i ruoli');
 for (const k of ['segreteria', 'tecnico', 'coordinatore']) assert.ok(R[k].menu.includes('chat'), k + ' ha la Chat nel menu');
 for (const k of ['direttore', 'presidenza', 'consigliere', 'docente']) assert.ok(!R[k].menu.includes('chat'), k + ' non ha la Chat (il Direttore non partecipa)');
-assert.ok(veste.includes("if (!o || (v === 'chat' && b.dataset.chatVisibile !== '1')) { b.style.display = 'none'; return; }"), 'senza il via del database la voce resta nascosta');
+// (21/10/2026) nella stessa riga anche i Documenti (documenti.js): la condizione della chat resta quella
+assert.ok(veste.split('\n').some((r) => r.includes("if (!o || (v === 'chat' && b.dataset.chatVisibile !== '1')") && r.includes("{ b.style.display = 'none'; return; }")), 'senza il via del database la voce resta nascosta');
 // (21/10/2026, chiesto dall'utente) in Oggi il riquadro «💬 Chat del team» subito dopo gli Appunti, col numero dei messaggi da leggere
-assert.ok(veste.includes("['btn-appunti', '📝', 'Appunti cantiere'],") && /\['btn-appunti'[^\]]*\],\s*\n(?:\s*\/\*[\s\S]*?\*\/\s*\n)?\s*\['nav-chat', '💬', 'Chat del team'\]\];/.test(veste), 'Chat subito dopo gli Appunti in Oggi');
+assert.ok(veste.includes("['btn-appunti', '📝', 'Appunti cantiere'],") && /\['btn-appunti'[^\]]*\],\s*\n(?:\s*\/\*[\s\S]*?\*\/\s*\n)?\s*\['nav-chat', '💬', 'Chat del team'\](\];|,)/.test(veste), 'Chat subito dopo gli Appunti in Oggi (dal 21/10 seguita dai Documenti)');
 assert.ok(/\[data-v2-preme="nav-chat"\] \.ct-num/.test(js) && /radice\.vesteV2\.azioni\(\)/.test(js), 'il numero anche sul riquadro, che si ridisegna quando la chat si accende');
 for (const k of ['v:chat', 'ct-invia', 'ct-allega', 'ct-scatta', 't:cancella', 't:ammetti', 't:togli', 'ct-conf-si', 'ct-conf-no']) assert.ok(aiuto.includes(`'${k}':`), 'nuvoletta ' + k);
 
