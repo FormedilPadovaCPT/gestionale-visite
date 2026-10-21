@@ -358,7 +358,8 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
    non gli è piaciuto, sopra è più funzionale). Le tabelle diventano schede. */
 @media(max-width:720px){
   body.v2 nav button{margin-left:0!important}
-  /* solo per il TECNICO: bozze, poi i riquadri delle azioni, poi rientri e incarichi (con molti rientri le azioni finivano troppo sotto) */
+  /* per il TECNICO e (21/10/2026, chiesto dall'utente) per la SEGRETERIA: bozze, poi i riquadri delle azioni (Segnala
+     cantiere … Documenti), poi rientri e incarichi (con molti rientri le azioni finivano troppo sotto) */
   body.v2[data-v2-ruolo="tecnico"] #v2-oggi .v2-colonne{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:0}
   body.v2[data-v2-ruolo="tecnico"] #v2-oggi .v2-c1,body.v2[data-v2-ruolo="tecnico"] #v2-oggi .v2-c2{display:contents}
   body.v2[data-v2-ruolo="tecnico"] #v2-bozze{order:1}
@@ -367,6 +368,25 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
   body.v2[data-v2-ruolo="tecnico"] #v2-incarichi{order:4}
   body.v2[data-v2-ruolo="tecnico"] #v2-posto-obiettivo{order:5}
   body.v2[data-v2-ruolo="tecnico"] #v2-posto-avvisi{order:6}
+  body.v2[data-v2-ruolo="segreteria"] #v2-oggi .v2-colonne{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:0}
+  body.v2[data-v2-ruolo="segreteria"] #v2-oggi .v2-c1,body.v2[data-v2-ruolo="segreteria"] #v2-oggi .v2-c2{display:contents}
+  body.v2[data-v2-ruolo="segreteria"] #v2-bozze{order:1}
+  body.v2[data-v2-ruolo="segreteria"] #v2-azioni{order:2}
+  body.v2[data-v2-ruolo="segreteria"] #v2-rientri{order:3}
+  body.v2[data-v2-ruolo="segreteria"] #v2-incarichi{order:4}
+  body.v2[data-v2-ruolo="segreteria"] #v2-posto-obiettivo{order:5}
+  body.v2[data-v2-ruolo="segreteria"] #v2-posto-avvisi{order:6}
+  /* (21/10/2026, chiesto dall'utente) il menu della SEGRETERIA sul telefono: prima le pagine che usa ogni giorno
+     (Oggi, Chat, Ufficio, Documenti), poi tutte le altre. Sul PC resta com'è, con Ufficio a destra. */
+  body.v2[data-v2-ruolo="segreteria"] nav button[data-view="dashboard"]{order:0!important}
+  body.v2[data-v2-ruolo="segreteria"] nav button[data-view="chat"]{order:1!important}
+  body.v2[data-v2-ruolo="segreteria"] nav button[data-view="segreteria"]{order:2!important}
+  body.v2[data-v2-ruolo="segreteria"] nav button[data-view="documenti"]{order:3!important}
+  body.v2[data-v2-ruolo="segreteria"] nav button[data-view="form"]{order:4!important}
+  body.v2[data-v2-ruolo="segreteria"] nav button[data-view="lista"]{order:5!important}
+  body.v2[data-v2-ruolo="segreteria"] nav button[data-view="cantieri"]{order:6!important}
+  body.v2[data-v2-ruolo="segreteria"] nav button[data-view="rubrica"]{order:7!important}
+  body.v2[data-v2-ruolo="segreteria"] nav button[data-view="statistiche"]{order:8!important}
   #v2-barra{overflow-x:auto;flex-wrap:nowrap;white-space:nowrap}
   body.v2 .v2-schede .tbl-wrap{overflow:visible}
   body.v2 .v2-schede table,body.v2 .v2-schede tbody,body.v2 .v2-schede tr,body.v2 .v2-schede td{display:block;width:100%}

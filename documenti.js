@@ -392,7 +392,9 @@
 .doc-form input,.doc-form select,.doc-form textarea{font:14px Barlow,sans-serif;border:1px solid #e3e4e6;border-radius:6px;padding:6px 8px}
 .doc-form fieldset{border:1px solid #e3e4e6;border-radius:6px;padding:6px 10px;display:flex;flex-wrap:wrap;gap:4px 14px}
 .doc-form legend{font-size:13px;color:#565c66}
-.doc-form .doc-check{display:flex;gap:5px;align-items:center}
+.doc-form .doc-check{display:flex;gap:8px;align-items:flex-start;text-transform:none;letter-spacing:0;font-weight:500;font-size:14px;margin:0;text-align:left}
+.doc-form .doc-check input{width:18px;height:18px;flex:0 0 auto;margin:1px 0 0;padding:0;border:0;min-height:0;accent-color:#e7500f}
+@media(max-width:720px){.doc-form fieldset{display:grid;gap:8px}}
 .doc-conferma{border:1px solid #e7500f;background:#fff1ea;border-radius:8px;padding:9px 11px;font-size:13px;display:grid;gap:8px}
 .doc-q{border-top:1px solid #eee;padding-top:8px}.doc-q summary{cursor:pointer;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .doc-q>*:not(summary){margin-top:6px}

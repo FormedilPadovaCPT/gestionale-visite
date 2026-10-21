@@ -81,6 +81,18 @@ assert.ok(!js.includes("'↩ Veste di prima'") && !js.includes("'classica' : 'v2
 // telefono, solo tecnico: i riquadri delle azioni sopra i rientri
 assert.ok(js.includes('body.v2[data-v2-ruolo="tecnico"] #v2-azioni{order:2}') && js.includes('body.v2[data-v2-ruolo="tecnico"] #v2-rientri{order:3}') && js.includes('body.v2[data-v2-ruolo="tecnico"] #v2-bozze{order:1}'), 'sul telefono del tecnico: bozze, azioni, rientri');
 assert.ok(js.indexOf('body.v2[data-v2-ruolo="tecnico"] #v2-azioni{order:2}') > js.indexOf('@media(max-width:720px){'), 'lo spostamento vale solo sul telefono');
+// (21/10/2026, chiesto dall'utente) lo stesso ordine per la segreteria: i pulsanti da Segnala cantiere a Documenti prima dei rientri
+assert.ok(js.includes('body.v2[data-v2-ruolo="segreteria"] #v2-azioni{order:2}') && js.includes('body.v2[data-v2-ruolo="segreteria"] #v2-rientri{order:3}') && js.includes('body.v2[data-v2-ruolo="segreteria"] #v2-oggi .v2-c2{display:contents}'), 'sul telefono della segreteria: azioni prima dei rientri');
+assert.ok(js.indexOf('body.v2[data-v2-ruolo="segreteria"] #v2-azioni{order:2}') > js.indexOf('@media(max-width:720px){'), 'anche per la segreteria solo sul telefono');
+// (21/10/2026, chiesto dall'utente) menu della segreteria sul telefono: Oggi, Chat, Ufficio, Documenti, poi le altre
+{
+  const ord = (v) => { const pre = 'body.v2[data-v2-ruolo="segreteria"] nav button[data-view="' + v + '"]{order:'; const a = js.indexOf(pre); if (a < 0) return null; const m = /^(\d+)!important\}/.exec(js.slice(a + pre.length)); return m ? Number(m[1]) : null; };
+  const prime = ['dashboard', 'chat', 'segreteria', 'documenti'].map(ord);
+  const altre = ['form', 'lista', 'cantieri', 'rubrica', 'statistiche'].map(ord);
+  assert.deepStrictEqual(prime, [0, 1, 2, 3], 'menu della segreteria sul telefono: Oggi, Chat, Ufficio, Documenti in testa');
+  assert.ok(altre.every((n) => n !== null && n > 3), 'menu della segreteria sul telefono: le altre pagine dopo');
+  assert.ok(js.indexOf('nav button[data-view="chat"]{order:1!important}') > js.indexOf('@media(max-width:720px){'), 'il nuovo ordine del menu vale solo sul telefono');
+}
 
 /* ── accesa dalla segreteria ── */
 const s = ambiente({ email: 'CPTPD@did.formedilpadova.it', veste: true });
