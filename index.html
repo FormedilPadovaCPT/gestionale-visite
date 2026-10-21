@@ -574,6 +574,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="scadenze">⏰ Scadenze</button>
     <button data-view="incarichi" id="nav-incarichi">📋 Incarichi<span id="nav-inc-badge" style="display:none;background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px">0</span></button>
     <button data-view="statistiche" id="nav-statistiche">📊 Statistiche</button>
+    <!-- chat del team (chat-team.js, 21/10/2026): la mostra il modulo solo a chi ci partecipa e la vede -->
+    <button data-view="chat" id="nav-chat" style="display:none">💬 Chat<span id="nav-chat-badge" style="display:none;background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px">0</span></button>
     <button data-view="appuntamenti" id="nav-appuntamenti" style="display:none">📅 Prossimi appuntamenti</button>
     <button data-view="direzione" id="nav-direzione" style="display:none">🏛️ Direzione<span id="nav-dir-badge" style="display:none">0</span></button>
     <button data-view="formazione" id="nav-formazione" style="display:none">📚 Formazione<span id="nav-form-badge" style="display:none;background:#e7500f;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;margin-left:6px">0</span></button>
@@ -583,6 +585,9 @@ tr.row-detail-hover:hover td{background:#fff3ed}
     <button data-view="segreteria" id="nav-segreteria" style="display:none">🗂️ Segreteria</button>
   </nav>
   <main>
+
+    <!-- CHAT DEL TEAM (chat-team.js, 21/10/2026): la pagina la disegna il modulo; i permessi li fa rispettare il database -->
+    <section id="view-chat" class="hidden"></section>
 
     <!-- DASHBOARD -->
     <section id="view-dashboard">
@@ -1423,6 +1428,8 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <div id="adm-cicli" style="display:none;margin-bottom:14px"></div>
         <!-- visite del mese per tecnico: il Coordinatore le aumenta (visite-mese.js, 16/10/2026) -->
         <div id="adm-visite-mese" style="display:none;margin-bottom:14px"></div>
+        <!-- chi è nella chat del team: il Coordinatore ammette e toglie (chat-team.js, 21/10/2026) -->
+        <div id="adm-chat-membri" style="display:none;margin-bottom:14px"></div>
 
         <!-- Intervallo cronologico + statistiche -->
         <div class="adm-section">
@@ -3000,7 +3007,7 @@ function navTo(view){
   // il calendario è del solo Direttore (03/10/2026): chi è di sola lettura e non è lui non ci arriva nemmeno per altra via
   if(view==='appuntamenti'&&S.viewer&&!S.direttore)view='dashboard'
   document.querySelectorAll('nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))
-  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','appuntamenti','direzione','formazione','admin','segreteria','committenti'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
+  ;['dashboard','form','lista','cantieri','rubrica','scadenze','incarichi','statistiche','appuntamenti','direzione','formazione','admin','segreteria','committenti','chat'].forEach(v=>$(('view-'+v))?.classList.toggle('hidden',v!==view))
   const navBar=$('form-nav-bar')
   if(view==='form'&&typeof incCaricaTendina==='function')incCaricaTendina().catch(e=>console.warn('incCaricaTendina:',e))
   if(navBar){if(view==='form'){navBar.classList.remove('hidden');navBar.style.display='flex'}else{navBar.classList.add('hidden')}; document.querySelector('main').style.paddingBottom=view==='form'?'60px':'14px'}
@@ -3016,6 +3023,7 @@ function navTo(view){
   if(view==='appuntamenti'){const h=$('app-cal-embed');if(h&&!h.dataset.loaded){h.dataset.loaded='1';h.innerHTML='<iframe src="https://calendar.google.com/calendar/embed?src=c_cf9b7b4f739cc42753f6207d36431da4dc7521c948e2e0135aa96f85e6ce5080%40group.calendar.google.com&ctz=Europe%2FRome&mode=AGENDA&showPrint=0&showCalendars=0&showTz=0&showTitle=0&hl=it" style="border:0;width:100%;height:600px;display:block" frameborder="0" scrolling="no"></iframe>'}}
   if(view==='direzione'&&window.direzione)window.direzione.carica().catch(e=>{console.error('direzione:',e);toast('Errore caricamento Direzione: '+e.message,'err')})
   if(view==='formazione'&&window.formazione)window.formazione.carica().catch(e=>{console.error('formazione:',e);toast('Errore caricamento Formazione: '+e.message,'err')})
+  if(view==='chat'&&window.chatTeam)window.chatTeam.apri().catch(e=>{console.error('chat:',e);toast('Errore caricamento Chat: '+e.message,'err')})
   if(view==='admin'){(window.aggiornaZonaCoord||loadFattureCoord)().catch(e=>console.warn('zona coordinatore:',e));if(window.avvisoVerbaliBox)window.avvisoVerbaliBox().catch(e=>console.warn('avviso verbali:',e));admInit();admLoadAvvisi&&admLoadAvvisi().catch(e=>console.warn('admLoadAvvisi:',e))}
   if(view==='segreteria'){sgrInit();admLoadCampagne&&admLoadCampagne().catch(e=>console.warn('admLoadCampagne:',e));if(window.direzione)window.direzione.obiettivi().catch(e=>console.warn('obiettivi:',e))}
   if(view==='committenti')admLoadCommittenti().catch(e=>console.error('committenti:',e))
@@ -16904,7 +16912,7 @@ document.addEventListener('input',function(ev){
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=7"></script>
-<script src="aiuto.js?v=30"></script>
+<script src="aiuto.js?v=31"></script>
 <script src="mail-respinte-tec.js?v=3"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=2"></script>
@@ -16917,6 +16925,8 @@ document.addEventListener('input',function(ev){
 <script src="fuori-procedura.js?v=2"></script>
 <!-- visite del mese: il Coordinatore le aumenta, con motivo e avvisi (16/10/2026) -->
 <script src="visite-mese.js?v=1"></script>
+<!-- chat del team al posto del gruppo WhatsApp (21/10/2026): dopo cantieri-critici-coord.js, che crea aggiornaZonaCoord -->
+<script src="chat-team.js?v=1"></script>
 <!-- «Dove sono?» (quartiere di Padova dal GPS) e appunti di cantiere personali, dalla Dashboard (23/09/2026) -->
 <script src="appunti-cantiere.js?v=3"></script>
 <!-- Direzione e Consiglio: pagina del Direttore, registro delle questioni, obiettivo CEIV (25/09/2026) -->
@@ -16930,7 +16940,7 @@ document.addEventListener('input',function(ev){
 <!-- cicli di visita (20/10/2026): proposta alla chiusura del verbale, regola sulla visita del ciclo, Zona Coordinatore; statistiche dei cicli -->
 <script src="cicli-visita.js?v=1"></script>
 <script src="statistiche-cicli.js?v=1"></script>
-<script src="veste-v2.js?v=44"></script>
+<script src="veste-v2.js?v=45"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

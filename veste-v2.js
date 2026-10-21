@@ -61,9 +61,9 @@
      riquadri di «Oggi» (blu e verde, come i pulsanti di sempre); per chi è di sola lettura Segnala, QR e Servizi sono
      pulsanti sulla pagina che vede per prima. Né tendina «Altre app», né voci-azione nel menu: provate, scartate. */
   const RUOLI = {
-    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', '|', 'segreteria'], apre: 'segreteria' },
-    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', 'formazione'], apre: 'dashboard' },
-    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'statistiche', 'formazione', '|', 'admin'], apre: 'dashboard' },
+    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', 'chat', '|', 'segreteria'], apre: 'segreteria' },
+    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'statistiche', 'formazione'], apre: 'dashboard' },
+    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'statistiche', 'formazione', '|', 'admin'], apre: 'dashboard' },
     // (13/10/2026) il docente esterno, col solo ruolo «docente»: la sola pagina Formazione (le sue firme, poi i suoi corsi)
     docente:      { nome: 'Docente',         menu: ['formazione'], apre: 'formazione', lettura: true },
     direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione', lettura: true },
@@ -110,7 +110,9 @@
     vista.insertBefore(el, intro && intro.parentNode === vista ? intro.nextSibling : vista.firstChild);
   }
 
-  const ETICHETTE = { dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti', formazione: '📚 Formazione' };
+  /* (21/10/2026) la Chat del team è nel menu solo di chi ci partecipa e la vede: lo dice il database a chat-team.js,
+     che segna la voce con data-chat-visibile="1". Senza quel segno la voce resta nascosta anche se è nel menu del ruolo. */
+  const ETICHETTE = { chat: '💬 Chat', dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti', formazione: '📚 Formazione' };
 
   const CHIAVE_TECNICO = 'gv-v2-tecnico';   // sessionStorage: di quale tecnico si guarda la pagina in «Vedi come: Tecnico»
   let _tecnici = null;       // l'elenco dei tecnici, letto una volta, per la tendina dell'anteprima
@@ -392,7 +394,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       const v = b.dataset.view;
       if (b.dataset.v2Etichetta === undefined) { b.dataset.v2Etichetta = b.firstChild && b.firstChild.nodeType === 3 ? b.firstChild.textContent : ''; b.dataset.v2Mostra = b.style.display; }
       const o = v && ordine[v];
-      if (!o) { b.style.display = 'none'; return; }
+      if (!o || (v === 'chat' && b.dataset.chatVisibile !== '1')) { b.style.display = 'none'; return; }
       b.style.display = ''; b.style.order = String(o.n); b.style.marginLeft = o.primoADestra ? 'auto' : '';
       b.classList.toggle('v2-cta', v === 'form');
       let et = ETICHETTE[v];
@@ -1281,5 +1283,5 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
     } catch (e) { console.warn('veste v2 (dopo):', e); return []; }
   }
 
-  window.vesteV2 = { prima, dopo, pronto, verso, accesa, ruolo, ruoloVero, simula, diChi, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat, luminanza, contrasto, leggibile };
+  window.vesteV2 = { rimenu: menu, prima, dopo, pronto, verso, accesa, ruolo, ruoloVero, simula, diChi, RUOLI, GRUPPI, FASI, faseDi, esercizi, gruppoDi, piuVicini, TIPI_FREQUENTI, areaRiepilogo, requisiti, gruppoStat, luminanza, contrasto, leggibile };
 })();

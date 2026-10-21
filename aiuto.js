@@ -44,6 +44,17 @@ window.AIUTO_TESTI = {
   't:aumenta': 'Alza le visite del mese di questo tecnico: chiede il numero nuovo e il motivo. Cambiano la lettera nel database e la scheda del tecnico; tecnico e segreteria ricevono l\'avviso. Da qui non si torna indietro: per abbassare serve la segreteria.',
   'vm-prec': 'Mostra le lettere di incarico del mese prima.',
   'vm-succ': 'Mostra le lettere di incarico del mese dopo.',
+  /* ── chat del team (21/10/2026) ── */
+  'v:chat': 'La chat del team, al posto del gruppo WhatsApp: messaggi, link, foto e video fra tecnici, Coordinatore e segreteria. È interna: non va alle imprese e non sostituisce verbale né protocollo.',
+  'ct-invia': 'Manda il messaggio a tutto il team. Chi ha le notifiche attive riceve un avviso senza nomi. Il messaggio si può cancellare dopo, ma resta la riga «messaggio cancellato».',
+  'ct-allega': 'Sceglie foto o video dalla galleria. La foto parte rimpicciolita; il video parte com\'è, fino a 100 MB (oltre, condividi un link di Drive). Il testo già scritto diventa la didascalia.',
+  'ct-scatta': 'Apre la fotocamera e manda la foto al team. Il testo già scritto diventa la didascalia. Foto con persone riconoscibili: restano interne.',
+  't:cancella': 'Chiede conferma, poi toglie il tuo messaggio per tutti: al suo posto resta «messaggio cancellato». Nel database e su Drive resta conservato, ma dall\'app non lo vede più nessuno.',
+  't:messaggi precedenti': 'Carica i 50 messaggi più vecchi di quelli che vedi.',
+  't:ammetti': 'Mette il tecnico nella chat del team, dopo la conferma qui sotto: vedrà anche i messaggi e i file già scambiati e riceverà le notifiche. Resta scritto chi l\'ha ammesso e quando.',
+  't:togli': 'Toglie il tecnico dalla chat, dopo la conferma qui sotto: da subito non vede più messaggi, foto e video, nemmeno quelli vecchi. I suoi messaggi restano col suo nome. Resta scritto chi l\'ha tolto e quando.',
+  'ct-conf-si': 'Esegue l\'ammissione o la rimozione scritta qui accanto. Si può sempre fare il contrario dopo: resta la traccia dei due movimenti.',
+  'ct-conf-no': 'Non cambia niente: chi è nella chat resta com\'era.',
   't:non approvo': 'Non approvi il rientro: scrivi il motivo, il tecnico lo riceve. Il verbale all\'impresa resta com\'è; se ne tiene conto nel controllo dei verbali prima della liquidazione.',
   /* ── menu ── */
   'v:dashboard': 'Torna alla pagina iniziale: pulsanti rapidi, avvisi, il tuo obiettivo del mese e la mappa dei cantieri aperti con l\'IPC dell\'ultima visita.',
