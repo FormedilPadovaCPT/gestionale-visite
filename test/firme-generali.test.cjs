@@ -36,7 +36,10 @@ for (const campo of ['r.titolo', 'error.message', 'r.rimandata_motivo || \'\'', 
 assert.ok(/await window\.firmeApp\.box\(host, presidente/.test(dir), 'la pagina Presidenza usa il riquadro di firme.js');
 assert.ok(!/from\('s_firme_presidente'\)/.test(dir), 'direzione.js non legge più il nome vecchio della tabella');
 assert.ok(/from\('s_firme'\)\.select\('id', \{ count: 'exact', head: true \}\)\.eq\('stato', 'in_attesa'\)/.test(dir), 'il numero sul pulsante Presidenza conta le firme in s_firme');
-assert.ok(/const guarda = anteprima === 'presidenza' && R\.segr;/.test(dir) && /\{ ruolo: 'presidente', mie: false, pulsanti: false/.test(dir), 'la segreteria in anteprima vede l\'elenco del Presidente senza pulsanti');
+assert.ok(/const guarda = \(anteprima === 'presidenza' \|\| anteprima === 'direttore'\) && R\.segr;/.test(dir) && /\{ ruolo: anteprima === 'direttore' \? 'direttore' : 'presidente', mie: false, pulsanti: false/.test(dir), 'la segreteria in anteprima vede l\'elenco del Presidente (o del Direttore) senza pulsanti');
+// (21/10/2026) anche il Direttore firma nell'app: le lettere di affiancamento dei tecnici nuovi
+assert.ok(/const presidente = !anteprima && \(R\.presidente \|\| R\.direttore\);/.test(dir), 'il Direttore vede «Da firmare» nella sua pagina');
+assert.ok(/if \(R\.presidente \|\| R\.direttore\) \{/.test(dir), 'e le sue firme contano nel numero sul pulsante');
 
 // ── la pagina Formazione ──
 assert.ok(/<section id="view-formazione" class="hidden">/.test(index) && /id="form-firme"/.test(index), 'index.html ha la vista Formazione');

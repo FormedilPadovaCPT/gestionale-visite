@@ -100,7 +100,7 @@
     const attesa = (data || []).filter((r) => r.stato === 'in_attesa').reverse();
     const recenti = (data || []).filter((r) => r.stato !== 'in_attesa').slice(0, 5);
     const bottoni = !!o.pulsanti;
-    const catena = (r) => (r.firmatario_ruolo === 'incaricato' || (r.firmatario_ruolo === 'docente' && r.tipo === 'incarico_docenza') ? ' · da firmare per accettazione, sotto il tuo nome: il Presidente ha già firmato'
+    const catena = (r) => (r.firmatario_ruolo === 'incaricato' || (r.firmatario_ruolo === 'docente' && r.tipo === 'incarico_docenza') ? (r.tipo === 'documento' ? ' · da firmare per accettazione, sotto il tuo nome: il Direttore ha già firmato' : ' · da firmare per accettazione, sotto il tuo nome: il Presidente ha già firmato')
       : r.ordine > 1 ? ` · ${r.ordine}ª firma: il documento porta già ${r.ordine - 1 === 1 ? 'la firma di chi è venuto prima' : 'le firme di chi è venuto prima'}` : '');
     const riga = (r) => {
       const g = giorni(r.richiesta_il);

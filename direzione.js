@@ -744,8 +744,10 @@
       if (prima && prima.parentNode) prima.parentNode.insertBefore(host, prima.nextSibling); else vista.appendChild(host);
     }
     if (!host) return;
-    const presidente = !anteprima && R.presidente;
-    const guarda = anteprima === 'presidenza' && R.segr;
+    /* (21/10/2026) anche il Direttore: le lettere di affiancamento dei tecnici nuovi
+       sono a sua firma, e la mail di firma-documenti lo manda qui (?vista=direzione) */
+    const presidente = !anteprima && (R.presidente || R.direttore);
+    const guarda = (anteprima === 'presidenza' || anteprima === 'direttore') && R.segr;
     if (!presidente && !guarda) { host.innerHTML = ''; return; }
     if (!window.firmeApp) {
       host.innerHTML = '<div class="card" style="border-left:4px solid #c0392b"><h3>✍️ Da firmare</h3><p style="font-size:13px;color:#c0392b;margin:0">Il modulo delle firme (firme.js) non si è caricato: ricarica la pagina.</p></div>';
@@ -753,7 +755,7 @@
     }
     await window.firmeApp.box(host, presidente
       ? { mie: true, pulsanti: true, titolo: '✍️ Da firmare', dopo: () => badge().catch(() => {}) }
-      : { ruolo: 'presidente', mie: false, pulsanti: false, titolo: '✍️ Da firmare' });
+      : { ruolo: anteprima === 'direttore' ? 'direttore' : 'presidente', mie: false, pulsanti: false, titolo: '✍️ Da firmare' });
   }
 
   /* ════════════════════════════════════════════════════════════
@@ -890,7 +892,8 @@
         n += count || 0;
       }
       else if (R.presidenza) { const a = await inAttesa(); n += (a.critici || []).length; }
-      if (R.presidente) {
+      if (R.presidente || R.direttore) {
+        /* la RLS dà a ciascuno le sole righe di cui è firmatario */
         const { count } = await window.sb.from('s_firme').select('id', { count: 'exact', head: true }).eq('stato', 'in_attesa');
         n += count || 0;
       }

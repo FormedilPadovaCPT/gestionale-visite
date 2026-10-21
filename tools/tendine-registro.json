@@ -1483,6 +1483,17 @@
         "id": "arch-tipo"
       },
       "motivo": "filtro dell'archivio dei documenti firmati: non scrive"
+    },
+    {
+      "id": "segr.la-tec",
+      "app": "segreteria",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "js/lettera-affiancamento.js",
+        "id": "la-tec"
+      },
+      "motivo": "elenco dei tecnici in servizio (tecnici), costruito al momento: sceglie chi è affiancato, non scrive una colonna"
     }
   ],
   "segreteria_gia_presenti": [
