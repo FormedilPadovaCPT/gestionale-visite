@@ -40,7 +40,7 @@
   const giorni = (d) => (d ? Math.max(0, Math.floor((new Date(oggi()) - new Date(String(d).slice(0, 10))) / 864e5)) : null);
   const avviso = (msg, tipo) => (window.toast ? window.toast(msg, tipo) : alert(msg));
   const BUCKET = 'firme-presidente';   // il nome del bucket resta quello del 04/10
-  const RUOLI = { presidente: 'Presidente', direttore: 'Direttore', rpf: 'responsabile del progetto formativo', docente: 'docente', incaricato: 'tecnico incaricato, per accettazione' };
+  const RUOLI = { presidente: 'Presidente', direttore: 'Direttore', rpf: 'responsabile del progetto formativo', docente: 'docente', incaricato: 'tecnico incaricato, per accettazione', personale: 'destinatario del documento' };
   const TIPI = { incarico_assev: 'lettera di incarico (asseverazione)', incarico_docenza: 'lettera di incarico di docenza', accettazione_incarico: 'accettazione dell\'incarico', scheda_formativa: 'scheda formativa', progetto_formativo: 'progetto formativo', registro_giornata: 'registro della giornata', registro_corso: 'registro del corso', verbale_verifica: 'verbale di verifica finale', documento: 'documento' };
 
   const _letti = new Set();   // i documenti aperti con «Leggi» in questa sessione: solo dopo si accende «Firmo»
@@ -90,6 +90,8 @@
     let q = sb.from('s_firme')
       .select('id, tipo, rif, titolo, stato, ordine, firmatario_email, firmatario_ruolo, corso_id, richiesta_il, firmata_il, rimandata_il, rimandata_motivo, file_originale, file_firmato, file_precedente')
       .in('stato', ['in_attesa', 'firmata', 'rimandata']).order('richiesta_il', { ascending: false }).limit(60);
+    /* (21/10/2026) o.rif: solo le righe il cui riferimento comincia così (pagina Documenti: «doc:») */
+    if (o.rif) q = q.like('rif', String(o.rif).replace(/[\\%_]/g, (c) => '\\' + c) + '%');
     if (o.ruolo) q = q.eq('firmatario_ruolo', o.ruolo);
     else if (o.mie && email) q = q.ilike('firmatario_email', email.replace(/[\\%_]/g, (c) => '\\' + c));
     const { data, error } = await q;

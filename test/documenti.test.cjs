@@ -123,6 +123,42 @@ assert.ok(/_MOD_Formedil-Padova_\$\{codice\}_v\$\{due\(versione\)\}\.pdf/.test(f
 assert.ok(!/permissions/.test(fn) && !/'anyone'/.test(fn), 'i file non si condividono con nessuno');
 assert.ok(!/error: \(e instanceof Error && e\.message\)/.test(fn), 'il messaggio delle eccezioni non esce nella risposta (CodeQL)');
 
+/* ── (21/10/2026, chiesto dall'utente) i documenti DA FIRMARE: si firma nell'app, col registro delle firme di sempre ── */
+const sqlF = leggi('supabase', 'sql', '2026_10_21_documenti_firma.sql');
+const firme = leggi('firme.js');
+const provaF = leggi('tools', 'prova_documenti_firma.sql');
+function controlliFirma(s) {
+  const ko = [];
+  const regola = (cond, msg) => { if (!cond) ko.push(msg); };
+  regola(/'incaricato', 'personale'\]\)\)/.test(s), 'ruolo «personale» nel registro delle firme');
+  regola(/if exists \(select 1 from doc_personale where id = p_doc and richiede_firma\) then\n\s+raise exception 'Questo documento si firma/.test(s), 'un documento da firmare non si chiude con la sola presa visione');
+  regola(/for vecchio in select id from doc_personale where codice = p_codice and ritirato_il is null loop\n\s+perform public\.doc_firme_ritira\(vecchio, io\);/.test(s), 'una versione nuova ritira le firme non date della vecchia');
+  regola(/if not found then raise exception 'Il documento non c''è o è già ritirato'; end if;\n\s+perform public\.doc_firme_ritira\(p_doc, io\);/.test(s), 'il ritiro ritira anche le firme non date');
+  regola(/if not coalesce\(p_richiede_firma, false\) then\n\s+for e in select public\.doc_destinatari_email\(nuovo\) loop/.test(s), 'per un documento da firmare la notifica la manda il registro delle firme, non due volte');
+  regola(/and stato in \('in_attesa', 'in_coda'\)/.test(s) && !/delete from s_firme/.test(s), 'le firme si ritirano, non si cancellano; quelle date restano');
+  regola(/revoke all on function public\.doc_firme_ritira\(bigint, text\) from public, anon, authenticated;/.test(s), 'ritirare le firme non si fa dall\'app');
+  return ko;
+}
+assert.deepStrictEqual(controlliFirma(sqlF), [], 'le regole delle firme nel database');
+const rottiF = [
+  ['presa visione al posto della firma', sqlF.replace("  if exists (select 1 from doc_personale where id = p_doc and richiede_firma) then\n    raise exception 'Questo documento si firma: usa «Firmo» nel riquadro «Documenti da firmare»';\n  end if;\n", '')],
+  ['firme della versione vecchia ancora da fare', sqlF.replace('    perform public.doc_firme_ritira(vecchio, io);\n', '')],
+  ['ruolo personale non previsto', sqlF.replace("'incaricato', 'personale']))", "'incaricato']))")],
+];
+for (const [nome, s] of rottiF) {
+  assert.notStrictEqual(s, sqlF, 'la copia rotta «' + nome + '» è davvero diversa');
+  assert.ok(controlliFirma(s).length > 0, 'il controllo deve fallire su: ' + nome);
+}
+assert.ok(/firmatari: \[\{ ruolo: 'personale', email, riquadro \}\]/.test(fn) && /rif: `doc:\$\{id\}:\$\{email\}`/.test(fn), 'una richiesta di firma per persona, sulla sua copia');
+assert.ok(/functions\/v1\/firma-documenti`/.test(fn) && /headers: \{ Authorization: auth,/.test(fn), 'la richiesta la fa firma-documenti col token della segreteria');
+assert.ok(/if \(body\.azione === 'chiedi_firme'\) \{\n\s+if \(!\(await eSegreteria\(email\)\)\)/.test(fn), 'chiedere le firme mancanti: solo la segreteria');
+assert.ok(/le richieste di firma non sono partite/.test(fn), 'se le richieste non partono, lo si dice');
+assert.ok(/radice\.firmeApp\.box\(host, \{ titolo: '✍️ Documenti da firmare'/.test(js), 'nella pagina TUTTO quello da firmare (anche le lettere di affiancamento), senza filtri');
+assert.ok(/firme = await radice\.firmeApp\.conta\(\)/.test(js), 'il numero conta anche le firme in attesa');
+assert.ok(/id="doc-f-firma"/.test(js) && /richiede_firma: c\.firma/.test(js), 'la segreteria sceglie se il documento va firmato');
+assert.ok(/personale: 'destinatario del documento'/.test(firme) && /if \(o\.rif\) q = q\.like\('rif'/.test(firme), 'firme.js conosce il ruolo nuovo');
+for (const k of ['FALLITA F1', 'FALLITA F5: presa visione su un documento da firmare', 'FALLITA F6: la firma della versione vecchia è ancora da fare']) assert.ok(provaF.includes(k), 'prova dal vivo: ' + k);
+
 /* ── la prova dal vivo copre i casi rotti ── */
 for (const k of ['FALLITA 2: un tecnico ha pubblicato', 'FALLITA 3b: il Direttore è destinatario', 'FALLITA 3c: un tecnico fuori servizio è destinatario', 'FALLITA 4b: presa visione senza aver aperto il file', 'FALLITA 5b', 'FALLITA 7a: presa visione tolta', 'FALLITA 9f: presa visione su una versione ritirata']) assert.ok(prova.includes(k), 'prova dal vivo: ' + k);
 

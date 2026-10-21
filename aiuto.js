@@ -60,7 +60,9 @@ window.AIUTO_TESTI = {
   't:ho letto e preso visione': 'Registra che hai letto questa versione del documento, con data e ora. Si attiva dopo che l’hai aperto e non si toglie; se il documento cambia, ti viene chiesto di nuovo.',
   't:pubblica…': 'Controlla i dati e chiede conferma qui sotto: non pubblica ancora niente.',
   't:sì, pubblica': 'Carica il PDF su Drive (non condiviso con nessuno), lo mette fra i documenti di chi lo riceve e manda a ciascuno una notifica. Se è una nuova versione, quella prima si ritira e la presa visione si chiede di nuovo.',
-  't:ritira…': 'Chiede conferma qui sotto per togliere questa versione senza sostituirla.',
+  'p:chiedi la firma a chi manca': 'Manda la richiesta di firma a chi riceve il documento e non l’ha ancora avuta (per esempio un tecnico entrato dopo nella chat): mail e notifica a ciascuno.',
+  'doc-f-firma': 'Con la spunta il documento va firmato: a ciascuno parte una richiesta di firma sulla sua copia, e la firma prende il posto della presa visione.',
+  't:ritira…':'Chiede conferma qui sotto per togliere questa versione senza sostituirla.',
   't:sì, ritira': 'Toglie la versione dall’elenco di chi la riceve. Le prese visione già date restano registrate, e il file resta su Drive.',
   't:non approvo': 'Non approvi il rientro: scrivi il motivo, il tecnico lo riceve. Il verbale all\'impresa resta com\'è; se ne tiene conto nel controllo dei verbali prima della liquidazione.',
   /* ── menu ── */

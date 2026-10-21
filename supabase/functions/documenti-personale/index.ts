@@ -18,6 +18,14 @@
 //   { azione:'pubblica', pdf_base64, titolo, codice, descrizione?, destinatari:[…] } → { ok, id, versione }
 //        solo la segreteria; una versione nuova dello stesso codice ritira la precedente
 //   { azione:'biglietti', ids:[…] } → { ok, biglietti:{ id: url } }
+//   { azione:'chiedi_firme', id } → { ok, chieste }   solo la segreteria (21/10/2026)
+//
+// DOCUMENTI DA FIRMARE (21/10/2026, chiesto dall'utente): con richiede_firma,
+// alla pubblicazione la funzione mette una copia del PDF nel bucket delle firme
+// e chiede a firma-documenti (col token della segreteria che pubblica) una
+// firma per ciascun destinatario, ruolo «personale», rif «doc:<id>:<email>»:
+// ognuno firma la SUA copia nel riquadro «Documenti da firmare». Chi diventa
+// destinatario dopo (un tecnico nuovo nella chat) si aggiunge con «chiedi_firme».
 // GET ?b=<biglietto>[&scarica=1]: il PDF. Il biglietto è firmato, vale 2 ore,
 //   porta l'account di chi l'ha chiesto, e a ogni richiesta si ricontrolla.
 //
@@ -25,6 +33,7 @@
 // dei verbali: «Documenti al personale» si crea nella stessa cartella madre).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { PDFDocument } from 'https://esm.sh/pdf-lib@1.17.1'
 import { getAccessToken } from '../_shared/google.ts'
 
 const CORS = {
@@ -131,6 +140,53 @@ async function eSegreteria(email: string): Promise<boolean> {
   return Array.isArray(data) && data.includes(email)
 }
 
+/* ── le firme: una copia per persona, nel registro delle firme che esiste già ── */
+const BUCKET_FIRME = 'firme-presidente'   // il bucket di firma-documenti (nome storico del 04/10)
+// dove va la firma: in fondo all'ultima pagina, a destra (sopra il piè di pagina)
+async function riquadroFirma(bytes: Uint8Array) {
+  const pdf = await PDFDocument.load(bytes)
+  const n = pdf.getPageCount()
+  const { width } = pdf.getPage(n - 1).getSize()
+  const w = 230, h = 60
+  return { pagina: n - 1, x: Math.max(20, Math.round(width - 56 - w)), y: 48, w, h }
+}
+async function chiediFirme(auth: string, id: number, gia?: Uint8Array): Promise<number> {
+  const { data: d, error: ed } = await servizio.from('doc_personale').select('id, titolo, nome_file, drive_file_id, richiede_firma, ritirato_il').eq('id', id).maybeSingle()
+  if (ed) throw ed
+  if (!d || !d.richiede_firma || d.ritirato_il) return 0
+  const { data: mancanti, error: em } = await servizio.rpc('doc_firme_mancanti', { p_doc: id })
+  if (em) throw em
+  const elenco = (Array.isArray(mancanti) ? mancanti : []).map((x: unknown) => String(x)).filter(Boolean)
+  if (!elenco.length) return 0
+  let bytes = gia
+  if (!bytes) {
+    const token = await getAccessToken(JSON.parse(Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON')!))
+    const r = await drive(token, `https://www.googleapis.com/drive/v3/files/${d.drive_file_id}?alt=media&supportsAllDrives=true`)
+    if (!r.ok) throw new Error(`lettura da Drive non riuscita (HTTP ${r.status})`)
+    bytes = new Uint8Array(await r.arrayBuffer())
+  }
+  const file = `originali/documento_doc${id}_${d.nome_file}`
+  const { error: eu } = await servizio.storage.from(BUCKET_FIRME).upload(file, bytes, { contentType: 'application/pdf', upsert: true })
+  if (eu) throw eu
+  const riquadro = await riquadroFirma(bytes)
+  let chieste = 0
+  for (let i = 0; i < elenco.length; i += 20) {
+    const documenti = elenco.slice(i, i + 20).map((email: string) => ({
+      tipo: 'documento', rif: `doc:${id}:${email}`, titolo: d.titolo, nome_file: d.nome_file, file_originale: file,
+      destinatario: email, firmatari: [{ ruolo: 'personale', email, riquadro }],
+    }))
+    // la richiesta la fa firma-documenti, col token di chi ha chiesto (la segreteria): avvisi compresi
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/firma-documenti`, {
+      method: 'POST', headers: { Authorization: auth, apikey: ANON, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ azione: 'richiedi', documenti }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok || j?.error) throw new Error('richiesta di firma non registrata: ' + (j?.error || `HTTP ${r.status}`))
+    chieste += Array.isArray(j.richieste) ? j.richieste.length : 0
+  }
+  return chieste
+}
+
 /* ── GET: il PDF, a chi può aprirlo ── */
 async function servi(req: Request): Promise<Response> {
   const u = new URL(req.url)
@@ -217,6 +273,7 @@ Deno.serve(async (req) => {
       const { data: id, error } = await servizio.rpc('doc_registra', {
         p_email: email, p_codice: codice, p_versione: versione, p_titolo: titolo, p_descrizione: body.descrizione || null,
         p_destinatari: destinatari, p_drive_file_id: f.id, p_nome_file: nome, p_sha256: sha256, p_md5: f.md5, p_dimensione: bytes.length,
+        p_richiede_firma: body.richiede_firma === true,
       })
       if (error) {
         // il file appena caricato non è legato a niente: va nel cestino di Drive, così non resta un doppione senza riga
@@ -225,7 +282,25 @@ Deno.serve(async (req) => {
         }).catch(() => {})
         return risposta({ ok: false, error: error.message }, 400)
       }
+      // documento da firmare: le richieste di firma, una per destinatario. Se non partono il documento resta
+      // pubblicato, e si rifanno con «Chiedi la firma a chi manca» (chiedi_firme): lo si dice, non si tace
+      if (body.richiede_firma === true) {
+        try {
+          const chieste = await chiediFirme(auth, Number(id), bytes)
+          return risposta({ ok: true, id, versione, nome_file: nome, sha256, firme_chieste: chieste })
+        } catch (e) {
+          console.error('documenti-personale, firme:', e)
+          return risposta({ ok: true, id, versione, nome_file: nome, sha256, firme_chieste: 0, avviso: 'Documento pubblicato, ma le richieste di firma non sono partite: usa «Chiedi la firma a chi manca».' })
+        }
+      }
       return risposta({ ok: true, id, versione, nome_file: nome, sha256 })
+    }
+
+    /* ── chiedere la firma a chi ancora non l'ha avuta (segreteria) ── */
+    if (body.azione === 'chiedi_firme') {
+      if (!(await eSegreteria(email))) return risposta({ ok: false, error: 'Le firme le chiede la segreteria' }, 403)
+      const chieste = await chiediFirme(auth, Number(body.id))
+      return risposta({ ok: true, chieste })
     }
 
     return risposta({ ok: false, error: 'azione sconosciuta' }, 400)
