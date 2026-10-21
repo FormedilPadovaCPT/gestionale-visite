@@ -475,6 +475,8 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
   function prepara() {
     document.body.classList.add('v2');
     document.body.dataset.v2Ruolo = ruolo();
+    /* (21/10/2026, chiesto dall'utente) il bollino rosso del LOG ERRORI lo vede solo la segreteria (index.html, #diag-btn) */
+    document.body.classList.toggle('diag-ok', eSegreteria());
     stile(); menu(); barra(); tieniEtichette(); verbaleAggancia();
     const lettura = !!RUOLI[ruolo()].lettura;
     if (lettura && !document.body.classList.contains('viewer-mode')) { document.body.classList.add('viewer-mode'); _letturaFinta = true; }

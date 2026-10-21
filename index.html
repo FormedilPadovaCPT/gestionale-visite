@@ -431,6 +431,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
 <body>
 
 <!-- ══ PANNELLO DIAGNOSTICA ERRORI (temporaneo) ══ -->
+<!-- (21/10/2026, chiesto dall'utente) bollino e pannello solo per la segreteria: la classe diag-ok sul body la mette
+     veste-v2.js all'accesso di cptpd@; gli altri non li vedono, nemmeno quando un errore aprirebbe il pannello da solo.
+     Fa eccezione «Dettagli» della schermata di avvio fallito, che lo apre a chi lo chiede. -->
+<style>#diag-btn{display:none!important}body.diag-ok #diag-btn{display:block!important}body:not(.diag-ok) #diag-panel{display:none!important}</style>
 <div id="diag-panel" style="display:none;position:fixed;bottom:0;left:0;right:0;max-height:38vh;overflow-y:auto;background:#1a1a1a;color:#f0f0f0;font:12px/1.4 monospace;z-index:99999;border-top:3px solid #e74c3c;padding:6px 10px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;position:sticky;top:0;background:#1a1a1a;padding:4px 0">
     <span style="color:#e74c3c;font-weight:bold">&#128308; LOG ERRORI</span>
@@ -441,7 +445,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
   </div>
   <div id="diag-log"></div>
 </div>
-<button onclick="var p=document.getElementById('diag-panel');p.style.display=p.style.display==='none'?'block':'none'" style="position:fixed;bottom:8px;right:8px;z-index:99998;background:#e74c3c;color:#fff;border:none;border-radius:50%;width:34px;height:34px;font-size:16px;cursor:pointer;opacity:0.75;box-shadow:0 2px 6px rgba(0,0,0,.4)" title="Mostra/nascondi log errori">&#128308;</button>
+<button id="diag-btn" onclick="var p=document.getElementById('diag-panel');p.style.display=p.style.display==='none'?'block':'none'" style="position:fixed;bottom:8px;right:8px;z-index:99998;background:#e74c3c;color:#fff;border:none;border-radius:50%;width:34px;height:34px;font-size:16px;cursor:pointer;opacity:0.75;box-shadow:0 2px 6px rgba(0,0,0,.4)" title="Mostra/nascondi log errori">&#128308;</button>
 <script>
 (function(){
   function addLog(type,msg,color){
@@ -2491,7 +2495,7 @@ function __showStartupError(titleHtml, detailHtml){
     '<div style="font-size:11px;color:#888;margin-top:6px">Stato rete: ' + online + '</div>' +
     '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">' +
       '<button type="button" onclick="location.reload()" style="padding:6px 14px;background:#e7500f;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px">🔄 Ricarica</button>' +
-      '<button type="button" onclick="var p=document.getElementById(\'diag-panel\');if(p)p.style.display=\'block\'" style="padding:6px 14px;background:#fff;color:#565c66;border:1px solid #ccc;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px">🔍 Dettagli</button>' +
+      '<button type="button" onclick="document.body.classList.add(\'diag-ok\');var p=document.getElementById(\'diag-panel\');if(p)p.style.display=\'block\'" style="padding:6px 14px;background:#fff;color:#565c66;border:1px solid #ccc;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px">🔍 Dettagli</button>' +
     '</div>';
   el.style.display='block';
 }
@@ -16963,7 +16967,7 @@ document.addEventListener('input',function(ev){
 <!-- cicli di visita (20/10/2026): proposta alla chiusura del verbale, regola sulla visita del ciclo, Zona Coordinatore; statistiche dei cicli -->
 <script src="cicli-visita.js?v=1"></script>
 <script src="statistiche-cicli.js?v=1"></script>
-<script src="veste-v2.js?v=50"></script>
+<script src="veste-v2.js?v=51"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->

@@ -26,7 +26,7 @@ function ambiente({ email, viewer, veste, direttore, presidenza, coord, come }) 
   const archivio = (iniziale) => { const m = new Map(Object.entries(iniziale || {})); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
   const classi = new Set();
   const finto = () => ({ style: {}, dataset: {}, classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, addEventListener() {}, appendChild() {}, insertBefore() {}, remove() {}, querySelector: () => null, querySelectorAll: () => [], setAttribute() {}, firstChild: null, childNodes: [] });
-  const document = { body: { classList: { add: (c) => classi.add(c), remove: (c) => classi.delete(c), contains: (c) => classi.has(c) }, dataset: {} },
+  const document = { body: { classList: { add: (c) => classi.add(c), remove: (c) => classi.delete(c), toggle: (c, si) => (si ? classi.add(c) : classi.delete(c)), contains: (c) => classi.has(c) }, dataset: {} },
     head: finto(), getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], createElement: finto, addEventListener() {} };
   const window = { S: { user: email ? { email } : null, viewer: !!viewer, direttore: !!direttore, presidenza: !!presidenza }, __isCoordPage: !!coord };
   const localStorage_ = archivio(veste === false ? { 'gv-veste': 'classica' } : veste ? { 'gv-veste': 'v2' } : {});
@@ -69,6 +69,8 @@ for (const caso of [
   assert.strictEqual(a.v2.simula(), false, caso.che + ': non sta guardando la pagina di un altro');
   assert.strictEqual(a.v2.prima('dashboard'), caso.apre, caso.che + ': pagina di apertura');
   assert.ok(a.classi.has('v2'), caso.che + ': la pagina prende la veste');
+  // (21/10/2026) il bollino rosso del LOG ERRORI: solo la segreteria vera, non chi entra con la sua e-mail in sola lettura
+  assert.strictEqual(a.classi.has('diag-ok'), caso.ruolo === 'segreteria', caso.che + ': bollino del log errori');
   assert.strictEqual(a.ls.getItem('gv-veste'), null, caso.che + ': la vecchia scelta nel browser si cancella');
 }
 // la segreteria che guarda «come Direttore»: vede quel menu, e la pagina Direzione sa che è un'anteprima (niente pulsanti)
@@ -84,6 +86,10 @@ assert.ok(js.indexOf('body.v2[data-v2-ruolo="tecnico"] #v2-azioni{order:2}') > j
 // (21/10/2026, chiesto dall'utente) lo stesso ordine per la segreteria: i pulsanti da Segnala cantiere a Documenti prima dei rientri
 assert.ok(js.includes('body.v2[data-v2-ruolo="segreteria"] #v2-azioni{order:2}') && js.includes('body.v2[data-v2-ruolo="segreteria"] #v2-rientri{order:3}') && js.includes('body.v2[data-v2-ruolo="segreteria"] #v2-oggi .v2-c2{display:contents}'), 'sul telefono della segreteria: azioni prima dei rientri');
 assert.ok(js.indexOf('body.v2[data-v2-ruolo="segreteria"] #v2-azioni{order:2}') > js.indexOf('@media(max-width:720px){'), 'anche per la segreteria solo sul telefono');
+// (21/10/2026, chiesto dall'utente) il bollino rosso del LOG ERRORI solo alla segreteria
+assert.ok(js.includes("document.body.classList.toggle('diag-ok', eSegreteria());"), 'la veste deve accendere il bollino solo alla segreteria');
+assert.ok(html.includes('<button id="diag-btn"') && html.includes('#diag-btn{display:none!important}body.diag-ok #diag-btn{display:block!important}'), 'il bollino deve essere spento per chi non è segreteria');
+assert.ok(html.includes('body:not(.diag-ok) #diag-panel{display:none!important}'), 'il pannello non deve aprirsi da solo agli altri');
 // (21/10/2026, chiesto dall'utente) menu della segreteria sul telefono: Oggi, Chat, Ufficio, Documenti, poi le altre
 {
   const ord = (v) => { const pre = 'body.v2[data-v2-ruolo="segreteria"] nav button[data-view="' + v + '"]{order:'; const a = js.indexOf(pre); if (a < 0) return null; const m = /^(\d+)!important\}/.exec(js.slice(a + pre.length)); return m ? Number(m[1]) : null; };
