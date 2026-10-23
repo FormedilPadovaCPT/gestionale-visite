@@ -22,7 +22,12 @@ assert.ok(/rpc\('mie_firme_archivio'/.test(firme) && /data-arch-apri="\$\{esc\(r
 assert.ok(/!o\.ruolo && !o\.email && recenti\.some/.test(firme), 'il pulsante dell\'archivio non compare nelle anteprime della segreteria');
 assert.ok(/\.from\('s_firme'\)/.test(firme) && !/from\('s_firme_presidente'\)/.test(firme), 'firme.js legge s_firme, non il nome vecchio');
 assert.ok(/functions\.invoke\('firma-documenti'/.test(firme) && !/'firma-presidente'/.test(firme), 'firma la funzione firma-documenti');
-assert.ok(/data-firma-si="\$\{r\.id\}" \$\{letto \? '' : 'disabled/.test(firme) && /_letti\.add\(r\.id\)/.test(firme), '«Firmo» si accende solo dopo aver aperto il documento');
+assert.ok(/data-firma-si="\$\{r\.id\}" \$\{senzaFirma\.has\(r\.id\) \?.*letto \? '' : 'disabled/.test(firme) && /_letti\.add\(r\.id\)/.test(firme), '«Firmo» si accende solo dopo aver aperto il documento');
+// (23/10/2026) senza la firma scansionata «Firmo» resta spento anche dopo «Leggi», e la riga dice perché
+assert.ok(/azione: 'ho_firma'/.test(firme) && /senzaFirma\.set\(r\.id/.test(firme), 'il riquadro chiede al server se la firma scansionata c\'è');
+assert.ok(/data-senza-firma="1" disabled/.test(firme) && /!si\.hasAttribute\('data-senza-firma'\)/.test(firme), '«Leggi» non riaccende «Firmo» a chi non ha la firma');
+assert.ok(/Non puoi ancora firmare\.<\/strong> \$\{esc\(senzaFirma\.get\(r\.id\)\)\}/.test(firme), 'il messaggio del server passa da esc()');
+assert.ok(/out && out\.ok && out\.ha === false/.test(firme), 'un controllo non riuscito non blocca: decide il server');
 assert.ok(/createSignedUrl\(percorso, 600\)/.test(firme) && /storage\.from\(BUCKET\)/.test(firme) && /const BUCKET = 'firme-presidente'/.test(firme), 'il PDF si apre dal bucket privato con un indirizzo a tempo');
 assert.ok(/if \(motivo\.trim\(\)\.length < 3\)/.test(firme), 'chi rimanda scrive il motivo');
 assert.ok(/Non sono riuscito a leggere i documenti da firmare: \$\{esc\(error\.message\)\}/.test(firme), 'un errore di lettura si dice, non diventa «niente da firmare»');

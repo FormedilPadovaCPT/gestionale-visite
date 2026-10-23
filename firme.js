@@ -102,6 +102,19 @@
     const attesa = (data || []).filter((r) => r.stato === 'in_attesa').reverse();
     const recenti = (data || []).filter((r) => r.stato !== 'in_attesa').slice(0, 5);
     const bottoni = !!o.pulsanti;
+    /* (23/10/2026) senza la firma scansionata non si firma: lo si dice PRIMA di premere «Firmo»,
+       con il messaggio del server (che rifiuta comunque). Se il controllo non riesce non si
+       blocca niente qui: decide il server, che vede la stessa cosa. */
+    const senzaFirma = new Map();
+    if (bottoni && attesa.length) {
+      const per = new Map();   // una domanda per ruolo: la firma è la stessa per tutte le sue righe
+      await Promise.all(attesa.map(async (r) => {
+        const k = String(r.firmatario_ruolo);
+        if (!per.has(k)) per.set(k, chiama({ azione: 'ho_firma', id: r.id }).catch((e) => { console.warn('controllo firma:', e.message); return null; }));
+        const out = await per.get(k);
+        if (out && out.ok && out.ha === false) senzaFirma.set(r.id, out.messaggio || 'Manca la tua firma scansionata: non puoi firmare.');
+      }));
+    }
     const catena = (r) => (r.firmatario_ruolo === 'incaricato' || (r.firmatario_ruolo === 'docente' && r.tipo === 'incarico_docenza') ? (r.tipo === 'documento' ? ' · da firmare per accettazione, sotto il tuo nome: il Direttore ha già firmato' : ' · da firmare per accettazione, sotto il tuo nome: il Presidente ha già firmato')
       : r.ordine > 1 ? ` · ${r.ordine}ª firma: il documento porta già ${r.ordine - 1 === 1 ? 'la firma di chi è venuto prima' : 'le firme di chi è venuto prima'}` : '');
     const riga = (r) => {
@@ -110,8 +123,9 @@
       return `<div data-firma="${r.id}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 0;border-top:1px solid #f0e6dd">
         <span style="font-size:13px;flex:1;min-width:220px"><strong>${esc(r.titolo)}</strong><br><span style="font-size:11.5px;color:#888">${esc(TIPI[r.tipo] || r.tipo)} · chiesta il ${dIt(r.richiesta_il)}${g ? ' · in attesa da ' + g + ' g' : ''}${esc(catena(r))}</span></span>
         <button class="btn-secondary btn-sm" type="button" data-firma-leggi="${r.id}" data-aiuto="Apre il documento da firmare in una scheda nuova. Dopo averlo letto si accende «Firmo».">📄 Leggi</button>
-        ${bottoni ? `<button class="btn-primary btn-sm" type="button" data-firma-si="${r.id}" ${letto ? '' : 'disabled title="Prima apri il documento con «Leggi»"'} data-aiuto="Appone la tua firma su questo documento, con data e ora, e lo restituisce firmato alla segreteria. Non si torna indietro.">✍ Firmo</button>
+        ${bottoni ? `<button class="btn-primary btn-sm" type="button" data-firma-si="${r.id}" ${senzaFirma.has(r.id) ? 'data-senza-firma="1" disabled title="Manca la tua firma scansionata"' : letto ? '' : 'disabled title="Prima apri il documento con «Leggi»"'} data-aiuto="Appone la tua firma su questo documento, con data e ora, e lo restituisce firmato alla segreteria. Non si torna indietro.">✍ Firmo</button>
         <button class="btn-secondary btn-sm" type="button" data-firma-no="${r.id}" data-aiuto="Non firmi: scrivi in due righe perché, e il documento torna alla segreteria col tuo motivo.">↩ Rimando</button>` : ''}
+        ${senzaFirma.has(r.id) ? `<div style="flex-basis:100%;background:#fff4e5;border:1px solid #f0c9a8;border-left:4px solid #e7500f;border-radius:0 6px 6px 0;padding:8px 11px;font-size:12.5px;color:#7a3300">⚠️ <strong>Non puoi ancora firmare.</strong> ${esc(senzaFirma.get(r.id))}</div>` : ''}
       </div>`;
     };
     const rigaFatta = (r) => `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid #f4f4f4;font-size:12px;color:#666">
@@ -132,7 +146,7 @@
       if (await apri(r.file_originale)) {
         _letti.add(r.id);
         const si = host.querySelector(`[data-firma-si="${r.id}"]`);
-        if (si) { si.disabled = false; si.removeAttribute('title'); }
+        if (si && !si.hasAttribute('data-senza-firma')) { si.disabled = false; si.removeAttribute('title'); }
       }
     }));
     host.querySelectorAll('[data-firma-apri]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); apri(a.dataset.firmaApri); }));
