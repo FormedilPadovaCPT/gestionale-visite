@@ -44,6 +44,12 @@ window.AIUTO_TESTI = {
   't:aumenta': 'Alza le visite del mese di questo tecnico: chiede il numero nuovo e il motivo. Cambiano la lettera nel database e la scheda del tecnico; tecnico e segreteria ricevono l\'avviso. Da qui non si torna indietro: per abbassare serve la segreteria.',
   'vm-prec': 'Mostra le lettere di incarico del mese prima.',
   'vm-succ': 'Mostra le lettere di incarico del mese dopo.',
+  /* ── cantiere finito dalle Scadenze (23/10/2026) ── */
+  'prop-chius-ok': 'Manda alla segreteria la proposta di chiudere il cantiere, con il giorno e il motivo. Non chiude niente: il rientro va «in attesa di chiusura» finché segreteria o Coordinatore non decidono.',
+  'prop-chius-annulla': 'Chiude la finestra senza proporre niente: il rientro resta fra le scadenze.',
+  'prop-chius-data': 'Il giorno in cui hai visto il cantiere finito: non può essere nel futuro né prima dell\'ultima visita. Va nella nota della chiusura.',
+  't:finito': 'Proponi alla segreteria di chiudere i cantieri spuntati perché sono finiti: scrivi quando l\'hai visto. I rientri vanno «in attesa di chiusura» finché non decidono.',
+  't:cantiere finito': 'Proponi alla segreteria di chiudere il cantiere di questo verbale perché è finito: scrivi quando l\'hai visto. Il rientro esce dalle tue scadenze finché non decidono.',
   /* ── chat del team (21/10/2026) ── */
   'v:chat': 'La chat del team, al posto del gruppo WhatsApp: messaggi, link, foto e video fra tecnici, Coordinatore e segreteria. È interna: non va alle imprese e non sostituisce verbale né protocollo.',
   'ct-invia': 'Manda il messaggio a tutto il team. Chi ha le notifiche attive riceve un avviso senza nomi. Il messaggio si può cancellare dopo, ma resta la riga «messaggio cancellato».',
@@ -165,7 +171,7 @@ window.AIUTO_TESTI = {
   'btn-lotti': 'Il cantiere ha più lotti: questa scheda diventa uno dei lotti e, se oggi sei in un altro, ne nasce una copia identica su cui va il verbale. Le visite già fatte restano dove sono.',
   'mi-esiste': 'La P.IVA o il CF che hai scritto sono di un\'impresa già in anagrafica: con «Usa questa» la metti nel verbale senza crearne una doppia.',
   /* proposta di chiusura (proposte-chiusura.js, 23/09/2026) */
-  't:proponi chiusura': 'Dici alla segreteria che il cantiere è finito, con due parole sul perché. Non chiude niente: decide la segreteria, e fino ad allora il cantiere resta attivo.',
+  't:proponi chiusura': 'Dici alla segreteria che il cantiere è finito: il giorno in cui l\'hai visto e il motivo. Non chiude niente: decide la segreteria, e intanto il rientro va «in attesa di chiusura».',
   't:proponi chiusura alla segreteria': 'Dici alla segreteria che il cantiere è finito, con due parole sul perché. Non chiude niente: decide la segreteria, e fino ad allora il cantiere resta attivo.',
   't:respingi la proposta': 'Il cantiere resta aperto. Ti chiede il motivo, che resta scritto accanto alla proposta per chi l\'ha fatta.',
   't:apri scheda': 'Apre la scheda del cantiere: dati, visite fatte e pulsanti per una nuova visita.',

@@ -55,7 +55,7 @@ assert.ok(/\}else if\(window\.__isCoord\|\|window\.__isCoordinatoreVero\)\{\n\s+
 assert.ok(/\$\{\(window\.__isSegreteria\|\|window\.__isCoordinatoreVero\)\?'<button class="btn-warn btn-sm" data-act="chiudi-cant"/.test(html), 'il coordinatore deve avere il lucchetto nelle Scadenze');
 assert.ok(/window\.__isCoordinatoreVero=null\n\s+if\(!isSegreteria\)\{try\{const r=await sb\.rpc\('is_coordinatore'\)/.test(html), 'il ruolo di coordinatore si chiede al database all’accesso');
 const _pc = fs.readFileSync(path.join(__dirname, '..', 'proposte-chiusura.js'), 'utf8');
-assert.ok(_pc.includes('const ufficio = () => !!(window.__isCoord || window.__isSegreteria || window.__isCoordinatoreVero);') && html.includes('proposte-chiusura.js?v=2'), 'il coordinatore non propone alla segreteria: chiude o respinge');
+assert.ok(_pc.includes('const ufficio = () => !!(window.__isCoord || window.__isSegreteria || window.__isCoordinatoreVero);') && html.includes('proposte-chiusura.js?v=3'), 'il coordinatore non propone alla segreteria: chiude o respinge');
 /* (09/10/2026, chiesto dall'utente) i PDF dei verbali vanno nell'archivio dei verbali, un file per verbale:
    l'impronta dei dati (senza la data di stampa) evita di riscriverlo se non e' cambiato */
 assert.ok(/JSON\.stringify\(\{pd:\{\.\.\.pd,dataOggi:null\},img\}\)/.test(html), 'l’impronta esclude la data di stampa');

@@ -18,6 +18,13 @@
    lucchetto (chiude il cantiere per fine lavori, come prima); tecnico e
    coordinatore hanno ➕, la visita di ritorno; chi è di sola lettura nessuno.
 
+   CANTIERE FINITO (23/10/2026, chiesto dall'utente): il tecnico spunta le
+   righe e nella barra preme «🏁 Finito» — la finestra della proposta di
+   chiusura (proposte-chiusura.js) chiede il giorno e il motivo. I cantieri
+   proposti stanno in fondo, nel gruppo «⏳ IN ATTESA DI CHIUSURA» (opzione
+   inAttesa), senza casella; lì l'ufficio chiude 🔒 o respinge ✖. Una riga
+   la cui proposta è stata respinta dice perché («✖ Chiusura respinta»).
+
    LA BARRA IN BASSO compare con almeno una riga spuntata: «🧭 Giro» per
    tutti (il giro a tappe di sempre, _giroVai), «Riassegna» e «Chiudi» per la
    sola segreteria (pendenza_assegna e chiudi_cantiere: il database li rifiuta
@@ -68,6 +75,11 @@
 .rg-testa.lontano{background:${GRIGIO_CHIARO};color:${GRIGIO}}
 .rg-riga{display:grid;grid-template-columns:28px minmax(0,1fr) 44px 44px;column-gap:8px;align-items:center;padding:6px 8px 6px 10px;border-bottom:1px solid #eceef0;min-height:56px;box-sizing:border-box}
 .rg-riga.senza-az{grid-template-columns:28px minmax(0,1fr) 44px}
+.rg-riga.rg-att{grid-template-columns:28px minmax(0,1fr) 44px 44px 44px;background:#fafbfb}
+.rg-riga.rg-att.senza-az{grid-template-columns:28px minmax(0,1fr) 44px}
+.rg-att-ic{display:flex;align-items:center;justify-content:center;width:28px;height:44px;color:${GRIGIO};font-size:16px}
+.rg-r3{font-size:11.5px;color:${GRIGIO};white-space:normal;line-height:1.35}
+.rg-r3.resp{color:${ARANCIO};font-weight:600}
 .rg-riga.sel{background:#fff8f4}
 .rg-chk{display:flex;align-items:center;justify-content:center;width:28px;height:44px;margin:0;cursor:pointer}
 .rg-chk input{width:20px!important;height:20px;min-width:0!important;margin:0!important;accent-color:${ARANCIO};cursor:pointer}
@@ -138,8 +150,32 @@
       <button type="button" class="rg-apri" data-rg="apri" data-vid="${esc(v.visita_id)}" data-aiuto="Apre il dettaglio dell'ultimo verbale di questo cantiere. Non cambia niente.">
         <span class="rg-r1"><span class="rg-nr" title="${esc(v.nr_verbale || '')}">${esc(ultime4(v.nr_verbale))}</span><span class="rg-cant">${esc(cant)}</span></span>
         <span class="rg-r2">${pezzi.join('')}${pezzi.length ? '<span>·</span>' : ''}${barre(ipc)}<span class="rg-ipc">${IPC_NOME[ipc] || 'Nessun rilievo'}</span>${dopoIpc ? '<span class="rg-coda">· ' + dopoIpc + '</span>' : ''}</span>
+        ${v._resp ? `<span class="rg-r3 resp">✖ Chiusura respinta: ${esc(v._resp.esito_note || '')}</span>` : ''}
       </button>
       <a class="rg-btn rg-btn-grigio" href="${esc(nav)}" target="_blank" rel="noopener" aria-label="Naviga al cantiere" data-aiuto="Apre il navigatore verso il cantiere."><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"></path></svg></a>
+      ${az}
+    </div>`;
+  }
+
+  /* (23/10/2026) un cantiere proposto come finito: non si spunta e non conta; la segreteria
+     (o il Coordinatore) lo chiude o respinge la proposta da qui, il tecnico vede che è arrivata */
+  function rigaAttesa(v, o) {
+    const p = v._prop || {};
+    const cant = nomeCantiere(v);
+    const pc = window.propChius;
+    const uff = !!(pc && pc.ufficio && pc.ufficio());
+    const testo = pc && pc.testoProposta ? pc.testoProposta(p) : '';
+    const az = uff
+      ? `<button type="button" class="rg-btn rg-btn-arancio" data-prop-chiudi="${esc(v.cantiere_id)}" data-lbl="${esc(cant)}" data-fine="${esc(p.fine_constatata_il || '')}" data-chi="${esc(p.proposta_nome || p.proposta_da || '')}" aria-label="Chiudi il cantiere" data-aiuto="Chiude il cantiere per fine lavori, come chiede la proposta: le sue visite e i suoi incarichi si chiudono. Si riapre dalla scheda del cantiere.">🔒</button>`
+        + `<button type="button" class="rg-btn rg-btn-grigio" data-prop-resp="${esc(p.id)}" data-lbl="${esc(cant)}" aria-label="Respingi la proposta" data-aiuto="Il cantiere resta aperto: scrivi perché. Il rientro torna fra le scadenze del tecnico con il tuo motivo.">✖</button>`
+      : '';
+    return `<div class="rg-riga rg-att${az ? '' : ' senza-az'}">
+      <span class="rg-att-ic" aria-hidden="true">⏳</span>
+      <button type="button" class="rg-apri" data-rg="apri" data-vid="${esc(v.visita_id)}" data-aiuto="Apre il dettaglio dell'ultimo verbale di questo cantiere. Non cambia niente.">
+        <span class="rg-r1"><span class="rg-nr" title="${esc(v.nr_verbale || '')}">${esc(ultime4(v.nr_verbale))}</span><span class="rg-cant">${esc(cant)}</span></span>
+        <span class="rg-r3">Proposta da ${esc(testo)}${p.motivo ? ' · ' + esc(p.motivo) : ''}</span>
+      </button>
+      <a class="rg-btn rg-btn-grigio" href="${esc(o.mappa(v))}" target="_blank" rel="noopener" aria-label="Naviga al cantiere" data-aiuto="Apre il navigatore verso il cantiere."><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"></path></svg></a>
       ${az}
     </div>`;
   }
@@ -196,6 +232,12 @@
         + g.righe.map((v) => riga(v, o, st)).join('') + '</section>';
     });
     if (!urg.length && !gruppi.size) h += `<div class="rg-vuoto">${q || st.ipc || st.gg ? 'Nessun rientro con questa ricerca.' : 'Nessun rientro scaduto' + (entro ? ' né nei prossimi ' + entro + ' giorni' : '') + '.'}</div>`;
+    /* (23/10/2026) in fondo, i cantieri proposti come finiti: fuori dai conteggi finché non si decide */
+    const att = (o.inAttesa || []).filter(passa);
+    if (att.length) {
+      h += `<section><div class="rg-testa lontano"><b>⏳ IN ATTESA DI CHIUSURA</b><span>${att.length}</span></div>`
+        + att.map((v) => rigaAttesa(v, o)).join('') + '</section>';
+    }
     h += '</div>';
 
     // la ricerca non perde il cursore a ogni lettera
@@ -219,7 +261,10 @@
     b.innerHTML = `<span><b>${n}</b><em> ${n === 1 ? 'selezionato' : 'selezionati'}</em></span>`
       + `<button type="button" class="rg-b-chiaro" data-rg="giro" data-aiuto="Apre il navigatore con i cantieri spuntati come tappe, in ordine dalla tua posizione (al massimo 10)."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M3 11l19-9-9 19-2-8-8-2z"></path></svg>Giro</button>`
       + (o.segreteria ? `<button type="button" class="rg-b-chiaro" data-rg="riassegna" data-aiuto="Passa il rientro dei cantieri spuntati a un altro tecnico. Il verbale resta di chi l'ha fatto.">Riassegna</button>`
-        + `<button type="button" class="rg-b-pieno" data-rg="chiudi-sel" data-aiuto="Chiude per fine lavori i cantieri spuntati: le loro visite e i loro incarichi si chiudono, e i rientri escono dalle scadenze.">Chiudi</button>` : '')
+        + `<button type="button" class="rg-b-pieno" data-rg="chiudi-sel" data-aiuto="Chiude per fine lavori i cantieri spuntati: le loro visite e i loro incarichi si chiudono, e i rientri escono dalle scadenze.">Chiudi</button>`
+        /* (23/10/2026) il tecnico non chiude: propone, con il giorno in cui ha visto il cantiere finito */
+        : (o.puoVisitare && window.propChius && window.propChius.puoProporre && window.propChius.puoProporre()
+          ? `<button type="button" class="rg-b-pieno" data-rg="finito-sel" data-aiuto="Proponi alla segreteria di chiudere i cantieri spuntati perché sono finiti: scrivi quando l'hai visto. I rientri vanno «in attesa di chiusura» finché non decidono.">🏁 Finito</button>` : ''))
       + '<button type="button" class="rg-b-x" data-rg="desel" aria-label="Togli la selezione">✕</button>';
   }
 
@@ -246,6 +291,7 @@
       if (az === 'giro') { giro([...st.sel.values()]); return; }
       if (az === 'riassegna') { riassegna(box, st).catch((er) => avviso('Riassegnazione non riuscita: ' + (er.message || er), 'err')); return; }
       if (az === 'chiudi-sel') { chiudi(box, st, [...st.sel.values()]).catch((er) => avviso('Chiusura non riuscita: ' + (er.message || er), 'err')); return; }
+      if (az === 'finito-sel') { finito(box, st).catch((er) => avviso('Proposta non inviata: ' + (er.message || er), 'err')); return; }
       if (az === 'chiudi') { const v = o.righe.get(b.dataset.cid); if (v) chiudi(box, st, [v]).catch((er) => avviso('Chiusura non riuscita: ' + (er.message || er), 'err')); }
     });
   }
@@ -288,6 +334,17 @@
     if (ko.length) avviso('Riassegnati ' + ok + ' su ' + righe.length + ' a ' + nome(t) + '. Non riusciti — ' + ko.join('; '), 'err');
     else avviso((righe.length === 1 ? 'Rientro passato' : righe.length + ' rientri passati') + ' a ' + nome(t) + '.', 'ok');
     render(box, st.ultimo);   // la selezione sparisce subito, poi si rilegge dal database
+    if (st.ultimo.dopo) await st.ultimo.dopo();
+  }
+
+  /* (23/10/2026) «🏁 Finito»: la finestra della proposta di chiusura (proposte-chiusura.js) per le righe spuntate */
+  async function finito(box, st) {
+    const righe = [...st.sel.values()];
+    if (!righe.length || !window.propChius || !window.propChius.finestra) return;
+    const fatto = await window.propChius.finestra(righe.map((v) => ({ cantId: v.cantiere_id, label: ultime4(v.nr_verbale) + ' ' + nomeCantiere(v), dataVisita: v.data_visita })));
+    if (!fatto) return;
+    st.sel.clear();
+    render(box, st.ultimo);
     if (st.ultimo.dopo) await st.ultimo.dopo();
   }
 

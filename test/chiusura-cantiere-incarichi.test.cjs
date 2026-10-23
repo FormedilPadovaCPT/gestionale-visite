@@ -65,7 +65,7 @@ const crea = (risposta) => new Function('sb', 'window', pezzo[0].replace(/window
   assert.strictEqual(f1.esitoIncarichiCantiere({ incarichi_chiusi: [] }), '', 'niente incarichi chiusi, niente da aggiungere al messaggio');
 
   /* ── i punti da cui si chiude: la lista viene letta PRIMA della conferma ── */
-  assert.ok(/async function chiudiCantiere\(cantId,label\)\{\n  const _inc=await righeIncarichiCantiere\(cantId\)\n  if\(!confirm\([^\n]*\+_inc\)\)return/.test(html), 'la scheda del cantiere legge gli incarichi prima del confirm');
+  assert.ok(/async function chiudiCantiere\(cantId,label,notaPre\)\{\n  const _inc=await righeIncarichiCantiere\(cantId\)\n  if\(!confirm\([^\n]*\+_inc\)\)return/.test(html), 'la scheda del cantiere legge gli incarichi prima del confirm');
   assert.ok(/window\.righeIncarichiCantiere\(v\.cantiere_id\)[\s\S]{0,400}if \(!confirm\([\s\S]{0,300}\+ incarichi\)\) return;/.test(rientri), 'i rientri leggono gli incarichi prima del confirm');
   assert.ok(/incChiusi\.push\(\.\.\.\(\(data && data\.incarichi_chiusi\) \|\| \[\]\)\)/.test(rientri), 'i rientri dicono quali incarichi hanno chiuso');
   assert.ok(/<script src="rientri-giorni\.js\?v=\d+"><\/script>/.test(html));

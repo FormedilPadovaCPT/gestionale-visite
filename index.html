@@ -1230,6 +1230,15 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         </div>
         <div id="scad-urg-empty" class="hidden" style="text-align:center;color:#27ae60;padding:18px;font-size:13px">✅ Nessun rientro urgente scaduto</div>
       </div>
+      <!-- (23/10/2026) cantieri proposti come finiti: fuori dalle scadenze finché segreteria o Coordinatore non decidono (proposte-chiusura.js) -->
+      <div class="card scad-tab" id="scad-attesa-card" style="border-left:5px solid #565c66;display:none">
+        <h3 style="color:#565c66">⏳ In attesa di chiusura</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:10px">Cantieri che un tecnico ha segnalato come finiti. Non contano fra le scadenze finché la segreteria o il Coordinatore non decidono: se chiudono il cantiere spariscono, se respingono la proposta il rientro torna fra le scadenze con il motivo.</p>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>Verbale</th><th>Ultima visita</th><th>Tecnico</th><th>Cantiere</th><th>Proposta</th><th>Motivo</th><th></th></tr></thead>
+          <tbody id="tbody-scad-attesa"></tbody></table>
+        </div>
+      </div>
     </section>
 
     <!-- INCARICHI ASSEGNATI -->
@@ -7589,6 +7598,15 @@ async function loadScadenze(){
   const dueWeeksAgo=new Date(oggi);dueWeeksAgo.setDate(dueWeeksAgo.getDate()-14)
   const sixtyDaysLater=new Date(oggi);sixtyDaysLater.setDate(sixtyDaysLater.getDate()+60)
   const urgenti=[], prossime=[]
+  // (23/10/2026) proposte di chiusura: il cantiere proposto come finito esce dalle scadenze e va
+  // «in attesa di chiusura» finché segreteria o Coordinatore non decidono (come promemoria e lettera di incarico).
+  // Lettura fallita ≠ «nessuna proposta»: si dice, e i cantieri proposti restano fra le scadenze.
+  const inAttesa=[]
+  let _pcAperte=new Map(),_pcRespinte=new Map()
+  if(window.propChius&&window.propChius.perScadenze){
+    try{const _r=await window.propChius.perScadenze();_pcAperte=_r.aperte;_pcRespinte=_r.respinte}
+    catch(e){toast('Non sono riuscito a leggere le proposte di chiusura ('+(e.message||e)+'): i cantieri proposti restano fra le scadenze.','err')}
+  }
 
   Object.values(ultimePerCantiere).forEach(v=>{
     if(v.cantieri&&v.cantieri.cantiere_chiuso)return // cantiere chiuso: niente scadenza
@@ -7601,6 +7619,10 @@ async function loadScadenze(){
     /* (20/10/2026) dal 1° ottobre la regola si legge sulla visita del ciclo (giorni scritti dal database); sullo storico sull'accesso */
     const calc=(window.CicliVisita&&v.ciclo_visita!=null)?CicliVisita.rientro(v):calcRientroFormedil(v.data_visita, v.acc_cant, ipc)
     if(!calc.date)return // archiviazione, ciclo fermo o critico: nessun rientro previsto
+    const _pa=_pcAperte.get(v.cantiere_id)
+    if(_pa){inAttesa.push({...v,_prop:_pa});return}   // proposto come finito: in attesa di chiusura
+    const _pr=_pcRespinte.get(v.cantiere_id)   // respinta dopo l'ultima visita: il rientro è tornato, la riga dice perché
+    if(_pr&&String(_pr.esito_il||'').slice(0,10)>=String(v.data_visita||'').slice(0,10))v._resp=_pr
     // La data del tecnico (se presente) stabilisce solo QUANDO; altrimenti si usa quella calcolata.
     let dr, isCalcolata=false, tipoCalc=calc.tipo||null   // il tipo (ordinaria/urgente/immediata) serve anche alla lista per giorni
     if(v.data_ritorno){
@@ -7624,7 +7646,7 @@ async function loadScadenze(){
   urgenti.sort((a,b)=>(ipcOrd[a.ipc||'']||3)-(ipcOrd[b.ipc||'']||3)||a.dr-b.dr)
 
   // zona/comune per filtri e giro a tappe (quartieri per Padova, come in mappa)
-  ;[...prossime,...urgenti].forEach(v=>{
+  ;[...prossime,...urgenti,...inAttesa].forEach(v=>{
     const cc=v.cantieri||{}
     let zk=cc.comune_nome||''
     if(/^padova$/i.test(zk)){
@@ -7655,14 +7677,31 @@ async function loadScadenze(){
       <td>${drLbl}</td>
       <td>${diffLbl}</td>
       <td style="font-size:12px">${tec}</td>
-      <td style="font-size:12px">${cant}</td>
+      <td style="font-size:12px">${cant}${v._resp?'<div style="font-size:11px;color:#c0392b" title="Proposta di chiusura respinta il '+fmtDate(String(v._resp.esito_il).slice(0,10))+'">✖ chiusura respinta: '+esc(v._resp.esito_note||'')+'</div>':''}</td>
       <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
-      <td style="white-space:nowrap"><button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Dettaglio">👁</button>${(window.__isSegreteria||window.__isCoordinatoreVero)?'<button class="btn-warn btn-sm" data-act="chiudi-cant" style="margin-left:4px" data-id="'+v.cantiere_id+'" data-lbl="'+esc(cant)+'" title="Chiudi cantiere (fine lavori)">🔒</button>':''}</td>
+      <td style="white-space:nowrap"><button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Dettaglio">👁</button>${(window.propChius&&window.propChius.puoProporre())?'<button class="btn-outline btn-sm" style="margin-left:4px" data-prop-finito="'+esc(v.cantiere_id)+'" data-lbl="'+esc(cant)+'" data-dv="'+esc(v.data_visita||'')+'" data-aiuto="Cantiere finito: proponi alla segreteria di chiuderlo, con il giorno in cui l\'hai visto. Il rientro esce dalle tue scadenze finché non decidono.">🏁</button>':''}${(window.__isSegreteria||window.__isCoordinatoreVero)?'<button class="btn-warn btn-sm" data-act="chiudi-cant" style="margin-left:4px" data-id="'+v.cantiere_id+'" data-lbl="'+esc(cant)+'" title="Chiudi cantiere (fine lavori)">🔒</button>':''}</td>
+    </tr>`
+  }
+
+  // (23/10/2026) i cantieri proposti come finiti: chi propone li vede qui, l'ufficio chiude o respinge
+  function attesaRow(v){
+    const cant=v.cantieri?.cantiere_etichetta||v.cantieri?.cantiere_indirizzo||'–'
+    const p=v._prop||{}
+    const tec=(tecMap[v.tecnico_id]||'–')
+    const uff=window.propChius&&window.propChius.ufficio()
+    return`<tr>
+      <td>${v.nr_verbale||'–'}</td>
+      <td>${fmtDate(v.data_visita)}</td>
+      <td style="font-size:12px">${tec}</td>
+      <td style="font-size:12px">${cant}</td>
+      <td style="font-size:12px">${esc(window.propChius?window.propChius.testoProposta(p):'')}</td>
+      <td style="font-size:12px;white-space:pre-wrap">${esc(p.motivo||'')}</td>
+      <td style="white-space:nowrap"><button class="btn-outline btn-sm" data-act="detail-visita" data-id="${v.visita_id}" title="Dettaglio">👁</button>${uff?'<button class="btn-warn btn-sm" style="margin-left:4px" data-prop-chiudi="'+esc(v.cantiere_id)+'" data-lbl="'+esc(cant)+'" data-fine="'+esc(p.fine_constatata_il||'')+'" data-chi="'+esc(p.proposta_nome||p.proposta_da||'')+'" title="Chiudi cantiere (fine lavori)">🔒</button><button class="btn-outline btn-sm" style="margin-left:4px" data-prop-resp="'+esc(p.id)+'" data-lbl="'+esc(cant)+'" title="Respingi la proposta">✖</button>':''}</td>
     </tr>`
   }
 
   // Salva i dati calcolati e (ri)popola il filtro tecnico, poi delega il rendering
-  _scadData={prossime,urgenti,tecMap,scadRow}
+  _scadData={prossime,urgenti,inAttesa,tecMap,scadRow,attesaRow}
   _scadBuildFilters([...prossime,...urgenti])
   // Popola il menu a tendina con i soli tecnici che hanno scadenze
   const sel=$('scad-tec-filter')
@@ -7757,7 +7796,8 @@ document.querySelectorAll('#view-scadenze th.sc-sort').forEach(th=>th.onclick=()
 })
 function renderScadenze(){
   if(!_scadData)return
-  const {prossime,urgenti,scadRow}=_scadData
+  const {prossime,urgenti,scadRow,attesaRow}=_scadData
+  const inAttesa=_scadData.inAttesa||[]
   const filtroTec=$('scad-tec-filter')?.value||''
   const fP=_scadApplySort(prossime.filter(v=>(!filtroTec||v.tecnico_id===filtroTec)&&_scadPass(v)&&(!_scadF.gg||v.diffDays<=+_scadF.gg)))
   const fU=_scadApplySort(urgenti.filter(v=>(!filtroTec||v.tecnico_id===filtroTec)&&_scadPass(v)))
@@ -7766,14 +7806,19 @@ function renderScadenze(){
   else{tbP.innerHTML='';show('scad-pros-empty')}
   if(fU.length){tbU.innerHTML=fU.map(v=>scadRow(v,true)).join('');hide('scad-urg-empty')}
   else{tbU.innerHTML='';show('scad-urg-empty')}
+  // (23/10/2026) in attesa di chiusura: non contano fra le scadenze, stanno in fondo
+  const fA=inAttesa.filter(v=>(!filtroTec||v.tecnico_id===filtroTec)&&_scadPass(v))
+  const tbA=$('tbody-scad-attesa'),cardA=$('scad-attesa-card')
+  if(tbA)tbA.innerHTML=fA.map(attesaRow).join('')
+  if(cardA)cardA.style.display=fA.length?'':'none'
   const cnt=$('scad-count')
-  if(cnt)cnt.textContent=`${fP.length} pianificate · ${fU.length} urgenti`
+  if(cnt)cnt.textContent=`${fP.length} pianificate · ${fU.length} urgenti`+(fA.length?` · ${fA.length} in attesa di chiusura`:'')
   bindRowActions()
   // sul telefono: la stessa scelta di righe, raggruppata per giorno (04/10/2026)
   if(window.RientriGiorni){
     try{
       const _vr=window.vesteV2&&window.vesteV2.ruolo?window.vesteV2.ruolo():null
-      window.RientriGiorni.render($('scad-giorni'),{urgenti:fU,prossime:fP,tecMap:_scadData.tecMap,
+      window.RientriGiorni.render($('scad-giorni'),{urgenti:fU,prossime:fP,inAttesa:fA,tecMap:_scadData.tecMap,
         segreteria:!!window.__isSegreteria&&(!_vr||_vr==='segreteria'),puoVisitare:!document.body.classList.contains('viewer-mode'),
         onFiltri:()=>$('view-scadenze').classList.toggle('filtri-aperti'),filtriAperti:()=>$('view-scadenze').classList.contains('filtri-aperti'),dopo:()=>window.ricaricaScadenze()})
     }catch(e){console.warn('rientri per giorno:',e)}
@@ -14444,7 +14489,7 @@ async function showVisitaDetail(vid){
         ciclo_visita,ciclo_esito,ciclo_rientro_giorni,ciclo_scelta,ciclo_motivo_tipo,ciclo_motivo,ciclo_proposta,ciclo_divergente,ciclo_fonte,visite_cicli(numero,stato,esito,n_visite,chiuso_il,percorso,percorso_esito),
         comm_tipo_sogg,comm_titolo,comm_nome,comm_cog,comm_cf,comm_piva,comm_rag_soc,comm_email,comm_tel,
         tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome),
-        cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,prot_int),
+        cantiere_id,cantieri(cantiere_etichetta,cantiere_indirizzo,cantiere_civico,comune_nome,cantiere_cnce,prot_int),
         imprese(impresa_nome,piva)
       `).eq('visita_id',vid).single(),
       sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
@@ -14557,6 +14602,8 @@ async function showVisitaDetail(vid){
     // (04/10/2026) sul telefono l'elenco non ha più il cestino: «Elimina» sta qui, per la segreteria
     if(window.__isCoord&&+v.elimina!==1) acts.push(`<button class="btn-outline btn-sm" style="color:#c0392b" onclick="hide('modal-qd');softDeleteVisita('${vid}','${(v.nr_verbale||'').replace(/'/g,'')}')">🗑 Elimina</button>`)
     $('qd-actions').innerHTML=acts.join('')
+    // (23/10/2026) il tecnico propone da qui la chiusura del cantiere finito
+    if(window.propChius&&window.propChius.dettaglioVisita&&v.cantiere_id&&!isBozza&&+v.elimina!==1)window.propChius.dettaglioVisita(v.cantiere_id,v.data_visita).catch(e=>console.warn('cantiere finito:',e))
   }catch(e){ console.error('showVisitaDetail:',e); $('qd-body').innerHTML=`<div style="color:#c0392b;padding:12px">Errore: ${e.message}</div>` }
 }
 
@@ -14848,10 +14895,10 @@ function esitoIncarichiCantiere(d,chiave){
   return l.length?' \u00b7 '+(l.length===1?'incarico #'+l[0].id+' '+che+'o':l.length+' incarichi '+che+'i ('+l.map(x=>'#'+x.id).join(', ')+')'):''
 }
 window.esitoIncarichiCantiere=esitoIncarichiCantiere
-async function chiudiCantiere(cantId,label){
+async function chiudiCantiere(cantId,label,notaPre){
   const _inc=await righeIncarichiCantiere(cantId)
   if(!confirm('Chiudere il cantiere "'+(label||cantId)+'" per fine lavori?\nTutte le visite collegate verranno chiuse automaticamente.'+_inc))return
-  const _note=prompt('Note sulla chiusura (facoltative — lascia vuoto se non servono).\nPremi Annulla per interrompere l\'operazione.','')
+  const _note=prompt('Note sulla chiusura (facoltative — lascia vuoto se non servono).\nPremi Annulla per interrompere l\'operazione.',notaPre||'')
   if(_note===null)return
   try{
     const{data,error}=await sb.rpc('chiudi_cantiere',{p_cantiere_id:cantId,p_motivo:'termini_lavori',p_note:_note.trim()||null})
@@ -16940,7 +16987,7 @@ document.addEventListener('input',function(ev){
 <script src="aiuto.js?v=33"></script>
 <script src="mail-respinte-tec.js?v=3"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
-<script src="proposte-chiusura.js?v=2"></script>
+<script src="proposte-chiusura.js?v=3"></script>
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
 <script src="codice-univoco.js?v=5"></script>
 <script src="lotti-cantiere.js?v=3"></script>
@@ -16962,7 +17009,7 @@ document.addEventListener('input',function(ev){
 <script src="formazione.js?v=6"></script>
 <script src="formazione-corsi.js?v=1"></script>
 <script src="formazione-docente.js?v=3"></script>
-<script src="rientri-giorni.js?v=6"></script>
+<script src="rientri-giorni.js?v=7"></script>
 <script src="statistiche-commissione.js?v=2"></script>
 <!-- cicli di visita (20/10/2026): proposta alla chiusura del verbale, regola sulla visita del ciclo, Zona Coordinatore; statistiche dei cicli -->
 <script src="cicli-visita.js?v=1"></script>
