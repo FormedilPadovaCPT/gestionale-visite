@@ -1496,6 +1496,17 @@
       "motivo": "elenco dei tecnici in servizio (tecnici), costruito al momento: sceglie chi è affiancato, non scrive una colonna"
     },
     {
+      "id": "segr.df-ruolo",
+      "app": "segreteria",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "js/documento-firma.js",
+        "id": "df-ruolo"
+      },
+      "motivo": "chi firma un PDF caricato (CARICHE di documento-firma-regole.js: Direttore o Presidente): sceglie il firmatario della richiesta, non scrive una colonna"
+    },
+    {
       "id": "gest.doc-f-cosa",
       "app": "gestionale",
       "classe": "dinamica",
