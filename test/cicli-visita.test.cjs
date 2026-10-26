@@ -1,7 +1,7 @@
 // Cicli di visita (20/10/2026): la regola sulla visita del ciclo in cicli-visita.js deve essere la stessa
 // tabella di ciclo_regola nel database (supabase/sql/2026_10_20d_cicli_visita.sql); la data di ritorno
 // di una visita col ciclo prende i giorni scritti dal database; senza risposta alla domanda del programma
-// il verbale non si chiude; il ciclo non va mai sul PDF né nella mail all'impresa; gli agganci in
+// il verbale non si chiude; proposta, scelta e motivo del ciclo non vanno sul PDF né nella mail all'impresa (numero e visita del ciclo sì, dal 26/10/2026, con verbale_posizione); gli agganci in
 // index.html, nella lettera mensile della segreteria e nel workflow di pubblicazione ci sono.
 // Il test gira anche su due copie rotte apposta (soglia della 5ª visita spostata; domanda senza risposta
 // che non ferma la chiusura) e pretende che falliscano.
@@ -129,7 +129,7 @@ async function verifica(src) {
   ;['cicli-visita.js?v=', 'statistiche-cicli.js?v=', 'CicliVisita.pronto(stato)', 'CicliVisita.campi()', 'CicliVisita.daSnap(snap)', 'CicliVisita.rientro(v)', 'CicliVisita.badge(v)', 'CicliVisita.dettaglio(v)', 'CicliVisita.proponi()', 'CicliVisita.render()', 'CicliVisita.azzera()', 'id="ciclo-box"', 'id="adm-cicli"', 'ciclo_visita,ciclo_esito,ciclo_rientro_giorni,tecnico_id']
     .forEach((k) => prova(index.includes(k), 'in index.html manca: ' + k))
   const pdf = fs.readFileSync(path.join(radice, 'verbale-pdf.js'), 'utf8')
-  prova(!/ciclo_(scelta|visita|motivo|proposta)/.test(pdf), 'il ciclo non va sul PDF del verbale')
+  prova(!/ciclo_(scelta|motivo|proposta)/.test(pdf), 'proposta, scelta e motivo del ciclo non vanno sul PDF del verbale')
   const sendVerbale = path.join(radice, 'supabase', 'functions', 'send-verbale', 'index.ts')
   if (fs.existsSync(sendVerbale)) prova(!/ciclo_(scelta|visita|motivo|proposta)/.test(fs.readFileSync(sendVerbale, 'utf8')), 'il ciclo non va nella mail all’impresa')
   const coord = fs.readFileSync(path.join(radice, 'cantieri-critici-coord.js'), 'utf8')
@@ -158,5 +158,5 @@ async function verifica(src) {
     if (!e.length) errori.push('la copia rotta «' + nome + '» passa il test: il test non vede quell’errore')
   }
   if (errori.length) { console.error('cicli-visita: ' + errori.length + ' problemi'); errori.forEach((e) => console.error(' - ' + e)); process.exit(1) }
-  console.log('cicli-visita: ok (regola come nel database, rientro col ciclo, domanda che ferma la chiusura, niente sul PDF, agganci; 3 copie rotte riconosciute)')
+  console.log('cicli-visita: ok (regola come nel database, rientro col ciclo, domanda che ferma la chiusura, sul PDF solo numero e visita, agganci; 3 copie rotte riconosciute)')
 })().catch((e) => { console.error(e); process.exit(1) })
