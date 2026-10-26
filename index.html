@@ -16907,7 +16907,9 @@ function incVerificaProt(){
   const msg=$('f-prot-msg'); if(!msg) return
   const v=(vGet('f-prot-int')||'').trim()
   stageDaIncarico(v)
-  if(!v){ msg.textContent=''; return }
+  const _tInc=tipoChiedeIncarico()
+  if(!v){ msg.innerHTML=_tInc?'<span style="color:#c0392b;font-weight:600">⛔ '+esc(INC_MSG_SERVE(_tInc))+'</span>':''; return }
+  if(_tInc&&!/^\d+$/.test(v)){ msg.innerHTML='<span style="color:#c0392b;font-weight:600">⛔ '+esc(INC_MSG_SERVE(_tInc))+'</span>'; return }
   if(!/^\d+$/.test(v)){ msg.innerHTML='<span style="color:#888">Testo libero: nessun incarico verrà agganciato.</span>'; return }
   const m=(_incApertiCache||[]).find(r=>String(r.id)===v)
   if(m){ msg.innerHTML='<span style="color:#27ae60">✓ Collegato a: '+esc(m.etichetta)+'</span>'; return }
@@ -16920,6 +16922,19 @@ function incVerificaProt(){
   })
 }
 window.incVerificaProt=incVerificaProt
+
+/* (26/10/2026, deciso dall'utente) LE TIPOLOGIE CHE NASCONO DA UN INCARICO: su segnalazione, cantiere qualità,
+   visite in serie, stage/ASL, attestazione, progetto SPISAL valgono solo con un incarico in essere agganciato
+   nel Protocollo interno. Il blocco vero sta nel database (verbale_mancanze: incarico-mancante, incarico-chiuso,
+   serie-senza-incarico, serie-completa); qui lo si dice mentre si compila. Chi cambia l'elenco lo cambia anche
+   in supabase/sql/2026_10_26_verbale_mancanze_incarico.sql. */
+const TIPI_CON_INCARICO={1:'Su segnalazione',6:'Cantiere qualità',8:'Adesione servizio visite in serie',9:'Visita STAGE/ASL',11:'Attestazione / consulenza e monitoraggio',12:'Progetto SPISAL'}
+function tipoChiedeIncarico(){ return TIPI_CON_INCARICO[+vGet('f-tipo')]||null }
+function INC_MSG_SERVE(t){
+  return 'La tipologia «'+t+'» vale solo con un incarico in essere: sceglilo da «Parti da un tuo incarico» o scrivi qui il suo numero. Senza, il verbale non si chiude'
+    +(t===TIPI_CON_INCARICO[8]?': se la serie è finita o non c\'è, l\'impresa deve richiedere di nuovo il servizio.':': chi chiede la visita deve fare la richiesta, e la segreteria ti dà l\'incarico.')
+}
+window.tipoChiedeIncarico=tipoChiedeIncarico
 
 /* (02/10/2026) DI CHI È L'INCARICO. Regola dell'utente: un tecnico non può agganciare
    alla sua visita l'incarico di un altro; si ferma con un messaggio e, se è giusto che
@@ -16960,6 +16975,7 @@ document.addEventListener('change',function(ev){
     if(ev.target.value) incDaTendina(ev.target.value).catch(e=>{console.warn('incarico dalla tendina:',e);toast('Incarico non agganciato: '+(e.message||e),'err')})
     else incVerificaProt()
   }
+  if(ev.target&&ev.target.id==='f-tipo') incVerificaProt()
 })
 document.addEventListener('input',function(ev){
   if(ev.target&&ev.target.id==='f-prot-int'){
@@ -16985,7 +17001,7 @@ document.addEventListener('input',function(ev){
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=7"></script>
-<script src="aiuto.js?v=33"></script>
+<script src="aiuto.js?v=34"></script>
 <script src="mail-respinte-tec.js?v=3"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=3"></script>

@@ -130,6 +130,7 @@ window.AIUTO_TESTI = {
   'btn-bozza': 'Salva il verbale come bozza: lo ritrovi in «Visite» e lo puoi completare dopo. Non parte niente all\'impresa.',
   'btn-final': 'Salva il verbale e prova a chiuderlo come definitivo. Se manca qualcosa di obbligatorio resta bozza e compare l\'elenco di tutto ciò che manca: tocchi una riga e vai al campo. Chiuso, non si modifica più (solo la segreteria può riaprirlo) e va al coordinatore per il controllo.',
   'btn-pdf': 'Genera il PDF del verbale con la tua firma e il logo dell\'ente. Dalla bozza esce con la scritta «bozza».',
+  'f-tipo': 'Come nasce la visita: la chiede l\'Osservatorio nazionale. Su segnalazione, cantiere qualità, visite in serie, stage, attestazione e progetto SPISAL valgono solo con un incarico in essere: senza, il verbale non si chiude.',
   'f-prot-inc': 'Scegli l\'incarico da cui nasce la visita: lo accetti, e si compilano da soli numero della richiesta, impresa e cantiere (se la segreteria li ha indicati). Se ne avevi già scelti altri, ti chiede prima di sostituirli.',
   'btn-email-verbale': 'Prepara la mail all\'impresa con il verbale allegato. Se la mail torna indietro, lo vedi in Dashboard nel riquadro dei verbali non consegnati.',
   't:tutto ver': 'Mette «verificato» su tutte le voci della macroarea in un colpo: poi correggi solo quelle non conformi.',
