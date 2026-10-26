@@ -79,6 +79,21 @@
   // DATI: i calcoli del verbale
   // D = { v, imps, chk, lavs, voci, tec2, rettBanner }
   // ════════════════════════════════════════════════════════════
+  /* (26/10/2026, deciso dall'utente, variante A di proposte_grafiche/2026_10_26_verbale-accesso-ciclo-visita)
+     sotto la banda grigia una riga «Accesso al cantiere 4 · Ciclo di visita 2 · Visita 1 di 3 · Serie di visite 4 di 10».
+     pos = verbale_posizione(visita) del database: { ciclo: {numero, visita, di}, serie: {n, di} }, di null oltre il
+     massimo («Visita 6» senza «di»). Senza ciclo né serie (storico, bozza, asseverazione) torna null e resta la
+     cella «N° accesso» nella banda, com'era. Il ciclo fino al 26/10 era interno: da oggi va sul verbale. */
+  function rigaPosizione(acc, pos) {
+    const c = pos && pos.ciclo, s = pos && pos.serie
+    if (!(c && c.visita) && !(s && s.n)) return null
+    const fino = (n, di) => String(n) + (di ? ' di ' + di : '')
+    const pezzi = [['Accesso al cantiere', acc ? String(acc) : '–']]
+    if (c && c.visita) pezzi.push(['Ciclo di visita', String(c.numero || '–')], ['Visita', fino(c.visita, c.di)])
+    if (s && s.n) pezzi.push(['Serie di visite', fino(s.n, s.di)])
+    return pezzi
+  }
+
   function prepara(D) {
     const v = D.v, cant = v.cantieri || {}
     const imps = D.imps || [], chk = D.chk || [], lavs = D.lavs || []
@@ -198,6 +213,7 @@
       tec2Nome: tec2 ? `${tec2.tecnico_nome || ''} ${tec2.tecnico_cognome || ''}`.trim() : '', tec2Email: (tec2 && tec2.email) || '',
       stagista: v.stage_vis && v.nom_stage ? v.nom_stage : '',
       tipoAcc: TIPO_ACC_SUL_VERBALE[v.tipo_accesso] || '–', accesso: v.acc_cant ? String(v.acc_cant) : '–',
+      posizione: rigaPosizione(v.acc_cant, D.posizione),   // 26/10/2026: accesso, ciclo, visita del ciclo e serie
       etichetta: cant.cantiere_etichetta || '–', nrVerbale: v.nr_verbale || '–',
       imprese, figure, cantiere, lavorazioni, noteLav: (v.note_lav || '').trim() || '–',
       ipc: { label, bg, ncp, ncn, oss, ver, msg, tinta },
@@ -529,8 +545,10 @@
     st.y = 37
     if (d.rettBanner) { rettifica(doc, L, st.y, W, d.rettBanner); st.y += 17 }
 
-    // banda grigia coi dati della visita (va a capo invece di tagliare)
-    const celle = [['Tecnico', d.tecNome || '–', 42], ['Data visita', d.dataVisita, 24], ['Tipologia visita', d.tipoAcc, 40], ['N° accesso', d.accesso, 20], ['Etichetta cantiere', d.etichetta, 48]]
+    // banda grigia coi dati della visita (va a capo invece di tagliare); con ciclo o serie l'accesso scende nella riga sotto (26/10/2026)
+    const celle = d.posizione
+      ? [['Tecnico', d.tecNome || '–', 46], ['Data visita', d.dataVisita, 26], ['Tipologia visita', d.tipoAcc, 50], ['Etichetta cantiere', d.etichetta, 52]]
+      : [['Tecnico', d.tecNome || '–', 42], ['Data visita', d.dataVisita, 24], ['Tipologia visita', d.tipoAcc, 40], ['N° accesso', d.accesso, 20], ['Etichetta cantiere', d.etichetta, 48]]
     f(doc, 'bold', 9.5, C.bianco)
     const testi = celle.map(([, val, w]) => righe(doc, val, w - 5))
     const extra = [d.tec2Nome ? '2° tecnico: ' + d.tec2Nome : '', d.stagista ? 'Stagista: ' + d.stagista : ''].filter(Boolean).join('   ·   ')
@@ -539,7 +557,21 @@
     let x = L + 4
     celle.forEach(([l, , w], i) => { spaziato(doc, l.toUpperCase(), x, st.y + 5, 5.8, C.etichetta, 0.4); f(doc, 'bold', 9.5, C.bianco); doc.text(testi[i], x, st.y + 10.5); x += w })
     if (extra) { f(doc, 'normal', 7.5, C.etichetta); doc.text(extra, L + 4, st.y + bh - 3) }
-    st.y += bh + 8
+    st.y += bh
+    if (d.posizione) {
+      // riga chiara col filo arancione: etichette in grigio, numeri in arancione
+      const h = 7.5
+      doc.setFillColor(...C.pietra); doc.rect(L, st.y, W, h, 'F')
+      doc.setFillColor(...C.arancio); doc.rect(L, st.y, 1.2, h, 'F')
+      let xp = L + 4.5
+      d.posizione.forEach(([l, n], i) => {
+        if (i) { f(doc, 'normal', 9, C.tenue); doc.text('·', xp, st.y + 5); xp += 4.5 }
+        f(doc, 'normal', 9, C.grigio); doc.text(l + ' ', xp, st.y + 5); xp += doc.getTextWidth(l + ' ')
+        f(doc, 'bold', 9, C.arancio); doc.text(n, xp, st.y + 5); xp += doc.getTextWidth(n) + 4.5
+      })
+      st.y += h
+    }
+    st.y += 8
 
     sezioniDati(doc, st, d, titolo)
 
@@ -646,6 +678,6 @@
     return doc
   }
 
-  root.VerbalePDF = { prepara, crea, partiNumero }
+  root.VerbalePDF = { prepara, crea, partiNumero, rigaPosizione }
   if (typeof module !== 'undefined' && module.exports) module.exports = root.VerbalePDF
 })(typeof window !== 'undefined' ? window : globalThis)

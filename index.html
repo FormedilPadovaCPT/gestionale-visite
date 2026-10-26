@@ -10527,7 +10527,16 @@ async function genPDF(vid, output='save'){
       const{data:t2}=await sb.from('tecnici').select('tecnico_nome,tecnico_cognome,email').eq('tecnico_id',v.tecnico2_id).maybeSingle()
       tec2=t2||null
     }
-    const pd=window.VerbalePDF.prepara({v,imps:imps||[],chk:chk||[],lavs:lavs||[],voci:S.voci||[],tec2,rettBanner:_rettBanner})
+    /* (26/10/2026, deciso dall'utente) accesso, ciclo, visita del ciclo e progressivo della serie sotto la banda grigia:
+       i numeri li dà il database (verbale_posizione), perché la serie conta anche le visite dei colleghi. Se non si
+       leggono il verbale esce lo stesso con il solo «N° accesso», com'era prima, e lo si dice */
+    let _pos=null
+    {
+      const{data:_p,error:_eP}=await sb.rpc('verbale_posizione',{p_visita_id:vid})
+      if(_eP){console.warn('verbale_posizione:',_eP);toast('Non sono riuscito a leggere ciclo e serie della visita ('+_eP.message+'): sul PDF resta il solo numero di accesso','warn',7000)}
+      else _pos=_p
+    }
+    const pd=window.VerbalePDF.prepara({v,imps:imps||[],chk:chk||[],lavs:lavs||[],voci:S.voci||[],tec2,rettBanner:_rettBanner,posizione:_pos})
     const comuneLabel=(v.cantieri||{}).comune_nome||''
 
     // ── Immagini: nessuna è bloccante, se una non arriva il verbale esce senza ──
@@ -14512,7 +14521,7 @@ async function showVisitaDetail(vid){
     ])
     /* (13/10/2026) visita fuori procedura: motivo del tecnico e decisione del Coordinatore (interno, mai sul PDF) */
     if(v.fp_tipo&&window.FuoriProcedura){html+=qdSec('⚠️ Fuori procedura (interno)')+qdDl(FuoriProcedura.dettaglio(v))}
-    /* (20/10/2026) ciclo di visita: numero, visita del ciclo, proposta e scelta (interno, mai sul PDF) */
+    /* (20/10/2026) ciclo di visita: numero, visita del ciclo, proposta e scelta. Dal 26/10/2026 numero e visita del ciclo vanno anche sul PDF (verbale_posizione); proposta, scelta e motivo restano interni */
     if(v.ciclo_visita!=null&&window.CicliVisita){html+=qdSec('🔁 Ciclo di visita (interno)')+qdDl(CicliVisita.dettaglio(v))}
     if(cant){
       html+=qdSec('Cantiere')
@@ -17035,7 +17044,7 @@ document.addEventListener('input',function(ev){
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
-<script src="verbale-pdf.js?v=13"></script>
+<script src="verbale-pdf.js?v=14"></script>
 <!-- mappa sul telefono: cantieri vicino a te (Nuova visita) e rientri sulla mappa (Scadenze) -->
 <script src="mappa.js?v=3"></script>
 </body>
