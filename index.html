@@ -7208,11 +7208,13 @@ function gradimentoDati(r){
   const azione=GRAD_AZIONE.map(l=>({label:l,n:+a[l]||0}))
   GRAD_AZIONE.forEach(l=>{delete a[l]});Object.keys(a).forEach(l=>azione.push({label:l,n:+a[l]||0}))
   const ricevuti=+r.ricevuti||0,vp=+r.visite_periodo||0,vc=+r.visite_con_questionario||0
+  /* (26/10/2026) i ringraziamenti arrivati per mail (registrati dal giro risposte-verbali, senza voto) si contano a parte */
+  const grazie=+r.ringraziamenti||0,grazieTxt=grazie?' · '+grazie+(grazie===1?' ringraziamento arrivato':' ringraziamenti arrivati')+' per mail':''
   const media=r.media==null?null:Math.round(+r.media*10)/10
   const testo=ricevuti
-    ?ricevuti+' questionari ricevuti'+(vp?' · '+vc+' visite con almeno un questionario su '+vp+' ('+String(Math.round(vc/vp*1000)/10).replace('.',',')+'%)':'')+(media!=null?' · utilità media '+String(media).replace('.',',')+' su 5':'')
-    :'Nessun questionario di gradimento nel filtro corrente.'
-  return{utilita:[1,2,3,4,5].map(k=>+u[k]||0),motivi:motivi.filter(x=>x.n>0),azione:azione.filter(x=>x.n>0),ricevuti,testo,pochi:ricevuti>0&&ricevuti<10}
+    ?ricevuti+' questionari ricevuti'+(vp?' · '+vc+' visite con almeno un questionario su '+vp+' ('+String(Math.round(vc/vp*1000)/10).replace('.',',')+'%)':'')+(media!=null?' · utilità media '+String(media).replace('.',',')+' su 5':'')+grazieTxt
+    :grazie?grazie+(grazie===1?' ringraziamento arrivato':' ringraziamenti arrivati')+' per mail, nessun questionario compilato.':'Nessun questionario di gradimento nel filtro corrente.'
+  return{grazie,utilita:[1,2,3,4,5].map(k=>+u[k]||0),motivi:motivi.filter(x=>x.n>0),azione:azione.filter(x=>x.n>0),ricevuti,testo,pochi:ricevuti>0&&ricevuti<10}
 }
 /* etichette lunghe su più righe: nelle schede strette Chart.js le taglierebbe */
 function _aCapo(t,max){const out=[];let r='';String(t||'').split(' ').forEach(w=>{if(r&&(r+' '+w).length>max){out.push(r);r=w}else r=r?r+' '+w:w});if(r)out.push(r);return out}

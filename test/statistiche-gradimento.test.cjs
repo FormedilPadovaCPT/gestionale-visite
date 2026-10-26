@@ -49,4 +49,14 @@ for (const campo of ['commento', 'recapito_contatto', 'note_ufficio', 'tecnico']
 }
 assert.ok(sql.includes("<> 'scartato'"), 'i questionari scartati non contano')
 
+// (26/10/2026) i ringraziamenti arrivati per mail si contano a parte, fuori dai numeri dei questionari
+const g2 = J(ctx.gradimentoDati({ ricevuti: 4, visite_con_questionario: 2, visite_periodo: 37, media: 4.25, ringraziamenti: 2 }))
+assert.strictEqual(g2.grazie, 2)
+assert.ok(/ · 2 ringraziamenti arrivati per mail$/.test(g2.testo), g2.testo)
+assert.strictEqual(J(ctx.gradimentoDati({ ricevuti: 0, ringraziamenti: 1 })).testo, '1 ringraziamento arrivato per mail, nessun questionario compilato.')
+assert.ok(!/ringraziament/.test(J(ctx.gradimentoDati({ ricevuti: 3 })).testo), 'senza ringraziamenti il testo è quello di prima')
+const sql26 = fs.readFileSync(path.join(radice, 'supabase', 'sql', '2026_10_26_dash_questionari_ringraziamenti.sql'), 'utf8')
+assert.ok(sql26.includes("'ricevuti', (select count(*) from f where fonte is distinct from 'mail')"), 'un ringraziamento non è un questionario')
+assert.ok(sql26.includes("'ringraziamenti', (select count(*) from f where fonte = 'mail')"))
+
 console.log('OK gradimento delle visite')
