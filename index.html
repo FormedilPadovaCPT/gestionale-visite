@@ -2714,7 +2714,7 @@ function ipcCls(ipc){return{ALTO:'badge-alto',MEDIO:'badge-medio',BASSO:'badge-b
 // Etichetta IPC da mostrare: NR → "Nessun Rilievo"
 function ipcLbl(ipc){return(!ipc||ipc==='NR')?'Nessun Rilievo':ipc}
 function vGet(id){return $(id)?.value}
-function vSet(id,v){if($(id))$(id).value=v??'';if(id==='f-cant-id'&&window.mappaEvento)window.mappaEvento('cantiere',v)}
+function vSet(id,v){if($(id))$(id).value=v??'';if(id==='f-cant-id'&&window.mappaEvento)window.mappaEvento('cantiere',v);if(id==='f-cant-id'&&window.incDalCantiere)window.incDalCantiere(v)}
 function cGet(id){return $(id)?.checked}
 function cSet(id,v){if($(id))$(id).checked=!!v}
 
@@ -16579,6 +16579,9 @@ function incDecidi(r,att){
   if(r.cantiere_id){
     if(!att.cantiere_id) cantiere='compila'
     else if(String(att.cantiere_id)===String(r.cantiere_id)) cantiere='niente'
+    /* (29/10/2026) l'incarico vale per tutti i lotti: il lotto scelto dal tecnico resta, se è del complesso lo dice
+       incAvvisaAltroCantiere (e alla chiusura il database) */
+    else if(r.tutti_i_lotti) cantiere='niente'
     else cantiere='chiedi'
   }else if(!att.cantiere_id&&(n(r.indirizzo)||n(r.comune))) cantiere='proponi'
   return{impresa,cantiere}
@@ -16923,16 +16926,75 @@ function incVerificaProt(){
   if(_tInc&&!/^\d+$/.test(v)){ msg.innerHTML='<span style="color:#c0392b;font-weight:600">⛔ '+esc(INC_MSG_SERVE(_tInc))+'</span>'; return }
   if(!/^\d+$/.test(v)){ msg.innerHTML='<span style="color:#888">Testo libero: nessun incarico verrà agganciato.</span>'; return }
   const m=(_incApertiCache||[]).find(r=>String(r.id)===v)
-  if(m){ msg.innerHTML='<span style="color:#27ae60">✓ Collegato a: '+esc(m.etichetta)+'</span>'; return }
+  if(m){ msg.innerHTML='<span style="color:#27ae60">✓ Collegato a: '+esc(m.etichetta)+'</span>'; incAvvisaAltroCantiere(v); return }
   msg.innerHTML='<span style="color:#D9A400">⚠ Nessun incarico aperto con questo numero (la visita si salva comunque).</span>'
   /* non è fra i miei aperti: può essere di un altro tecnico, e allora non si aggancia */
   const req=_incChiReq=(_incChiReq||0)+1
   incDiChi(v).then(di=>{
     if(req!==_incChiReq||(vGet('f-prot-int')||'').trim()!==v) return
     if(di==='altrui') msg.innerHTML='<span style="color:#c0392b;font-weight:600">⛔ '+esc(INC_MSG_ALTRUI(v))+'</span>'
+    else incAvvisaAltroCantiere(v)
   })
 }
 window.incVerificaProt=incVerificaProt
+
+/* (29/10/2026, deciso dall'utente) L'INCARICO ARRIVA DAL CANTIERE. «L'incarico è sempre puntuale»: la segreteria lo
+   dà per un cantiere (o per un lotto, o per tutti i lotti del complesso), quindi il tecnico non deve scriverne il
+   numero. Qualunque strada scelga il cantiere (ricerca, mappa, rientri, elenco, scheda nuova) passa da vSet('f-cant-id'),
+   che chiama questa funzione: se c'è UN suo incarico aperto che vale per quel cantiere, si aggancia da solo con la
+   stessa strada della tendina «Parti da un tuo incarico» (incDaTendina); se sono di più, si sceglie dalla tendina.
+   Non si tocca niente quando la visita ha già un numero (si controlla solo che valga qui), quando è una visita già
+   salvata, o se la lettura fallisce: alla chiusura decide il database (verbale_mancanze, «incarico-altro-cantiere»;
+   la regola è incarico_vale_per_cantiere). Gli incarichi senza cantiere, quelli di prima del 29/10, non compaiono. */
+var _incCantReq=0
+function incDalCantiere(cid){
+  const req=++_incCantReq
+  cid=String(cid||'').trim()
+  if(!cid||!S.user) return
+  setTimeout(async()=>{
+    if(req!==_incCantReq||String(vGet('f-cant-id')||'').trim()!==cid) return
+    const prot=(vGet('f-prot-int')||'').trim()
+    if(prot){ incVerificaProt(); return }
+    if(S.savedId) return
+    let lista=[]
+    try{
+      const{data,error}=await sb.rpc('incarichi_per_cantiere',{p_cantiere_id:cid})
+      if(error) throw error
+      lista=data||[]
+    }catch(e){ console.warn('incarichi del cantiere:',e); return }
+    if(req!==_incCantReq||String(vGet('f-cant-id')||'').trim()!==cid||(vGet('f-prot-int')||'').trim()) return
+    const msg=$('f-prot-msg')
+    if(lista.length>1){
+      if(msg) msg.innerHTML='<span style="color:#D9A400">⚠ Su questo cantiere hai '+lista.length+' incarichi aperti: scegli quello di questa visita da «Parti da un tuo incarico».</span>'
+      return
+    }
+    if(lista.length!==1) return
+    const r=lista[0]
+    /* una tipologia già scelta che non nasce da un incarico (per esempio una programmata): si chiede prima */
+    const t=vGet('f-tipo')
+    if(t&&!tipoChiedeIncarico()&&!confirm('Su questo cantiere c\'è il tuo incarico n. '+r.id+' ('+r.etichetta+').\n\nQuesta visita è dell\'incarico?\n\nOK = sì, lo aggancio · Annulla = no, è un\'altra visita')) return
+    await incDaTendina(r.id)
+    toast('Incarico n. '+r.id+' agganciato da solo: vale per questo cantiere'+(r.tutti_i_lotti?' e per tutti i lotti del complesso':'')+'.','ok',6000)
+  },0)
+}
+window.incDalCantiere=incDalCantiere
+
+/* Il numero c'è (scritto, scelto o copiato dalla visita di prima) ma l'incarico vale per un altro cantiere: lo si
+   dice in rosso mentre si compila. Null (incarico senza cantiere) o lettura fallita: non si dice niente. */
+var _incQuiReq=0
+function incAvvisaAltroCantiere(v){
+  const req=++_incQuiReq
+  const cid=String(vGet('f-cant-id')||'').trim()
+  if(!/^\d{1,18}$/.test(String(v||''))||!cid) return
+  sb.rpc('incarico_vale_per_cantiere',{p_incarico_id:+v,p_cantiere_id:cid}).then(({data,error})=>{
+    if(error||data!==false) return
+    if(req!==_incQuiReq||(vGet('f-prot-int')||'').trim()!==String(v)||String(vGet('f-cant-id')||'').trim()!==cid) return
+    const msg=$('f-prot-msg'); if(!msg) return
+    msg.innerHTML='<span style="color:#c0392b;font-weight:600">⛔ '+esc(INC_MSG_ALTRO_CANTIERE(v))+'</span>'
+  }).catch(e=>console.warn('incarico e cantiere:',e))
+}
+function INC_MSG_ALTRO_CANTIERE(n){return 'L\'incarico n. '+n+' vale per un altro cantiere: scegli il cantiere dell\'incarico. Se la visita è davvero su questo cantiere, l\'impresa deve fare una nuova richiesta per questo cantiere.'}
+window.incAvvisaAltroCantiere=incAvvisaAltroCantiere
 
 /* (26/10/2026, deciso dall'utente) LE TIPOLOGIE CHE NASCONO DA UN INCARICO: su segnalazione, cantiere qualità,
    visite in serie, stage/ASL, attestazione, progetto SPISAL valgono solo con un incarico in essere agganciato
@@ -17012,7 +17074,7 @@ document.addEventListener('input',function(ev){
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=7"></script>
-<script src="aiuto.js?v=34"></script>
+<script src="aiuto.js?v=35"></script>
 <script src="mail-respinte-tec.js?v=3"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=3"></script>

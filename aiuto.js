@@ -132,6 +132,7 @@ window.AIUTO_TESTI = {
   'btn-pdf': 'Genera il PDF del verbale con la tua firma e il logo dell\'ente. Dalla bozza esce con la scritta «bozza».',
   'f-tipo': 'Come nasce la visita: la chiede l\'Osservatorio nazionale. Su segnalazione, cantiere qualità, visite in serie, stage, attestazione e progetto SPISAL valgono solo con un incarico in essere: senza, il verbale non si chiude.',
   'f-prot-inc': 'Scegli l\'incarico da cui nasce la visita: lo accetti, e si compilano da soli numero della richiesta, impresa e cantiere (se la segreteria li ha indicati). Se ne avevi già scelti altri, ti chiede prima di sostituirli.',
+  'f-prot-int': 'Il numero dell\'incarico da cui nasce la visita. Di solito non si scrive: scegliendo il cantiere, se c\'è un tuo incarico aperto per quel cantiere (o per il suo complesso a lotti) si aggancia da solo. Se l\'incarico vale per un altro cantiere il verbale non si chiude: l\'impresa deve fare una nuova richiesta.',
   'btn-email-verbale': 'Prepara la mail all\'impresa con il verbale allegato. Se la mail torna indietro, lo vedi in Dashboard nel riquadro dei verbali non consegnati.',
   't:tutto ver': 'Mette «verificato» su tutte le voci della macroarea in un colpo: poi correggi solo quelle non conformi.',
   'btn-prev': 'Torna al passo precedente del verbale. Quello che hai scritto resta.',
