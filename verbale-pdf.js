@@ -103,7 +103,8 @@
     const e = String(eti || '').trim(), l = String(lotto || '').trim()
     if (!l) return e
     const esc = l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    return e.replace(new RegExp('\\s*[–-]\\s*lotto\\s+' + esc + '\\s*$', 'i'), '').trim() || e
+    // «lotto» facoltativo: «… – Campo Base» col lotto «Campo Base» (l'etichetta ha 50 caratteri al massimo)
+    return e.replace(new RegExp('\\s*[–-]\\s*(lotto\\s+)?' + esc + '\\s*$', 'i'), '').trim() || e
   }
 
   function prepara(D) {

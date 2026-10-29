@@ -9,6 +9,8 @@ const S = V.etichettaSenzaLotto;
 assert.strictEqual(S('Via Sturzo – lotto 2', '2'), 'Via Sturzo');
 assert.strictEqual(S('via Venezia - Giotto 1 – lotto Giotto 1', 'Giotto 1'), 'via Venezia - Giotto 1');
 assert.strictEqual(S('Via Milano 10 - Lotto eden 2', 'eden 2'), 'Via Milano 10');
+assert.strictEqual(S('NuovaSR10 CARRON CNCEC9013075850 – Campo Base', 'Campo Base'), 'NuovaSR10 CARRON CNCEC9013075850');
+assert.strictEqual(S('Via Boccaccio PADOVA (Furlan) – lotto 2', '2'), 'Via Boccaccio PADOVA (Furlan)');
 // una coda che nomina un altro lotto, o scritta in un altro modo, resta com'è
 assert.strictEqual(S('Via Sturzo – lotto 3', '2'), 'Via Sturzo – lotto 3');
 assert.strictEqual(S('Via X (lotto 3)', '3'), 'Via X (lotto 3)');
