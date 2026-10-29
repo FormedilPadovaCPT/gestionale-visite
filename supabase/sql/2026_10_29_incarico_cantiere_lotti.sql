@@ -13,7 +13,8 @@
 --      Il complesso è quello di lotti_del_cantiere, quindi valgono anche i lotti creati dopo l'incarico;
 --   3. incarichi_per_cantiere: gli incarichi aperti del tecnico che valgono per il cantiere scelto (aggancio
 --      automatico nel gestionale, niente numero da scrivere);
---   4. verbale_mancanze: un verbale agganciato a un incarico che vale per un altro cantiere non si chiude;
+--   4. verbale_mancanze: un verbale agganciato a un incarico che vale per un altro cantiere non si chiude, e il
+--      messaggio «incarico-mancante» non dice più di scrivere il numero (il campo non si vede più nel verbale);
 --   5. incarichi_del_cantiere: chiudere un lotto non chiude un incarico che vale per tutti i lotti, se ne restano
 --      aperti altri;
 --   6. tg_incarichi_guard: cantiere, lotti e impresa dell'incarico li cambia solo la segreteria;
@@ -260,7 +261,7 @@ begin
     end if;
     if not inc_ok then
       esito := esito || jsonb_build_object('cosa','incarico-mancante','tab',1,'campo','f-prot-int',
-        'testo','La tipologia «'||tipo_nome||'» vale solo per una visita che nasce da un incarico della segreteria: nel «Protocollo interno» va il numero dell''incarico, oppure sceglilo da «Parti da un tuo incarico». Se l''incarico non c''è, la visita non si chiude con questa tipologia: l''impresa (o chi segnala) deve fare la richiesta, e la segreteria ti dà l''incarico.');
+        'testo','La tipologia «'||tipo_nome||'» vale solo per una visita che nasce da un incarico della segreteria: scegli il cantiere dell''incarico (si aggancia da solo), oppure sceglilo da «Parti da un tuo incarico». Se l''incarico non c''è, la visita non si chiude con questa tipologia: l''impresa (o chi segnala) deve fare la richiesta, e la segreteria ti dà l''incarico.');
     elsif inc.stato = 'chiuso' then
       esito := esito || jsonb_build_object('cosa','incarico-chiuso','tab',1,'campo','f-prot-int',
         'testo','L''incarico n. '||inc.id||' è chiuso: non si fanno altre visite «'||tipo_nome||'» su di esso.'

@@ -39,6 +39,16 @@ assert.ok(/if\(S\.savedId\) return/.test(html), 'una visita già salvata non si 
 assert.ok(/await incDaTendina\(r\.id\)/.test(html), 'la stessa strada della tendina');
 assert.ok(/if\(error\|\|data!==false\) return/.test(html), 'la lettura fallita non dice «altro cantiere»');
 
+/* il numero non si scrive più: il campo resta nascosto (si salva in prot_int), a vista c'è l'incarico agganciato */
+assert.ok(html.includes('<input type="hidden" id="f-prot-int">'), 'il Protocollo interno è nascosto');
+assert.ok(!/<input type="text" id="f-prot-int"/.test(html), 'nessun campo da scrivere a mano');
+assert.ok(/id="f-prot-vis"/.test(html) && /function incMostraNumero\(v\)\{/.test(html), 'si vede quale incarico è agganciato');
+assert.ok(/if\(id==='f-prot-int'&&window\.incMostraNumero\)window\.incMostraNumero\(v\)/.test(html), 'la vista segue ogni cambio del numero');
+assert.ok(/id!=='f-prot-togli'\) return\s+vSet\('f-prot-int',''\)/.test(html), '«✕ Togli» sgancia');
+assert.ok(/if\(m\.campo==='f-prot-int'\)m=Object\.assign\(\{\},m,\{campo:'f-prot-box'\}\)/.test(html), 'dalle mancanze si va al riquadro visibile');
+assert.ok(!/scrivi qui il suo numero/.test(html), 'il messaggio non chiede più il numero');
+assert.ok(!/nel «Protocollo interno» va il numero/.test(sql), 'neanche il database');
+
 /* incDecidi: con l'incarico di tutti i lotti il lotto scelto dal tecnico resta */
 const m = html.match(/function incDecidi\(r,att\)\{[\s\S]*?\r?\n\}/);
 const incDecidi = Function(m[0] + '; return incDecidi')();

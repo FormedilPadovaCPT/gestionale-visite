@@ -829,7 +829,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
           </div>
           <div class="row" style="margin-top:12px">
             <input type="hidden" id="f-acc-cant2">
-            <div class="field"><label>Protocollo interno <span style="font-weight:400;font-size:11px;color:#aaa">(n° richiesta)</span></label><div style="display:flex;gap:6px"><input type="text" id="f-prot-int" placeholder="Prot. richiesta" style="flex:1;min-width:0"></div><div id="f-prot-msg" style="font-size:11px;margin-top:3px"></div></div>
+            <!-- (29/10/2026, deciso dall'utente) il numero dell'incarico non si scrive più: si aggancia scegliendo il cantiere o da
+                 «Parti da un tuo incarico». Il campo resta, nascosto, perché si salva in prot_int come prima. -->
+            <input type="hidden" id="f-prot-int">
+            <div class="field" id="f-prot-box" tabindex="-1"><label>Incarico</label><div id="f-prot-vis" style="font-size:13px;padding:6px 0">—</div><div id="f-prot-msg" style="font-size:11px;margin-top:3px"></div></div>
           </div>
           <div class="row">
             <div class="field" style="flex:0 1 260px"><label>Codice CNCE <span style="font-weight:400;font-size:11px;color:#aaa">(dal cantiere)</span></label><input type="text" id="f-cnce" placeholder="–" readonly style="background:#f8f8f8"></div>
@@ -2714,7 +2717,7 @@ function ipcCls(ipc){return{ALTO:'badge-alto',MEDIO:'badge-medio',BASSO:'badge-b
 // Etichetta IPC da mostrare: NR → "Nessun Rilievo"
 function ipcLbl(ipc){return(!ipc||ipc==='NR')?'Nessun Rilievo':ipc}
 function vGet(id){return $(id)?.value}
-function vSet(id,v){if($(id))$(id).value=v??'';if(id==='f-cant-id'&&window.mappaEvento)window.mappaEvento('cantiere',v);if(id==='f-cant-id'&&window.incDalCantiere)window.incDalCantiere(v)}
+function vSet(id,v){if($(id))$(id).value=v??'';if(id==='f-cant-id'&&window.mappaEvento)window.mappaEvento('cantiere',v);if(id==='f-cant-id'&&window.incDalCantiere)window.incDalCantiere(v);if(id==='f-prot-int'&&window.incMostraNumero)window.incMostraNumero(v)}
 function cGet(id){return $(id)?.checked}
 function cSet(id,v){if($(id))$(id).checked=!!v}
 
@@ -3779,6 +3782,7 @@ async function initForm(snap=null){
     'f-nr-imp','f-nr-ind','f-nr-lav','f-nr-lav-str','f-costi','f-stato-lav','f-note-lav',
     'f-oss-tec','f-oss-int','f-note-for-m','f-data-ritorno','cant-detail']
   clearIds.forEach(id=>{const el=$(id);if(el)el.value=''})
+  if(window.incMostraNumero)window.incMostraNumero('')
   hideCantCard()
   ;['f-qual-ppre','f-tec-select','f-tec2-select'].forEach(id=>{const el=$(id);if(el)el.selectedIndex=0})
   ;['f-tec2-display','f-tec2-id','f-tec2-email'].forEach(id=>vSet(id,''))
@@ -5398,6 +5402,7 @@ async function mailImpresaControlla(idx){
    Toccando una riga si va al campo. «scheda-cantiere» apre la scheda del cantiere scelto. */
 function vaiAlCampoMancante(m){
   m=m||{}
+  if(m.campo==='f-prot-int')m=Object.assign({},m,{campo:'f-prot-box'})   // (29/10/2026) il numero non si scrive più
   if(m.campo==='scheda-cantiere'){activateTab(1);editCantiereForm();return}
   const _mi=/^im-[a-z_]+-(\d+)$/.exec(m.campo||'')
   if(_mi)S._impOpen=+_mi[1]
@@ -16920,6 +16925,7 @@ window.stageDaIncarico=stageDaIncarico
 function incVerificaProt(){
   const msg=$('f-prot-msg'); if(!msg) return
   const v=(vGet('f-prot-int')||'').trim()
+  incMostraNumero(v)
   stageDaIncarico(v)
   const _tInc=tipoChiedeIncarico()
   if(!v){ msg.innerHTML=_tInc?'<span style="color:#c0392b;font-weight:600">⛔ '+esc(INC_MSG_SERVE(_tInc))+'</span>':''; return }
@@ -16996,6 +17002,25 @@ function incAvvisaAltroCantiere(v){
 function INC_MSG_ALTRO_CANTIERE(n){return 'L\'incarico n. '+n+' vale per un altro cantiere: scegli il cantiere dell\'incarico. Se la visita è davvero su questo cantiere, l\'impresa deve fare una nuova richiesta per questo cantiere.'}
 window.incAvvisaAltroCantiere=incAvvisaAltroCantiere
 
+/* (29/10/2026) Che cosa vede il tecnico al posto del vecchio campo «Protocollo interno»: il numero dell'incarico
+   agganciato (con l'etichetta, se è fra i suoi aperti) e «✕ Togli» per sganciarlo, oppure come si aggancia. Un valore
+   non numerico arriva solo dai verbali vecchi: si mostra com'è scritto. */
+function incMostraNumero(v){
+  const box=$('f-prot-vis'); if(!box) return
+  v=String(v??'').trim()
+  if(!v){ box.innerHTML='<span style="color:#888">Nessuno. Si aggancia da solo scegliendo il cantiere dell\'incarico, oppure da «Parti da un tuo incarico» nel primo passo.</span>'; return }
+  const m=/^\d+$/.test(v)&&(_incApertiCache||[]).find(r=>String(r.id)===v)
+  box.innerHTML=(/^\d+$/.test(v)?'<b>n. '+esc(v)+'</b>'+(m?' · '+esc(String(m.etichetta).replace(/^\d+\s*·\s*/,'')):''):esc(v))
+    +' <button type="button" class="btn btn-ghost btn-sm" id="f-prot-togli" data-aiuto="Sgancia l\'incarico da questa visita: la visita resta, senza incarico.">✕ Togli</button>'
+}
+window.incMostraNumero=incMostraNumero
+document.addEventListener('click',function(ev){
+  if(!ev.target||ev.target.id!=='f-prot-togli') return
+  vSet('f-prot-int','')
+  const s=$('f-prot-inc'); if(s) s.value=''
+  incVerificaProt()
+})
+
 /* (26/10/2026, deciso dall'utente) LE TIPOLOGIE CHE NASCONO DA UN INCARICO: su segnalazione, cantiere qualità,
    visite in serie, stage/ASL, attestazione, progetto SPISAL valgono solo con un incarico in essere agganciato
    nel Protocollo interno. Il blocco vero sta nel database (verbale_mancanze: incarico-mancante, incarico-chiuso,
@@ -17004,7 +17029,7 @@ window.incAvvisaAltroCantiere=incAvvisaAltroCantiere
 const TIPI_CON_INCARICO={1:'Su segnalazione',6:'Cantiere qualità',8:'Adesione servizio visite in serie',9:'Visita STAGE/ASL',11:'Attestazione / consulenza e monitoraggio',12:'Progetto SPISAL'}
 function tipoChiedeIncarico(){ return TIPI_CON_INCARICO[+vGet('f-tipo')]||null }
 function INC_MSG_SERVE(t){
-  return 'La tipologia «'+t+'» vale solo con un incarico in essere: sceglilo da «Parti da un tuo incarico» o scrivi qui il suo numero. Senza, il verbale non si chiude'
+  return 'La tipologia «'+t+'» vale solo con un incarico in essere: scegli il cantiere dell\'incarico (si aggancia da solo) oppure sceglilo da «Parti da un tuo incarico». Senza, il verbale non si chiude'
     +(t===TIPI_CON_INCARICO[8]?': se la serie è finita o non c\'è, l\'impresa deve richiedere di nuovo il servizio.':': chi chiede la visita deve fare la richiesta, e la segreteria ti dà l\'incarico.')
 }
 window.tipoChiedeIncarico=tipoChiedeIncarico
