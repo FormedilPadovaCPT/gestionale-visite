@@ -84,14 +84,26 @@
      pos = verbale_posizione(visita) del database: { ciclo: {numero, visita, di}, serie: {n, di} }, di null oltre il
      massimo («Visita 6» senza «di»). Senza ciclo né serie (storico, bozza, asseverazione) torna null e resta la
      cella «N° accesso» nella banda, com'era. Il ciclo fino al 26/10 era interno: da oggi va sul verbale. */
-  function rigaPosizione(acc, pos) {
+  /* (29/10/2026, deciso dall'utente) il lotto del cantiere apre la riga: «Lotto 2 · Accesso al cantiere 4 · Ciclo…»,
+     perché ciclo e visite si contano per lotto. Con il lotto la riga c'è anche senza ciclo né serie (storico). */
+  function rigaPosizione(acc, pos, lotto) {
     const c = pos && pos.ciclo, s = pos && pos.serie
-    if (!(c && c.visita) && !(s && s.n)) return null
+    const lo = String(lotto || '').trim()
+    if (!(c && c.visita) && !(s && s.n) && !lo) return null
     const fino = (n, di) => String(n) + (di ? ' di ' + di : '')
     const pezzi = [['Accesso al cantiere', acc ? String(acc) : '–']]
+    if (lo) pezzi.unshift(['Lotto', lo])
     if (c && c.visita) pezzi.push(['Ciclo di visita', String(c.numero || '–')], ['Visita', fino(c.visita, c.di)])
     if (s && s.n) pezzi.push(['Serie di visite', fino(s.n, s.di)])
     return pezzi
+  }
+
+  /* «Via Sturzo – lotto 2» → «Via Sturzo»: toglie solo la coda che nomina QUEL lotto, il resto non si tocca */
+  function etichettaSenzaLotto(eti, lotto) {
+    const e = String(eti || '').trim(), l = String(lotto || '').trim()
+    if (!l) return e
+    const esc = l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return e.replace(new RegExp('\\s*[–-]\\s*lotto\\s+' + esc + '\\s*$', 'i'), '').trim() || e
   }
 
   function prepara(D) {
@@ -108,7 +120,11 @@
     const impPrinc = imps[0] || null
     const tecNome = v.tecnici ? `${v.tecnici.tecnico_nome || ''} ${v.tecnici.tecnico_cognome || ''}`.trim() : ''
     const tec2 = D.tec2 || null
-    const cantLabel = cant.cantiere_etichetta || `${cant.cantiere_indirizzo || ''} ${cant.cantiere_civico || ''}`.trim()
+    /* (29/10/2026) il lotto si stampa da solo (riga sotto la banda, scheda del cantiere, lettera): dall'etichetta si
+       toglie la coda «– lotto N» che lo ripete; nel database l'etichetta resta com'è */
+    const lotto = String(cant.lotto || '').trim()
+    const etiBase = lotto ? etichettaSenzaLotto(cant.cantiere_etichetta, lotto) : (cant.cantiere_etichetta || '')
+    const cantLabel = etiBase || `${cant.cantiere_indirizzo || ''} ${cant.cantiere_civico || ''}`.trim()
     const comune = cant.comune_nome || ''
     const chkMap = {}
     chk.forEach((r) => { chkMap[r.codice] = { valore: r.valore, nota: r.nota } })
@@ -141,7 +157,9 @@
       // quello che risultava in questa visita (30/09/2026), altrimenti quello del cantiere
       ['Tipo intervento', TIP_INT[v.vis_tip_int ?? cant.cantiere_tip_int] || '–', 'Tipo opera', TIP_OPE[tipOpe] ? TIP_OPE[tipOpe] + (opeAltro ? ' – ' + opeAltro : '') : '–'],
       ['Importo lavori (€)', IMP_LBL[v.vis_importo ?? cant.cantiere_importo] || '–', 'Durata cantiere', DUR_LBL[v.vis_durata ?? cant.cantiere_durata] || '–'],
-      ['Codice CNCE', cant.cantiere_cnce || '–', 'Etichetta cantiere', cant.cantiere_etichetta || '–'],   // 06/10/2026: l'etichetta (Osservatorio) al posto del codice univoco
+      // 29/10/2026: con il lotto, una riga «Lotto | Complesso» e l'etichetta senza la coda del lotto
+      ...(lotto ? [['Lotto', lotto, 'Complesso', etiBase || '–'], ['Codice CNCE', cant.cantiere_cnce || '–', '', '']]
+        : [['Codice CNCE', cant.cantiere_cnce || '–', 'Etichetta cantiere', cant.cantiere_etichetta || '–']]),   // 06/10/2026: l'etichetta (Osservatorio) al posto del codice univoco
       ['N° imprese in cantiere', String((imps.filter((im) => im.impresa_id).length + ncImp + ncAut) || v.nr_imp || 1), 'Totale lavoratori', String((imps.reduce((s, im) => s + (+im.nr_lav || 0), 0) + ncLav) || v.nr_lavoratori || 0)]
     ]
     // (06/10/2026) imprese, lavoratori e autonomi visti ma non elencati: già nei totali qui sopra, la riga dice quanti sono
@@ -207,14 +225,14 @@
       dataOggi, rettBanner: D.rettBanner || null,
       bozza: (v.stato || 'bozza') === 'bozza',   // 23/09/2026: il PDF della bozza lo dice su ogni pagina
       impNome: (impPrinc && impPrinc.imprese && impPrinc.imprese.impresa_nome) || (v.imprese && v.imprese.impresa_nome) || '',
-      cantDetail: [cantLabel, comune].filter(Boolean).join(' – '),
+      cantDetail: [cantLabel, comune].filter(Boolean).join(' – ') + (lotto ? ' · Lotto ' + lotto : ''),
       dataVisita: fmtDate(v.data_visita) || '–',
       tecNome, tecEmail: (v.tecnici && v.tecnici.email) || '',
       tec2Nome: tec2 ? `${tec2.tecnico_nome || ''} ${tec2.tecnico_cognome || ''}`.trim() : '', tec2Email: (tec2 && tec2.email) || '',
       stagista: v.stage_vis && v.nom_stage ? v.nom_stage : '',
       tipoAcc: TIPO_ACC_SUL_VERBALE[v.tipo_accesso] || '–', accesso: v.acc_cant ? String(v.acc_cant) : '–',
-      posizione: rigaPosizione(v.acc_cant, D.posizione),   // 26/10/2026: accesso, ciclo, visita del ciclo e serie
-      etichetta: cant.cantiere_etichetta || '–', nrVerbale: v.nr_verbale || '–',
+      posizione: rigaPosizione(v.acc_cant, D.posizione, lotto),   // 26/10/2026: accesso, ciclo, visita del ciclo e serie
+      etichetta: etiBase || '–', nrVerbale: v.nr_verbale || '–',
       imprese, figure, cantiere, lavorazioni, noteLav: (v.note_lav || '').trim() || '–',
       ipc: { label, bg, ncp, ncn, oss, ver, msg, tinta },
       ossTec: (v.oss_tec || '').replace(/\r/g, '').trim(),
@@ -678,6 +696,6 @@
     return doc
   }
 
-  root.VerbalePDF = { prepara, crea, partiNumero, rigaPosizione }
+  root.VerbalePDF = { prepara, crea, partiNumero, rigaPosizione, etichettaSenzaLotto }
   if (typeof module !== 'undefined' && module.exports) module.exports = root.VerbalePDF
 })(typeof window !== 'undefined' ? window : globalThis)
