@@ -73,7 +73,7 @@ jobs:
       # Copia del backup (sempre cifrato) nella cartella "Backup_Gestionale"
       # del Drive di cptpd, via service account con delega. Se il secret
       # GOOGLE_SERVICE_ACCOUNT_JSON non è configurato, il passo viene saltato.
-      # Rotazione: i backup su Drive più vecchi di 60 giorni vengono cestinati.
+      # Rotazione: i backup su Drive più vecchi di 120 giorni vengono cestinati.
       - name: Carica su Google Drive (Backup_Gestionale)
         env:
           GSA_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
@@ -122,8 +122,8 @@ jobs:
           up.raise_for_status()
           print('Caricato su Drive:', path, f'({len(data)/1e6:.1f} MB)')
 
-          # rotazione: cestina i backup più vecchi di 60 giorni
-          lim = (datetime.datetime.utcnow() - datetime.timedelta(days=60)).strftime('%Y-%m-%dT%H:%M:%S')
+          # rotazione: cestina i backup più vecchi di 120 giorni
+          lim = (datetime.datetime.utcnow() - datetime.timedelta(days=120)).strftime('%Y-%m-%dT%H:%M:%S')
           q2 = f"'{fid}' in parents and name contains 'backup_' and modifiedTime < '{lim}' and trashed = false"
           for o in requests.get('https://www.googleapis.com/drive/v3/files',
                                 params={'q': q2, 'fields': 'files(id,name)'},
