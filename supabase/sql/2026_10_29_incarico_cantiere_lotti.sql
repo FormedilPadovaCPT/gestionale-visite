@@ -137,6 +137,9 @@ end $function$;
 drop trigger if exists trg_incarichi_previste on public.incarichi;
 create trigger trg_incarichi_previste before insert on public.incarichi
   for each row execute function public.tg_incarichi_previste();
+-- (aggiunta 02/11/2026) Supabase concede EXECUTE ad anon a ogni funzione nuova: i test 03 e 21 erano rossi per questa.
+-- Il trigger scatta lo stesso: il permesso si controlla quando si crea il trigger, non quando scatta.
+revoke all on function public.tg_incarichi_previste() from public, anon, authenticated;
 
 -- 5. CHIUDERE UN LOTTO NON CHIUDE L'INCARICO CHE VALE PER TUTTI I LOTTI
 CREATE OR REPLACE FUNCTION public.incarichi_del_cantiere(p_cantiere_id text)
