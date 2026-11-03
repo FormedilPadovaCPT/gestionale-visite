@@ -10505,6 +10505,8 @@ async function genPDF(vid, output='save'){
     // La grafica del verbale sta in verbale-pdf.js (stile «ciclo con rilievi», 13/09/2026):
     // qui si caricano i dati e le immagini, là si fanno i calcoli e il disegno.
     if(!window.VerbalePDF){toast('Modulo del verbale non caricato — ricarica la pagina','err');_pdfInProgress=false;return}
+    // (03/11/2026) senza i dati di legge delle voci l'ipotesi di sanzione uscirebbe coi vecchi importi della checklist
+    if(!window.SANZIONI_VOCI){toast('Dati delle sanzioni non caricati — ricarica la pagina','err');_pdfInProgress=false;return}
     // Ricarica sempre voci dal DB per avere articolo/importo_sanzione aggiornati
     {
       const{data:vd}=await sb.from('checklist_voci').select('*').order('ordine')
@@ -17143,7 +17145,8 @@ document.addEventListener('input',function(ev){
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->
 <script src="manuali.js"></script>
 <!-- verbale di sopralluogo in PDF, stile «ciclo con rilievi»: genPDF carica dati e immagini, qui il disegno -->
-<script src="verbale-pdf.js?v=16"></script>
+<script src="sanzioni-voci.js?v=1"></script>
+<script src="verbale-pdf.js?v=17"></script>
 <!-- mappa sul telefono: cantieri vicino a te (Nuova visita) e rientri sulla mappa (Scadenze) -->
 <script src="mappa.js?v=3"></script>
 </body>

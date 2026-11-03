@@ -107,6 +107,75 @@
     return e.replace(new RegExp('\\s*[–-]\\s*(lotto\\s+)?' + esc + '\\s*$', 'i'), '').trim() || e
   }
 
+  /* ── Ipotesi di sanzione (03/11/2026, deciso dall'utente) ──
+     I dati di legge di ogni voce stanno in sanzioni-voci.js (generato dal foglio v02 della checklist, da validare
+     da FORMEDIL Italia e SPISAL). Le regole del calcolo sono di legge:
+     - voci dello stesso punto dell'allegato = UNA violazione (artt. 87 c.5-6, 159 c.3, 165 c.2; nota INL 2668/2025);
+     - formazione, sorveglianza sanitaria e simili: x2 oltre 5 lavoratori, x3 oltre 10 (art. 55 c.6-bis),
+       contati sull'impresa principale (deciso dall'utente: i rilievi non sono attribuiti a un'impresa);
+     - se l'impresa regolarizza: 1/4 del massimo per le ammende, pagamento ridotto per le amministrative;
+     - sospensione (art. 14, Allegato I): somma aggiuntiva per ciascuna fattispecie, 300 € a lavoratore per 3 e 6;
+     - patente (art. 27, Allegato I-bis): al massimo il doppio dei crediti della violazione più grave (c.6).
+     Le voci «ipotesi» entrano col caso più probabile, segnate con l'asterisco. */
+  const A231 = 'Se da una violazione derivasse un infortunio con lesioni gravi o mortale, per le società si aggiungerebbe la responsabilità dell\'ente (D.Lgs. 231/2001, art. 25-septies): sanzione fino a 1.000 quote e possibili misure interdittive.'
+  const AVVERTENZA = 'Ipotesi di sanzione calcolata dal CPT su quanto rilevato in visita, a solo scopo informativo: non è una contestazione. Le violazioni e le sanzioni le accerta solo l\'organo di vigilanza.'
+  function stimaSanzioni(rilievi, dati, nLav) {
+    if (!dati || !dati.voci) return null
+    const lav = +nLav || 0
+    const molt = lav > 10 ? 3 : lav > 5 ? 2 : 1
+    const viol = new Map(), sosp = new Map(), pat = new Map(), rif = []
+    let voci = 0, ipotesi = false, nc231 = false, moltUsato = false
+    for (const r of rilievi) {
+      const z = dati.voci[r.codice]
+      if (!z || z.certezza === 'nessuna') continue
+      voci++
+      if (z.certezza === 'ipotesi') ipotesi = true
+      if (r.val === 'NC+' && z.natura === 'penale') nc231 = true
+      const k = z.categoria || ('voce:' + r.codice)
+      const m = z.molt === 'oltre_5_10' ? molt : 1
+      if (m > 1) moltUsato = true
+      const prima = viol.get(k)
+      if (!prima || z.max * m > prima.max) viol.set(k, { max: z.max * m, ridotta: z.ridotta * m, codici: ((prima && prima.codici) || []).concat(r.codice) })
+      else prima.codici.push(r.codice)
+      if (z.sosp) {
+        const s = sosp.get(z.sosp)
+        if (s) s.certa = s.certa || !!z.sosp_certa
+        else sosp.set(z.sosp, { n: z.sosp, desc: z.sosp_desc, somma: z.sosp_per_lav ? z.sosp_somma * Math.max(lav, 1) : z.sosp_somma, perLav: !!z.sosp_per_lav, certa: !!z.sosp_certa })
+      }
+      if (z.patente) { const p = pat.get(z.patente); if (!p || z.crediti > p) pat.set(z.patente, z.crediti) }
+      for (const c of z.rif || []) if (!rif.includes(c)) rif.push(c)
+    }
+    if (!voci) return null
+    let max = 0, ridotta = 0
+    for (const v of viol.values()) { max += v.max; ridotta += v.ridotta }
+    const cr = [...pat.values()]
+    const crTot = Math.min(cr.reduce((a, b) => a + b, 0), cr.length ? 2 * Math.max(...cr) : 0)
+    const ordArt = (a, b) => (parseInt(a) - parseInt(b)) || a.localeCompare(b, 'it', { numeric: true })
+    return {
+      max: Math.round(max * 100) / 100, ridotta: Math.round(ridotta * 100) / 100,
+      voci, violazioni: viol.size, unite: voci - viol.size, ipotesi, lav, molt: moltUsato ? molt : 1,
+      sospensioni: [...sosp.values()].sort((a, b) => parseInt(a.n) - parseInt(b.n)),
+      sommaSosp: [...sosp.values()].reduce((a, s) => a + s.somma, 0),
+      crediti: crTot, art231: nc231,
+      // il comma intero contiene già la sua lettera: «96 c.1 lett. a)» non si ripete se c'è «96 c.1»
+      riferimenti: rif.sort(ordArt).map((k) => dati.estratti[k]).filter(Boolean)
+        .filter((e, _, tutti) => !e.lett || !tutti.some((x) => x.art === e.art && x.comma === e.comma && !x.lett)),
+      lettoIl: dati.letto_il
+    }
+  }
+  /* riga sotto il rilievo: obbligo, articolo che lo punisce, pena; ipotesi, sospensione e crediti se ci sono */
+  function rigaSanzione(z) {
+    if (!z) return ''
+    if (z.certezza === 'nessuna') return 'Nessuna sanzione specifica: ' + (z.ipotesi || '')
+    const righe = [`${z.precetto} D.Lgs. 81/2008 · sanzione ${z.sanz}: ${z.pena}${z.certezza === 'ipotesi' ? ' *' : ''}`]
+    if (z.certezza === 'ipotesi' && z.ipotesi) righe.push('* Ipotesi: ' + z.ipotesi)
+    const extra = []
+    if (z.sosp) extra.push(`possibile sospensione dell'attività (art. 14, Allegato I n. ${z.sosp})`)
+    if (z.patente) extra.push(`patente a crediti: ${z.crediti} ${z.crediti === 1 ? 'credito' : 'crediti'} in meno se accertata`)
+    if (extra.length) righe.push(extra.join(' · ').replace(/^./, (c) => c.toUpperCase()) + (z.sosp_nota ? ` (${z.sosp_nota.replace(/\.$/, '').replace(/^./, (c) => c.toLowerCase())})` : ''))
+    return righe.join('\n')
+  }
+
   function prepara(D) {
     const v = D.v, cant = v.cantieri || {}
     const imps = D.imps || [], chk = D.chk || [], lavs = D.lavs || []
@@ -201,6 +270,9 @@
       perZona[z] = perZona[z] || {}
       ;(perZona[z][p] = perZona[z][p] || []).push(x)
     })
+    // (03/11/2026) i dati di legge delle voci: senza sanzioni-voci.js il verbale esce con gli importi vecchi della checklist
+    const dati = D.sanzioni || root.SANZIONI_VOCI || null
+    const rilievi = []
     let sanzione = 0
     const zone = []
     for (const z of Object.keys(perZona).map(Number).sort((a, b) => a - b)) {
@@ -213,7 +285,9 @@
           if (!val) continue
           const viol = ['OSS', 'NC+', 'NC-'].includes(val)
           if (viol && x.importo_sanzione) sanzione += Number(x.importo_sanzione)
-          voce.push({ desc: x.descrizione || '', val, nota: r.nota || '', articolo: viol && x.articolo ? x.articolo : '' })
+          if (viol) rilievi.push({ codice: x.codice, val })
+          const z = dati && dati.voci[x.codice]
+          voce.push({ desc: x.descrizione || '', val, nota: r.nota || '', articolo: !viol ? '' : z ? rigaSanzione(z) : (x.articolo || '') })
         }
         const nota = (notePref[z] || {})[p] || ''
         if (voce.length || nota) gruppi.push({ label: PREF_LBL[p] || p, voci: voce, nota })
@@ -238,7 +312,8 @@
       ipc: { label, bg, ncp, ncn, oss, ver, msg, tinta },
       ossTec: (v.oss_tec || '').replace(/\r/g, '').trim(),
       zone,
-      sanzione: sanzione > 0 ? { max: '€ ' + eur(sanzione), ridotta: '€ ' + eur(sanzione / 4) } : null,
+      sanzione: dati ? null : sanzione > 0 ? { max: '€ ' + eur(sanzione), ridotta: '€ ' + eur(sanzione / 4) } : null,
+      stima: dati ? stimaSanzioni(rilievi, dati, impPrinc ? +impPrinc.nr_lav || 0 : 0) : null,
       corpo: [
         `Il giorno ${leggibile(v.data_visita) || fmtDate(v.data_visita) || '–'} è passato nel vostro cantiere in oggetto, per fornirvi utili consigli in materia di prevenzione infortuni, uno dei nostri tecnici${tecNome ? ', ' + tecNome : ''}.`,
         'Egli si è soffermato ad illustrare al VS personale in cantiere le più importanti norme che devono essere tenute presenti per garantire la sicurezza durante le varie fasi lavorative, con particolare riferimento a quelle in corso.',
@@ -444,7 +519,67 @@
     st.y += 32
   }
 
+  // a mano e non con toLocaleString: in Node senza dati italiani «5.800,00» usciva «5800,00»
+  const eurIt = (n) => { const [i, d] = (Math.round(n * 100) / 100).toFixed(2).split('.'); return i.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + d }
+  // il font del PDF (helvetica, WinAnsi) non ha il segno meno «−»: nelle righe del verbale si scrive in parole
+  // (test/verbale-sanzioni.test.cjs controlla che i testi del file di dati non lo usino)
+  /* righe di spiegazione del riquadro: tutte dai numeri di stimaSanzioni, nessuna scritta a mano */
+  function noteStima(s) {
+    const out = []
+    if (s.unite) out.push(`Calcolata su ${s.violazioni} ${s.violazioni === 1 ? 'violazione' : 'violazioni'} per ${s.voci} voci rilevate: le voci dello stesso punto dell'allegato contano una volta sola (nota INL e Conferenza delle Regioni prot. 2668 del 18/03/2025).`)
+    if (s.molt > 1) out.push(`Formazione e sorveglianza sanitaria: importo ${s.molt === 2 ? 'raddoppiato' : 'triplicato'} perché l'impresa principale ha ${s.lav} lavoratori in cantiere (art. 55 c.6-bis D.Lgs. 81/2008).`)
+    if (s.ipotesi) out.push('* Voci in cui la sanzione dipende da quanto accertato: il calcolo considera il caso più probabile, indicato sotto la voce.')
+    if (s.sospensioni.length) {
+      const perLav = (x) => (s.lav ? `300 € × ${s.lav} ${s.lav === 1 ? 'lavoratore' : 'lavoratori'}` : '300 € per ciascun lavoratore')
+      const el = s.sospensioni.map((x) => `n. ${x.n} ${x.desc.toLowerCase()}${x.certa ? '' : ' *'} (${x.perLav ? perLav(x) : eurIt(x.somma) + ' €'})`).join(' · ')
+      // senza il numero dei lavoratori le fattispecie «a lavoratore» contano per uno: la somma è un minimo
+      const minimo = !s.lav && s.sospensioni.some((x) => x.perLav) ? 'di almeno ' : 'di '
+      out.push(`Possibile sospensione dell'attività (art. 14 D.Lgs. 81/2008), che l'Ispettorato del lavoro o la ASL dispongono quando accertano una violazione dell'Allegato I: ${el}. Per riprendere si eliminano le violazioni e si paga una somma aggiuntiva ${minimo}${eurIt(s.sommaSosp)} €, il doppio se l'impresa è già stata sospesa negli ultimi cinque anni.`)
+    }
+    if (s.crediti) out.push(`Patente a crediti (art. 27 D.Lgs. 81/2008): se le violazioni fossero accertate con provvedimento definitivo, fino a ${s.crediti} ${s.crediti === 1 ? 'credito' : 'crediti'} in meno sui 30 iniziali; con meno di 15 crediti l'impresa non può lavorare nei cantieri.`)
+    if (s.art231) out.push(A231)
+    return out
+  }
+  function stima(doc, st, d) {
+    const s = d.stima
+    if (!s) return
+    if (st.y + 40 > PH - 20) { doc.addPage(); st.y = S.top }
+    const W = S.R - S.L
+    doc.setFillColor(...C.grigio); doc.rect(S.L, st.y, W, 19, 'F')
+    spaziato(doc, 'IPOTESI DI SANZIONE', S.L + 4, st.y + 5.5, 6.8, C.etichetta, 0.5)
+    f(doc, 'normal', 7.5, C.etichetta); doc.text('Sanzione massima prevista:', S.L + 4, st.y + 12.5); doc.text('Se l\'impresa regolarizza:', S.L + W / 2 + 4, st.y + 12.5)
+    f(doc, 'bold', 12, C.bianco); doc.text('€ ' + eurIt(s.max), S.L + W / 2 - 4, st.y + 13, { align: 'right' })
+    f(doc, 'bold', 12, [250, 184, 148]); doc.text('€ ' + eurIt(s.ridotta), S.R - 4, st.y + 13, { align: 'right' })
+    st.y += 19
+    const corpo = noteStima(s).map((t) => [{ content: t, styles: { fontSize: 6.8, textColor: C.scuro } }])
+    corpo.push([{ content: AVVERTENZA, styles: { fontSize: 7, fontStyle: 'bolditalic', textColor: C.grigio } }])
+    doc.autoTable({
+      startY: st.y, margin: S.margini, theme: 'plain', head: [], body: corpo,
+      styles: { font: 'helvetica', cellPadding: { top: 1.2, bottom: 1.2, left: 4, right: 4 }, fillColor: C.fondo, overflow: 'linebreak' }
+    })
+    st.y = doc.lastAutoTable.finalY + 5
+  }
+  /* in fondo, come l'Osservatorio nazionale: il testo vigente degli obblighi richiamati dai rilievi */
+  function riferimentiNormativi(doc, st, d, titolo) {
+    const s = d.stima
+    if (!s || !s.riferimenti.length) return
+    nuovaPaginaSe(doc, st, PH - 60)
+    titolo('Riferimenti normativi')
+    f(doc, 'italic', 7, C.tenue)
+    doc.text(righe(doc, `D.Lgs. 81/2008, testo vigente letto su Normattiva il ${s.lettoIl.split('-').reverse().join('/')}: per ogni rilievo il comma dell'obbligo richiamato.`, S.R - S.L), S.L, st.y + 1)
+    st.y += 5
+    const corpo = []
+    for (const e of s.riferimenti) {
+      const dove = [e.comma ? 'comma ' + e.comma : '', e.lett ? 'lettera ' + e.lett + ')' : ''].filter(Boolean).join(', ')
+      corpo.push([{ content: `Articolo ${e.art} – ${e.rubrica}${dove ? ' (' + dove + ')' : ''}`, styles: { fontStyle: 'bold', fontSize: 7.4, textColor: C.grigio, cellPadding: { top: 2, bottom: 0.5, left: 0, right: 0 } } }])
+      corpo.push([{ content: e.testo, styles: { fontSize: 6.8, textColor: C.scuro, cellPadding: { top: 0.3, bottom: 1.5, left: 0, right: 0 } } }])
+    }
+    doc.autoTable({ startY: st.y, margin: S.margini, theme: 'plain', head: [], body: corpo, styles: { font: 'helvetica', overflow: 'linebreak' } })
+    st.y = doc.lastAutoTable.finalY + 5
+  }
+
   function sanzioni(doc, st, d) {
+    if (d.stima) return stima(doc, st, d)
     if (!d.sanzione) return
     if (st.y + 24 > PH - 20) { doc.addPage(); st.y = S.top }
     const W = S.R - S.L
@@ -655,6 +790,7 @@
         st.y = doc.lastAutoTable.finalY + 4
       }
     }
+    riferimentiNormativi(doc, st, d, titolo)
     fotoGriglia(doc, st, img.foto, titolo)
     firmeTecnici(doc, st, d, img.firme, titolo)
     campagna(doc, st, img.campagna)
@@ -697,6 +833,6 @@
     return doc
   }
 
-  root.VerbalePDF = { prepara, crea, partiNumero, rigaPosizione, etichettaSenzaLotto }
+  root.VerbalePDF = { prepara, crea, partiNumero, rigaPosizione, etichettaSenzaLotto, stimaSanzioni, rigaSanzione }
   if (typeof module !== 'undefined' && module.exports) module.exports = root.VerbalePDF
 })(typeof window !== 'undefined' ? window : globalThis)
