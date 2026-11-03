@@ -687,9 +687,10 @@
   }
 
   /* firme dei tecnici in fondo alla pagina: una o due affiancate; senza immagine resta la riga per firmare a mano */
-  function firmeTecnici(doc, st, d, firme, titolo) {
+  function firmeTecnici(doc, st, d, firme, titolo, inFondo = true) {
     nuovaPaginaSe(doc, st, PH - 60)
-    st.y = Math.max(st.y, PH - 58)
+    if (inFondo) st.y = Math.max(st.y, PH - 58)   // da sola chiude la pagina; con i riferimenti dopo resta sotto il testo
+    else st.y += 4
     titolo('Firma del tecnico')
     const W = S.R - S.L
     const lista = [d.tecNome, ...(d.tec2Nome ? [d.tec2Nome] : [])]
@@ -861,9 +862,13 @@
         st.y = doc.lastAutoTable.finalY + 4
       }
     }
-    riferimentiNormativi(doc, st, d, titolo)
     fotoGriglia(doc, st, img.foto, titolo)
-    firmeTecnici(doc, st, d, img.firme, titolo)
+    /* (03/11/2026) la firma chiude il verbale e i riferimenti normativi seguono come estratto allegato, come
+       l'Osservatorio nazionale: prima, quando i riferimenti arrivavano in fondo alla pagina, la firma finiva da sola
+       su una pagina vuota (verbale 0043 del 26/10/2026). Con i riferimenti dopo, la firma non si spinge in fondo */
+    const conRif = !!(d.stima && d.stima.riferimenti.length)
+    firmeTecnici(doc, st, d, img.firme, titolo, !conRif)
+    riferimentiNormativi(doc, st, d, titolo)
     campagna(doc, st, img.campagna)
   }
 
