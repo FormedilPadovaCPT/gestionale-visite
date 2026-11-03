@@ -52,6 +52,12 @@ assert.strictEqual(s.sommaSosp, 300 + 2500 + 3000 + 3000);
 assert.strictEqual(st(['OPE_POF_003'], 'NC-').art231, false);
 assert.strictEqual(st(['OPE_POF_003'], 'NC+').art231, true);
 
+// voce aggiunta alla checklist dopo l'ultimo giro dello script: non entra nel conto ma il verbale lo dice
+s = st(['IMP_LOG_001', 'VOCE_NUOVA_999']);
+assert.strictEqual(s.voci, 1);
+assert.strictEqual(s.senzaDati, 1);
+assert.strictEqual(st(['IMP_LOG_001']).senzaDati, 0);
+
 // voce senza sanzione specifica: niente riquadro
 assert.strictEqual(st(['DOC_GEN_008']), null);
 assert.strictEqual(st([]), null);
@@ -68,6 +74,8 @@ const WIN = new Set([...'€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—
 const fuori = (t) => [...String(t)].filter((c) => c.charCodeAt(0) > 255 && !WIN.has(c));
 for (const [c, z] of Object.entries(D.voci)) assert.deepStrictEqual(fuori(V.rigaSanzione(z)), [], c);
 for (const [k, e] of Object.entries(D.estratti)) assert.deepStrictEqual(fuori(e.testo + e.rubrica), [], 'estratto ' + k);
+// e non porta all'impresa gli appunti di chi valida il foglio Excel
+for (const [c, z] of Object.entries(D.voci)) assert.ok(!/come sopra|da confermare|da rivedere|da decidere|vedi colonna/i.test(V.rigaSanzione(z)), c + ': ' + V.rigaSanzione(z));
 
 // prepara: col file di dati il verbale usa la stima nuova e non più gli importi vecchi della checklist
 const voci = [

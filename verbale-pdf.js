@@ -124,10 +124,12 @@
     const lav = +nLav || 0
     const molt = lav > 10 ? 3 : lav > 5 ? 2 : 1
     const viol = new Map(), sosp = new Map(), pat = new Map(), rif = []
-    let voci = 0, ipotesi = false, nc231 = false, moltUsato = false
+    let voci = 0, ipotesi = false, nc231 = false, moltUsato = false, senzaDati = 0
     for (const r of rilievi) {
       const z = dati.voci[r.codice]
-      if (!z || z.certezza === 'nessuna') continue
+      // una voce aggiunta alla checklist dopo l'ultimo giro dello script non ha dati: non si conta, ma lo si dice
+      if (!z) { senzaDati++; continue }
+      if (z.certezza === 'nessuna') continue
       voci++
       if (z.certezza === 'ipotesi') ipotesi = true
       if (r.val === 'NC+' && z.natura === 'penale') nc231 = true
@@ -156,7 +158,7 @@
       voci, violazioni: viol.size, unite: voci - viol.size, ipotesi, lav, molt: moltUsato ? molt : 1,
       sospensioni: [...sosp.values()].sort((a, b) => parseInt(a.n) - parseInt(b.n)),
       sommaSosp: [...sosp.values()].reduce((a, s) => a + s.somma, 0),
-      crediti: crTot, art231: nc231,
+      crediti: crTot, art231: nc231, senzaDati,
       // il comma intero contiene già la sua lettera: «96 c.1 lett. a)» non si ripete se c'è «96 c.1»
       riferimenti: rif.sort(ordArt).map((k) => dati.estratti[k]).filter(Boolean)
         .filter((e, _, tutti) => !e.lett || !tutti.some((x) => x.art === e.art && x.comma === e.comma && !x.lett)),
@@ -527,6 +529,7 @@
   function noteStima(s) {
     const out = []
     if (s.unite) out.push(`Calcolata su ${s.violazioni} ${s.violazioni === 1 ? 'violazione' : 'violazioni'} per ${s.voci} voci rilevate: le voci dello stesso punto dell'allegato contano una volta sola (nota INL e Conferenza delle Regioni prot. 2668 del 18/03/2025).`)
+    if (s.senzaDati) out.push(`${s.senzaDati} ${s.senzaDati === 1 ? 'voce rilevata non ha' : 'voci rilevate non hanno'} ancora i dati di legge e ${s.senzaDati === 1 ? 'non è' : 'non sono'} nel conto.`)
     if (s.molt > 1) out.push(`Formazione e sorveglianza sanitaria: importo ${s.molt === 2 ? 'raddoppiato' : 'triplicato'} perché l'impresa principale ha ${s.lav} lavoratori in cantiere (art. 55 c.6-bis D.Lgs. 81/2008).`)
     if (s.ipotesi) out.push('* Voci in cui la sanzione dipende da quanto accertato: il calcolo considera il caso più probabile, indicato sotto la voce.')
     if (s.sospensioni.length) {
@@ -568,14 +571,36 @@
     f(doc, 'italic', 7, C.tenue)
     doc.text(righe(doc, `D.Lgs. 81/2008: per ogni rilievo il comma dell'obbligo richiamato.`, S.R - S.L), S.L, st.y + 1)
     st.y += 5
-    const corpo = []
+    /* (03/11/2026, chiesto dall'utente) su due colonne, come un codice: il testo scorre nella prima colonna,
+       poi nella seconda, poi alla pagina dopo; un titolo non resta da solo in fondo a una colonna */
+    const GAP = 7, CW = (S.R - S.L - GAP) / 2, FONDO = PH - 22
+    const TIT = 7.2, TXT = 6.5, hT = hRiga(TIT, 1.2), hX = hRiga(TXT, 1.22)
+    let col = 0, y0 = st.y, y = st.y, yMax = st.y
+    const riga = (fine) => { doc.setDrawColor(...C.linea); doc.setLineWidth(0.2); doc.line(S.L + CW + GAP / 2, y0, S.L + CW + GAP / 2, fine) }
+    const avanti = () => {
+      if (col === 0) { yMax = Math.max(yMax, y); col = 1; y = y0; return }
+      riga(FONDO - 2); doc.addPage(); col = 0; y0 = y = yMax = S.top
+    }
     for (const e of s.riferimenti) {
       const dove = [e.comma ? 'comma ' + e.comma : '', e.lett ? 'lettera ' + e.lett + ')' : ''].filter(Boolean).join(', ')
-      corpo.push([{ content: `Articolo ${e.art} – ${e.rubrica}${dove ? ' (' + dove + ')' : ''}`, styles: { fontStyle: 'bold', fontSize: 7.4, textColor: C.grigio, cellPadding: { top: 2, bottom: 0.5, left: 0, right: 0 } } }])
-      corpo.push([{ content: e.testo, styles: { fontSize: 6.8, textColor: C.scuro, cellPadding: { top: 0.3, bottom: 1.5, left: 0, right: 0 } } }])
+      f(doc, 'bold', TIT, C.grigio)
+      const tit = righe(doc, `Articolo ${e.art} – ${e.rubrica}${dove ? ' (' + dove + ')' : ''}`, CW)
+      f(doc, 'normal', TXT, C.scuro)
+      const txt = String(e.testo).split('\n').flatMap((p) => righe(doc, p, CW))
+      if (y + tit.length * hT + Math.min(2, txt.length) * hX > FONDO) avanti()
+      f(doc, 'bold', TIT, C.grigio)
+      for (const t of tit) { doc.text(t, S.L + col * (CW + GAP), y + hT * 0.8); y += hT }
+      y += 0.4
+      f(doc, 'normal', TXT, C.scuro)
+      for (const t of txt) {
+        if (y + hX > FONDO) { avanti(); f(doc, 'normal', TXT, C.scuro) }
+        doc.text(t, S.L + col * (CW + GAP), y + hX * 0.8); y += hX
+      }
+      y += 2.2
+      yMax = Math.max(yMax, y)
     }
-    doc.autoTable({ startY: st.y, margin: S.margini, theme: 'plain', head: [], body: corpo, styles: { font: 'helvetica', overflow: 'linebreak' } })
-    st.y = doc.lastAutoTable.finalY + 5
+    if (col === 1) riga(yMax - 2)
+    st.y = yMax + 3
   }
 
   function sanzioni(doc, st, d) {
