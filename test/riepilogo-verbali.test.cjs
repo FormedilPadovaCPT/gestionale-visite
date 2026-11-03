@@ -82,4 +82,25 @@ const v = (o) => ({ visita_id: 1, nr_verbale: 'CPT/25_26/0001', data_visita: '20
   assert.strictEqual(ultimoGiorno('2026-09'), '2026-09-30');
 }
 
+/* (03/11/2026) la visita fuori procedura NON approvata entra fra i verbali da sistemare; approvata o ancora da
+   decidere no (quella da decidere la ferma il database, fattura_questioni_aperte) */
+{
+  const pulito = { oss_tec: 'Cantiere in fase di getto.' };
+  const r = riepiloga([
+    v({ ...pulito, visita_id: 'n', cantiere_id: 'C1', fp_tipo: 'archiviato', fp_esito: 'non_approvata' }),
+    v({ ...pulito, visita_id: 'a', cantiere_id: 'C2', fp_tipo: 'archiviato', fp_esito: 'approvata' }),
+    v({ ...pulito, visita_id: 'd', cantiere_id: 'C3', fp_tipo: 'anticipato', fp_esito: null }),
+  ], [], {}, analizza, OGGI);
+  assert.deepStrictEqual(r.daSistemare.map((x) => x.visita.visita_id), ['n'], 'solo la non approvata');
+  assert.ok(/fuori procedura non approvata/.test(r.daSistemare[0].avvisi.map((a) => a.testo).join(' ')), 'con il suo motivo');
+}
+
+/* (03/11/2026) il database ferma la fattura anche per la visita fuori procedura da decidere, e lo dice */
+{
+  const sql = require('fs').readFileSync(require('path').join(__dirname, '..', 'supabase', 'sql', '2026_11_03_fatture_pendenze_coordinatore.sql'), 'utf8');
+  assert.ok(/v\.fp_tipo is not null and v\.fp_esito is null/.test(sql), 'fuori procedura da decidere = pendenza della fattura');
+  assert.ok(/Visite fuori procedura/.test(sql), 'il messaggio dice dove si chiude');
+  assert.ok(/fp_tipo, fp_esito'/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'riepilogo-verbali.js'), 'utf8')), 'il riepilogo legge i campi del fuori procedura');
+}
+
 console.log('riepilogo-verbali: tutti i controlli passati');

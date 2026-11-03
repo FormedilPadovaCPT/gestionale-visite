@@ -3299,7 +3299,7 @@ async function loadFattureCoord(){
     return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid #f0e6dd">
       <strong style="font-size:12px">${esc_(r.tecnico_nome)}</strong>${badge(r.stato)}
       <span style="font-size:12px;color:#444;flex:1;min-width:220px">fattura n&deg; <strong>${esc_(r.numero||'?')}</strong>${r.data_fattura?' del '+dIt(r.data_fattura):''} &middot; ricevuta ${dIt(r.data_ricevimento)} &middot; <strong>${eur(r.importo)} &euro;</strong> &middot; ${errPrest?'<span style="color:#c0392b">prestazioni non lette</span>':`${k.n} prestazioni (netto ${eur(k.netto)})`}${r.stato==='standby'&&r.standby_motivo?`<br><span style="color:#c0392b">Stand-by: ${esc_(r.standby_motivo)}</span>`:''}${r.note?`<br><span style="color:#888">${esc_(r.note)}</span>`:''}</span>
-      ${(blocchi[r.id]||[]).length?`<span style="flex-basis:100%;font-size:12px;color:#c0392b">&#9940; Non pu&ograve; andare in pagamento: ${(blocchi[r.id]||[]).map(b=>`<strong>${esc_(b.nr_verbale||'')}</strong> (${esc_(b.motivo)})`).join(', ')}. Si chiude dal riepilogo &laquo;Verbali da sistemare&raquo; qui sotto.</span>`:''}
+      ${(blocchi[r.id]||[]).length?`<span style="flex-basis:100%;font-size:12px;color:#c0392b">&#9940; Non pu&ograve; andare in pagamento: ${(blocchi[r.id]||[]).map(b=>`<strong>${esc_(b.nr_verbale||'')}</strong> (${esc_(b.motivo)})`).join(', ')}. Si chiude qui sotto, da &laquo;Verbali da sistemare&raquo; o da &laquo;Visite fuori procedura&raquo;.</span>`:''}
       <button class="btn-primary btn-sm" onclick="fattDecidi(${r.id},'approvata')"${(blocchi[r.id]||[]).length?' disabled':''}>&#9989; Approva</button>
       ${r.stato!=='standby'?`<button class="btn-outline btn-sm" onclick="fattDecidi(${r.id},'standby')">&#9208; Stand-by</button>`:''}
       <a href="https://formedilpadovacpt.github.io/segreteria/#fattura-${r.id}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:var(--orange,#e7500f);text-decoration:none">dettaglio &#8599;</a>
@@ -17100,7 +17100,7 @@ document.addEventListener('input',function(ev){
 <script src="cantieri-critici-coord.js?v=5"></script>
 <script src="controllo-verbale.js?v=2"></script>
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
-<script src="riepilogo-verbali.js?v=3"></script>
+<script src="riepilogo-verbali.js?v=4"></script>
 <!-- che cosa ne fa il Coordinatore: segnala al tecnico o fa passare; il tecnico risponde in Oggi (20/10/2026) -->
 <script src="questioni-verbali.js?v=2"></script>
 <script src="scheda-impresa.js?v=2"></script>

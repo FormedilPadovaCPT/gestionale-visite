@@ -111,6 +111,12 @@
       } catch (e) {
         avvisi = [{ chi: 'errore', testo: 'Non sono riuscito a controllare questo verbale: ' + (e && e.message ? e.message : e) }];
       }
+      /* (03/11/2026) la visita fuori procedura NON approvata entra fra i verbali da sistemare (decisione del 13/10):
+         prima di pagarla il Coordinatore la fa passare o la segnala al tecnico. Quella ancora da decidere la ferma
+         il database (fattura_questioni_aperte). */
+      if (v.fp_tipo && v.fp_esito === 'non_approvata') {
+        avvisi.push({ chi: 'fuori_procedura', testo: 'Visita fuori procedura non approvata dal Coordinatore: decidere se farla passare in pagamento o segnalarla al tecnico' });
+      }
       if (avvisi.length) esito.push({ visita: v, avvisi });
     }
     /* ordinati per verbale, non per tecnico */
@@ -154,7 +160,7 @@
     return completa((visite || []).filter((v) => !v.elimina));
   }
 
-  const CAMPI = 'visita_id, nr_verbale, data_visita, ora_visita, ora_fine, data_ritorno, acc_cant, ipc, oss_tec, note_lav, ppre_nome, ppre_cog, nom_ppre, qual_ppre, cantiere_id, impresa_id, tecnico_id, elimina, stato';
+  const CAMPI = 'visita_id, nr_verbale, data_visita, ora_visita, ora_fine, data_ritorno, acc_cant, ipc, oss_tec, note_lav, ppre_nome, ppre_cog, nom_ppre, qual_ppre, cantiere_id, impresa_id, tecnico_id, elimina, stato, fp_tipo, fp_esito';
 
   /* (20/10/2026) gli stessi controlli su un elenco di verbali, non su un mese: li usa la Zona
      Coordinatore prima di approvare una fattura (questioni-verbali.js, controllaFattura) */
