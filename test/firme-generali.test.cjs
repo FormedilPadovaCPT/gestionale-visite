@@ -65,7 +65,7 @@ assert.ok(/S\.carica=null;S\.docente=false/.test(index), 'un tecnico che entra d
 // ── la veste ──
 assert.ok(/docente:\s+\{ nome: 'Docente',\s+menu: \['formazione'\], apre: 'formazione', lettura: true \}/.test(veste), 'RUOLI.docente: la sola pagina Formazione');
 assert.ok(/if \(s\.docente\) return 'docente';/.test(veste), 'ruoloVero riconosce il docente');
-assert.ok(/'statistiche', 'formazione'\], apre: 'dashboard' \}/.test(veste), 'il tecnico ha Formazione nel menu');
+assert.ok(/'statistiche', 'corsi', 'formazione'\], apre: 'dashboard' \}/.test(veste), 'il tecnico ha Formazione nel menu (dal 03/11/2026 dopo Corsi in programma)');
 assert.ok(/formazione: '📚 Formazione'/.test(veste), 'l\'etichetta del menu');
 
 // ── pubblicazione e versioni ──

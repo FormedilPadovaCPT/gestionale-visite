@@ -119,7 +119,8 @@ assert.strictEqual(R.tecnico.apre, 'dashboard'); assert.strictEqual(R.coordinato
 assert.strictEqual(R.direttore.apre, 'direzione', 'il Direttore apre su Direzione');
 assert.strictEqual(R.presidenza.apre, 'direzione', 'la Presidenza apre sulla sua pagina');
 assert.strictEqual(R.consigliere.apre, 'dashboard', 'i consiglieri aprono sulla Mappa (corretto dall’utente il 03/10/2026)');
-assert.deepStrictEqual(R.consigliere.menu, ['dashboard', 'statistiche'], 'il consigliere vede Mappa e Statistiche: niente calendario');
+// (03/11/2026, chiesto dall'utente) in più i Corsi in programma della Scuola, che sono di tutti; il calendario d'ufficio no
+assert.deepStrictEqual(R.consigliere.menu, ['dashboard', 'statistiche', 'corsi'], 'il consigliere vede Mappa, Statistiche e Corsi in programma: niente calendario');
 // NEL MENU STANNO SOLO LE PAGINE (deciso dall'utente la sera del 03/10/2026, dopo aver provato la tendina e le voci-azione)
 for (const k of Object.keys(R)) assert.ok(R[k].menu.every((v) => v === '|' || html.includes('data-view="' + v + '"')), k + ': nel menu solo voci che sono pagine');
 assert.ok(!js.includes('Altre app ▾') && !js.includes('function altreApp') && !js.includes('function vociAzione'), 'né tendina «Altre app» né voci-azione nel menu');

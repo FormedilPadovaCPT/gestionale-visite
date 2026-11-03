@@ -60,17 +60,19 @@
   /* (03/10/2026 sera, deciso dall'utente dopo due prove) NEL MENU STANNO SOLO LE PAGINE. Asseverazione e Servizi CPT sono
      riquadri di «Oggi» (blu e verde, come i pulsanti di sempre); per chi è di sola lettura Segnala, QR e Servizi sono
      pulsanti sulla pagina che vede per prima. Né tendina «Altre app», né voci-azione nel menu: provate, scartate. */
+  /* (03/11/2026, chiesto dall'utente) «🎓 Corsi in programma» (corsi-programmati.js) è di tutti, docenti esterni esclusi:
+     è la programmazione della Scuola, non il calendario d'ufficio, che resta del solo Direttore. */
   const RUOLI = {
-    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', 'chat', 'documenti', '|', 'segreteria'], apre: 'segreteria' },
-    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'documenti', 'statistiche', 'formazione'], apre: 'dashboard' },
-    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'documenti', 'statistiche', 'formazione', '|', 'admin'], apre: 'dashboard' },
+    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', 'corsi', 'chat', 'documenti', '|', 'segreteria'], apre: 'segreteria' },
+    tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'documenti', 'statistiche', 'corsi', 'formazione'], apre: 'dashboard' },
+    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'documenti', 'statistiche', 'corsi', 'formazione', '|', 'admin'], apre: 'dashboard' },
     // (13/10/2026) il docente esterno, col solo ruolo «docente»: la sola pagina Formazione (le sue firme, poi i suoi corsi)
     docente:      { nome: 'Docente',         menu: ['formazione'], apre: 'formazione', lettura: true },
-    direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti'], apre: 'direzione', lettura: true },
+    direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti', 'corsi'], apre: 'direzione', lettura: true },
     // il calendario è del solo Direttore (deciso dall'utente il 03/10/2026): la Presidenza vede quello che le compete
-    presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard'], apre: 'direzione', lettura: true },
+    presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard', 'corsi'], apre: 'direzione', lettura: true },
     // (03/10/2026, corretto dall'utente dopo aver guardato l'anteprima) il consigliere apre sulla Mappa e non vede il calendario
-    consigliere:  { nome: 'Consigliere',     menu: ['dashboard', 'statistiche'], apre: 'dashboard', lettura: true },
+    consigliere:  { nome: 'Consigliere',     menu: ['dashboard', 'statistiche', 'corsi'], apre: 'dashboard', lettura: true },
   };
   /* Per chi è di sola lettura «Segnala un cantiere», il QR e i Servizi CPT sono PULSANTI SULLA PAGINA che vede per prima:
      sulla Mappa restano quelli di sempre, sopra i cantieri in monitoraggio; sulla pagina Direzione/Presidenza la veste ne
@@ -113,7 +115,7 @@
   /* (21/10/2026) la Chat del team è nel menu solo di chi ci partecipa e la vede: lo dice il database a chat-team.js,
      che segna la voce con data-chat-visibile="1". Senza quel segno la voce resta nascosta anche se è nel menu del ruolo.
      Lo stesso per i Documenti (documenti.js, data-doc-visibile="1"): tecnici in servizio, Coordinatore e segreteria. */
-  const ETICHETTE = { chat: '💬 Chat', documenti: '📄 Documenti', dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti', formazione: '📚 Formazione' };
+  const ETICHETTE = { chat: '💬 Chat', documenti: '📄 Documenti', dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti', corsi: '🎓 Corsi', formazione: '📚 Formazione' };
 
   const CHIAVE_TECNICO = 'gv-v2-tecnico';   // sessionStorage: di quale tecnico si guarda la pagina in «Vedi come: Tecnico»
   let _tecnici = null;       // l'elenco dei tecnici, letto una volta, per la tendina dell'anteprima
