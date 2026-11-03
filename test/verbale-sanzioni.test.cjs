@@ -54,7 +54,14 @@ assert.strictEqual(st(['OPE_POF_003'], 'NC+').art231, true);
 
 // (03/11/2026, chiesto dall'utente) nel riquadro in grassetto: caso più probabile, sospensione, patente, responsabilità dell'ente
 const note = V.noteStima(st(['FOR_BAS_001', 'OPE_POF_003', 'PIN_TES_001'], 'NC+', 7)).join(' ');
-for (const g of ['**il calcolo considera il caso più probabile**', "**Possibile sospensione dell'attività**", '**Patente a crediti**', "**responsabilità dell'ente**"]) assert.ok(note.includes(g), g);
+// (03/11/2026) sospensione, patente e 231 anche in arancione («**!»)
+for (const g of ['**il calcolo considera il caso più probabile**', "**!Possibile sospensione dell'attività**", '**!Patente a crediti**', "**!Responsabilità dell'ente – D.Lgs. 231/2001**"]) assert.ok(note.includes(g), g);
+
+// (03/11/2026, proposta C) le sigle dei quadratini: STOP, crediti in gioco, 231
+const tutte = V.noteStima(st(['FOR_BAS_001', 'OPE_POF_003', 'PIN_TES_001'], 'NC+', 7));
+assert.ok(tutte.some((t) => t.startsWith("@@STOP@@**!Possibile sospensione")));
+assert.ok(tutte.some((t) => t.startsWith('@@-5@@**!Patente a crediti')));
+assert.ok(tutte.some((t) => t.startsWith("@@231@@**!Responsabilità dell'ente")));
 
 // voce aggiunta alla checklist dopo l'ultimo giro dello script: non entra nel conto ma il verbale lo dice
 s = st(['IMP_LOG_001', 'VOCE_NUOVA_999']);

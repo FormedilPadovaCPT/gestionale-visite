@@ -117,7 +117,7 @@
      - sospensione (art. 14, Allegato I): somma aggiuntiva per ciascuna fattispecie, 300 € a lavoratore per 3 e 6;
      - patente (art. 27, Allegato I-bis): al massimo il doppio dei crediti della violazione più grave (c.6).
      Le voci «ipotesi» entrano col caso più probabile, segnate con l'asterisco. */
-  const A231 = 'Se da una violazione derivasse un infortunio con lesioni gravi o mortale, per le società si aggiungerebbe la responsabilità dell\'ente (D.Lgs. 231/2001, art. 25-septies): sanzione fino a 1.000 quote e possibili misure interdittive.'
+  const A231 = '**!Responsabilità dell\'ente – D.Lgs. 231/2001** (art. 25-septies): se da una violazione derivasse un infortunio con lesioni gravi o mortale, per le società si aggiungerebbe una sanzione fino a 1.000 quote e possibili misure interdittive.'
   const AVVERTENZA = 'Ipotesi di sanzione calcolata dal CPT su quanto rilevato in visita, a solo scopo informativo: non è una contestazione. Le violazioni e le sanzioni le accerta solo l\'organo di vigilanza.'
   function stimaSanzioni(rilievi, dati, nLav) {
     if (!dati || !dati.voci) return null
@@ -538,16 +538,19 @@
       const el = s.sospensioni.map((x) => `n. ${x.n} ${x.desc.toLowerCase()}${x.certa ? '' : ' *'} (${x.perLav ? perLav(x) : eurIt(x.somma) + ' €'})`).join(' · ')
       // senza il numero dei lavoratori le fattispecie «a lavoratore» contano per uno: la somma è un minimo
       const minimo = !s.lav && s.sospensioni.some((x) => x.perLav) ? 'di almeno ' : 'di '
-      out.push(`**Possibile sospensione dell'attività** (art. 14 D.Lgs. 81/2008), che l'Ispettorato del lavoro o la ASL dispongono quando accertano una violazione dell'Allegato I: ${el}. Per riprendere si eliminano le violazioni e si paga una somma aggiuntiva ${minimo}${eurIt(s.sommaSosp)} €, il doppio se l'impresa è già stata sospesa negli ultimi cinque anni.`)
+      out.push(`@@STOP@@**!Possibile sospensione dell'attività** (art. 14 D.Lgs. 81/2008), che l'Ispettorato del lavoro o la ASL dispongono quando accertano una violazione dell'Allegato I: ${el}. Per riprendere si eliminano le violazioni e si paga una somma aggiuntiva ${minimo}${eurIt(s.sommaSosp)} €, il doppio se l'impresa è già stata sospesa negli ultimi cinque anni.`)
     }
-    if (s.crediti) out.push(`**Patente a crediti** (art. 27 D.Lgs. 81/2008): se le violazioni fossero accertate con provvedimento definitivo, fino a ${s.crediti} ${s.crediti === 1 ? 'credito' : 'crediti'} in meno sui 30 iniziali; con meno di 15 crediti l'impresa non può lavorare nei cantieri.`)
-    if (s.art231) out.push(A231.replace('responsabilità dell\'ente', '**responsabilità dell\'ente**'))
+    if (s.crediti) out.push(`@@-${s.crediti}@@**!Patente a crediti** (art. 27 D.Lgs. 81/2008): se le violazioni fossero accertate con provvedimento definitivo, fino a ${s.crediti} ${s.crediti === 1 ? 'credito' : 'crediti'} in meno sui 30 iniziali; con meno di 15 crediti l'impresa non può lavorare nei cantieri.`)
+    if (s.art231) out.push('@@231@@' + A231)
     return out
   }
-  /* testo con parti in grassetto (**così**) a capo sulla larghezza w: righe di pezzi { t, b } */
+  /* testo con parti in grassetto (**così**, **!così** in grassetto arancione) a capo sulla larghezza w: righe di pezzi { t, b, o } */
   function testoRicco(doc, testo, w, size) {
     const parole = []
-    String(testo).split('**').forEach((pezzo, i) => pezzo.split(/(\s+)/).forEach((p) => { if (p) parole.push({ t: p, b: i % 2 === 1 }) }))
+    String(testo).split('**').forEach((pezzo, i) => {
+      const b = i % 2 === 1, o = b && pezzo.startsWith('!')
+      ;(o ? pezzo.slice(1) : pezzo).split(/(\s+)/).forEach((p) => { if (p) parole.push({ t: p, b, o }) })
+    })
     const largo = (p) => { doc.setFont('helvetica', p.b ? 'bold' : 'normal'); doc.setFontSize(size); return doc.getTextWidth(p.t) }
     const out = [[]]
     let x = 0
@@ -568,29 +571,40 @@
     if (!s) return
     const W = S.R - S.L
     // le note, con le parole chiave in grassetto: prima si misurano, poi fondo e testo; il riquadro non si spezza
-    const SZ = 6.8, h = hRiga(SZ, 1.25), PAD = 4, SP = 1.6
-    const blocchi = noteStima(s).map((t) => testoRicco(doc, t, W - 2 * PAD, SZ))
-    f(doc, 'bolditalic', 7, C.grigio)
-    const avv = righe(doc, AVVERTENZA, W - 2 * PAD), hAvv = hRiga(7, 1.25)
-    const alto = 2 + blocchi.reduce((a, b) => a + b.length * h + SP, 0) + avv.length * hAvv + 2
+    const SZ = 7.8, h = hRiga(SZ, 1.25), PAD = 4, SP = 1.8   // (03/11/2026) carattere più grande, chiesto dall'utente
+    /* (03/11/2026, proposta C scelta dall'utente) «@@SIGLA@@» in testa alla nota = quadratino arancione con la sigla
+       (STOP, -crediti, 231), come i quadratini delle zone; il testo della nota rientra accanto */
+    const ICO = 8.4, IH = 3.6, RIENTRO = ICO + 2.2
+    const blocchi = noteStima(s).map((t) => {
+      const m = /^@@([^@]+)@@/.exec(t)
+      const testo = m ? t.slice(m[0].length) : t
+      return { sigla: m ? m[1] : null, righe: testoRicco(doc, testo, W - 2 * PAD - (m ? RIENTRO : 0), SZ) }
+    })
+    f(doc, 'bolditalic', 8, C.grigio)
+    const avv = righe(doc, AVVERTENZA, W - 2 * PAD), hAvv = hRiga(8, 1.25)
+    const alto = 2 + blocchi.reduce((a, b) => a + b.righe.length * h + SP, 0) + avv.length * hAvv + 2
     if (st.y + 19 + alto > PH - 20) { doc.addPage(); st.y = S.top }
     doc.setFillColor(...C.grigio); doc.rect(S.L, st.y, W, 19, 'F')
-    spaziato(doc, 'IPOTESI DI SANZIONE', S.L + 4, st.y + 5.5, 6.8, C.etichetta, 0.5)
-    f(doc, 'normal', 7.5, C.etichetta); doc.text('Sanzione massima prevista:', S.L + 4, st.y + 12.5); doc.text('Se l\'impresa regolarizza:', S.L + W / 2 + 4, st.y + 12.5)
+    spaziato(doc, 'IPOTESI DI SANZIONE', S.L + 4, st.y + 5.5, 7.5, C.etichetta, 0.5)
+    f(doc, 'normal', 8.5, C.etichetta); doc.text('Sanzione massima prevista:', S.L + 4, st.y + 12.5); doc.text('Se l\'impresa regolarizza:', S.L + W / 2 + 4, st.y + 12.5)
     f(doc, 'bold', 12, C.bianco); doc.text('€ ' + eurIt(s.max), S.L + W / 2 - 4, st.y + 13, { align: 'right' })
     f(doc, 'bold', 12, [250, 184, 148]); doc.text('€ ' + eurIt(s.ridotta), S.R - 4, st.y + 13, { align: 'right' })
     st.y += 19
     doc.setFillColor(...C.fondo); doc.rect(S.L, st.y, W, alto, 'F')
     let y = st.y + 2
     for (const b of blocchi) {
-      for (const r of b) {
-        let x = S.L + PAD
-        for (const p of r) { f(doc, p.b ? 'bold' : 'normal', SZ, C.scuro); doc.text(p.t, x, y + h * 0.78); x += doc.getTextWidth(p.t) }
+      if (b.sigla) {
+        doc.setFillColor(...C.arancio); doc.roundedRect(S.L + PAD, y + h * 0.5 - IH / 2, ICO, IH, 0.6, 0.6, 'F')
+        f(doc, 'bold', b.sigla.length > 3 ? 5.6 : 6.2, C.bianco); doc.text(b.sigla, S.L + PAD + ICO / 2, y + h * 0.5 + 0.75, { align: 'center' })
+      }
+      for (const r of b.righe) {
+        let x = S.L + PAD + (b.sigla ? RIENTRO : 0)
+        for (const p of r) { f(doc, p.b ? 'bold' : 'normal', SZ, p.o ? C.arancio : C.scuro); doc.text(p.t, x, y + h * 0.78); x += doc.getTextWidth(p.t) }
         y += h
       }
       y += SP
     }
-    f(doc, 'bolditalic', 7, C.grigio)
+    f(doc, 'bolditalic', 8, C.grigio)
     for (const r of avv) { doc.text(r, S.L + PAD, y + hAvv * 0.78); y += hAvv }
     st.y += alto + 5
   }
