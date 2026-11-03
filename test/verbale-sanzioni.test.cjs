@@ -52,6 +52,10 @@ assert.strictEqual(s.sommaSosp, 300 + 2500 + 3000 + 3000);
 assert.strictEqual(st(['OPE_POF_003'], 'NC-').art231, false);
 assert.strictEqual(st(['OPE_POF_003'], 'NC+').art231, true);
 
+// (03/11/2026, chiesto dall'utente) nel riquadro in grassetto: caso più probabile, sospensione, patente, responsabilità dell'ente
+const note = V.noteStima(st(['FOR_BAS_001', 'OPE_POF_003', 'PIN_TES_001'], 'NC+', 7)).join(' ');
+for (const g of ['**il calcolo considera il caso più probabile**', "**Possibile sospensione dell'attività**", '**Patente a crediti**', "**responsabilità dell'ente**"]) assert.ok(note.includes(g), g);
+
 // voce aggiunta alla checklist dopo l'ultimo giro dello script: non entra nel conto ma il verbale lo dice
 s = st(['IMP_LOG_001', 'VOCE_NUOVA_999']);
 assert.strictEqual(s.voci, 1);
