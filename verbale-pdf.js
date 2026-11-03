@@ -566,7 +566,7 @@
     nuovaPaginaSe(doc, st, PH - 60)
     titolo('Riferimenti normativi')
     f(doc, 'italic', 7, C.tenue)
-    doc.text(righe(doc, `D.Lgs. 81/2008, testo vigente letto su Normattiva il ${s.lettoIl.split('-').reverse().join('/')}: per ogni rilievo il comma dell'obbligo richiamato.`, S.R - S.L), S.L, st.y + 1)
+    doc.text(righe(doc, `D.Lgs. 81/2008: per ogni rilievo il comma dell'obbligo richiamato.`, S.R - S.L), S.L, st.y + 1)
     st.y += 5
     const corpo = []
     for (const e of s.riferimenti) {
