@@ -1734,7 +1734,7 @@ tr.row-detail-hover:hover td{background:#fff3ed}
         <!-- Riaggancio cantieri senza CNCE -->
         <div class="adm-section">
           <div class="adm-section-title">🔗 Riaggancio cantieri senza CNCE</div>
-          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:12px">Cantieri creati dai tecnici senza codice CNCE: il sistema cerca il cantiere codificato simile a cui spostare le visite. Le visite vengono riagganciate e il cantiere provvisorio archiviato.</p>
+          <p style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:12px">Cantieri senza codice CNCE con almeno una visita dal 1° ottobre 2026 (lo storico precedente non si riaggancia più): il sistema cerca il cantiere codificato simile a cui spostare le visite. Le visite vengono riagganciate e il cantiere provvisorio archiviato.</p>
           <button class="btn-primary btn-sm" onclick="admCaricaRiaggancio()">🔍 Trova cantieri senza CNCE</button>
           <div id="adm-riaggancio-list" style="margin-top:12px"></div>
         </div>
@@ -13819,7 +13819,7 @@ async function admCaricaRiaggancio(){
   wrap.innerHTML='<div style="color:rgba(255,255,255,.4);font-size:13px;padding:8px">Caricamento… (qualche secondo)</div>'
   const{data,error}=await sb.rpc('s_riaggancio_candidati')
   if(error){wrap.innerHTML='<div style="color:#e67e22;font-size:13px">Non sono riuscito a leggere i cantieri: '+esc(error.message)+'</div>';return}
-  _riagg={righe:(data&&data.righe)||[],senza:(data&&data.senza_cnce)||0,mostra:50,filtro:_riagg.filtro||''}
+  _riagg={righe:(data&&data.righe)||[],senza:(data&&data.senza_cnce)||0,storico:(data&&data.storico_escluso)||0,mostra:50,filtro:_riagg.filtro||''}
   admDisegnaRiaggancio()
 }
 function admDisegnaRiaggancio(){
@@ -13833,7 +13833,7 @@ function admDisegnaRiaggancio(){
   const commHtml=(nome,cod)=>(nome||cod)
     ?`👤 ${esc(nome||('cod. '+cod))} <span style="color:rgba(255,255,255,.35);font-family:monospace;font-size:10px">${esc(cod||'')}</span>`
     :`<span style="color:rgba(255,255,255,.3)">👤 committente non indicato</span>`
-  let html=`<div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:8px">${senza} cantieri senza CNCE · <b>${righe.length}</b> con almeno un cantiere codificato simile nello stesso comune (prima i <span style="color:#2ecc71">${stessi} con lo stesso committente</span>) · gli altri ${senza-righe.length} non hanno candidati.</div>`
+  let html=`<div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:8px">${senza} cantieri senza CNCE · <b>${righe.length}</b> con almeno un cantiere codificato simile nello stesso comune (prima i <span style="color:#2ecc71">${stessi} con lo stesso committente</span>) · gli altri ${senza-righe.length} non hanno candidati.${_riagg.storico?` <span style="color:rgba(255,255,255,.4)">Esclusi ${_riagg.storico} cantieri dello storico (ultima visita prima del 1° ottobre 2026).</span>`:''}</div>`
     +`<input id="adm-riagg-filtro" type="search" placeholder="Filtra per via, comune, committente…" value="${esc(_riagg.filtro)}" oninput="_riaggFiltra(this.value)" style="width:100%;max-width:360px;margin-bottom:10px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;font-size:12px">`
   if(!vis.length)html+='<div style="color:rgba(255,255,255,.4);font-size:13px;padding:8px">Nessun cantiere corrisponde al filtro.</div>'
   for(const c of vis.slice(0,_riagg.mostra)){
