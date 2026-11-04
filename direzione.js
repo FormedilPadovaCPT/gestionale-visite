@@ -724,7 +724,23 @@
     try { await firmeBox(Rv, _come); } catch (e) { console.warn('da firmare:', e); }
     try { await approvazioniBox(Rv, _come); } catch (e) { console.warn('da approvare:', e); }
     await decisioniBox($('dir-decisioni'), 'direzione');
+    materialeBox($('dir-materiale'), R);
     badge().catch(() => {});
+  }
+
+  /* (04/11/2026, chiesto dall'utente) Il materiale sui dati dell'esercizio 2025-26 — report, giornale, video,
+     racconto, dati per il pubblico e post, statistiche dell'Osservatorio e del modulo Google, slide sulle
+     non conformità — sta in una pagina pubblicata fuori dal gestionale, aperta a chi ha il link. Qui solo il
+     Direttore ha il collegamento; il materiale lo aggiorna la segreteria, e il collegamento resta lo stesso. */
+  const MATERIALE_ES_2526 = 'https://claude.ai/artifact/JUCrwhUiHCBBML4qF8vdYC';
+  function materialeBox(host, R) {
+    if (!host) return;
+    if (!R.direttore) { host.innerHTML = ''; return; }
+    host.innerHTML = `<div class="card" style="border-left:4px solid #565c66">
+      <h3>📊 I dati dell'esercizio 2025-26</h3>
+      <p style="font-size:13px;color:#555;margin:0 0 8px;line-height:1.45">Tutto il lavoro sulle 918 visite in una pagina: il report annuale e il giornale da sfogliare, il video e il racconto, i dati e i post per il pubblico, le statistiche dell'Osservatorio e del modulo Google, le slide sulle non conformità voce per voce. Sono bozze, salvo dove è scritto diversamente.</p>
+      <a class="btn-primary btn-sm" href="${MATERIALE_ES_2526}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none" data-aiuto="Apre in una scheda nuova la pagina con tutto il materiale sui dati 2025-26. La vede chiunque abbia il collegamento: non serve entrare con la password.">Apri la pagina dei dati ↗</a>
+    </div>`;
   }
 
   /* ════════════════════════════════════════════════════════════
