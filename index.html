@@ -4823,11 +4823,25 @@ $('btn-mi-save').onclick=async()=>{
   const piva=vGet('mi-piva').trim()||null
   if(!nome){toast('Ragione sociale obbligatoria','warn');$('mi-nome').focus();return}
   let cf=vGet('mi-cf').trim().toUpperCase()||null
+  // (04/11/2026, chiesto dall'utente) Codice fiscale vuoto ma P.IVA valida: prima lo si chiede al
+  // Registro Imprese, poi per una società si usa la P.IVA. Prima l'impresa si salvava senza CF e
+  // con la ragione sociale come chiave (4 imprese dal 1/10, pulsante «Dati ufficiali» mai premuto).
+  const _pv=String(piva||'').replace(/\s+/g,'')
+  if(!cf&&pivaValida(_pv)){
+    const _forma=formaNuovaImpresa(vGet('mi-forma'),nome)
+    const _uff=await cfDalRegistroImprese(_pv)
+    if(_uff){cf=_uff;toast('Codice fiscale preso dal Registro Imprese (InfoCamere): '+cf,'ok',6000)}
+    else if(_forma==='societa'){cf=_pv;toast('Codice fiscale = partita IVA, come di norma per una società','ok',6000)}
+    if(cf)vSet('mi-cf',cf)
+  }
   let impId=cf
   if(!cf){
-    const _idfb=_idFallbackAnag(nome)
+    const _idfb=pivaValida(_pv)?_pv:_idFallbackAnag(nome)
     if(!_idfb){toast('Inserisci prima la ragione sociale','warn');$('mi-nome').focus();return}
-    if(!confirm('ATTENZIONE - inserimento eccezionale.\n\nStai salvando un\'impresa SENZA codice fiscale. Il CF e l\'identificativo dell\'impresa: senza, il dato e inutile ai fini dell\'elaborazione da parte dell\'ufficio.\n\nSe procedi, come identificativo verra usata la ragione sociale senza spazi:\n\n'+_idfb+'\n\nProcedere comunque?')){$('mi-cf').focus();return}
+    const _perche=pivaValida(_pv)
+      ?'La partita IVA non basta: per una ditta individuale o un lavoratore autonomo il codice fiscale e quello PERSONALE del titolare (16 caratteri, lo trovi sul documento o sulla visura). Il Registro Imprese non lo ha restituito.\n\nSe procedi, l\'impresa si salva senza codice fiscale e come identificativo verra usata la partita IVA:\n\n'
+      :'Stai salvando un\'impresa SENZA codice fiscale e senza una partita IVA valida. Il CF e l\'identificativo dell\'impresa: senza, il dato e inutile ai fini dell\'elaborazione da parte dell\'ufficio.\n\nSe procedi, come identificativo verra usata la ragione sociale senza spazi:\n\n'
+    if(!confirm('ATTENZIONE - inserimento eccezionale.\n\n'+_perche+_idfb+'\n\nProcedere comunque?')){$('mi-cf').focus();return}
     impId=_idfb
   }
   const ccnlVal=vGet('mi-ccnl')||null
@@ -13422,6 +13436,32 @@ function cfImpresaProblema(x){
   return cfPersonaValido(c)?'':'Il carattere di controllo non torna: ricontrolla il codice.'
 }
 const FORME_SOCIETA=['S.r.l.','S.r.l.s','S.n.c.','S.A.S.','S.p.A.','S.coop.','Consorzio']
+/* funzione pura (04/11/2026): «Nuova impresa» senza codice fiscale. 'societa' = il CF di norma è la
+   P.IVA; 'individuale' = il CF è quello personale del titolare; '' = non si sa. La tendina vince sulla
+   ragione sociale; con la tendina vuota si guarda la forma scritta nel nome. */
+function formaNuovaImpresa(forma,nome){
+  const f=String(forma||'').trim()
+  if(/^(Ditta Individuale|Lavoratore autonomo)$/i.test(f))return 'individuale'
+  if(FORME_SOCIETA.includes(f)||f==='S.r.l. Unipersonale')return 'societa'
+  if(f)return ''
+  const n=String(nome||'').toUpperCase().replace(/\./g,'')
+  if(/\b(SRLS?|SNC|SAS|SPA|SCARL|SCRL|SOC(IETA)? ?COOP(ERATIVA)?|COOP|CONSORZIO)\b/.test(n))return 'societa'
+  return ''
+}
+/* Il codice fiscale dal Registro Imprese (InfoCamere, solo società, lun-ven 8-18) per una P.IVA.
+   '' se non risponde entro 8 secondi, se non la trova o se il codice non supera il controllo:
+   chi chiama decide che cosa fare, e il salvataggio non si ferma per questo. */
+async function cfDalRegistroImprese(piva){
+  try{
+    const r=await Promise.race([
+      sb.functions.invoke('dati-impresa-ufficiali',{body:{piva,cf:''}}),
+      new Promise(ok=>setTimeout(()=>ok({error:{message:'tempo scaduto'}}),8000))])
+    if(r.error){console.warn('Registro Imprese:',r.error.message);return ''}
+    const ic=r.data&&r.data.infocamere
+    const cf=ic&&ic.esito==='ok'&&ic.dati?normCf(ic.dati.cf):''
+    return cf&&!cfImpresaProblema(cf)?cf:''
+  }catch(e){console.warn('Registro Imprese:',e);return ''}
+}
 let _impSenzaCf=[]
 async function admImpSenzaCf(){
   const tb=$('tbody-imp-senza-cf'),conto=$('imp-senza-cf-conto')

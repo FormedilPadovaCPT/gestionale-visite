@@ -57,3 +57,23 @@ assert.ok(/revoke execute on function public\.imprese_senza_cf\(\) from public, 
 assert.ok(/security invoker/.test(sql));
 
 console.log('ok — imprese senza codice fiscale: controllo delle cifre, doppioni, errori detti');
+
+// (04/11/2026) «Nuova impresa» con la sola P.IVA: società → CF = P.IVA; ditta individuale e
+// lavoratore autonomo → CF personale del titolare, la P.IVA non basta.
+const g = Function(
+  prendi(/const FORME_SOCIETA=\[[^\]]*\]/, 'FORME_SOCIETA') + ';' +
+  prendi(/function formaNuovaImpresa\(forma,nome\)\{[\s\S]*?\r?\n\}/, 'formaNuovaImpresa') +
+  '; return { formaNuovaImpresa }')();
+assert.strictEqual(g.formaNuovaImpresa('S.r.l.', 'rariplast'), 'societa');
+assert.strictEqual(g.formaNuovaImpresa('S.r.l. Unipersonale', 'X'), 'societa');
+assert.strictEqual(g.formaNuovaImpresa('Lavoratore autonomo', 'Rampin Michele'), 'individuale');
+assert.strictEqual(g.formaNuovaImpresa('Ditta Individuale', 'ROSSI SRL'), 'individuale', 'la tendina vince sul nome');
+assert.strictEqual(g.formaNuovaImpresa('', 'Eurotermoidraulica S.r.l'), 'societa');
+assert.strictEqual(g.formaNuovaImpresa('', 'EDIL BETA S.N.C. DI ROSSI'), 'societa');
+assert.strictEqual(g.formaNuovaImpresa('', 'Pellicone Natalino'), '', 'senza forma né sigla non si indovina');
+assert.strictEqual(g.formaNuovaImpresa('Altro', 'Pippo SRL'), '', '«Altro» scelto a mano non diventa società');
+assert.strictEqual(g.formaNuovaImpresa('', 'SPAZIO CASA'), '', 'SPA dentro una parola non conta');
+// il salvataggio chiede il CF al Registro Imprese e, senza CF, usa la P.IVA come chiave, non il nome
+assert.ok(/cfDalRegistroImprese\(_pv\)/.test(html), 'il salvataggio deve chiedere il CF al Registro Imprese');
+assert.ok(/const _idfb=pivaValida\(_pv\)\?_pv:_idFallbackAnag\(nome\)/.test(html), 'con P.IVA valida la chiave è la P.IVA');
+console.log('ok: forma della nuova impresa');
