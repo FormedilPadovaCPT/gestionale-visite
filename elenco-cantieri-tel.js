@@ -77,8 +77,9 @@
     const quando = c.seg_data ? new Date(c.seg_data).toLocaleDateString('it-IT') : '';
     const nav = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(c.lat + ',' + c.lng) + '&travelmode=driving';
     return `<article class="ct-card ct-segn">
-      <div class="ct-head"><span class="ct-com">Segnalato</span>${giro(c, o.giroSel, c.lat + ',' + c.lng, c.label)}</div>
+      <div class="ct-head"><span class="ct-com">${esc(c.comune_nome ? c.comune_nome + ' · segnalato' : 'Segnalato')}</span>${giro(c, o.giroSel, c.lat + ',' + c.lng, c.label)}</div>
       <h3 class="ct-tit">📍 ${esc(c.label)}</h3>
+      ${c.cantiere_indirizzo ? `<div class="ct-comm">${esc(c.cantiere_indirizzo)}</div>` : ''}
       ${c.seg_tec || quando ? `<div class="ct-comm">${esc([c.seg_tec, quando].filter(Boolean).join(' · '))}</div>` : ''}
       <div class="ct-act ct-uno"><a class="btn-outline" href="${esc(nav)}" target="_blank" rel="noopener">🧭 Naviga</a></div>
     </article>`;

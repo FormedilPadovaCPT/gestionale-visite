@@ -8159,6 +8159,7 @@ async function loadCantieri(q=''){
       if(s.lat==null||s.lng==null)return
       const lbl=(s.note&&s.note.trim())||'Cantiere segnalato'
       rows.push({_segn:true,_s:s,seg_id:s.id,cantiere_id:'segn:'+s.id,label:lbl,lat:s.lat,lng:s.lng,
+        comune_nome:s.comune_nome||null,cantiere_indirizzo:s.indirizzo_gps||s.indirizzo||null,
         seg_tec:s.tecnico_nome||s.segnalata_da||'',seg_data:s.created_at,n_visite:0})
     })
   }catch(_e){console.warn('segnalazioni:',_e)}
@@ -8193,7 +8194,11 @@ window.loadCantieri=loadCantieri
 window._clRender=()=>_clRender()  // (13/10/2026) elenco-cantieri-tel.js ridisegna quando cambia la misura dello schermo
 function _clPass(d){
   const s=_clState
-  if(d._segn)return !(s.comSel.size||s.ope||s.imp||s.sca||s.vis||s.orig==='cnce')
+  if(d._segn){
+    if(s.ope||s.imp||s.sca||s.vis||s.orig==='cnce')return false
+    if(!s.comSel.size)return true
+    return !!d.comune_nome&&[...s.comSel].some(x=>x.toLowerCase()===String(d.comune_nome).trim().toLowerCase())
+  }
   if(!s.fuori&&!d._inPD)return false
   if(s.area==='zona'&&_clZona&&_clZona.size&&!_clInZona(d))return false
   if(s.comSel.size&&![...s.comSel].some(x=>x.toLowerCase()===String(d.zona_key||d.comune_nome||'').trim().toLowerCase()))return false
@@ -8331,8 +8336,8 @@ function _clRender(){
       return`<tr class="row-detail-hover">
       <td onclick="event.stopPropagation()"><input type="checkbox" class="giro-chk" data-id="${c.cantiere_id}" data-lat="${c.lat??''}" data-lng="${c.lng??''}" data-addr="${c.lat+','+c.lng}" data-label="${esc(c.label)}" ${_giroSel.has(c.cantiere_id)?'checked':''} onchange="_giroToggle(this)" style="width:17px;height:17px;cursor:pointer"></td>
       <td><strong style="color:#d5008f">📍 ${esc(c.label)}</strong>${c.seg_tec?`<div style="font-size:11px;color:#888">${esc(c.seg_tec)}${_dt?' · '+_dt:''}</div>`:''}</td>
-      <td>–</td>
-      <td>–</td>
+      <td style="font-size:12px">${esc(c.cantiere_indirizzo||'–')}</td>
+      <td>${esc(c.comune_nome||'–')}</td>
       <td>–</td>
       <td><span style="font-size:11px;color:#d5008f;font-weight:600">segnalato</span></td>
       <td>–</td>
@@ -8891,12 +8896,33 @@ function _segnComprimiFoto(file){
   })
 }
 
+/* (04/11/2026, chiesto dall'utente) via e comune dalle coordinate, con la ricerca inversa di OpenStreetMap:
+   senza, il segnalato restava in elenco col solo testo della nota e spariva appena si sceglieva un comune.
+   Il comune è city, poi town, municipality, village (in Italia village è spesso la frazione quando c'è city).
+   Se la ricerca non riesce entro 5 secondi la segnalazione si salva lo stesso, senza via e comune. */
+async function _segnDoveSono(lat,lng){
+  try{
+    const u='https://nominatim.openstreetmap.org/reverse?'+new URLSearchParams({format:'jsonv2',lat:String(lat),lon:String(lng),zoom:'18',addressdetails:'1','accept-language':'it'})
+    const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),5000)
+    const r=await fetch(u,{signal:ctl.signal});clearTimeout(t)
+    if(!r.ok)return null
+    const a=((await r.json())||{}).address||{}
+    let com=a.city||a.town||a.municipality||a.village||null
+    if(com&&typeof COMUNI_PD!=='undefined'){const k=COMUNI_PD.find(c=>c.toLowerCase()===com.toLowerCase());if(k)com=k}
+    const via=[a.road||a.pedestrian||a.square||'',a.house_number||''].join(' ').trim()||null
+    return{comune:com,via}
+  }catch(e){console.warn('ricerca inversa:',e);return null}
+}
+window._segnDoveSono=_segnDoveSono
+
 async function salvaSegnalazione(){
   if(!_segnPos){toast(_segnGps===false?'Tocca la mappa nel punto del cantiere: senza una posizione la segnalazione non si salva.':'Posizione GPS non ancora rilevata: aspetta un attimo, o tocca la mappa sul cantiere.','warn',7000);return}
   const btn=$('segn-salva');btn.disabled=true;btn.textContent='⏳ Salvataggio…'
   try{
     const tecNome=S.tecnico?`${S.tecnico.tecnico_nome||''} ${S.tecnico.tecnico_cognome||''}`.trim():(S.viewerNome||null)
+    const dove=await _segnDoveSono(_segnPos.lat,_segnPos.lng)
     const{data:row,error}=await sb.from('segnalazioni_cantiere').insert({
+      comune_nome:dove&&dove.comune||null,indirizzo_gps:dove&&dove.via||null,
       lat:_segnPos.lat,lng:_segnPos.lng,
       accuracy_m:_segnPos.da==='gps'?Math.round(_segnPos.acc||0):null,   // un punto scelto a mano o dall'indirizzo non ha la precisione del GPS
       posizione_da:['mappa','indirizzo'].includes(_segnPos.da)?_segnPos.da:'gps',
@@ -17117,7 +17143,7 @@ document.addEventListener('input',function(ev){
 <!-- codice univoco del cantiere proposto dall'app: iniziali tecnico-strada civico-sigla impresa (23/09/2026) -->
 <script src="codice-univoco.js?v=5"></script>
 <script src="lotti-cantiere.js?v=3"></script>
-<script src="elenco-cantieri-tel.js?v=2"></script>
+<script src="elenco-cantieri-tel.js?v=3"></script>
 <script src="esito-incarico.js?v=2"></script>
 <!-- visite fuori procedura: avviso al tecnico, motivo, decisione del Coordinatore (13/10/2026) -->
 <script src="fuori-procedura.js?v=2"></script>
