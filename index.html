@@ -4168,8 +4168,8 @@ async function _renderCantCardExtra(c){
       html+=row('Committente','<span style="color:#999">non indicato nel cantiere</span>')
     }
     const nomi=new Map()
-    if(c.cantiere_cnce){
-      const{data:prev}=await sb.from('cantiere_imprese_previste').select('impresa_nome').eq('cnce',c.cantiere_cnce)
+    {
+      const{data:prev}=await sb.from('cantiere_imprese_previste').select('impresa_nome').or(filtroPreviste(c.cantiere_cnce,cid))
       ;(prev||[]).forEach(p=>{const n=(p.impresa_nome||'').trim();if(n)nomi.set(n.toUpperCase(),n)})
     }
     const{data:vids}=await sb.from('visite').select('visita_id').eq('cantiere_id',cid).eq('elimina',0).limit(100)
@@ -4331,22 +4331,37 @@ async function autoAccCant(cantId){
 // Propone il committente indicato nel cantiere (CF/P.IVA caricato d'ufficio) chiedendo conferma
 // Proposte imprese collegate al CNCE del cantiere (tabella cantiere_imprese_previste)
 let _proposteCnce=null
+/* (06/11/2026) le imprese previste sono di due fonti: la lista della Cassa Edile, legata al codice CNCE, e
+   quelle indicate dalla segreteria, legate al cantiere (anche senza CNCE: cantieri aperti da una richiesta).
+   Filtro PostgREST per leggerle tutte e due; una stessa impresa compare una volta sola, e vince la Cassa. */
+function filtroPreviste(cnce,cid){
+  const q=v=>'"'+String(v).replace(/["\\]/g,'')+'"'
+  const p=[];if(cnce)p.push('cnce.eq.'+q(cnce));if(cid)p.push('cantiere_id.eq.'+q(cid))
+  return p.join(',')
+}
+function previsteUniche(righe){
+  const m=new Map()
+  ;(righe||[]).forEach(r=>{const k=String(r.impresa_cf||'').trim().toUpperCase();if(!k)return;const g=m.get(k);if(!g||(g.fonte==='segreteria'&&r.fonte!=='segreteria'))m.set(k,r)})
+  return[...m.values()].sort((a,b)=>String(a.impresa_nome||'').localeCompare(String(b.impresa_nome||'')))
+}
 async function caricaProposteImprese(force){
   const wrap=$('imp-proposte');if(!wrap)return
   const cnce=(vGet('f-cnce')||'').trim()
-  if(!cnce){wrap.innerHTML='';_proposteCnce=null;return}
-  if(cnce===_proposteCnce&&!force)return
-  _proposteCnce=cnce
-  const{data,error}=await sb.from('cantiere_imprese_previste').select('impresa_cf,impresa_nome,note').eq('cnce',cnce).order('impresa_nome')
-  if(error){wrap.innerHTML='';return}
+  const cid=(vGet('f-cant-id')||'').trim()
+  if(!cnce&&!cid){wrap.innerHTML='';_proposteCnce=null;return}
+  const chiave=cnce+'|'+cid
+  if(chiave===_proposteCnce&&!force)return
+  _proposteCnce=chiave
+  const{data,error}=await sb.from('cantiere_imprese_previste').select('impresa_cf,impresa_nome,note,fonte').or(filtroPreviste(cnce,cid)).order('impresa_nome')
+  if(error){wrap.innerHTML=`<div style="margin:0 0 10px;font-size:12px;color:#c0392b">Non sono riuscito a leggere le imprese previste per questo cantiere (${esc(error.message)}).</div>`;return}
   const gia=new Set(S.imprese.map(im=>String(im.impresa_id||'').toUpperCase()))
-  const list=(data||[]).filter(r=>!gia.has(String(r.impresa_cf||'').toUpperCase()))
+  const list=previsteUniche(data).filter(r=>!gia.has(String(r.impresa_cf||'').toUpperCase()))
   if(!list.length){wrap.innerHTML='';return}
   wrap.innerHTML=`<div style="margin:0 0 10px;padding:10px 12px;border:1px dashed #e7500f;border-radius:8px;background:#fff7f0">`
-    +`<div style="font-weight:600;color:#e7500f;font-size:13px;margin-bottom:6px">🏢 Imprese previste per questo cantiere (CNCE ${esc(cnce)})</div>`
+    +`<div style="font-weight:600;color:#e7500f;font-size:13px;margin-bottom:6px">🏢 Imprese previste per questo cantiere${cnce?` (CNCE ${esc(cnce)})`:''}</div>`
     +`<div style="font-size:12px;color:#777;margin-bottom:8px">Elenco caricato d'ufficio. Aggiungi quelle effettivamente presenti in cantiere.</div>`
     +list.map((r,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-top:1px solid #f0e0d5">`
-      +`<div style="font-size:13px"><b>${esc(r.impresa_nome||'(senza nome)')}</b> <span style="color:#999">${esc(r.impresa_cf||'')}</span>${r.note?`<div style="color:#999;font-size:11px">${esc(r.note)}</div>`:''}</div>`
+      +`<div style="font-size:13px"><b>${esc(r.impresa_nome||'(senza nome)')}</b> <span style="color:#999">${esc(r.impresa_cf||'')}</span>${r.fonte==='segreteria'?' <span style="color:#999;font-size:11px">· indicata dalla segreteria</span>':''}${r.note?`<div style="color:#999;font-size:11px">${esc(r.note)}</div>`:''}</div>`
       +`<button class="btn-outline btn-sm" data-prop="${i}" style="white-space:nowrap;border-color:#e7500f;color:#e7500f">+ Aggiungi</button>`
       +`</div>`).join('')
     +`</div>`
@@ -14863,16 +14878,17 @@ async function showCantiereDetail(cantId){
         })
         html+='</tbody></table>'
       }
-      if(c.cantiere_cnce){
-        const{data:prevs}=await sb.from('cantiere_imprese_previste').select('impresa_cf,impresa_nome,note').eq('cnce',c.cantiere_cnce).order('impresa_nome')
+      {
+        const{data:_pr}=await sb.from('cantiere_imprese_previste').select('impresa_cf,impresa_nome,note,fonte').or(filtroPreviste(c.cantiere_cnce,c.cantiere_id)).order('impresa_nome')
+        const prevs=previsteUniche(_pr)
         if(prevs&&prevs.length){
-          html+=qdSec('Imprese previste CNCE ('+prevs.length+')')
+          html+=qdSec('Imprese previste'+(c.cantiere_cnce?' CNCE':'')+' ('+prevs.length+')')
           html+='<table style="width:100%;font-size:12px;border-collapse:collapse"><tbody>'
           prevs.forEach(p=>{
             html+='<tr style="border-top:1px solid #f0f0f0">'
               +'<td style="padding:5px 6px">'+esc(p.impresa_nome||'–')+'</td>'
               +'<td style="padding:5px 6px;color:#888;font-family:monospace">'+esc(p.impresa_cf||'–')+'</td>'
-              +'<td style="padding:5px 6px;color:#888">'+esc(p.note||'')+'</td>'
+              +'<td style="padding:5px 6px;color:#888">'+esc([p.fonte==='segreteria'?'indicata dalla segreteria':'',p.note||''].filter(Boolean).join(' · '))+'</td>'
             +'</tr>'
           })
           html+='</tbody></table>'
