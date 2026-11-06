@@ -65,10 +65,11 @@
   const RUOLI = {
     segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', 'corsi', 'chat', 'documenti', '|', 'segreteria'], apre: 'segreteria' },
     tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'documenti', 'statistiche', 'corsi', 'formazione'], apre: 'dashboard' },
-    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'documenti', 'statistiche', 'corsi', 'formazione', '|', 'admin'], apre: 'dashboard' },
+    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'documenti', 'statistiche', 'corsi', 'formazione', '|', 'comunicazione', 'admin'], apre: 'dashboard' },
     // (13/10/2026) il docente esterno, col solo ruolo «docente»: la sola pagina Formazione (le sue firme, poi i suoi corsi)
     docente:      { nome: 'Docente',         menu: ['formazione'], apre: 'formazione', lettura: true },
-    direttore:    { nome: 'Direttore',       menu: ['direzione', 'statistiche', 'dashboard', 'appuntamenti', 'corsi'], apre: 'direzione', lettura: true },
+    // (06/11/2026, chiesto dall'utente) «📣 Comunicazione»: i post per i social da approvare (comunicazione-post.js); anche al Coordinatore, per il visto
+    direttore:    { nome: 'Direttore',       menu: ['direzione', 'comunicazione', 'statistiche', 'dashboard', 'appuntamenti', 'corsi'], apre: 'direzione', lettura: true },
     // il calendario è del solo Direttore (deciso dall'utente il 03/10/2026): la Presidenza vede quello che le compete
     presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard', 'corsi'], apre: 'direzione', lettura: true },
     // (03/10/2026, corretto dall'utente dopo aver guardato l'anteprima) il consigliere apre sulla Mappa e non vede il calendario
@@ -115,7 +116,7 @@
   /* (21/10/2026) la Chat del team è nel menu solo di chi ci partecipa e la vede: lo dice il database a chat-team.js,
      che segna la voce con data-chat-visibile="1". Senza quel segno la voce resta nascosta anche se è nel menu del ruolo.
      Lo stesso per i Documenti (documenti.js, data-doc-visibile="1"): tecnici in servizio, Coordinatore e segreteria. */
-  const ETICHETTE = { chat: '💬 Chat', documenti: '📄 Documenti', dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', appuntamenti: '📅 Appuntamenti', corsi: '🎓 Corsi', formazione: '📚 Formazione' };
+  const ETICHETTE = { chat: '💬 Chat', documenti: '📄 Documenti', dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', comunicazione: '📣 Comunicazione', appuntamenti: '📅 Appuntamenti', corsi: '🎓 Corsi', formazione: '📚 Formazione' };
 
   const CHIAVE_TECNICO = 'gv-v2-tecnico';   // sessionStorage: di quale tecnico si guarda la pagina in «Vedi come: Tecnico»
   let _tecnici = null;       // l'elenco dei tecnici, letto una volta, per la tendina dell'anteprima
