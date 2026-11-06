@@ -3493,6 +3493,12 @@ function buildTabs(){
 }
 
 function activateTab(n){
+  /* (06/11/2026) scheda del cantiere incompleta: il tecnico resta al passo «Cantiere» finché non la completa */
+  if(schedaCantiereBlocca(n,{...(S._cantMancanze||{}),cidForm:vGet('f-cant-id'),segreteria:!!window.__isSegreteria,definitivo:!!S._definitivoBloccato})){
+    toast('Prima di andare avanti completa la scheda del cantiere: '+S._cantMancanze.mancanze.map(x=>x.testo).join('; ')+'.','err',9000)
+    n=1
+    if(!$('modal-cant')||$('modal-cant').classList.contains('hidden')){window._mcGeoFrom='visita';admEditCantiere(vGet('f-cant-id'))}
+  }
   S.tab=n
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',+b.dataset.ti===n))
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',+c.dataset.tab===n))
@@ -4136,11 +4142,13 @@ function renderCantCard(c){
     ${row('Data ult. lavori',dataUlt)}
     ${row('Etichetta',c.cantiere_etichetta)}
     ${row('Descrizione',c.cantiere_descrizione)}
+    ${(()=>{const _m=cantiereMancanzeScheda(c);return _m.length?`<div style="margin:6px 0;padding:6px 10px;border-radius:6px;background:#fdecea;border-left:3px solid #c0392b;color:#8a1f12">⚠ <b>Scheda da completare prima della visita:</b> ${esc(_m.map(x=>x.testo).join('; '))}. <button type="button" class="btn-outline btn-sm" onclick="editCantiereForm()">✏️ Completa la scheda</button></div>`:''})()}
     <div id="cant-card-extra" data-cant="${c.cantiere_id||''}"></div>
     ${c.cantiere_id?`<div style="margin-top:8px"><button type="button" class="btn-outline btn-sm" id="btn-lotti" data-cant="${esc(c.cantiere_id)}" onclick="window.LottiCantiere&&LottiCantiere.apri(this.dataset.cant)">🧩 ${c.lotto?'Lotti del cantiere':'Ha più lotti'}</button></div>`:''}
   `.trim()
   card.classList.remove('hidden')
   _renderCantCardExtra(c)
+  chiediSchedaCantiere(c)
 }
 // Completa la scheda cantiere con committente e imprese associate (async, non blocca il form)
 async function _renderCantCardExtra(c){
@@ -5146,12 +5154,15 @@ $('btn-mc-save').onclick=async()=>{
     const _mancaC=cantiereMancanze({comune:vGet('mc-com'),tipInt:vGet('mc-tip-int'),tipOpe:vGet('mc-tip-ope'),tipOpeAltro:vGet('mc-tip-ope-altro'),durata:vGet('mc-durata'),importo:vGet('mc-importo')})
     if(_mancaC.length){
       const _txt=_mancaC.map(x=>x.testo).join('; ')
-      if(!window._editCantId||window._mcGeoFrom==='visita'){
+      /* (06/11/2026) la segreteria salva anche incompleta: il comune però serve sempre (zona e tecnico) */
+      if(window.__isSegreteria){
+        if(_mancaC.some(x=>x.campo==='mc-com')){toast('Serve almeno il comune del cantiere: dice la zona e il tecnico.','err',8000);const _e=$('mc-com');if(_e)_e.focus();return}
+        toast('Scheda salvata incompleta ('+_txt+'): il tecnico la completa prima di fare la visita.','warn',9000)
+      }else if(!window._editCantId||window._mcGeoFrom==='visita'){
         toast('Scheda del cantiere incompleta: '+_txt+'. Sono dati obbligatori per l\'Osservatorio nazionale.','err',10000)
         const _e=$(_mancaC[0].campo);if(_e)_e.focus()
         return
-      }
-      toast('Attenzione, scheda incompleta: '+_txt+'. Un verbale su questo cantiere non si chiude finché non è completa.','warn',9000)
+      }else toast('Attenzione, scheda incompleta: '+_txt+'. Un verbale su questo cantiere non si chiude finché non è completa.','warn',9000)
     }
   }
   const fields={
@@ -5395,6 +5406,35 @@ function cantiereMancanze(d){
   if(!(+d.durata>=1&&+d.durata<=6))out.push({campo:'mc-durata',testo:+d.durata===7?'la durata è «Non disponibile»: stimala':'manca la durata dei lavori (se non la conosci, stimala)'})
   if(!(+d.importo>=1&&+d.importo<=10))out.push({campo:'mc-importo',testo:+d.importo===11?'l\'importo è «Non disponibile»: stimalo':'manca l\'importo dei lavori (se non lo conosci, stimalo)'})
   return out
+}
+/* (06/11/2026, deciso dall'utente sulla richiesta Galiazzo) LA SEGRETERIA APRE IL CANTIERE CON QUELLO CHE SA,
+   IL TECNICO LO COMPLETA PRIMA DI FARE LA VISITA. Dalla richiesta di un'impresa la segreteria conosce spesso solo
+   indirizzo e comune: può salvare la scheda così (e solo lei). Il tecnico, appena il cantiere entra nel suo verbale,
+   si trova davanti la scheda da completare e non passa oltre il passo «Cantiere» finché non è completa; alla
+   chiusura resta il controllo del database (verbale_mancanze). Le stesse regole di cantiereMancanze, lette da una
+   riga di `cantieri`. */
+function cantiereMancanzeScheda(c){
+  c=c||{}
+  return cantiereMancanze({comune:c.comune_nome,tipInt:c.cantiere_tip_int,tipOpe:c.cantiere_tip_ope,tipOpeAltro:c.cantiere_tip_ope_altro,durata:c.cantiere_durata,importo:c.cantiere_importo})
+}
+/* s = {cid: cantiere della scheda letta, cidForm: cantiere del verbale, mancanze, segreteria, definitivo} */
+function schedaCantiereBlocca(n,s){
+  s=s||{}
+  return +n>1&&!s.segreteria&&!s.definitivo&&!!s.cid&&String(s.cid)===String(s.cidForm||'')&&(s.mancanze||[]).length>0
+}
+/* il verbale chiede la scheda: una volta per cantiere, e mai sul definitivo o alla segreteria */
+function chiediSchedaCantiere(c){
+  const m=cantiereMancanzeScheda(c)
+  S._cantMancanze={cid:c&&c.cantiere_id,mancanze:m}
+  if(!m.length||window.__isSegreteria||!c||!c.cantiere_id)return
+  if(S._cantChiesto===c.cantiere_id)return
+  setTimeout(()=>{
+    if(S._definitivoBloccato||vGet('f-cant-id')!==String(c.cantiere_id))return
+    const vf=$('view-form');if(!vf||vf.classList.contains('hidden'))return
+    S._cantChiesto=c.cantiere_id
+    toast('La scheda di questo cantiere è da completare prima della visita: '+m.map(x=>x.testo).join('; ')+'.','warn',10000)
+    window._mcGeoFrom='visita';admEditCantiere(c.cantiere_id)
+  },400)
 }
 
 /* (03/10/2026, sera) E-MAIL DELLE IMPRESE DEL VERBALE. La regola è mailImpreseDoppie (app-data.js).
