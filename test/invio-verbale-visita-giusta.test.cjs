@@ -13,7 +13,7 @@ assert.ok(i > 0, 'il gestore del pulsante Invia');
 const corpo = html.slice(i, html.indexOf('const pdfDataUri=await genPDF(vid', i));
 assert.ok(/const vid=window\._evContext\?\.vid\|\|null/.test(corpo), 'la visita è quella della finestra aperta');
 assert.ok(!/S\.savedId\|\|S\.fd\?\.visita_id\|\|window\._evContext\?\.vid/.test(corpo), 'mai più la visita rimasta aperta nella maschera');
-assert.ok(/from\('visite'\)\.select\('visita_id,nr_verbale'\)\.eq\('visita_id',vid\)/.test(corpo), 'si legge il numero del verbale da allegare');
+assert.ok(/from\('visite'\)\.select\('visita_id,nr_verbale(,stato)?'\)\.eq\('visita_id',vid\)/.test(corpo), 'si legge il numero del verbale da allegare');
 assert.ok(/String\(_vChk\.nr_verbale\|\|''\)\.trim\(\)!==_nrMail/.test(corpo) && /Invio FERMATO/.test(corpo), 'se non coincide con la mail, non parte');
 assert.ok(/if\(_eChk\|\|!_vChk\)\{toast\('Non sono riuscito a controllare/.test(corpo), 'se il controllo non riesce, non parte');
 /* le due finestre d'invio mettono nel contesto visita e numero dello stesso verbale */

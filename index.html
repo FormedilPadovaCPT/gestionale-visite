@@ -5965,7 +5965,9 @@ async function _saveVisitaCorpo(stato){
     }catch(fe){console.warn('Upload foto durante il salvataggio:',fe)}
 
     show('btn-pdf')
-    show('btn-email-verbale')
+    /* (06/11/2026, chiesto dall'utente) una bozza non si manda all'impresa: il pulsante compare solo col definitivo.
+       Prima compariva dopo qualunque salvataggio, e il 06/11 quattro bozze (0075, 0077-0079) sono partite all'impresa. */
+    if(stato==='definitivo')show('btn-email-verbale');else hide('btn-email-verbale')
     if(stato==='definitivo'&&(!_eraDefinitivo||!window.__isCoord))bloccaMascheraDefinitivo()
     upsertPersoneVisita().catch(_e=>console.warn('upsertPersone:',_e))
     if(_mancanze)toast('Salvato come bozza: per chiuderlo come definitivo manca ancora qualcosa.','warn',6000)
@@ -8056,7 +8058,7 @@ function vtRow(v){
     actions=detailBtn
       +(isBozza?`<button class="btn-warn btn-sm" data-act="riapri" data-id="${v.visita_id}" title="Riapri bozza">✏️ Riapri</button>`:(coord?`<button class="btn-warn btn-sm" data-act="modvis" data-id="${v.visita_id}" title="Modifica visita (coordinatore)">✏️ Modifica</button>`:''))
       +`<button class="btn-primary btn-sm" data-act="pdf" data-id="${v.visita_id}">PDF</button>`
-      +`<button class="btn-outline btn-sm" data-act="email" data-id="${v.visita_id}" title="Invia verbale via email">📧</button>`
+      +(isBozza?'':`<button class="btn-outline btn-sm" data-act="email" data-id="${v.visita_id}" title="Invia verbale via email">📧</button>`)   // (06/11/2026) la bozza non si invia
       +(coord?`<button class="btn-outline btn-sm" data-act="softdel" data-id="${v.visita_id}" data-nr="${nr}" title="Metti in eliminata" style="color:#c0392b">🗑</button>`:'')
   }
   return`<tr class="row-detail-hover" data-act="detail-visita" data-id="${v.visita_id}"${isElim?' style="opacity:.55"':''}>
@@ -9970,7 +9972,7 @@ async function inviEmailVerbaleFromList(vid){
   _setEvModalRett(false)
   toast('Caricamento dati visita…')
   const{data:v,error}=await sb.from('visite').select(`
-    visita_id,nr_verbale,data_visita,tecnico2_id,tecnico_id,fp_serie_proposta,
+    visita_id,nr_verbale,stato,data_visita,tecnico2_id,tecnico_id,fp_serie_proposta,
     note_for_sn,note_for_m,note_for_tipi,ppre_titolo,ppre_nome,ppre_cog,qual_ppre,tel_ppre,
     comm_nome,comm_cog,comm_rag_soc,comm_tipo_sogg,comm_email,
     resp_lav,rl_email,
@@ -9980,6 +9982,7 @@ async function inviEmailVerbaleFromList(vid){
     tecnici!visite_tecnico_id_fkey(tecnico_nome,tecnico_cognome)
   `).eq('visita_id',vid).single()
   if(error||!v){toast('Visita non trovata','err');return}
+  if(v.stato!=='definitivo'){toast('Questo verbale è ancora in bozza: prima si chiude con «Definitivo», poi si invia all\'impresa.','warn',9000);return}   // (06/11/2026)
   window._evSerie=!!v.fp_serie_proposta   // (13/10/2026) il tecnico propone una serie di visite
   const{data:impRows}=await sb.from('visite_imprese_presenti').select('impresa_id,is_principale,imprese(impresa_nome,impresa_email_ref,impresa_telefono,piva,cassa_edile,stato_cassa)').eq('visita_id',vid).order('ordine')
   // formazione mancante (25/09/2026): il pacchetto per la mail all'impresa e la segnalazione all'ufficio corsi
@@ -10414,8 +10417,10 @@ $('btn-ev-invia').onclick=async()=>{
   if(!vid){toast('Salva prima la visita','warn');return}
   /* e prima di generare il PDF si controlla che sia proprio il verbale scritto nell'oggetto: se non coincide, non parte */
   {const _nrMail=String(window._evContext?.nr_verbale||'').trim()
-   const{data:_vChk,error:_eChk}=await sb.from('visite').select('visita_id,nr_verbale').eq('visita_id',vid).maybeSingle()
+   const{data:_vChk,error:_eChk}=await sb.from('visite').select('visita_id,nr_verbale,stato').eq('visita_id',vid).maybeSingle()
    if(_eChk||!_vChk){toast('Non sono riuscito a controllare quale verbale sto per allegare: invio fermato. Riprova.','err',9000);return}
+   /* (06/11/2026, chiesto dall'utente) una bozza non parte: lo stato si legge adesso dal database, non dalla maschera */
+   if(_vChk.stato!=='definitivo'){toast('Invio FERMATO: il verbale '+(_vChk.nr_verbale||'')+' è ancora in bozza. Chiudilo con «Definitivo» e poi invialo.','err',12000);return}
    if(!_nrMail||String(_vChk.nr_verbale||'').trim()!==_nrMail){
      console.error('invio verbale fermato: allegato',_vChk.nr_verbale,'≠ mail',_nrMail,vid)
      toast('Invio FERMATO: il verbale da allegare ('+(_vChk.nr_verbale||'?')+') non è quello della mail ('+(_nrMail||'?')+'). Chiudi questa finestra e riapri l\'invio dal verbale giusto.','err',15000)

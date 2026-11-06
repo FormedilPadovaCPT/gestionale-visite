@@ -176,9 +176,18 @@ serve(async (req) => {
     if (visita_id) {
       const adm = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
       const { data: v, error } = await adm.from('visite')
-        .select('nr_verbale,data_visita,imprese(impresa_nome),cantieri(comune_nome),tecnici!visite_tecnico_id_fkey(tecnico_cognome)')
+        .select('nr_verbale,data_visita,stato,imprese(impresa_nome),cantieri(comune_nome),tecnici!visite_tecnico_id_fkey(tecnico_cognome)')
         .eq('visita_id', visita_id).maybeSingle()
       if (error) console.warn('upload-pdf: dati del verbale non letti:', error.message)
+      /* (06/11/2026, chiesto dall'utente) UNA BOZZA NON VA IN ARCHIVIO, e quindi non parte: la pagina passa di qui
+         prima di mandare il verbale all'impresa. Il 06/11 quattro bozze (0075, 0077-0079) erano partite cosi'.
+         Se lo stato non si legge, ci si ferma lo stesso: un invio rifiutato si rifa', una bozza spedita no. */
+      if (!verifica && (error || !v || (v as any).stato !== 'definitivo')) {
+        const msg = (error || !v)
+          ? 'non sono riuscito a leggere lo stato del verbale: invio fermato, riprova'
+          : `il verbale ${v.nr_verbale || ''} e' ancora in bozza: si chiude con «Definitivo» e poi si invia`
+        return new Response(JSON.stringify({ ok: false, error: msg }), { status: 409, headers: { 'Content-Type': 'application/json', ...CORS } })
+      }
       if (v) info = {
         nr: v.nr_verbale || info.nr, data: v.data_visita || info.data,
         impresa: (v as any).imprese?.impresa_nome || '', comune: (v as any).cantieri?.comune_nome || '',
