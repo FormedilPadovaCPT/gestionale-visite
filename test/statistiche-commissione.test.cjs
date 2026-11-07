@@ -43,19 +43,11 @@ function verifica(src, sql) {
   // in testa: i numeri del documento
   prova(t.includes('13,6% visite con almeno una non conformità (125 su 918)'), '13,6%: 125 su 918')
   prova(t.includes('17,5% nei cantieri privati, contro 5,0% dei pubblici'), 'privato 17,5%, pubblico 5,0%')
-  prova(t.includes('20,6% privati, imprese sotto i 10 addetti; 12,0% le altre'), 'privati sotto i 10 addetti 20,6%, le altre 12,0%')
   prova(t.includes("30,1% quando l'impresa visitata è una subappaltatrice (73 visite)"), 'subappaltatrice 30,1%')
-  // 1. dimensione
-  haRiga('da 1 a 4 212 34 16,0% 5 20,3%')
-  haRiga('da 5 a 9 116 23 19,8% 2 31,0%')
-  haRiga('da 10 a 49 170 18 10,6% 3 15,9%')
-  haRiga('50 e oltre 176 7 4,0% 1 4,0%')
-  haRiga('addetti non noti 244 43 17,6% 6 27,5%')
-  haRiga('Totale 918 125 13,6% 17 19,6%')
-  haRiga('da 1 a 4 159 19,5% 53 5,7%')
-  haRiga('50 e oltre 40 12,5% 136 1,5%')
-  haRiga('addetti non noti 213 17,8% 31 16,1%')
-  prova(t.includes('noti per 674 visite su 918'), 'addetti noti per 674 visite su 918')
+  // 07/11/2026: niente dipendenti dell'anagrafica. Anche se il database mandasse ancora «dimensione», la pagina non la usa.
+  prova(!/addett/i.test(t), 'la pagina non parla di addetti')
+  prova(!/Dimensione dell/.test(t), "niente sezione «Dimensione dell'impresa»")
+  prova(!/d\.dimensione|numero_addetti/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')), 'il codice non legge la dimensione')
   // 2. committente
   haRiga('Privato 636 111 17,5% 25,6%')
   haRiga('altre visite 556 101 18,2% 27,3%')
@@ -90,8 +82,8 @@ function verifica(src, sql) {
   // 6. sospese: solo conteggi
   prova(t.includes('41 visite rivolte a un\'impresa sospesa, a 27 imprese'), 'sospese principali 41 visite, 27 imprese')
   prova(t.includes('87 visite con almeno un\'impresa sospesa fra tutte le presenti: 47 imprese'), 'sospese fra tutte le presenti 47 in 87 (foto del verbale)')
-  prova((h.match(/<section class="com-sez/g) || []).length === 6, 'sei sezioni in riquadri')
-  prova(/<span>6<\/span>Le visite sul territorio/.test(h) && /<span>5<\/span>Imprese sospese/.test(h), 'sospese 5, territorio 6')
+  prova((h.match(/<section class="com-sez/g) || []).length === 5, 'cinque sezioni in riquadri (la dimensione è tolta)')
+  prova(/<span>5<\/span>Le visite sul territorio/.test(h) && /<span>4<\/span>Imprese sospese/.test(h), 'sospese 4, territorio 5')
   // niente dati per tecnico, nessun nome di impresa
   prova(!/tecnic[oi] [A-Z]|Caon|De Marco|Bortolami/.test(t), 'nessun nome di tecnico')
   prova(t.includes('nessun numero è per singolo tecnico'), 'la scheda dice che non ci sono dati per tecnico')

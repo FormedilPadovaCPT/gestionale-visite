@@ -56,7 +56,6 @@
     return { da: y + '-10-01', a: (y + 1) + '-09-30', nome: "l'esercizio " + y + '/' + (y + 1) + ' (1 ottobre ' + y + ' – 30 settembre ' + (y + 1) + ')' };
   }
 
-  const CLASSI = { '1-4': 'da 1 a 4', '5-9': 'da 5 a 9', '10-49': 'da 10 a 49', '50+': '50 e oltre', nn: 'addetti non noti' };
   const RUOLI = { 'affidataria ed esecutrice': 'Affidataria ed esecutrice', esecutrice: 'Esecutrice', subappaltatrice: 'Subappaltatrice', affidataria: 'Affidataria (non esegue)', 'lavoratore autonomo': 'Lavoratore autonomo', 'non indicato': 'Ruolo non indicato' };
   const maiusc = (s) => { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); };
   const somma = (righe, campo) => righe.reduce((t, r) => t + (+r[campo] || 0), 0);
@@ -77,7 +76,6 @@
     let h = '<p class="com-periodo">' + esc(maiusc(per.nome)) + ', per data della visita · <b>vale solo il filtro Esercizio</b> · nessun numero è per singolo tecnico.</p>';
     if (!T) return h + '<p class="com-nota">Nessuna visita nel periodo scelto.</p>';
 
-    const dim = Array.isArray(d.dimensione) ? d.dimensione : [];
     const com = Array.isArray(d.committente) ? d.committente : [];
     const ruo = Array.isArray(d.ruolo) ? d.ruolo : [];
     const sub = Array.isArray(d.subappalto) ? d.subappalto : [];
@@ -87,30 +85,20 @@
     const ct = (c, s) => com.filter((r) => r.ct === c && (s == null || !!r.serv === s));
     const priv = ct('privato'), pub = ct('pubblico');
     const rSub = ruo.find((r) => r.ruolo === 'subappaltatrice') || { visite: 0, nc: 0 };
-    const sotto = dim.filter((r) => r.classe === '1-4' || r.classe === '5-9'), sopra = dim.filter((r) => r.classe === '10-49' || r.classe === '50+');
 
     // in testa: i quattro numeri della pagina e la legenda in una riga
     const kpi = [
       [quota(d.con_nc, T), 'visite con almeno una non conformità (' + num(d.con_nc) + ' su ' + num(T) + ')'],
       [quota(somma(priv, 'nc'), somma(priv, 'visite')) || '—', 'nei cantieri privati, contro ' + (quota(somma(pub, 'nc'), somma(pub, 'visite')) || '—') + ' dei pubblici'],
-      [quota(somma(sotto, 'priv_nc'), somma(sotto, 'priv_visite')) || '—', 'privati, imprese sotto i 10 addetti; ' + (quota(somma(sopra, 'priv_nc'), somma(sopra, 'priv_visite')) || '—') + ' le altre'],
       [+rSub.visite >= SOGLIA_PICCOLO ? quota(rSub.nc, rSub.visite) : '—', "quando l'impresa visitata è una subappaltatrice (" + num(rSub.visite) + ' visite)'],
     ];
     h += '<div class="com-kpi">' + kpi.map((k) => '<div><b>' + esc(k[0]) + '</b><span>' + esc(k[1]) + '</span></div>').join('') + '</div>';
     h += '<p class="com-leggi"><b>Come si leggono.</b> <b>% NC</b> = visite con almeno una NC− o NC+ nella check-list (ogni visita conta una volta) · <b>NC gravi</b> = visite con almeno una NC+ · <b>% rischio</b> = IPC medio o alto · impresa di riferimento = la principale della visita · escluse le eliminate · <span class="com-piccolo">pochi dati</span> = meno di ' + SOGLIA_PICCOLO + ' visite · ⚠ = meno di ' + SOGLIA_POCHE + ', da leggere con prudenza.</p>';
     h += '<div class="com-griglia">';
 
-    // 1. dimensione: le due tabelle una accanto all'altra
-    const conAdd = T - +(dim.find((r) => r.classe === 'nn') || {}).visite || 0;
-    const rDim = dim.map((r) => ({ cls: r.classe === 'nn' ? 'com-grigia' : '', celle: [esc(CLASSI[r.classe] || r.classe), num(r.visite), num(r.nc), perc(r.nc, r.visite), num(r.ncg), perc(r.rischio, r.visite, 'r')] }));
-    rDim.push({ cls: 'com-tot', celle: ['Totale', num(T), num(d.con_nc), perc(d.con_nc, T), num(d.con_ncg), perc(d.rischio, T, 'r')] });
-    const t1 = '<div><p class="com-sottot">Tutte le visite</p>' + tabella(['Addetti', 'Visite', 'Con NC', '% NC', 'NC gravi', '% rischio'], rDim) + '</div>';
-    const t2 = '<div><p class="com-sottot">Privato e pubblico separati</p>' + tabella(['Addetti', 'Privato', '% NC', 'Pubblico', '% NC'],
-      dim.map((r) => ({ cls: r.classe === 'nn' ? 'com-grigia' : '', celle: [esc(CLASSI[r.classe] || r.classe), num(r.priv_visite), perc(r.priv_nc, r.priv_visite), num(r.pub_visite), perc(r.pub_nc, r.pub_visite)] }))) + '</div>';
-    h += sezione(1, "Dimensione dell'impresa", '<div class="com-due">' + t1 + t2 + '</div>',
-      "Addetti dell'impresa principale in anagrafica (oggi, non alla data della visita): noti per " + num(conAdd) + ' visite su ' + num(T) + '; 0 addetti contano in «da 1 a 4». Le grandi lavorano soprattutto nel pubblico, dove le NC sono meno: fra i soli privati, '
-      + (quota(somma(sotto, 'priv_nc'), somma(sotto, 'priv_visite')) || '—') + ' sotto i 10 addetti (' + num(somma(sotto, 'priv_visite')) + ' visite) e ' + (quota(somma(sopra, 'priv_nc'), somma(sopra, 'priv_visite')) || '—') + ' da 10 in su (' + num(somma(sopra, 'priv_visite')) + ').', true);
-
+    /* 07/11/2026, regola dell'utente: le statistiche si fanno coi dati scritti dal tecnico nel verbale. La sezione
+       «Dimensione dell'impresa» usava i dipendenti dell'anagrafica (imprese.numero_addetti), che non si usano mai:
+       tolta qui e nel database (dash_commissione_calcolo non li calcola più). */
     // 2. committente
     const rCom = [];
     [['privato', 'Privato'], ['pubblico', 'Pubblico'], ['non_indicato', 'Committente non indicato']].forEach(([k, nome]) => {
@@ -121,12 +109,12 @@
         rCom.push({ cls: 'com-sotto', celle: [sn, num(n), num(somma(g, 'nc')), perc(somma(g, 'nc'), n), perc(somma(g, 'rischio'), n, 'r')] });
       });
     });
-    h += sezione(2, 'Committente pubblico o privato', tabella(['Committente e tipo di visita', 'Visite', 'Con NC', '% NC', '% rischio'], rCom),
+    h += sezione(1, 'Committente pubblico o privato', tabella(['Committente e tipo di visita', 'Visite', 'Con NC', '% NC', '% rischio'], rCom),
       'Committente dalla sua scheda. «Su richiesta o in serie» = visite su richiesta, in serie e consulenze con attestazione; «altre» = programmate, del CPT, stage, segnalazioni.');
 
     // 3. ruolo e subappalto
     const sSi = sub.find((r) => r.con_sub) || { visite: 0, nc: 0 }, sNo = sub.find((r) => !r.con_sub) || { visite: 0, nc: 0 };
-    h += sezione(3, 'Affidataria o subappaltatrice', tabella(["Ruolo dell'impresa visitata", 'Visite', 'Con NC', '% NC', 'NC gravi', '% rischio'],
+    h += sezione(2, 'Affidataria o subappaltatrice', tabella(["Ruolo dell'impresa visitata", 'Visite', 'Con NC', '% NC', 'NC gravi', '% rischio'],
       ruo.map((r) => ({ celle: [esc(RUOLI[r.ruolo] || maiusc(r.ruolo)), num(r.visite), num(r.nc), perc(r.nc, r.visite), num(r.ncg), perc(r.rischio, r.visite, 'r')] }))),
       "Ruolo dell'impresa principale. Con subappaltatrici fra le presenti: " + (quota(sSi.nc, sSi.visite) || '—') + ' di visite con NC (' + num(sSi.visite) + ' visite); senza: ' + (quota(sNo.nc, sNo.visite) || '—') + ' (' + num(sNo.visite) + ').');
 
@@ -136,11 +124,11 @@
       .map(([g, nome, cls]) => ({ cls, celle: [nome, num(c(g, true).imprese), num(c(g, true).visite), num(c(g, false).imprese), num(c(g, false).visite)] }));
     const fo = d.cassa_foto || {};
     const tutteCeiv = c('tutte', true).imprese, servCeiv = c('servizi', true).imprese;
-    h += sezione(4, 'Imprese C.E.I.V. e servizi', tabella(['', 'Imprese C.E.I.V.', 'Visite', 'Non iscritte', 'Visite'], rCei),
+    h += sezione(3, 'Imprese C.E.I.V. e servizi', tabella(['', 'Imprese C.E.I.V.', 'Visite', 'Non iscritte', 'Visite'], rCei),
       'Imprese C.E.I.V. visitate: <b>' + num(tutteCeiv) + '</b>, di cui ' + num(servCeiv) + (tutteCeiv && servCeiv ? ' (' + quota(servCeiv, tutteCeiv) + ')' : '') + ' con un servizio. C.E.I.V. = attiva o sospesa nella foto del verbale (alla data della visita per ' + num(fo.alla_data_visita) + ' visite, stato attuale fotografato per ' + num(fo.stato_attuale) + (+fo.senza_foto ? ', stato di oggi per ' + num(fo.senza_foto) + ' senza foto' : '') + "). Un'impresa può stare in più righe.");
 
     // 5. sospese: solo conteggi
-    h += sezione(5, 'Imprese sospese in Cassa Edile',
+    h += sezione(4, 'Imprese sospese in Cassa Edile',
       "<div class=\"com-mini\"><div><b>" + num(so.principali_visite) + "</b><span>visite rivolte a un'impresa sospesa, a <em>" + num(so.principali_imprese) + '</em> imprese</span></div>'
       + "<div><b>" + num(so.tutte_visite) + "</b><span>visite con almeno un'impresa sospesa fra tutte le presenti: <em>" + num(so.tutte_imprese) + '</em> imprese</span></div></div>',
       "«Sospesa»: iscrizione alla Cassa sospesa, di solito per un'irregolarità nei versamenti; l'impresa però lavora. Solo conteggi: l'elenco qui non si mostra. Stato dalla foto del verbale.");
@@ -155,7 +143,7 @@
           num(r.visite), '<span class="com-p com-p-q"><i><b style="width:' + Math.round((+r.visite || 0) / T * 100) + '%"></b></i>' + (quota(r.visite, T) || '—') + '</span>', num(r.cantieri),
           spec ? num(r.comuni_toccati) : num(r.comuni_toccati) + ' su ' + num(r.comuni_area), perc(r.nc, r.visite), perc(r.rischio, r.visite, 'r')] };
     });
-    h += sezione(6, 'Le visite sul territorio', tabella(['Area', 'Visite', 'Quota', 'Cantieri', 'Comuni toccati', '% NC', '% rischio'], rAree)
+    h += sezione(5, 'Le visite sul territorio', tabella(['Area', 'Visite', 'Quota', 'Cantieri', 'Comuni toccati', '% NC', '% rischio'], rAree)
       + (aree.some((r) => r.area_id === 'non_assegnato') ? '<p class="com-errore">⚠ Ci sono visite in comuni della provincia che nessuna area comprende: va aggiunto il comune in aree_territorio_comuni.</p>' : '')
       + '<details class="com-comuni"><summary>Quali comuni stanno in ogni area</summary>' + elencoComuni(aPd, comuni) + '</details>',
       'I ' + num(somma(aPd, 'comuni_area')) + ' comuni della provincia in ' + aPd.length + ' aree geografiche, indipendenti dalle zone dei tecnici; «comuni toccati» = con almeno una visita. Le aree le decide la segreteria (tabella aree_territorio).', true);
