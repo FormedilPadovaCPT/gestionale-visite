@@ -1516,6 +1516,17 @@
         "id": "doc-f-cosa"
       },
       "motivo": "documento nuovo o nuova versione di uno in vigore: elenco costruito dai documenti pubblicati, non scrive una colonna"
+    },
+    {
+      "id": "segr.pg-modello",
+      "app": "segreteria",
+      "classe": "interna",
+      "fonte": {
+        "tipo": "html",
+        "file": "js/post-grafica.js",
+        "id": "pg-modello"
+      },
+      "motivo": "modello dell'immagine proposta del post: decide come si disegna, non scrive nel database"
     }
   ],
   "segreteria_gia_presenti": [
