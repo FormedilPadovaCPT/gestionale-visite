@@ -1538,6 +1538,17 @@
         "id": "pg-foto"
       },
       "motivo": "foto dell'immagine proposta, scelta dall'archivio img/foto-post: decide che cosa si disegna, non scrive nel database"
+    },
+    {
+      "id": "segr.pg-colore",
+      "app": "segreteria",
+      "classe": "interna",
+      "fonte": {
+        "tipo": "html",
+        "file": "js/post-grafica.js",
+        "id": "pg-colore"
+      },
+      "motivo": "colore del pilastro nell'immagine proposta (arancio, grigio, verde, senza colore): decide come si disegna, non scrive nel database"
     }
   ],
   "segreteria_gia_presenti": [
