@@ -266,6 +266,14 @@
   function azzera() { daSnap(null); render(); }
 
   /* ── elenco e dettaglio ── */
+  /* «visita 2 di 3» sotto il numero di accesso nell'elenco delle visite (09/11/2026, chiesto dall'utente):
+     stessa dicitura del PDF (verbale_posizione) — «di 3» per le visite 1ª-3ª, «di 5» per 4ª e 5ª, solo il numero oltre.
+     Lo storico (prima del 01/10/2026) non ha ciclo e resta col solo accesso. */
+  function visitaDi(v) {
+    const n = v && v.ciclo_visita != null ? +v.ciclo_visita : 0;
+    if (!n) return '';
+    return 'visita ' + n + (n <= 3 ? ' di 3' : n <= 5 ? ' di 5' : '');
+  }
   function badge(v) {
     if (!v || v.ciclo_visita == null) return '';
     const c = v.visite_cicli || {};
@@ -382,5 +390,5 @@
     boxCoord().catch(() => {});
   }
 
-  window.CicliVisita = { regola, rientro, proponi, render, pronto, campi, daSnap, azzera, calcRitorno, regolaAttuale, numeroVisita, numeroCiclo, attivo, autorizzata, badge, dettaglio, boxCoord, decidi, esito, correggi, etichettaMotivo, MOTIVI, PERCORSI, ESITI, proposta: () => _prop };
+  window.CicliVisita = { regola, rientro, proponi, render, pronto, campi, daSnap, azzera, calcRitorno, regolaAttuale, numeroVisita, numeroCiclo, attivo, autorizzata, visitaDi, badge, dettaglio, boxCoord, decidi, esito, correggi, etichettaMotivo, MOTIVI, PERCORSI, ESITI, proposta: () => _prop };
 })();

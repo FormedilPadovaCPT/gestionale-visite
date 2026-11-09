@@ -8063,7 +8063,7 @@ function vtRow(v){
   }
   return`<tr class="row-detail-hover" data-act="detail-visita" data-id="${v.visita_id}"${isElim?' style="opacity:.55"':''}>
     <td>${v.nr_verbale||'-'}${window.FuoriProcedura?FuoriProcedura.badge(v):''}${window.CicliVisita?CicliVisita.badge(v):''}${isElim?' <span class="badge" style="background:#c0392b;color:#fff">eliminata</span>':''}</td><td>${fmtDate(v.data_visita)}</td>
-    <td style="text-align:center;font-weight:600">${v.acc_cant?v.acc_cant+'°':'–'}</td>
+    <td style="text-align:center;font-weight:600">${v.acc_cant?v.acc_cant+'°':'–'}${(window.CicliVisita&&CicliVisita.visitaDi)?(t=>t?`<div style="font-size:10px;font-weight:400;color:#888;white-space:nowrap" title="Visita del ciclo (dal 01/10/2026 il ciclo conta solo le visite da quella data)">${t}</div>`:'')(CicliVisita.visitaDi(v)):''}</td>
     <td>${cant}</td><td>${v.imprese?.impresa_nome||'-'}</td>
     <td><span class="badge ${ipcCls(ipc)}">${ipcLbl(ipc)}</span></td>
     ${_lcCell(v)}
@@ -17277,7 +17277,7 @@ document.addEventListener('input',function(ev){
 <script src="rientri-giorni.js?v=7"></script>
 <script src="statistiche-commissione.js?v=3"></script>
 <!-- cicli di visita (20/10/2026): proposta alla chiusura del verbale, regola sulla visita del ciclo, Zona Coordinatore; statistiche dei cicli -->
-<script src="cicli-visita.js?v=1"></script>
+<script src="cicli-visita.js?v=2"></script>
 <script src="statistiche-cicli.js?v=1"></script>
 <script src="veste-v2.js?v=54"></script>
 <!-- manuali d’uso: ultima versione pubblicata, dalla edge function manuali -->

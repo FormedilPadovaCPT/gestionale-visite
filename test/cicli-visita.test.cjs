@@ -122,6 +122,7 @@ async function verifica(src) {
 
   // 5. il badge e il dettaglio
   prova(C.badge({ ciclo_visita: 2, ciclo_divergente: true, visite_cicli: { numero: 1, stato: 'aperto' } }).includes('1·v2') && C.badge({ ciclo_visita: null }) === '', 'badge: ciclo·visita, niente sullo storico')
+  prova(C.visitaDi({ ciclo_visita: 1 }) === 'visita 1 di 3' && C.visitaDi({ ciclo_visita: 4 }) === 'visita 4 di 5' && C.visitaDi({ ciclo_visita: 6 }) === 'visita 6' && C.visitaDi({ ciclo_visita: null }) === '', 'elenco: «visita N di 3/5» come sul PDF, niente sullo storico')
   prova(C.dettaglio({ ciclo_visita: 3, ciclo_esito: 'fermo', visite_cicli: { numero: 2, n_visite: 3, stato: 'fermo' }, ciclo_proposta: { proposta: 'continua', motivo: 'stesse imprese' } }).some((r) => /Coordinatore/.test(r[1])), 'dettaglio: il ciclo fermo lo dice')
 
   // 6. gli agganci
