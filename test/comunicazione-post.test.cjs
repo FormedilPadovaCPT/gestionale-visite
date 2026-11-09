@@ -39,7 +39,11 @@ assert.ok(/if\(view==='comunicazione'&&window\.comunicazionePost\)window\.comuni
 assert.ok(/<script src="comunicazione-post\.js\?v=\d+"><\/script>/.test(html), 'lo script è caricato');
 assert.ok(/direttore: +\{ nome: 'Direttore', +menu: \['direzione', 'comunicazione',/.test(veste), 'nel menu del Direttore');
 assert.ok(/coordinatore: \{ nome: 'Coordinatore', +menu: \[[^\]]*'\|', 'comunicazione', 'admin'\]/.test(veste), 'nel menu del Coordinatore');
-for (const r of ['segreteria', 'tecnico', 'docente', 'presidenza', 'consigliere']) {
+// (09/11/2026) la Presidenza ha la voce, ma la vede solo quando c'è un suo passaggio (spento finché il Direttore non conferma)
+assert.ok(/presidenza: +\{ nome: 'Presidenza', +menu: \['direzione', 'comunicazione',/.test(veste), 'nel menu della Presidenza');
+assert.ok(/\(v === 'comunicazione' && ruolo\(\) === 'presidenza' && !simula\(\) && b\.dataset\.comVisibile !== '1'\)/.test(veste), 'per la Presidenza la voce resta nascosta senza un suo passaggio, tranne nell\'anteprima');
+assert.ok(/nav\.dataset\.comVisibile = tutti \? '1' : '0';/.test(js), 'la voce la accende comunicazione-post.js quando c\'è un passaggio della Presidenza');
+for (const r of ['segreteria', 'tecnico', 'docente', 'consigliere']) {
   const riga = veste.split('\n').find((l) => new RegExp(`^\\s+${r}: +\\{ nome:`).test(l)) || '';
   assert.ok(riga && !riga.includes("'comunicazione'"), `non nel menu di ${r}`);
 }
@@ -47,7 +51,29 @@ assert.ok(/comunicazione-post\.js post-formato\.js/.test(deploy) && /- 'comunica
 assert.ok(fs.existsSync(path.join(__dirname, '..', 'post-formato.js')), 'la copia della formattazione c\'è (la tiene allineata verifica-post-formato.mjs della segreteria)');
 
 // le decisioni
-assert.ok(/const pulsanti = !_come && \(Rv\.coord \|\| Rv\.direttore\);/.test(js), 'i pulsanti solo a chi decide davvero, non nell\'anteprima');
+assert.ok(/const pulsanti = !_come && \(Rv\.coord \|\| Rv\.direttore \|\| Rv\.pres\);/.test(js), 'i pulsanti solo a chi decide davvero, non nell\'anteprima');
+
+// la Presidenza (09/11/2026): vede i suoi, decide una volta, il post come uscirà; nell'esempio i pulsanti sono inattivi
+const righeP = [
+  { id: 5, verso: 'presidenza', stato: 'in_attesa', richiesto_il: '2026-11-09T09:00:00Z', decisioni: { presidente: { esito: 'approvato' } } },
+  { id: 6, verso: 'direttore', stato: 'in_attesa', richiesto_il: '2026-11-09T08:00:00Z' },
+];
+assert.deepStrictEqual(C.daVedere(righeP, { pres: true }).map((r) => r.id), [5], 'la Presidenza vede i suoi');
+assert.strictEqual(C.verso({ pres: true }), 'presidenza');
+assert.strictEqual(C.miaDecisione(righeP[0], { carica: 'presidente' }).esito, 'approvato', 'il Presidente ha già deciso');
+assert.strictEqual(C.miaDecisione(righeP[0], { carica: 'vicepresidente' }), null, 'il Vicepresidente no');
+const nessunF = null;
+const sP = C.schedaPres({ id: 7, verso: 'presidenza', stato: 'in_attesa', decisioni: {}, nota_richiesta: '<b>motivo</b>',
+  testi: { titolo: 'Titolo <x>', testo_telegram: 'testo <script>', immagine_url: 'https://x/a.png', hashtag: '#A' } }, nessunF, { carica: 'vicepresidente' }, { pulsanti: true });
+assert.ok(sP.includes('data-cp-esito="approvato"') && sP.includes('data-cp-esito="approvato_indicazioni"') && sP.includes('data-cp-esito="non_approvato"'), 'tre pulsanti a chi deve decidere');
+assert.ok(!sP.includes('<script>') && !sP.includes('<b>motivo</b>') && sP.includes('&lt;b&gt;motivo'), 'testi e motivo ripuliti');
+assert.ok(sP.includes('class="cp-tel"') && sP.includes('src="https://x/a.png"'), 'il post si vede come uscirà, con l\'immagine');
+const sEs = C.schedaPres({ id: 'es1', verso: 'presidenza', stato: 'in_attesa', decisioni: {}, testi: { titolo: 'E', testo_telegram: 't' } }, nessunF, { carica: null }, { pulsanti: false, esempio: true });
+assert.ok(!sEs.includes('data-cp-esito') && (sEs.match(/ disabled/g) || []).length === 3, 'nell\'esempio i pulsanti si vedono ma non fanno niente');
+const sGia = C.schedaPres(righeP[0], nessunF, { carica: 'presidente' }, { pulsanti: true });
+assert.ok(!sGia.includes('data-cp-esito') && /Hai già deciso/.test(sGia), 'chi ha già deciso non ha più i pulsanti');
+assert.ok(/radice\.sb\.rpc\('s_post_decidi', \{ p_passaggio: r\.id, p_esito: esito, p_nota: nota \? nota\.trim\(\) : null \}\)/.test(js), 'anche per la Presidenza decide il database');
+assert.ok(/\.eq\('giro', 'serie-918-visite'\)\.eq\('stato', 'bozza'\)/.test(js) && /if \(_come === 'presidenza' && !attesa\.length\)/.test(js), 'l\'esempio solo nell\'anteprima e solo se non c\'è niente di vero');
 assert.ok(/const mio = pulsanti && r\.verso === verso\(R\);/.test(js), 'e solo sui propri passaggi');
 assert.ok(/radice\.sb\.rpc\('s_post_decidi', \{ p_passaggio: id, p_esito: esito, p_nota: nota \? nota\.trim\(\) : null \}\)/.test(js), 'decide il database');
 assert.ok(/if \(nota\.trim\(\)\.length < 3\) \{ avviso\('Scrivi due righe/.test(js), 'modifiche, indicazioni e «non approvo» vogliono la nota');

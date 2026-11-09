@@ -71,7 +71,9 @@
     // (06/11/2026, chiesto dall'utente) «📣 Comunicazione»: i post per i social da approvare (comunicazione-post.js); anche al Coordinatore, per il visto
     direttore:    { nome: 'Direttore',       menu: ['direzione', 'comunicazione', 'statistiche', 'dashboard', 'appuntamenti', 'corsi'], apre: 'direzione', lettura: true },
     // il calendario è del solo Direttore (deciso dall'utente il 03/10/2026): la Presidenza vede quello che le compete
-    presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'statistiche', 'dashboard', 'corsi'], apre: 'direzione', lettura: true },
+    // (09/11/2026, chiesto dall'utente) «📣 Comunicazione»: i post che toccano le parti li approvano Presidente e Vicepresidente.
+    // La voce compare solo quando c'è un passaggio della Presidenza (data-com-visibile, comunicazione-post.js): spento finché il Direttore non conferma
+    presidenza:   { nome: 'Presidenza',      menu: ['direzione', 'comunicazione', 'statistiche', 'dashboard', 'corsi'], apre: 'direzione', lettura: true },
     // (03/10/2026, corretto dall'utente dopo aver guardato l'anteprima) il consigliere apre sulla Mappa e non vede il calendario
     consigliere:  { nome: 'Consigliere',     menu: ['dashboard', 'statistiche', 'corsi'], apre: 'dashboard', lettura: true },
   };
@@ -418,7 +420,7 @@ body.v2 .v2-scuro::placeholder{color:#888!important}
       const v = b.dataset.view;
       if (b.dataset.v2Etichetta === undefined) { b.dataset.v2Etichetta = b.firstChild && b.firstChild.nodeType === 3 ? b.firstChild.textContent : ''; b.dataset.v2Mostra = b.style.display; }
       const o = v && ordine[v];
-      if (!o || (v === 'chat' && b.dataset.chatVisibile !== '1') || (v === 'documenti' && b.dataset.docVisibile !== '1')) { b.style.display = 'none'; return; }
+      if (!o || (v === 'chat' && b.dataset.chatVisibile !== '1') || (v === 'documenti' && b.dataset.docVisibile !== '1') || (v === 'comunicazione' && ruolo() === 'presidenza' && !simula() && b.dataset.comVisibile !== '1')) { b.style.display = 'none'; return; }
       b.style.display = ''; b.style.order = String(o.n); b.style.marginLeft = o.primoADestra ? 'auto' : '';
       b.classList.toggle('v2-cta', v === 'form');
       let et = ETICHETTE[v];
