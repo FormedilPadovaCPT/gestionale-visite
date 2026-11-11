@@ -5,8 +5,11 @@
 //   · se il file del verbale c'e' gia' e i dati non sono cambiati (stessa «impronta» mandata dalla
 //     pagina) non si scrive niente e si restituisce quello che c'e';
 //   · se i dati sono cambiati si SOSTITUISCE il contenuto dello stesso file (stesso id, stesso link
-//     pubblico): niente piu' copie «(1)», «(2)»;
+//     pubblico): niente piu' copie «(1)», «(2)» — ma SOLO se il file e' del gestionale (scelta.js);
 //   · altrimenti si crea, con il link pubblico in lettura come prima (lo chiede l'utente: qualcosa lo usa).
+//     ⚠️ (11/11/2026) Un verbale storico gia' in archivio (senza `visita_id`) non si sovrascrive mai: il
+//     PDF del gestionale gli si crea accanto (esito «creato_accanto»), col suffisso
+//     `_rigenerazione-gestionale-N` se il nome sarebbe lo stesso.
 // Se l'archivio non si raggiunge, il PDF va nella cartella di prima (DRIVE_VERBALI_FOLDER_ID), come
 // prima del 09/10: l'invio del verbale non deve mai fermarsi per l'archivio. La risposta lo dice.
 //
@@ -28,6 +31,7 @@ import { getAccessToken } from '../_shared/google.ts'
 // (audit 05/09/2026: il token Google viene dal modulo condiviso, non piu' copiato qui)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { scegli, prefisso } from './scelta.js'
 
 /* ⚠️ CHI PUO' CHIAMARLA (14/09/2026). verify_jwt=true lasciava passare la
    chiave anon, che sta in chiaro nel repository pubblico del gestionale:
@@ -59,8 +63,8 @@ const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files'
 const TUTTI = 'supportsAllDrives=true&includeItemsFromAllDrives=true'
 const qv = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 
-async function cerca(token: string, q: string, campi = 'files(id,name)'): Promise<any[]> {
-  const r = await fetch(`${DRIVE}?q=${encodeURIComponent(q)}&fields=${encodeURIComponent(campi)}&pageSize=20&${TUTTI}`,
+async function cerca(token: string, q: string, campi = 'files(id,name)', quanti = 20): Promise<any[]> {
+  const r = await fetch(`${DRIVE}?q=${encodeURIComponent(q)}&fields=${encodeURIComponent(campi)}&pageSize=${quanti}&${TUTTI}`,
     { headers: { Authorization: `Bearer ${token}` } })
   const d = await r.json()
   if (!r.ok) throw new Error('Drive: ' + JSON.stringify(d).slice(0, 200))
@@ -220,43 +224,59 @@ serve(async (req) => {
     }
     if (!pdf_base64) throw new Error('pdf_base64 mancante')
 
-    // Il file di questo verbale, se c'e' gia': prima per l'identificativo della visita, poi per il numero
-    // (i file spostati a mano nell'archivio non hanno ancora l'identificativo).
+    // Il file di questo verbale, se c'e' gia'. ⚠️ (11/11/2026, rianalisi R224) Si TOCCA solo un file del
+    // gestionale: `visita_id` nelle appProperties e nome che da' il gestionale (scelta.js). I file trovati
+    // per prefisso di nome sono gli originali storici portati a mano nell'archivio (senza `visita_id`), i
+    // `_versione-sostituita`, i `-form`/`-cf` delle serie parallele: si leggono solo per non prenderne il
+    // nome, e il PDF del gestionale si crea ACCANTO. Prima qui si sostituiva il primo trovato per prefisso:
+    // cosi' si sono persi gli originali di 0697, 0716, 0731 e 0811 (ES 2025-26, recuperati da Drive).
     const campi = 'files(id,name,webViewLink,appProperties)'
-    let esist: any = null
-    if (visita_id) esist = (await cerca(token, `'${dove}' in parents and trashed=false and appProperties has { key='visita_id' and value='${qv(String(visita_id))}' }`, campi))[0] || null
-    if (!esist && archivio && /^Verbale_\d{4}_/.test(nome)) {
-      const pref = nome.slice(0, 13)   // «Verbale_0003_»
-      esist = (await cerca(token, `'${dove}' in parents and trashed=false and name contains '${qv(pref)}'`, campi))
-        .find((f) => String(f.name).startsWith(pref)) || null
-    }
+    const perId = visita_id
+      ? await cerca(token, `'${dove}' in parents and trashed=false and appProperties has { key='visita_id' and value='${qv(String(visita_id))}' }`, campi, 100)
+      : []
+    const pref = prefisso(nome)   // «Verbale_0003_»
+    const perPrefisso = pref
+      ? (await cerca(token, `'${dove}' in parents and trashed=false and name contains '${qv(pref)}'`, campi, 100))
+          .filter((f) => String(f.name).toLowerCase().startsWith(pref.toLowerCase()))
+      : []
+    const scelta = scegli({ nome, visitaId: visita_id, perId, perPrefisso })
+    const esist: any = scelta.esist
+    const nomeFile = scelta.nome   // = nome, oppure …_rigenerazione-gestionale-N.pdf se il nome e' gia' di un altro file
     const props: Record<string, string> = { visita_id: String(visita_id || '') }
     if (impronta) props.impronta = String(impronta)
 
+    const NOTE: Record<string, string> = {
+      invariato: 'gia\' in archivio con gli stessi dati: non riscritto',
+      sostituito: 'sostituito il PDF del gestionale (stesso file, stesso link)',
+      creato: 'creato',
+      creato_accanto: 'creato accanto all\'originale: i file gia\' presenti con questo numero non sono stati toccati',
+    }
     const risposta = (f: any, esito: string) => new Response(JSON.stringify({
-      ok: true, esito, archivio, motivo: archivio ? undefined : motivo,
+      ok: true, esito, nota: NOTE[esito] || esito, archivio, motivo: archivio ? undefined : motivo,
       drive_file_id: f.id,
       drive_url: f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`,
-      file_name: f.name || nome,
+      file_name: f.name || nomeFile,
+      originali_intatti: scelta.originali.length ? scelta.originali : undefined,
     }), { headers: { 'Content-Type': 'application/json', ...CORS } })
 
-    // 1. stessi dati: non si riscrive niente (al massimo si corregge il nome)
+    // 1. stessi dati: non si riscrive niente (al massimo si corregge il nome, mai su quello di un altro file)
     if (esist && impronta && esist.appProperties?.impronta === String(impronta)) {
-      if (esist.name !== nome) {
+      if (esist.name !== nomeFile) {
         await fetch(`${DRIVE}/${esist.id}?supportsAllDrives=true`, {
           method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: nome }),
+          body: JSON.stringify({ name: nomeFile }),
         })
-        esist.name = nome
+        esist.name = nomeFile
       }
       return risposta(esist, 'invariato')
     }
 
     const pdfBytes = Uint8Array.from(atob(pdf_base64), (c) => c.charCodeAt(0))
 
-    // 2. dati cambiati: si sostituisce il contenuto dello STESSO file (id e link pubblico restano)
+    // 2. dati cambiati: si sostituisce il contenuto dello STESSO file (id e link pubblico restano).
+    //    Solo un file del gestionale: un originale storico non arriva mai qui (scelta.js).
     if (esist) {
-      const { body, tipo } = multipart({ name: nome, appProperties: props }, pdfBytes)
+      const { body, tipo } = multipart({ name: nomeFile, appProperties: props }, pdfBytes)
       const r = await fetch(`${UPLOAD}/${esist.id}?uploadType=multipart&fields=id,name,webViewLink&supportsAllDrives=true`,
         { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': tipo }, body })
       const d = await r.json()
@@ -264,8 +284,9 @@ serve(async (req) => {
       return risposta(d, 'sostituito')
     }
 
-    // 3. nuovo: si crea, con il link pubblico in lettura come prima
-    const { body, tipo } = multipart({ name: nome, parents: [dove], appProperties: props }, pdfBytes)
+    // 3. nuovo: si crea, con il link pubblico in lettura come prima. Se con lo stesso numero c'e' gia'
+    //    un file che non e' del gestionale (l'originale storico), il nuovo gli sta accanto.
+    const { body, tipo } = multipart({ name: nomeFile, parents: [dove], appProperties: props }, pdfBytes)
     const up = await fetch(`${UPLOAD}?uploadType=multipart&fields=id,name,webViewLink&supportsAllDrives=true`,
       { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': tipo }, body })
     const upData = await up.json()
@@ -275,7 +296,7 @@ serve(async (req) => {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ role: 'reader', type: 'anyone' }),
     })
-    return risposta(upData, 'creato')
+    return risposta(upData, scelta.originali.length ? 'creato_accanto' : 'creato')
 
   } catch (e) {
     console.error('upload-pdf error:', e)
