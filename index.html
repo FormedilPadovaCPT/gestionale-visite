@@ -10922,7 +10922,7 @@ async function genPDF(vid, output='save'){
           body:JSON.stringify({pdf_base64:b64,nr_verbale:v.nr_verbale,data_visita:v.data_visita,visita_id:vid,impronta:_impronta})
         })
         const d=await r.json()
-        if(d.ok)toast(d.esito==='invariato'?'PDF già in archivio, uguale: non l\'ho ricopiato ✓':d.esito==='sostituito'?'PDF aggiornato in archivio (sostituito il precedente) ✓':'PDF salvato in archivio ✓','ok')
+        if(d.ok)toast(d.esito==='invariato'?'PDF già in archivio, uguale: non l\'ho ricopiato ✓':d.esito==='sostituito'?'PDF aggiornato in archivio (sostituito il precedente) ✓':d.esito==='creato_accanto'?'PDF salvato in archivio accanto all\'originale, che resta com\'era ✓':'PDF salvato in archivio ✓','ok')
         else console.warn('upload-pdf:',d.error)
       }catch(e){console.warn('upload-pdf:',e)}
     }
