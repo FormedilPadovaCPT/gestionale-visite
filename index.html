@@ -3766,6 +3766,7 @@ function _formAzzera(){
 }
 async function initForm(snap=null){
   _tipiOrig=null
+  window._persScelta={}   // (11/11/2026) persona scelta per riquadro (presente, RL, CSP, CSE): riparte da zero a ogni verbale
   S.fd={}; S.checklist={}; S.noteChk={}; S.imprese=[]; S.lavorazioni=[]; S.savedId=null; S.foto={}; S._impOpen=0
   if(window.CicliVisita)CicliVisita.azzera()   // (20/10/2026) proposta e risposta del ciclo ripartono da zero
   S._formBase=null
@@ -9120,12 +9121,14 @@ const _PERS_RUOLI={presente:'Presente in visita',rl:'Resp. lavori',csp:'CSP',cse
 // ── scheda persona (modifica) ──
 let _mpId=null
 let _mpRiservati=[]
+let _mpCfPrima=''   // (11/11/2026) il codice fiscale com'era all'apertura: il tecnico lo scrive solo se manca
 async function editPersona(id){
   const{data:rows,error}=await sb.rpc('rubrica_persona_dettaglio',{p_id:id})
   const r=(rows||[])[0]
   if(error||!r){toast('Persona non trovata','err');return}
   _mpId=id
   _mpRiservati=r.contatti_riservati||[]
+  _mpCfPrima=r.cf||''
   // 04/10/2026: 1.074 persone hanno un titolo fuori elenco («geom.», «Dott. Ing.»): prima salvando diventava vuoto
   selComEScritto($('mp-titolo'),r.titolo||'');vSet('mp-nome',r.nome||'');vSet('mp-cognome',r.cognome||'')
   vSet('mp-cf',r.cf||'');vSet('mp-qualifica',r.qualifica||'');vSet('mp-email',r.email||'');vSet('mp-telefono',r.telefono||'')
@@ -9138,8 +9141,9 @@ async function editPersona(id){
   if(t)t.textContent=_mpFromRuolo?('👥 Scheda persona — '+(_PERS_RUOLI[_mpFromRuolo]||_mpFromRuolo)):'👥 Scheda persona'
   const qEl=$('mp-qualifica');if(qEl){qEl.readOnly=false;qEl.style.background='';qEl.title=''}
   const coord=!!window.__isCoord
-  $('mp-cf').disabled=!coord
-  $('mp-cf-note').textContent=coord?'':'(modificabile solo dalla segreteria)'
+  /* (11/11/2026, deciso dall'utente) il tecnico scrive il codice fiscale dove manca; cambiarlo resta della segreteria */
+  $('mp-cf').disabled=!PersOmonimi.cfScrivibile(coord,r.cf)
+  $('mp-cf-note').textContent=coord?'':r.cf?'(lo cambia solo la segreteria)':'(se lo conosci scrivilo: poi lo cambia solo la segreteria)'
   const _rw=$('mp-ruoli-edit-wrap');if(_rw)_rw.style.display=coord?'':'none'
   $('mp-ruoli').textContent=coord?'':'Ruoli visti nelle visite: '+((r.ruoli||[]).map(x=>_PERS_RUOLI[x]||x).join(', ')||'–')
   // ── riservatezza contatti: solo la segreteria vede e imposta le spunte ──
@@ -9175,8 +9179,24 @@ $('mp-salva').onclick=async()=>{
   ;[['email','mp-email'],['email2','mp-email2'],['email3','mp-email3'],['telefono','mp-telefono'],['telefono2','mp-telefono2']].forEach(([campo,elId])=>{
     if(isSeg||!_mpRiservati.includes(campo))upd[campo]=vGet(elId).trim()||null
   })
+  /* (11/11/2026) codice fiscale: la segreteria lo scrive e lo cambia; gli altri lo scrivono solo dove manca
+     (il database rifiuta comunque il cambio di un codice già scritto: trg_persone_0z_cf_solo_se_vuoto).
+     Prima di salvarlo si controllano carattere di controllo, lettere di nome e cognome, e che non sia di un'altra scheda. */
+  const _cfNuovo=vGet('mp-cf').replace(/\s+/g,'').toUpperCase()
+  if(PersOmonimi.cfScrivibile(window.__isCoord,_mpCfPrima)&&(_cfNuovo||window.__isCoord)){
+    if(_cfNuovo&&_cfNuovo!==String(_mpCfPrima||'').toUpperCase()){
+      const pb=PersOmonimi.cfProblema(_cfNuovo,nome,cog)
+      if(pb&&pb.grave){toast(pb.motivo,'warn',8000);return}
+      if(pb&&!window.__isCoord){toast(pb.motivo+' Correggi il codice o il nome; se sei sicuro, chiedi alla segreteria.','warn',10000);return}
+      if(pb&&!confirm(pb.motivo+'\n\nOK = salvo lo stesso'))return
+      const{data:_gia,error:_eGia}=await sb.from('persone').select('persona_id,titolo,nome,cognome').eq('elimina',0).eq('cf',_cfNuovo).limit(2)
+      if(_eGia){toast('Non sono riuscito a controllare se il codice fiscale è già in anagrafica ('+_eGia.message+'): non salvo. Riprova.','err');return}
+      const _altra=(_gia||[]).find(g=>g.persona_id!==_mpId)
+      if(_altra){toast('Questo codice fiscale è già di «'+PersOmonimi.etichetta(_altra)+'»: è la stessa persona, usa quella scheda.','warn',10000);return}
+    }
+    upd.cf=_cfNuovo||null
+  }
   if(window.__isCoord){
-    upd.cf=vGet('mp-cf').trim().toUpperCase()||null
     if($('mp-ruoli-edit-wrap')?.style.display!=='none'){
       const _rr=vGet('mp-ruoli-edit').trim()
       upd.ruoli=_rr?_rr.split(',').map(s=>s.trim()).filter(Boolean):[]
@@ -9191,24 +9211,24 @@ $('mp-salva').onclick=async()=>{
     if(!_mpNewRuolo)return
     const btn=$('mp-salva');btn.disabled=true
     try{
-      // controllo doppioni su nome+cognome normalizzati e ordinati (prende anche gli invertiti)
-      const _q=cog.replace(/[,()*%]/g,' ').trim()
+      /* controllo doppioni su nome+cognome normalizzati e ordinati (prende anche gli invertiti).
+         (11/11/2026, omonimi) Prima si poteva solo usare la scheda esistente: ora si sceglie fra quelle con
+         lo stesso nome, oppure si crea l'omonimo, purché qualcosa lo distingua (titolo, e-mail, telefono, CF).
+         Una lettura fallita non è «nessuno»: si ferma, invece di creare alla cieca. */
       let esistenti=[]
-      try{
-        const{data}=await sb.from('persone').select('*').eq('elimina',0).or('cognome.ilike.'+_q+',nome.ilike.'+_q).limit(50)
-        const k=[_normPers(nome),_normPers(cog)].sort().join('|')
-        esistenti=(data||[]).filter(r=>[_normPers(r.nome),_normPers(r.cognome)].sort().join('|')===k)
-      }catch(_e){}
+      try{esistenti=await _cercaInAnagrafica(nome,cog)}
+      catch(e){toast('Non sono riuscito a controllare se la persona è già in anagrafica ('+(e.message||e)+'): scheda non creata. Riprova.','err');return}
       if(esistenti.length){
-        const r=esistenti[0]
-        const et=[r.titolo,r.nome,r.cognome].filter(Boolean).join(' ')
-        const det=[r.qualifica,[r.email,r.telefono].filter(Boolean).join(' · ')].filter(Boolean).join('\n')
-        if(confirm('In anagrafica esiste già questa persona:\n\n'+et+(det?'\n'+det:'')+'\n\nOK = uso la scheda esistente (evita doppioni)\nAnnulla = torno indietro e correggo i dati')){
-          _applyPersonaAlForm(_mpNewRuolo,r)
+        const sc=_scegliFraOmonimi(esistenti,'In anagrafica c\'è già '+(esistenti.length===1?'una persona':esistenti.length+' persone')+' con questo nome:')
+        if(!sc)return
+        if(sc!=='nuova'){
+          _applyPersonaAlForm(_mpNewRuolo,sc)
           hide('modal-persona');_mpNewRuolo=null
           toast('Persona esistente collegata','ok')
+          return
         }
-        return
+        const _no=PersOmonimi.percheNonCreare({...upd,cf:upd.cf||_cfNuovo},esistenti)
+        if(_no){toast(_no,'warn',10000);return}
       }
       upd.ruoli=[_mpNewRuolo];upd.elimina=0
       const{data:ins,error}=await sb.from('persone').insert(upd).select().maybeSingle()
@@ -9354,6 +9374,9 @@ function _perParole(qb,testo,campi){
 }
 
 // ── autocomplete persone nel form visita ──
+/* (11/11/2026, omonimi) la persona scelta dall'elenco resta legata al riquadro: è quella che il salvataggio
+   aggiorna in anagrafica, anche se ci sono altre persone con lo stesso nome (persone-omonimi.js) */
+window._persScelta=window._persScelta||{}
 function attachPersonAC(cfg){
   const list=document.createElement('div')
   list.className='hidden'
@@ -9363,6 +9386,7 @@ function attachPersonAC(cfg){
   const hideL=()=>list.classList.add('hidden')
   const showAt=el=>{const r=el.getBoundingClientRect();list.style.left=(r.left+window.scrollX)+'px';list.style.top=(r.bottom+window.scrollY+2)+'px';list.classList.remove('hidden')}
   const pick=r=>{
+    if(cfg.ruolo&&r.persona_id)window._persScelta[cfg.ruolo]=r.persona_id
     const set=(id,v)=>{const el=$(id);if(el&&v)el.value=v}
     if(cfg.titolo&&r.titolo){const s=$(cfg.titolo);if(s&&[...s.options].some(o=>o.value===r.titolo||o.text===r.titolo))s.value=r.titolo}
     set(cfg.nome,r.nome);set(cfg.cog,r.cognome)
@@ -9387,6 +9411,7 @@ function attachPersonAC(cfg){
   // e le prime 8 in ordine di cognome: cercando per nome la persona restava spesso fuori (27/09/2026).
   let _seq=0
   const onInput=async ev=>{
+    if(cfg.ruolo)delete window._persScelta[cfg.ruolo]   // nome o cognome riscritti: la persona scelta prima non vale più
     const q=ev.target.value.trim()
     if(q.length<2){hideL();return}
     const testo=[cfg.nome,cfg.cog].map(id=>($(id)?.value||'')).join(' ')
@@ -9419,10 +9444,10 @@ function attachPersonAC(cfg){
     el.setAttribute('autocomplete','off')
   })
 }
-attachPersonAC({nome:'f-ppre-nome',cog:'f-ppre-cog',titolo:'f-ppre-titolo',tel:'f-tel-ppre',qual:'f-qual-ppre'})
-attachPersonAC({nome:'f-rl-nome',cog:'f-rl-cog',titolo:'f-rl-titolo',email:'f-rl-email',tel:'f-rl-tel'})
-attachPersonAC({nome:'f-csp-nome',cog:'f-csp-cog',titolo:'f-csp-titolo',email:'f-csp-email',tel:'f-csp-tel'})
-attachPersonAC({nome:'f-cse-nome',cog:'f-cse-cog',titolo:'f-cse-titolo',email:'f-cse-email',tel:'f-cse-tel'})
+attachPersonAC({ruolo:'presente',nome:'f-ppre-nome',cog:'f-ppre-cog',titolo:'f-ppre-titolo',tel:'f-tel-ppre',qual:'f-qual-ppre'})
+attachPersonAC({ruolo:'rl',nome:'f-rl-nome',cog:'f-rl-cog',titolo:'f-rl-titolo',email:'f-rl-email',tel:'f-rl-tel'})
+attachPersonAC({ruolo:'csp',nome:'f-csp-nome',cog:'f-csp-cog',titolo:'f-csp-titolo',email:'f-csp-email',tel:'f-csp-tel'})
+attachPersonAC({ruolo:'cse',nome:'f-cse-nome',cog:'f-cse-cog',titolo:'f-cse-titolo',email:'f-cse-email',tel:'f-cse-tel'})
 
 // ── NUOVA PERSONA dal form visita (stessa mascherina della scheda rubrica) ────
 // La qualifica di RL/CSP/CSE non si sceglie: il riquadro in cui si inserisce la determina.
@@ -9443,6 +9468,7 @@ function _normPers(s){
 }
 function _applyPersonaAlForm(ruolo,r){
   const cfg=_PERS_CFG[ruolo];if(!cfg||!r)return
+  if(r.persona_id)window._persScelta[ruolo]=r.persona_id
   const set=(id,v)=>{const el=$(id);if(el&&v)el.value=v}
   if(cfg.titolo&&r.titolo){const s2=$(cfg.titolo);if(s2&&[...s2.options].some(o=>o.value===r.titolo||o.text===r.titolo))s2.value=r.titolo}
   set(cfg.nome,r.nome);set(cfg.cog,r.cognome)
@@ -9459,24 +9485,51 @@ async function _cercaInAnagrafica(nome,cog){
   const filtri=[]
   if(n){filtri.push('nome.ilike.'+n);filtri.push('cognome.ilike.'+n)}
   if(c){filtri.push('nome.ilike.'+c);filtri.push('cognome.ilike.'+c)}
-  let data=null
-  try{const r=await sb.from('persone').select('*').eq('elimina',0).or(filtri.join(',')).limit(50);data=r.data}catch(_e){return[]}
+  /* (11/11/2026) una lettura fallita non è «nessuno»: prima tornava [] e il chiamante creava un doppione */
+  const r=await sb.from('persone').select('*').eq('elimina',0).or(filtri.join(',')).limit(50)
+  if(r.error)throw r.error
+  const data=r.data
   // confronto su nome+cognome normalizzati e ORDINATI: intercetta anche le schede invertite
   const k=[_normPers(n),_normPers(c)].sort().join('|')
   return (data||[]).filter(r=>[_normPers(r.nome),_normPers(r.cognome)].sort().join('|')===k)
+}
+/* (11/11/2026) più schede con lo stesso nome: si chiede quale. Restituisce la scheda, 'nuova' o null */
+function _scegliFraOmonimi(candidati,intro,conNuova=true){
+  const righe=candidati.map((r,i)=>(i+1)+') '+PersOmonimi.descrivi(r)).join('\n')
+  const ris=prompt(intro+'\n\n'+righe+'\n\nScrivi il numero della persona'+(conNuova?', oppure N se è un\'altra persona (un omonimo da aggiungere)':'')+'.\nLascia vuoto per tornare indietro.','')
+  const t=String(ris==null?'':ris).trim().toUpperCase()
+  if(!t)return null
+  if(conNuova&&t==='N')return 'nuova'
+  const n=parseInt(t,10)
+  if(n>=1&&n<=candidati.length)return candidati[n-1]
+  toast('Scelta non valida: scrivi uno dei numeri'+(conNuova?' oppure N':''),'warn');return null
 }
 window.apriSchedaPersona=async function(ruolo){
   const cfg=_PERS_CFG[ruolo];if(!cfg)return
   const nome=(vGet(cfg.nome)||'').trim(), cog=(vGet(cfg.cog)||'').trim()
   if(!nome&&!cog){toast('Scrivi prima nome e cognome','warn');return}
-  const trovate=await _cercaInAnagrafica(nome,cog)
+  let trovate
+  try{trovate=await _cercaInAnagrafica(nome,cog)}catch(e){toast('Non sono riuscito a leggere l\'anagrafica ('+(e.message||e)+'): riprova.','err');return}
   if(!trovate.length){
     if(confirm('"'+[nome,cog].filter(Boolean).join(' ')+'" non e ancora in anagrafica.\n\nOK = creo adesso la scheda\nAnnulla = la creo io al salvataggio del verbale'))nuovaPersona(ruolo)
     return
   }
-  if(trovate.length>1)toast(trovate.length+' schede con questo nominativo: apro la prima. Controlla i duplicati in rubrica','warn')
+  /* (11/11/2026) con più schede si apre quella del riquadro (scelta, o riconosciuta da e-mail, telefono, titolo);
+     se non si capisce quale sia si chiede — prima si apriva la prima, che poteva essere l'omonimo */
+  const es=PersOmonimi.scegli({nome,cognome:cog,titolo:cfg.titolo?vGet(cfg.titolo):'',email:cfg.email?vGet(cfg.email):'',
+    tel:cfg.tel?vGet(cfg.tel):'',sceltaId:window._persScelta[ruolo]},trovate)
+  let p=es.persona
+  if(!p){
+    const sc=_scegliFraOmonimi(es.candidati||trovate,es.motivo==='titolo'
+      ?'In anagrafica c\'è una persona con questo nome ma con un titolo diverso da quello scritto. È lei?'
+      :'In anagrafica ci sono '+(es.candidati||trovate).length+' persone con questo nome. Quale è quella del verbale?')
+    if(sc==='nuova'){nuovaPersona(ruolo);return}
+    if(!sc)return
+    p=sc
+  }
+  window._persScelta[ruolo]=p.persona_id
   _mpFromRuolo=ruolo
-  await editPersona(trovate[0].persona_id)
+  await editPersona(p.persona_id)
 }
 // Aggancio del doppio clic per DELEGA su document.
 // NB: NON usare DOMContentLoaded in questo modulo: c'e' un await top-level
@@ -9522,8 +9575,9 @@ window.nuovaPersona=function(ruolo){
     }
   }
   const coord=!!window.__isCoord
-  $('mp-cf').disabled=!coord
-  $('mp-cf-note').textContent=coord?'':'(modificabile solo dalla segreteria)'
+  _mpCfPrima=''   // scheda nuova: il codice fiscale lo può scrivere anche il tecnico
+  $('mp-cf').disabled=false
+  $('mp-cf-note').textContent=coord?'':'(se lo conosci scrivilo: poi lo cambia solo la segreteria)'
   $('mp-ruoli').textContent='Verrà salvata in anagrafica con il ruolo: '+(_PERS_RUOLI[ruolo]||ruolo)
   const t=$('mp-title');if(t)t.textContent='👥 Nuova persona — '+(_PERS_RUOLI[ruolo]||ruolo)
   // scheda nuova: nessun campo riservato ereditato dall'ultima persona aperta
@@ -9536,7 +9590,11 @@ window.nuovaPersona=function(ruolo){
 }
 
 // ── aggiorna l'anagrafica quando si salva una visita ──
+/* (11/11/2026, omonimi) la scheda da aggiornare è quella scelta nel riquadro; senza scelta, fra più schede
+   con lo stesso nome decidono e-mail, telefono e titolo (PersOmonimi.scegli). Se non si capisce quale sia
+   non si scrive su nessuna: prima si prendeva la prima, e i recapiti dell'uno finivano sulla scheda dell'altro. */
 async function upsertPersoneVisita(){
+  const _ambigue=[],_nonLette=[]
   const specs=[
     {t:'f-ppre-titolo',n:'f-ppre-nome',c:'f-ppre-cog',tel:'f-tel-ppre',q:'f-qual-ppre',ruolo:'presente'},
     {t:'f-rl-titolo',n:'f-rl-nome',c:'f-rl-cog',em:'f-rl-email',tel:'f-rl-tel',ruolo:'rl'},
@@ -9553,19 +9611,24 @@ async function upsertPersoneVisita(){
     // per RL/CSP/CSE la qualifica non si digita: la determina il riquadro di inserimento
     const qual=s.q?((vGet(s.q)||'').trim()||null):(_PERS_QUAL_AUTO[s.ruolo]||null)
     try{
-      const _campiP='persona_id,titolo,email,email2,email3,telefono,telefono2,qualifica,ruoli'
-      let qb=sb.from('persone').select(_campiP).eq('elimina',0).limit(1)
-      qb=nome?qb.ilike('nome',nome):qb.is('nome',null)
-      qb=cog?qb.ilike('cognome',cog):qb.is('cognome',null)
-      let{data:ex}=await qb
-      // nome e cognome scambiati: il database corregge le inversioni palesi al
-      // salvataggio, quindi la persona puo' gia' esistere nell'ordine giusto (14/09/2026)
-      if((!ex||!ex.length)&&nome&&cog){
-        const _inv=await sb.from('persone').select(_campiP).eq('elimina',0).ilike('nome',cog).ilike('cognome',nome).limit(1)
-        ex=_inv.data
+      // nome e cognome anche scambiati: il database corregge le inversioni palesi al salvataggio (14/09/2026)
+      const trovate=await _cercaInAnagrafica(nome,cog)
+      const sid=window._persScelta&&window._persScelta[s.ruolo]
+      if(sid&&!trovate.some(r=>r.persona_id===sid)){
+        const{data:sc,error:eSc}=await sb.from('persone').select('*').eq('persona_id',sid).eq('elimina',0).limit(1)
+        if(eSc)throw eSc
+        if(sc&&sc.length)trovate.push(sc[0])
       }
-      if(ex&&ex.length){
-        const r=ex[0],upd={}
+      const es=PersOmonimi.scegli({nome,cognome:cog,titolo,email,tel,sceltaId:sid},trovate)
+      if(es.ambigua){
+        const chi='«'+[titolo,nome,cog].filter(Boolean).join(' ')+'» ('+(_PERS_RUOLI[s.ruolo]||s.ruolo)+')'
+        _ambigue.push(es.motivo==='titolo'
+          ?chi+': in anagrafica c\'è «'+PersOmonimi.etichetta(es.candidati[0])+'», con un titolo diverso'
+          :chi+': in anagrafica ci sono '+es.candidati.length+' persone con questo nome')
+        continue
+      }
+      if(es.persona){
+        const r=es.persona,upd={}
         if(titolo&&!r.titolo)upd.titolo=titolo
         const _ems=[r.email,r.email2,r.email3].map(x=>(x||'').trim().toLowerCase())
         if(email&&!_ems.includes(email.toLowerCase())){
@@ -9587,8 +9650,11 @@ async function upsertPersoneVisita(){
       }else{
         await sb.from('persone').insert({titolo,nome:nome||null,cognome:cog||null,email,telefono:tel,qualifica:qual,ruoli:[s.ruolo],updated_by:S.user?.email||null})
       }
-    }catch(_e){console.warn('upsertPersone:',_e)}
+    }catch(_e){console.warn('upsertPersone:',_e);_nonLette.push([nome,cog].filter(Boolean).join(' '))}
   }
+  if(_ambigue.length)toast('Verbale salvato. Anagrafica non aggiornata per '+_ambigue.join('; ')
+    +'. Non si capisce quale sia: scegli la persona dall\'elenco che compare scrivendo il nome, oppure, se è un\'altra persona, creala col doppio clic sul nome.','warn',14000)
+  if(_nonLette.length)toast('Verbale salvato, ma l\'anagrafica non è stata aggiornata per: '+_nonLette.join(', ')+' (lettura non riuscita).','warn',9000)
 }
 // ── invio verbale: destinatari con scelta email alternativa ──
 /* (06/10/2026, chiesto dall'utente) ogni destinatario ha la sua spunta: il tecnico toglie chi non deve ricevere il
@@ -17244,9 +17310,10 @@ document.addEventListener('input',function(ev){
 <script src="scheda-impresa.js?v=2"></script>
 <script src="imprese-anagrafica.js?v=1"></script>
 <script src="dati-ufficiali.js?v=1"></script>
+<script src="persone-omonimi.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=7"></script>
-<script src="aiuto.js?v=38"></script>
+<script src="aiuto.js?v=39"></script>
 <script src="mail-respinte-tec.js?v=3"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=3"></script>
