@@ -29,6 +29,13 @@ assert.strictEqual(P.scegli({ nome: 'Carraro', cognome: 'Marco' }, [geom]).perso
 assert.ok(P.scegli({ nome: 'Luca', cognome: 'Carraro' }, [geom, ing]).nessuna, 'nessuno con quel nome: si può creare');
 assert.ok(P.scegli(MC, [{ ...ing, elimina: 1 }]).nessuna, 'le schede eliminate non contano');
 
+/* recapiti del Geom. rimasti nel riquadro dopo aver scelto l'Ing.: non si copiano */
+const alt = P.recapitiAltrui(ing, [geom, ing], 'info@carrarosicurezzacantieri.com', '340 3813287');
+assert.ok(alt.email && alt.tel && alt.chi.persona_id === 'g', 'e-mail e telefono del Geom. riconosciuti');
+const mio = P.recapitiAltrui(ing, [geom, ing], 'ing.carraro@studio.it', '');
+assert.ok(!mio.email && !mio.chi, 'un recapito nuovo si copia');
+assert.ok(/if\(email&&!_alt\.email&&/.test(html) && /if\(tel&&!_alt\.tel&&/.test(html), 'il salvataggio non copia i recapiti dell’omonimo');
+
 /* creare l'omonimo */
 assert.strictEqual(P.percheNonCreare({ titolo: 'Ing.', ...MC }, [geom]), '', 'l’Ing. si crea accanto al Geom.');
 assert.ok(P.percheNonCreare({ titolo: 'Geom.', ...MC }, [geom]), 'identico al Geom.: non si crea');

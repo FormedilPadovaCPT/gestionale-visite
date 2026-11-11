@@ -83,6 +83,18 @@
     return '';
   }
 
+  /* I recapiti scritti nel riquadro che stanno già sulla scheda di un OMONIMO non si copiano sulla scheda
+     scelta: scegliendo l'Ing. dall'elenco, nel riquadro possono essere rimasti e-mail e telefono del Geom.
+     Esito: { email, tel } veri se quel recapito è di un'altra scheda con lo stesso nome; chi = quella scheda. */
+  function recapitiAltrui(persona, schede, email, tel) {
+    const altre = (schede || []).filter((x) => x && x.persona_id !== persona.persona_id && x.elimina !== 1
+      && chiave(x.nome, x.cognome) === chiave(persona.nome, persona.cognome));
+    const em = String(email || '').trim().toLowerCase(), tl = String(tel || '').replace(/\D/g, '');
+    const diEm = em ? altre.find((x) => emailDi(x).includes(em)) : null;
+    const diTl = tl ? altre.find((x) => telDi(x).includes(tl)) : null;
+    return { email: !!diEm, tel: !!diTl, chi: diEm || diTl || null };
+  }
+
   /* ── codice fiscale ── */
   function cfValido(x) {
     const c = String(x || '').replace(/\s+/g, '').toUpperCase();
@@ -120,7 +132,7 @@
   /* chi può scrivere il codice fiscale della scheda: la segreteria sempre, gli altri solo dove manca */
   const cfScrivibile = (segreteria, cfAttuale) => !!segreteria || !String(cfAttuale || '').trim();
 
-  const api = { norm, chiave, titoliDiversi, etichetta, descrivi, scegli, percheNonCreare, cfValido, cfProblema, cfScrivibile, triCognome, triNome };
+  const api = { norm, chiave, titoliDiversi, etichetta, descrivi, scegli, percheNonCreare, recapitiAltrui, cfValido, cfProblema, cfScrivibile, triCognome, triNome };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PersOmonimi = api;
 })(typeof window !== 'undefined' ? window : globalThis);

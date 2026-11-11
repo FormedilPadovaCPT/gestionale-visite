@@ -9629,15 +9629,17 @@ async function upsertPersoneVisita(){
       }
       if(es.persona){
         const r=es.persona,upd={}
+        const _alt=PersOmonimi.recapitiAltrui(r,trovate,email,tel)   // recapiti di un omonimo rimasti nel riquadro: non si copiano
+        if(_alt.chi)_ambigue.push('«'+PersOmonimi.etichetta(r)+'» ('+(_PERS_RUOLI[s.ruolo]||s.ruolo)+'): '+(_alt.email&&_alt.tel?'e-mail e telefono scritti sono':_alt.email?'l\'e-mail scritta è':'il telefono scritto è')+' di «'+PersOmonimi.etichetta(_alt.chi)+'», non copiati sulla sua scheda: correggili nel riquadro')
         if(titolo&&!r.titolo)upd.titolo=titolo
         const _ems=[r.email,r.email2,r.email3].map(x=>(x||'').trim().toLowerCase())
-        if(email&&!_ems.includes(email.toLowerCase())){
+        if(email&&!_alt.email&&!_ems.includes(email.toLowerCase())){
           if(!r.email)upd.email=email
           else if(!r.email2)upd.email2=email
           else if(!r.email3)upd.email3=email
         }
         const _tls=[r.telefono,r.telefono2].map(x=>(x||'').replace(/\s/g,''))
-        if(tel&&!_tls.includes(tel.replace(/\s/g,''))){
+        if(tel&&!_alt.tel&&!_tls.includes(tel.replace(/\s/g,''))){
           if(!r.telefono)upd.telefono=tel
           else if(!r.telefono2)upd.telefono2=tel
         }
@@ -9652,7 +9654,7 @@ async function upsertPersoneVisita(){
       }
     }catch(_e){console.warn('upsertPersone:',_e);_nonLette.push([nome,cog].filter(Boolean).join(' '))}
   }
-  if(_ambigue.length)toast('Verbale salvato. Anagrafica non aggiornata per '+_ambigue.join('; ')
+  if(_ambigue.length)toast('Verbale salvato. Anagrafica da guardare: '+_ambigue.join('; ')
     +'. Non si capisce quale sia: scegli la persona dall\'elenco che compare scrivendo il nome, oppure, se è un\'altra persona, creala col doppio clic sul nome.','warn',14000)
   if(_nonLette.length)toast('Verbale salvato, ma l\'anagrafica non è stata aggiornata per: '+_nonLette.join(', ')+' (lettura non riuscita).','warn',9000)
 }
@@ -17310,7 +17312,7 @@ document.addEventListener('input',function(ev){
 <script src="scheda-impresa.js?v=2"></script>
 <script src="imprese-anagrafica.js?v=1"></script>
 <script src="dati-ufficiali.js?v=1"></script>
-<script src="persone-omonimi.js?v=1"></script>
+<script src="persone-omonimi.js?v=2"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=7"></script>
 <script src="aiuto.js?v=39"></script>
