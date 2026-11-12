@@ -10267,7 +10267,7 @@ async function _evApriStessa(es){
   const t=$('email-verbale-title'),b=$('email-verbale-rett')
   if(t)t.textContent='📧 Invia di nuovo il verbale'
   if(b){
-    b.textContent=`Stessa versione già inviata il ${quando}: il verbale non è cambiato, quindi parte come nuovo invio, senza la dicitura di rettifica. Chi l'ha già ricevuto è in fondo, senza spunta.`
+    b.textContent=`Stessa versione già inviata il ${quando}: il verbale non è cambiato, quindi parte come nuovo invio, senza la dicitura di rettifica. Chi aveva ricevuto una versione precedente e oggi non è fra i destinatari è in fondo, senza spunta.`
       +(minuti<15?` ⚠️ L'ultimo invio è di ${Math.max(1,minuti)} minut${Math.max(1,minuti)===1?'o':'i'} fa.`:'')
     b.classList.remove('hidden')
   }
