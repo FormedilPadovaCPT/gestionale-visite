@@ -50,8 +50,8 @@ assert.ok(/if\(!_reinvio&&!emails\.some\(_evImpresa\)&&tutti\.some\(_evImpresa\)
 
 /* ── «+ Aggiungi» di un indirizzo già in elenco ma senza spunta lo rimette ── */
 assert.ok(/if\(gia&&gia\.escluso\)\{gia\.escluso=false;/.test(html));
-/* ── la rettifica usa lo stesso elenco ── */
-const rett = pezzo(/function apriEmailRettifica\(p\)\{[\s\S]*?\n\}\n/, 'apriEmailRettifica');
-assert.ok(/window\._evEmails=emails\n  _evRenderList\(\)/.test(rett) && !/email-verbale-list/.test(rett), 'anche in rettifica si spunta');
+/* ── la rettifica usa lo stesso elenco (dal 12/11/2026 la stessa finestra, più chi ha avuto la versione precedente) ── */
+const rett = pezzo(/async function _evAggiungiPrecedenti\(vid,invii\)\{[\s\S]*?\n\}\n/, '_evAggiungiPrecedenti');
+assert.ok(/window\._evEmails=RettificaInvio\.conPrecedenti\(window\._evEmails\|\|\[\],invii\|\|\[\]\)/.test(rett) && /_evRenderList\(\)/.test(rett) && !/email-verbale-list/.test(rett), 'anche in rettifica si spunta');
 
 console.log('ok — invio del verbale: il tecnico toglie la spunta a chi non deve riceverlo');

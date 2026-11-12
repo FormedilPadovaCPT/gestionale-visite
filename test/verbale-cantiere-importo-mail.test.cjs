@@ -46,7 +46,7 @@ for (const id of ['mp-cf-note', 'f-comm-email', 'im-email_verbale-0', 'f-cant-se
   assert.ok(!re.test(id), id + ' non è un campo CF')
 
 /* ── invio dalla maschera: se «Email invio verbale» è vuoto vale l'anagrafica ── */
-const inv = fn(/async function inviEmailVerbale\(\)\{[\s\S]*?\r?\n\}/, 'inviEmailVerbale')
+const inv = fn(/async function inviEmailVerbale\(opz\)\{[\s\S]*?\r?\n\}/, 'inviEmailVerbale')
 assert.ok(/from\('imprese'\)\.select\('impresa_id,impresa_email_ref,impresa_email2,impresa_email3'\)/.test(inv), 'deve leggere l’anagrafica delle imprese')
 assert.ok(/\|\|_anag\[String\(im\.impresa_id\|\|''\)\.trim\(\)\]/.test(inv), 'campo vuoto = indirizzo dell’anagrafica')
 assert.ok(/if\(_eIa\)_anagErr=_eIa\.message/.test(inv), 'l’errore di lettura si legge')

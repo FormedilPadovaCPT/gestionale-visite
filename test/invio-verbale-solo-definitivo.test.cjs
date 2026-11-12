@@ -21,7 +21,7 @@ assert.strictEqual(mostra.length, 1, 'un solo punto mostra il pulsante, quello c
 assert.ok(/\(isBozza\?'':`<button class="btn-outline btn-sm" data-act="email"/.test(html), 'busta solo sui definitivi');
 
 /* 3. apertura dall'elenco: lo stato si legge e la bozza si ferma */
-const iL = html.indexOf('async function inviEmailVerbaleFromList(vid){');
+const iL = html.indexOf('async function inviEmailVerbaleFromList(vid,opz){');
 assert.ok(iL > 0, 'la funzione di invio dall\'elenco');
 const corpoL = html.slice(iL, html.indexOf('window._evSerie=', iL));
 assert.ok(/visita_id,nr_verbale,stato,/.test(corpoL), 'dall\'elenco si legge lo stato');

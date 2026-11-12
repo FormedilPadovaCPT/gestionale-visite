@@ -2482,10 +2482,10 @@ tr.row-detail-hover:hover td{background:#fff3ed}
       <label>Note a spiegazione della rettifica <span style="font-weight:400;font-size:11px;color:#aaa">(facoltative – compariranno nella comunicazione)</span></label>
       <textarea id="rett-note" rows="3" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:12px;resize:vertical" placeholder="Es. per mero errore materiale erano stati indicati 2 lavoratori presenti…"></textarea>
     </div>
-    <p style="font-size:12px;color:#666;margin-bottom:14px">Vuoi reinviare il verbale rettificato? Sostituirà integralmente quello già trasmesso e sarà inviato agli stessi destinatari.</p>
+    <p style="font-size:12px;color:#666;margin-bottom:14px">Partirà come <b>rettifica</b>: sostituisce integralmente il verbale già trasmesso. Nella finestra d'invio scegli i destinatari; chi ha ricevuto una versione precedente e oggi non c'è è in fondo, senza spunta.</p>
     <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn-secondary btn-sm" id="btn-rett-no" type="button">Non reinviare</button>
-      <button class="btn-primary btn-sm" id="btn-rett-si" type="button">📧 Reinvia verbale rettificato</button>
+      <button class="btn-secondary btn-sm" id="btn-rett-no" type="button">Non ora</button>
+      <button class="btn-primary btn-sm" id="btn-rett-si" type="button">📧 Prosegui con la rettifica</button>
     </div>
   </div>
 </div>
@@ -9682,7 +9682,7 @@ function _evRenderList(){
     <label style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #eee;font-size:13px;cursor:${cpt?'default':'pointer'};${via?'opacity:.5;':''}">
       <input type="checkbox" data-ev-spunta="${i}" ${via?'':'checked'} ${cpt?'disabled title="La copia all\'ufficio parte sempre: è la traccia dell\'invio"':'title="Togli la spunta per non mandargli il verbale"'} onchange="window._evSpunta(${i},this.checked)" style="width:16px;height:16px;flex:0 0 auto;margin:0">
       <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--grey);min-width:72px;letter-spacing:.4px">${esc(e.ruolo||'—')}</span>
-      <span style="flex:1;color:#333">${esc(e.nome||'')}${via?' <i style="font-size:11px;color:#999">— non lo riceve</i>':''}</span>
+      <span style="flex:1;color:#333">${esc(e.nome||'')}${e.precedente?' <i style="font-size:11px;color:#b35a00">— ha ricevuto una versione precedente</i>':''}${via?' <i style="font-size:11px;color:#999">— non lo riceve</i>':''}</span>
       ${(e.alt&&e.alt.length>1)
         ?`<select onchange="window._evEmails[${i}].email=this.value" title="Questo contatto ha più email: scegli a quale inviare" style="color:var(--orange);font-size:12px;max-width:240px;border:1px solid #f0d9cc;border-radius:6px;padding:2px 4px;background:#fffaf7"${via?' disabled':''}>${e.alt.map(a=>`<option value="${esc(a)}"${a===e.email?' selected':''}>${esc(a)}</option>`).join('')}</select>`
         :`<span style="color:var(--orange);font-size:12px;${via?'text-decoration:line-through;':''}">${esc(e.email)}</span>`}
@@ -10026,7 +10026,7 @@ window.admEliminaCampagna=admEliminaCampagna
    la manda il tecnico. Nel registro degli invii la riga è «reinvio», e il rimbalzo si chiude da solo. */
 window.reinviaVerbaleA=async function(vid,dest,opz){
   window._evReinvio=null
-  await inviEmailVerbaleFromList(vid)
+  await inviEmailVerbaleFromList(vid,{senzaValutazione:true})
   if(!window._evContext||window._evContext.vid!==vid)return
   const cpt=(window._evEmails||[]).find(e=>e.ruolo==='CPT')
   window._evEmails=[{ruolo:dest.ruolo||'Destinatario',nome:dest.nome||'',email:dest.email},...(cpt?[cpt]:[])]
@@ -10034,8 +10034,9 @@ window.reinviaVerbaleA=async function(vid,dest,opz){
   _evRenderList()
   const t=$('email-verbale-title');if(t)t.textContent='📧 Ritrasmetti il verbale all’indirizzo corretto'
 }
-async function inviEmailVerbaleFromList(vid){
+async function inviEmailVerbaleFromList(vid,opz){
   window._evReinvio=null
+  window._evStessaVersione=null
   window._evRettifica=null
   _setEvModalRett(false)
   toast('Caricamento dati visita…')
@@ -10149,7 +10150,9 @@ Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle per
   btnInvia.disabled=false; btnInvia.textContent='📤 Invia ora'
   const evStatus=$('email-verbale-status')
   evStatus.textContent=''; evStatus.style.color=''
-  _evSetupCampagna();_evAnteprima();_evExtraReset();show('modal-email-verbale')
+  /* (12/11/2026) la ritrasmissione all'indirizzo corretto (reinviaVerbaleA) non si valuta: è la stessa versione a un indirizzo solo */
+  if(opz&&opz.senzaValutazione){_evMostra();return}
+  await _evApri()
 }
 
 // ── RETTIFICA VERBALE GIÀ INVIATO ──
@@ -10163,12 +10166,12 @@ function _rettFmtDate(iso,soloData=false){
   const ds=`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
   return soloData?ds:`${ds} alle ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
 }
-function diffSnapRettifica(oldS,newS){
+function diffSnapRettifica(oldS,newS,opz){
   if(!oldS||!newS)return['Contenuto del verbale aggiornato (dettaglio non disponibile)']
   const out=[]
   const keys=new Set([...Object.keys(oldS),...Object.keys(newS)])
   keys.forEach(k=>{
-    if(RETT_SKIP.has(k)||['imprese','checklist','note_checklist','lavorazioni'].includes(k))return
+    if((RETT_SKIP.has(k)&&!(opz&&opz.titoli&&/_titolo$/.test(k)))||['imprese','checklist','note_checklist','lavorazioni'].includes(k))return
     const ov=oldS[k],nv=newS[k]
     if((ov&&typeof ov==='object')||(nv&&typeof nv==='object'))return
     if(!_rettEq(ov,nv))out.push(`${RETT_LABELS[k]||k}: ${_rettVal(ov)} → ${_rettVal(nv)}`)
@@ -10211,127 +10214,126 @@ function _setEvModalRett(isRett,infoTxt){
     else{b.textContent='';b.classList.add('hidden')}
   }
 }
-async function checkRettifica(vid){
-  /* (12/10/2026) la ritrasmissione a un solo indirizzo corretto («reinvio») non è l'invio da rettificare:
-     ha un destinatario solo, e la rettifica deve andare a tutti */
-  const{data:invii,error:eInv}=await sb.from('verbali').select('id,tipo,inviato_at,dest,email_dest,oggetto,snapshot')
-    .eq('visita_id',vid).eq('inviato_email',true).or('tipo.is.null,tipo.neq.reinvio')
-    .order('inviato_at',{ascending:false}).limit(1)
-  /* lettura fallita ≠ mai inviato: senza saperlo non si propone la rettifica
-     e non si lascia partire un invio che sembrerebbe il primo (vedi btn-ev-invia) */
-  if(eInv){
+/* (12/11/2026, deciso dall'utente dal verbale 0093) LA RETTIFICA SI DECIDE AL MOMENTO DELL'INVIO.
+   Da qualunque pulsante si apra l'invio (maschera o elenco Visite) il verbale che sta per partire si confronta
+   con l'ultimo spedito, sui dati che vanno stampati (RettificaInvio, rettifica-invio.js):
+   - è cambiato qualcosa → RETTIFICA, e non c'è modo di mandarlo come primo invio;
+   - non è cambiato niente → nuovo invio della stessa versione (tipo «copia»), senza dicitura;
+   - mai spedito → primo invio.
+   Chi ha ricevuto una versione precedente e oggi non è fra i destinatari compare in fondo, senza spunta.
+   Prima la rettifica la proponeva solo la finestra dopo il salvataggio, e chiusa quella si spediva come nuovo. */
+async function _evValutaInvio(vid){
+  const{data:invii,error}=await sb.from('verbali').select('id,tipo,inviato_at,dest,email_dest,snapshot,pdf_dati')
+    .eq('visita_id',vid).eq('inviato_email',true).order('inviato_at',{ascending:false})
+  if(error)return{vid,stato:'errore',errore:'lettura degli invii precedenti: '+error.message}
+  if(!invii||!invii.length)return{vid,stato:'primo',invii:[]}
+  const ultimo=invii[0]
+  const dati=await genPDF(vid,'dati')
+  if(!dati)return{vid,stato:'errore',errore:'non sono riuscito a preparare i dati del verbale'}
+  let modifiche=null
+  if(ultimo.pdf_dati)modifiche=RettificaInvio.differenze(ultimo.pdf_dati,dati)
+  else if(ultimo.snapshot){
+    /* invii di prima del 12/11/2026: senza i dati del PDF si confronta la copia della maschera, titoli compresi */
+    const{data:sr,error:eS}=await sb.from('visite_snapshot').select('snapshot').eq('visita_id',vid).maybeSingle()
+    if(eS)return{vid,stato:'errore',errore:'lettura della copia del verbale: '+eS.message}
+    if(sr&&sr.snapshot)modifiche=diffSnapRettifica(ultimo.snapshot,sr.snapshot,{titoli:true})
+  }
+  if(modifiche===null)return{vid,stato:'da-chiedere',ultimo,invii,dati}
+  return{vid,stato:modifiche.length?'rettifica':'stessa',ultimo,invii,modifiche,dati}
+}
+function _evMostra(){_evSetupCampagna();_evAnteprima();_evExtraReset();show('modal-email-verbale')}
+/* chi ha ricevuto una versione precedente, in fondo senza spunta; un indirizzo respinto e poi corretto
+   (12/10/2026) non torna fra loro con quello sbagliato */
+async function _evAggiungiPrecedenti(vid,invii){
+  window._evEmails=RettificaInvio.conPrecedenti(window._evEmails||[],invii||[])
+  const{data:cor,error:eCor}=await sb.from('mail_correzioni').select('vecchia,nuova').eq('visita_id',vid).order('fatta_il')
+  if(eCor){toast('Non sono riuscito a leggere gli indirizzi corretti di questo verbale ('+eCor.message+'): controlla i destinatari prima di inviare.','warn',9000)}
+  else{
+    const vecchie=new Set((cor||[]).map(c=>String(c.vecchia||'').trim().toLowerCase()))
+    window._evEmails=window._evEmails.filter(e=>!(e.precedente&&vecchie.has(String(e.email||'').trim().toLowerCase())))
+  }
+  _evRenderList()
+}
+function _evOggettoRettifica(){
+  const el=$('email-verbale-oggetto');if(!el||/RETTIFICA verbale/.test(el.value))return
+  const P='FORMEDIL Padova -AREA SICUREZZA E SALUTE- '
+  el.value=el.value.startsWith(P)?P+'RETTIFICA verbale - '+el.value.slice(P.length):'RETTIFICA verbale - '+el.value
+}
+async function _evApriStessa(es){
+  const quando=_rettFmtDate(es.ultimo.inviato_at)
+  const minuti=Math.round((Date.now()-new Date(es.ultimo.inviato_at).getTime())/60000)
+  window._evStessaVersione={vid:es.vid,dataPrimoInvio:_rettFmtDate(es.ultimo.inviato_at,true)}
+  await _evAggiungiPrecedenti(es.vid,es.invii)
+  const t=$('email-verbale-title'),b=$('email-verbale-rett')
+  if(t)t.textContent='📧 Invia di nuovo il verbale'
+  if(b){
+    b.textContent=`Stessa versione già inviata il ${quando}: il verbale non è cambiato, quindi parte come nuovo invio, senza la dicitura di rettifica. Chi l'ha già ricevuto è in fondo, senza spunta.`
+      +(minuti<15?` ⚠️ L'ultimo invio è di ${Math.max(1,minuti)} minut${Math.max(1,minuti)===1?'o':'i'} fa.`:'')
+    b.classList.remove('hidden')
+  }
+  _evMostra()
+}
+async function _evApri(es){
+  const vid=window._evContext&&window._evContext.vid
+  window._evStessaVersione=null
+  if(!vid){_evMostra();return}
+  if(!es||es.vid!==vid){
+    toast('Controllo se il verbale è già stato inviato e se è cambiato…')
+    try{es=await _evValutaInvio(vid)}catch(e){es={vid,stato:'errore',errore:e&&e.message||String(e)}}
+  }
+  window._evValutazione=es
+  /* lettura fallita ≠ mai inviato: senza saperlo non si apre l'invio (dirlo «primo» sarebbe una bugia) */
+  if(es.stato==='errore'){
     window._evInviiNonLetti=vid
-    toast('Non sono riuscito a leggere gli invii precedenti di questo verbale ('+eInv.message+'): non so se è già stato trasmesso. Ricarica e riapri la visita prima di inviarlo.','err',9000)
+    toast('Non sono riuscito a capire se questo verbale è già stato inviato e se è cambiato ('+es.errore+'): invio fermato. Riprova tra poco.','err',10000)
     return
   }
   if(window._evInviiNonLetti===vid)window._evInviiNonLetti=null
-  const last=invii&&invii[0]
-  if(!last)return
-  const modifiche=diffSnapRettifica(last.snapshot,buildSnap(vid))
-  if(!modifiche.length)return
-  window._rettPending={last,modifiche}
-  const nDest=(last.email_dest||[]).length
-  $('rett-info').textContent=`Questo verbale è già stato inviato il ${_rettFmtDate(last.inviato_at)} a ${nDest} destinatar${nDest===1?'io':'i'}.`
-  $('rett-modifiche').innerHTML=modifiche.map(m=>`<li>${m}</li>`).join('')
+  if(es.stato==='primo'){_evMostra();return}
+  if(es.stato==='stessa')return _evApriStessa(es)
+  let modifiche=es.modifiche
+  if(es.stato==='da-chiedere'){
+    if(!confirm(`Questo verbale è già stato inviato il ${_rettFmtDate(es.ultimo.inviato_at)}, ma di quell'invio non c'è la copia che serve a capire che cosa è cambiato.\n\nOK = l'ho corretto: parte come RETTIFICA, che sostituisce il precedente\nAnnulla = è la stessa versione: parte come nuovo invio`))return _evApriStessa(es)
+    modifiche=['Verbale corretto dal tecnico (le modifiche non si possono elencare: il primo invio è di prima del confronto automatico)']
+  }
+  window._rettPending={vid,last:es.ultimo,modifiche,invii:es.invii}
+  $('rett-info').textContent=`Questo verbale è già stato inviato il ${_rettFmtDate(es.ultimo.inviato_at)} a ${(es.ultimo.email_dest||[]).length} destinatari, ed è cambiato: partirà come RETTIFICA, che sostituisce integralmente quello inviato.`
+  $('rett-modifiche').innerHTML=modifiche.map(m=>`<li>${esc(m)}</li>`).join('')
   $('rett-note').value=''
   show('modal-rettifica')
 }
+/* dopo il salvataggio di un verbale già spedito e cambiato, la rettifica si propone subito;
+   «Non ora» non cambia niente: quando lo si invierà, partirà comunque come rettifica */
+async function checkRettifica(vid){
+  const{data:invii,error:eInv}=await sb.from('verbali').select('id').eq('visita_id',vid).eq('inviato_email',true).limit(1)
+  if(eInv){window._evInviiNonLetti=vid;toast('Non sono riuscito a leggere gli invii precedenti di questo verbale ('+eInv.message+'): non so se è già stato trasmesso. Ricarica e riapri la visita prima di inviarlo.','err',9000);return}
+  if(!invii||!invii.length)return
+  const es=await _evValutaInvio(vid)
+  if(es.stato==='errore'){toast('Non sono riuscito a capire se il verbale è cambiato rispetto a quello inviato ('+es.errore+'): lo si vedrà quando lo invierai.','warn',9000);return}
+  if(es.stato==='rettifica'||es.stato==='da-chiedere')await inviEmailVerbale({valutazione:es})
+}
 $('btn-rett-no').onclick=()=>{hide('modal-rettifica');window._rettPending=null}
-$('btn-rett-si').onclick=()=>{
+$('btn-rett-si').onclick=async()=>{
   const p=window._rettPending
   if(!p)return
   hide('modal-rettifica')
   window._rettPending=null
+  if(!window._evContext||window._evContext.vid!==p.vid){toast('La finestra d\'invio non è più quella di questo verbale: riapri l\'invio.','err',8000);return}
   window._evRettifica={
     modifiche:p.modifiche,
     note:$('rett-note').value.trim()||null,
     dataPrimoInvio:_rettFmtDate(p.last.inviato_at,true)
   }
-  apriEmailRettifica(p)
-}
-function apriEmailRettifica(p){
-  let emails=Array.isArray(p.last.dest)&&p.last.dest.length?p.last.dest.map(d=>({ruolo:d.ruolo||'',nome:d.nome||'',email:d.email})):
-    (p.last.email_dest||[]).map(e=>({ruolo:'',nome:'',email:e}))
-  emails=emails.filter(e=>e.email)
-  if(!emails.length){toast('Nessun destinatario registrato per il precedente invio','warn');return}
-  /* (12/10/2026) un indirizzo respinto e poi corretto non si rimanda a quello sbagliato */
-  const _vidR=S.savedId||S.fd?.visita_id||null
-  if(_vidR){sb.from('mail_correzioni').select('vecchia,nuova').eq('visita_id',_vidR).order('fatta_il').then(({data:cor,error:eCor})=>{
-    if(eCor){toast('Non sono riuscito a leggere gli indirizzi corretti di questo verbale ('+eCor.message+'): controlla i destinatari prima di inviare.','warn',9000);return}
-    let cambiati=0
-    ;(cor||[]).forEach(c=>(window._evEmails||[]).forEach(e=>{if(String(e.email||'').trim().toLowerCase()===String(c.vecchia||'').trim().toLowerCase()){e.email=c.nuova;cambiati++}}))
-    if(cambiati){_evRenderList();toast('Indirizzi corretti dopo una mancata consegna: la rettifica va a quelli nuovi.','ok')}
-  })}
-
-  const nrVerb=vGet('f-verbale')||''
-  const cant=vGet('f-cant-search')||''
-  const _fInd=[S.fd?.cantiere_indirizzo,S.fd?.cantiere_civico].filter(Boolean).join(' ')
-  const _fCom=S.fd?.comune_nome||''
-  const _fImp=(S.imprese&&S.imprese.length?S.imprese[0]?.impresa_nome:'')||''
-  window._evSerie=!!(window.FuoriProcedura&&FuoriProcedura.serieProposta())   // (13/10/2026) il tecnico propone una serie di visite
-  // formazione mancante (25/09/2026): dal modulo appena salvato
-  // (la funzione non e' asincrona: si calcola subito con quello che c'e', e la lettura
-  //  dell'impresa aggiorna il pacchetto appena arriva, prima che il tecnico prema Invia)
-  try{const _i0=(S.imprese&&S.imprese[0])||{}
-    const _calc=_ir=>{window._evFormazione=_evFormazioneCalc({sn:cGet('f-note-for-sn'),tipi:_tipiSel()||[],nota:vGet('f-note-for-m'),
-      ceiv:_ceivDa(_ir.cassa_edile||_i0.ceiv,_ir.stato_cassa),impresa:_i0.impresa_nome||null,piva:_ir.piva||_i0.piva||null,impresa_id:_i0.impresa_id||null,
-      impresa_email:(_ir.impresa_email_ref||'').trim()||null,impresa_tel:_ir.impresa_telefono||null,
-      referente:[vGet('f-ppre-titolo'),vGet('f-ppre-nome'),vGet('f-ppre-cog')].filter(Boolean).join(' ')+(vGet('f-qual-ppre')?' ('+vGet('f-qual-ppre')+')':'')||null,referente_tel:vGet('f-tel-ppre')||null,tecnico_id:S.tecnico?.tecnico_id||null});_evAnteprima&&_evAnteprima()}
-    _calc({})
-    _tipiFormazione().then(()=>_calc({})).catch(()=>{})
-    if(_i0.impresa_id)sb.from('imprese').select('impresa_email_ref,impresa_telefono,piva,cassa_edile,stato_cassa').eq('impresa_id',_i0.impresa_id).maybeSingle().then(({data:_d})=>_calc(_d||{})).catch(()=>{})
-  }catch(e){console.warn('formazione dal modulo:',e);window._evFormazione=null}
-  const _fTec1=vGet('f-tec-display')||''
-  const _fTec2=vGet('f-tec2-display')||''
-  const _fTec=[_fTec1,_fTec2].filter(Boolean).join(' e ')
-  const _fDsRaw=vGet('f-data')||''
-  let _fData=''
-  if(_fDsRaw){const _fd=new Date(_fDsRaw+'T00:00:00');if(!isNaN(_fd))_fData=`${String(_fd.getDate()).padStart(2,'0')}/${String(_fd.getMonth()+1).padStart(2,'0')}/${_fd.getFullYear()}`}
-  const r=window._evRettifica||{}
-
-  $('email-verbale-oggetto').value='FORMEDIL Padova -AREA SICUREZZA E SALUTE- '+['RETTIFICA verbale',`Cantiere di ${_fInd} ${nrVerb}`.trim(),_fImp,_fCom,_fTec,_fData].filter(Boolean).join(' - ')
-
-  const testaEl=$('email-verbale-testo')
-  if(testaEl)testaEl.value=
-`Spett.le impresa${_fImp?'\n'+_fImp:''}
-
-Prevenzione Infortuni – RETTIFICA VERBALE
-
-Cantiere di ${[_fInd,_fCom].filter(Boolean).join(' – ')||_fCom||_fInd}
-
-Con la presente Vi comunichiamo che il verbale ${nrVerb?'n. '+nrVerb+' ':''}relativo alla visita effettuata${_fData?' il '+_fData:''} nel cantiere in oggetto, già trasmesso in data ${r.dataPrimoInvio||''}, è stato rettificato.
-
-Modifiche apportate:
-${(r.modifiche||[]).map(m=>'• '+m).join('\n')}
-${r.note?'\nNote: '+r.note+'\n':''}
-Vi trasmettiamo in allegato il verbale rettificato, che sostituisce integralmente quello precedentemente inviato, da ritenersi privo di validità.
-
-Ci scusiamo per l'inconveniente e rimaniamo a disposizione per ogni eventuale chiarimento.
-
-Distinti saluti.
-
-Renato Squizzato
-Area Sicurezza e Salute | FORMEDIL PADOVA
-Via Basilicata 10 – 35127 Padova (PD)
-email: cpt@formedilpadova.it · cptpd@did.formedilpadova.it
-Tel. 049 - 761168 (int.4)
-URL: www.formedilpadova.it`
-
-  window._evEmails=emails
-  _evRenderList()
-  window._evContext={vid:S.savedId||S.fd?.visita_id||null,nr_verbale:nrVerb,data_visita:_fDsRaw,cantiere:cant,
-    impresa:_fImp,tecnico:_fTec1,tecnico2:_fTec2,comune:_fCom,cantIndirizzo:_fInd,dataVisita:_fData}
-  _setEvModalRett(true,`Rettifica – sostituisce il verbale trasmesso il ${r.dataPrimoInvio||''}. Destinatari precompilati dal precedente invio.`)
-  const btnInvia=$('btn-ev-invia')
-  btnInvia.disabled=false;btnInvia.textContent='📤 Invia ora'
-  const evStatus=$('email-verbale-status')
-  evStatus.textContent='';evStatus.style.color=''
-  _evAnteprima();_evExtraReset();show('modal-email-verbale')
+  _evOggettoRettifica()
+  await _evAggiungiPrecedenti(p.vid,p.invii)
+  _setEvModalRett(true,`Rettifica – sostituisce il verbale trasmesso il ${window._evRettifica.dataPrimoInvio}. Chi ha ricevuto una versione precedente e oggi non è fra i destinatari è in fondo, senza spunta: spuntalo se deve ricevere la rettifica.`)
+  _evMostra()
 }
 
 // ── EMAIL VERBALE ──
-async function inviEmailVerbale(){
+async function inviEmailVerbale(opz){
   window._evContext=null
+  window._evStessaVersione=null
   window._evReinvio=null
   window._evRettifica=null
   _setEvModalRett(false)
@@ -10466,13 +10468,13 @@ Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle per
   const evStatus=$('email-verbale-status')
   evStatus.textContent=''
   evStatus.style.color=''
-  _evSetupCampagna();_evAnteprima();_evExtraReset();show('modal-email-verbale')
+  await _evApri(opz&&opz.valutazione)
 }
 
 $('btn-email-verbale').onclick=inviEmailVerbale
 $('btn-ev-extra').onclick=_evAggiungi
 $('ev-extra').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_evAggiungi()}}
-$('btn-ev-close').onclick=()=>{hide('modal-email-verbale');window._evSerie=null;window._evRettifica=null;window._evReinvio=null;_setEvModalRett(false)}
+$('btn-ev-close').onclick=()=>{hide('modal-email-verbale');window._evSerie=null;window._evRettifica=null;window._evReinvio=null;_setEvModalRett(false);window._evStessaVersione=null;window._evValutazione=null}
 $('btn-ev-invia').onclick=async()=>{
   // (06/10/2026) solo i destinatari spuntati; nel registro degli invii resta chi l'ha ricevuto davvero
   const tutti=window._evEmails||[]
@@ -10495,6 +10497,11 @@ $('btn-ev-invia').onclick=async()=>{
      return}}
   /* (12/10/2026) la ritrasmissione all'indirizzo corretto va a quello solo: gli altri il verbale l'hanno già */
   const _reinvio=window._evReinvio&&window._evReinvio.vid===vid?window._evReinvio:null
+  /* (12/11/2026) la valutazione l'ha fatta l'apertura della finestra: senza, o con un verbale cambiato che non è in rettifica, non parte */
+  const _val=window._evValutazione&&window._evValutazione.vid===vid?window._evValutazione:null
+  const _stessa=window._evStessaVersione&&window._evStessaVersione.vid===vid?window._evStessaVersione:null
+  if(!_reinvio&&!_val){toast('Invio fermato: non so se questo verbale è già stato inviato e se è cambiato. Chiudi la finestra e riapri l\'invio.','err',10000);return}
+  if(!_reinvio&&(_val.stato==='rettifica'||_val.stato==='da-chiedere')&&!window._evRettifica&&!_stessa){toast('Invio fermato: il verbale è cambiato rispetto a quello già inviato e può partire solo come rettifica. Chiudi la finestra e riapri l\'invio.','err',12000);return}
   // (03/10/2026, regola dell'utente) almeno un'impresa deve ricevere il verbale: senza, arriverebbe solo alle figure
   if(!_reinvio&&!emails.some(_evImpresa)&&tutti.some(_evImpresa)){toast('Hai tolto la spunta a tutte le imprese: il verbale arriverebbe solo alle figure del cantiere. Rimetti la spunta ad almeno un\'impresa e poi invia.','err',9000);return}
   if(!_reinvio&&!emails.some(_evImpresa)){toast('Nessuna impresa fra i destinatari: il verbale arriverebbe solo alle figure del cantiere. Aggiungi l\'indirizzo dell\'impresa con «+ Aggiungi» e poi invia.','err',9000);const _x=$('ev-extra');if(_x)_x.focus();return}
@@ -10606,10 +10613,11 @@ $('btn-ev-invia').onclick=async()=>{
         email_dest:emails.map(e=>e.email),
         dest:emails,
         oggetto:_oggettoUfficioVerbale(),
-        tipo:_ret?'rettifica':_reinvio?'reinvio':'invio',
-        motivo:_ret?.note||(_reinvio?`ritrasmesso all'indirizzo corretto dopo la mancata consegna (${_reinvio.vecchia} → ${_reinvio.nuova})`:null),
+        tipo:_ret?'rettifica':_reinvio?'reinvio':_stessa?'copia':'invio',
+        motivo:_ret?.note||(_reinvio?`ritrasmesso all'indirizzo corretto dopo la mancata consegna (${_reinvio.vecchia} → ${_reinvio.nuova})`:_stessa?`nuovo invio della stessa versione già inviata il ${_stessa.dataPrimoInvio}`:null),
         modifiche:_ret?.modifiche||null,
         snapshot:snapRow?.snapshot||null,
+        pdf_dati:(window._pdfDatiConfronto&&window._pdfDatiConfronto.vid===vid)?window._pdfDatiConfronto.dati:null,   // (12/11/2026) ciò che era stampato: il prossimo invio si confronta con questo
         inviato_da:session?.user?.email||null
       })
       if(eLog)throw eLog
@@ -10624,6 +10632,7 @@ $('btn-ev-invia').onclick=async()=>{
     }
     window._evReinvio=null
     window._evRettifica=null
+    window._evStessaVersione=null;window._evValutazione=null
     _setEvModalRett(false)
     setTimeout(()=>hide('modal-email-verbale'), 2000)
     if(!$('view-lista')?.classList.contains('hidden'))loadLista().catch(()=>{})
@@ -10675,7 +10684,7 @@ const _fotoPdfCache={}
 async function genPDF(vid, output='save'){
   if(_pdfInProgress&&output==='save'){toast('PDF già in generazione, attendi…','warn');return}
   _pdfInProgress=true
-  toast('Generazione PDF…')
+  if(output!=='dati')toast('Generazione PDF…')
   try{
     if(!vid){toast('ID visita mancante','err');_pdfInProgress=false;return}
     if(!window.jspdf?.jsPDF){toast('Libreria PDF non caricata — ricarica la pagina','err');_pdfInProgress=false;return}
@@ -10692,9 +10701,13 @@ async function genPDF(vid, output='save'){
 
     const{data:v,error:eV}=await sb.from('visite').select(`*,tecnici!visite_tecnico_id_fkey(*),cantieri(*,committenti(*)),imprese(*)`).eq('visita_id',vid).single()
     if(eV)throw new Error('Errore caricamento visita: '+eV.message)
-    const{data:chk}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
-    const{data:lavs}=await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid)
-    const{data:imps}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva,impresa_email_ref)').eq('visita_id',vid).order('ordine')
+    /* (12/11/2026) una lettura fallita non è una check-list vuota: il PDF non esce, e il confronto per la rettifica non sbaglia */
+    const{data:chk,error:eChk}=await sb.from('visite_checklist').select('codice,valore,nota').eq('visita_id',vid)
+    if(eChk)throw new Error('Errore caricamento check-list: '+eChk.message)
+    const{data:lavs,error:eLavs}=await sb.from('visite_lavorazioni').select('genere,fase,lavorazione').eq('visita_id',vid)
+    if(eLavs)throw new Error('Errore caricamento lavorazioni: '+eLavs.message)
+    const{data:imps,error:eImps}=await sb.from('visite_imprese_presenti').select('*,imprese(impresa_nome,impresa_cf,piva,impresa_email_ref)').eq('visita_id',vid).order('ordine')
+    if(eImps)throw new Error('Errore caricamento imprese: '+eImps.message)
 
     if(!v){toast('Visita non trovata','err');return}
 
@@ -10898,6 +10911,15 @@ async function genPDF(vid, output='save'){
       }
     }catch(_ec){console.warn('campagna PDF:',_ec)}
 
+    /* (12/11/2026) i dati che vanno stampati, con l'impronta delle foto: si salvano con l'invio e il prossimo
+       invio si confronta con questi (RettificaInvio). Con output 'dati' ci si ferma qui, senza disegnare. */
+    let _datiConfronto=null
+    try{
+      const _hf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify((img.foto||[]).map(x=>x&&x.uri||''))))
+      _datiConfronto=window.RettificaInvio.normalizza(pd,[...new Uint8Array(_hf)].map(b=>b.toString(16).padStart(2,'0')).join(''))
+    }catch(_eD){console.warn('dati per il confronto non calcolati:',_eD)}
+    window._pdfDatiConfronto=_datiConfronto?{vid,dati:_datiConfronto}:null
+    if(output==='dati')return _datiConfronto
     const doc=window.VerbalePDF.crea(window.jspdf.jsPDF,pd,img)
 
     /* (09/10/2026) L'IMPRONTA DEI DATI DEL VERBALE: dice all'archivio se il PDF e' cambiato. Contiene tutto
@@ -17313,9 +17335,10 @@ document.addEventListener('input',function(ev){
 <script src="imprese-anagrafica.js?v=1"></script>
 <script src="dati-ufficiali.js?v=1"></script>
 <script src="persone-omonimi.js?v=2"></script>
+<script src="rettifica-invio.js?v=1"></script>
 <script src="ceiv-imprese.js?v=4"></script>
 <script src="notifiche.js?v=7"></script>
-<script src="aiuto.js?v=39"></script>
+<script src="aiuto.js?v=40"></script>
 <script src="mail-respinte-tec.js?v=3"></script>
 <!-- il tecnico propone la chiusura di un cantiere, la segreteria decide (23/09/2026) -->
 <script src="proposte-chiusura.js?v=3"></script>

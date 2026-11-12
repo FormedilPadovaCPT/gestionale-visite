@@ -25,13 +25,17 @@ assert.ok(/window\._evEmails=\[\{ruolo:dest\.ruolo\|\|'Destinatario',nome:dest\.
   'destinatari: il solo indirizzo corretto più la copia all’ufficio');
 assert.ok(/if\(!window\._evContext\|\|window\._evContext\.vid!==vid\)return/.test(html), 'se la finestra non si è aperta su quella visita, non si tocca niente');
 assert.ok(/const _reinvio=window\._evReinvio&&window\._evReinvio\.vid===vid\?window\._evReinvio:null/.test(html), 'la ritrasmissione vale solo per la sua visita');
-assert.ok(/tipo:_ret\?'rettifica':_reinvio\?'reinvio':'invio'/.test(html), 'nel registro degli invii è un «reinvio»');
+assert.ok(/tipo:_ret\?'rettifica':_reinvio\?'reinvio':_stessa\?'copia':'invio'/.test(html), 'nel registro degli invii è un «reinvio»');
 assert.ok(/sb\.rpc\('s_mail_respinta_chiudi',\{p_id:_reinvio\.respintaId,p_stato:'risolta'/.test(html), 'partito l’invio, il rimbalzo si chiude');
 assert.ok(/window\._evRettifica=null;window\._evReinvio=null;_setEvModalRett\(false\)/.test(html), 'chiudendo la finestra la ritrasmissione si azzera');
-assert.ok(/async function inviEmailVerbaleFromList\(vid\)\{\n\s+window\._evReinvio=null/.test(html), 'un invio normale dall’elenco non eredita la ritrasmissione');
+assert.ok(/async function inviEmailVerbaleFromList\(vid,opz\)\{\n\s+window\._evReinvio=null/.test(html), 'un invio normale dall’elenco non eredita la ritrasmissione');
+assert.ok(/await inviEmailVerbaleFromList\(vid,\{senzaValutazione:true\}\)/.test(html), 'la ritrasmissione all’indirizzo corretto non diventa una rettifica');
 
 /* la rettifica: dall'ultimo invio completo, con gli indirizzi corretti */
-assert.ok(/\.eq\('visita_id',vid\)\.eq\('inviato_email',true\)\.or\('tipo\.is\.null,tipo\.neq\.reinvio'\)/.test(html), 'la rettifica non parte dal reinvio a un solo indirizzo');
+/* (12/11/2026) la rettifica si confronta con l'ultima versione spedita, qualunque invio sia, e propone tutti quelli
+   che hanno ricevuto una versione precedente: chi aveva avuto solo il reinvio all'indirizzo corretto non si perde */
+assert.ok(/from\('verbali'\)\.select\('id,tipo,inviato_at,dest,email_dest,snapshot,pdf_dati'\)\n\s+\.eq\('visita_id',vid\)\.eq\('inviato_email',true\)\.order\('inviato_at',\{ascending:false\}\)/.test(html), 'la rettifica legge tutti gli invii, dal più recente');
+assert.ok(/RettificaInvio\.conPrecedenti\(window\._evEmails\|\|\[\],invii\|\|\[\]\)/.test(html), 'e propone chi ha ricevuto una versione precedente');
 assert.ok(/from\('mail_correzioni'\)\.select\('vecchia,nuova'\)/.test(html), 'la rettifica sostituisce gli indirizzi corretti');
 assert.ok(/if\(eCor\)\{toast\('Non sono riuscito a leggere gli indirizzi corretti/.test(html), 'una lettura fallita si dice');
 
