@@ -18,6 +18,7 @@ name: Schema del database (notturno)
 #
 # Diverso dal backup (backup-db.yml), che ha i dati ed è cifrato: qui non c'è
 # un solo dato, e il file deve restare leggibile.
+# Dal 13/11/2026 salva anche lo schema del portale (progetto Servizi), col secret SERVIZI_DB_URL.
 
 on:
   schedule:
