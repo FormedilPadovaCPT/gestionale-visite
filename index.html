@@ -2561,7 +2561,7 @@ window.onunhandledrejection = function(e) {
 <script type="module">
 import { creaOsservatorio } from './osservatorio.js'
 import { creaEsportazioni } from './esportazioni.js?v=1'   // (13/11/2026) alzare ?v= quando il file cambia
-import { creaReportOsservatorio } from './report-osservatorio.js?v=1'   // (13/11/2026) alzare ?v= quando il file cambia
+import { creaReportOsservatorio } from './report-osservatorio.js?v=2'   // (13/11/2026) alzare ?v= quando il file cambia
 console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
 
 // ── Caricamento robusto di Supabase con fallback su più CDN ───────────────────
@@ -12014,7 +12014,7 @@ async function admGeneraReport(){
 
     // ── 6. PDF ──
     const{jsPDF}=window.jspdf
-    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true})   // (13/11/2026) grafici compressi senza perdita, come nel report Osservatorio
     const M=12,CW=210-M*2,half=(CW-4)/2
 
     // helper: immagine + cornice card

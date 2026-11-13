@@ -561,7 +561,8 @@ async function admGeneraReportOsservatorio(){
 
     // ════════ PDF ════════
     const{jsPDF}=window.jspdf
-    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
+    // (13/11/2026) compress:true: i grafici entrano compressi SENZA perdita (stessi pixel): il PDF passa da ~150 MB a ~3 MB
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true})
     let pg=0
     const newPage=first=>{if(!first)doc.addPage();pg++}
 
