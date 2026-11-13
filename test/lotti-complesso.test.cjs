@@ -8,7 +8,9 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const dir = path.join(__dirname, '..');
-const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+/* (13/11/2026) l'estrazione per la Cassa Edile sta in esportazioni.js (secondo modulo estratto dal file
+   centrale): le due sorgenti si leggono insieme, così i controlli valgono dovunque stia il codice */
+const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8') + '\n' + fs.readFileSync(path.join(dir, 'esportazioni.js'), 'utf8');
 const js = fs.readFileSync(path.join(dir, 'lotti-cantiere.js'), 'utf8');
 const aiuto = fs.readFileSync(path.join(dir, 'aiuto.js'), 'utf8');
 const sql = fs.readFileSync(path.join(dir, 'supabase', 'sql', '2026_10_07_lotti_complesso.sql'), 'utf8');
@@ -77,7 +79,7 @@ assert.ok(/if\(String\(c\?\.lotto\|\|''\)\.trim\(\)&&String\(c\.lotto\)\.trim\(\
 assert.ok(/nell\\'indirizzo c\\'è scritto «lotto '\+esc\(_pl\)\+'»: forse è un lotto a sé/.test(html), 'il controllo duplicati CNCE avvisa quando legge un lotto nell’indirizzo');
 
 /* ── l'estrazione CEIV: tutte le visite sotto il CNCE, distinte per lotto ── */
-assert.ok(/cantieri!inner\(cantiere_cnce,cantiere_indirizzo,cantiere_civico,comune_nome,lotto\)/.test(html), 'l’estrazione legge il lotto');
+assert.ok(/cantieri!inner\(cantiere_cnce,cantiere_indirizzo,cantiere_civico,comune_nome,lotto\)/.test(fs.readFileSync(path.join(dir, 'esportazioni.js'), 'utf8')), 'l’estrazione legge il lotto');   // dal 13/11/2026 l'estrazione CEIV sta in esportazioni.js
 assert.ok(/lotto: String\(c\.lotto \|\| ''\)\.trim\(\)/.test(html), 'normalizeRows porta il lotto');
 assert.ok(/const indirizzoConLotto = \(r\) => \(r\.indirizzo \|\| ''\) \+ \(r\.lotto \? ' – lotto ' \+ r\.lotto : ''\)/.test(html) && /r\.cnce, _fmtDate\(r\.data\), r\.tecnico, r\.acc, indirizzoConLotto\(r\), r\.comune,/.test(html), 'Excel: il lotto accanto all’indirizzo, tracciato invariato');
 assert.ok(/\(a\.cnce \|\| ''\)\.localeCompare\(b\.cnce \|\| ''\) \|\| _ordLotto\(a\.lotto\)\.localeCompare\(_ordLotto\(b\.lotto\)\) \|\| \(b\.data \|\| ''\)\.localeCompare\(a\.data \|\| ''\)/.test(html), 'ordine CNCE, lotto, data');
