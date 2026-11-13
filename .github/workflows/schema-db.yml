@@ -49,6 +49,7 @@ jobs:
         id: estrai
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SERVIZI_DB_URL: ${{ secrets.SERVIZI_DB_URL }}
         run: |
           set -euo pipefail
           [ -n "${DB_URL:-}" ] || { echo "Secret SUPABASE_DB_URL mancante."; exit 1; }
@@ -110,6 +111,24 @@ jobs:
             echo "funzioni=$(grep -cE '^CREATE (OR REPLACE )?(FUNCTION|PROCEDURE) ' fuori/gestionale_schema.sql || true)"
             echo "policy=$(grep -c '^CREATE POLICY ' fuori/gestionale_schema.sql || true)"
           } >> "$GITHUB_OUTPUT"
+          # 3. (13/11/2026) il progetto «Servizi» (portale pubblico): database piccolo, a parte.
+          #    Si estrae solo se c'è il secret SERVIZI_DB_URL; se manca lo si dice nel verdetto
+          #    e il resto del giro vale lo stesso. Se c'è e l'estrazione fallisce, il giro fallisce.
+          if [ -n "${SERVIZI_DB_URL:-}" ]; then
+            fase servizi
+            if ! pg_dump "$SERVIZI_DB_URL" --schema-only --no-owner --schema=public > fuori/grezzo_servizi.sql 2> fuori/errori.txt; then
+              echo "pg_dump del portale non riuscito ($(wc -l < fuori/errori.txt) righe di errore, non riportate)"
+              tr '\n' ' ' < fuori/errori.txt | head -c 500 > fuori/motivo.txt
+              exit 1
+            fi
+            grep -vE '^\\(un)?restrict |^-- Dumped (from|by) ' fuori/grezzo_servizi.sql > fuori/servizi_schema.sql
+            rm -f fuori/grezzo_servizi.sql fuori/errori.txt
+            [ "$(grep -c '^CREATE TABLE ' fuori/servizi_schema.sql)" -ge 8 ] || { echo "Schema del portale con troppe poche tabelle: non lo deposito."; echo 'schema del portale troppo piccolo' > fuori/motivo.txt; exit 1; }
+            echo "servizi=si" >> "$GITHUB_OUTPUT"
+          else
+            echo "Secret SERVIZI_DB_URL assente: lo schema del portale non si estrae."
+            echo "servizi=secret-assente" >> "$GITHUB_OUTPUT"
+          fi
           fase deposito
           # un dump troppo piccolo è un dump sbagliato: meglio fermarsi che sovrascrivere quello buono
           [ "$(grep -c '^CREATE TABLE ' fuori/gestionale_schema.sql)" -ge 150 ] || { echo "Schema con troppe poche tabelle: non lo deposito."; exit 1; }
@@ -158,7 +177,9 @@ jobs:
               c.raise_for_status(); did = c.json()['id']
 
           cambiati = []
-          for nome in ('gestionale_schema.sql', 'gestionale_contorno.sql'):
+          for nome in ('gestionale_schema.sql', 'gestionale_contorno.sql', 'servizi_schema.sql'):
+              if not os.path.exists(os.path.join('fuori', nome)):
+                  continue      # lo schema del portale c'è solo col suo secret
               dati = open(os.path.join('fuori', nome), 'rb').read()
               md5 = hashlib.md5(dati).hexdigest()
               gia = figli(did, nome, False)
@@ -191,6 +212,7 @@ jobs:
           DEPOSITATO: ${{ steps.drive.outputs.depositato }}
           CAMBIATI: ${{ steps.drive.outputs.cambiati }}
           KB: ${{ steps.estrai.outputs.kb }}
+          SERVIZI: ${{ steps.estrai.outputs.servizi }}
           TABELLE: ${{ steps.estrai.outputs.tabelle }}
           FUNZIONI: ${{ steps.estrai.outputs.funzioni }}
           POLICY: ${{ steps.estrai.outputs.policy }}
@@ -200,12 +222,12 @@ jobs:
           export PATH="/usr/lib/postgresql/17/bin:$PATH"
           if [ "$STATO" = success ] && [ "${DEPOSITATO:-}" = si ]; then esito=riuscita; fase=""; else esito=fallita; fase="${FASE:-avvio}"; fi
           motivo=$(head -c 500 fuori/motivo.txt 2>/dev/null | tr '\n' ' ' || true)
-          psql "$DB_URL" -q -v ON_ERROR_STOP=1 -v fase="$fase" -v motivo="$motivo" -v esito="$esito" -v kb="${KB:-}" -v tabelle="${TABELLE:-}" -v funzioni="${FUNZIONI:-}" -v policy="${POLICY:-}" -v cambiati="${CAMBIATI:-}" -v run="$RUN_URL" <<'SQL'
+          psql "$DB_URL" -q -v ON_ERROR_STOP=1 -v fase="$fase" -v motivo="$motivo" -v esito="$esito" -v kb="${KB:-}" -v tabelle="${TABELLE:-}" -v funzioni="${FUNZIONI:-}" -v policy="${POLICY:-}" -v cambiati="${CAMBIATI:-}" -v servizi="${SERVIZI:-}" -v run="$RUN_URL" <<'SQL'
           insert into public.s_test_automatici (suite, esito, passati, falliti, run_url, dettaglio)
           values ('schema', :'esito', nullif(:'kb', '')::int, 0, :'run',
                   jsonb_strip_nulls(jsonb_build_object(
                     'tabelle', nullif(:'tabelle', '')::int, 'funzioni', nullif(:'funzioni', '')::int,
-                    'policy', nullif(:'policy', '')::int, 'file_cambiati', nullif(:'cambiati', ''),
+                    'policy', nullif(:'policy', '')::int, 'file_cambiati', nullif(:'cambiati', ''), 'portale', nullif(:'servizi', ''),
                     'fermo_a', nullif(:'fase', ''), 'motivo', nullif(:'motivo', ''))));
           SQL
           echo "Verdetto registrato: $esito"
