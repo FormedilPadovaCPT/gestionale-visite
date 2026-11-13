@@ -22,6 +22,11 @@ on:
   schedule:
     - cron: '0 2 * * *'   # ogni notte alle 02:00 UTC (04:00 italiane)
   workflow_dispatch:       # avvio manuale dal tab Actions
+  # (13/11/2026) anche quando cambia questo file: una modifica al backup si prova
+  # subito, non la notte dopo quando nessuno guarda
+  push:
+    branches: [main]
+    paths: ['.github/workflows/backup-db.yml']
 
 permissions:
   contents: read
@@ -54,7 +59,11 @@ jobs:
           # 'auth' e' incluso per poter ricreare gli utenti in caso di ripristino
           # (contiene gli hash delle password: il file finale e' sempre cifrato GPG).
           # Non e' incluso 'storage': i file dei bucket non stanno nel database.
-          pg_dump "$DB_URL" --no-owner --no-privileges \
+          # (13/11/2026) CON i permessi: fino a oggi il dump usava --no-privileges, quindi
+          # dopo un ripristino le funzioni tornavano eseguibili da chiunque (i REVOKE
+          # fatti dopo l'audit di settembre non c'erano). La prova mensile di ripristino
+          # gira in un'immagine che ha gli stessi ruoli di Supabase, quindi i GRANT passano.
+          pg_dump "$DB_URL" --no-owner \
             --schema=public --schema=planning --schema=cpt_admin --schema=archivio \
             --schema=auth \
             | gzip -9 > "backup_${TS}.sql.gz"
