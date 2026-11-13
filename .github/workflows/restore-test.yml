@@ -101,6 +101,15 @@ jobs:
               raise SystemExit('Nessun backup_* nella cartella Backup_Gestionale')
           ult = sorted(files, key=lambda f: f['name'])[-1]
           print('Ultimo backup su Drive:', ult['name'], ult.get('size'), 'byte, modificato', ult.get('modifiedTime'))
+          # (13/11/2026) la prova vale solo su un backup FRESCO: prima prendeva
+          # «l'ultimo» senza guardarne l'eta', e un mese di backup mancati passava
+          # con una prova verde su un file vecchio. Il giro e' notturno: oltre 3
+          # giorni vuol dire che si e' fermato, e la prova deve dirlo.
+          import datetime as _dt
+          _mod = _dt.datetime.fromisoformat(ult['modifiedTime'].replace('Z', '+00:00'))
+          _eta = (_dt.datetime.now(_dt.timezone.utc) - _mod).days
+          if _eta > 3:
+              raise SystemExit(f"L'ultimo backup su Drive ({ult['name']}) ha {_eta} giorni: il backup notturno si e' fermato")
           with requests.get(f"https://www.googleapis.com/drive/v3/files/{ult['id']}?alt=media", headers=H, stream=True) as d:
               d.raise_for_status()
               with open(ult['name'], 'wb') as f:

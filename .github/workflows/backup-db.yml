@@ -121,6 +121,11 @@ jobs:
           up = requests.put(init.headers['Location'], data=data)
           up.raise_for_status()
           print('Caricato su Drive:', path, f'({len(data)/1e6:.1f} MB)')
+          # (13/11/2026) lo dice al passo finale, che registra il verdetto: «caricato»
+          # si scrive solo qui, dopo che Drive ha risposto bene
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              for riga in ('SU_DRIVE=si', f'BACKUP_NOME={os.path.basename(path)}', f'BACKUP_MB={round(len(data)/1e6)}'):
+                  print(riga, file=env)
 
           # rotazione: cestina i backup più vecchi di 120 giorni
           lim = (datetime.datetime.utcnow() - datetime.timedelta(days=120)).strftime('%Y-%m-%dT%H:%M:%S')
@@ -133,3 +138,27 @@ jobs:
                              json={'trashed': True})
               print('Cestinato backup vecchio:', o['name'])
           PY
+
+      # (13/11/2026) IL BACKUP DICE DI ESSERE STATO FATTO. Fino a oggi, se il giro
+      # notturno smetteva, lo diceva solo un'email di GitHub: nel cruscotto della
+      # segreteria non c'era niente, e la prova mensile di ripristino poteva restare
+      # verde su un file vecchio. Ora ogni notte scrive una riga in
+      # s_test_automatici (suite «backup»), anche quando qualcosa è andato storto:
+      # il silenzio non è un esito. «riuscita» solo se il file è arrivato su Drive.
+      - name: Registra il verdetto in s_test_automatici
+        if: always()
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          STATO: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "${DB_URL:-}" ] || { echo "SUPABASE_DB_URL assente: non posso registrare"; exit 0; }
+          if [ "$STATO" = success ] && [ "${SU_DRIVE:-}" = si ]; then esito=riuscita
+          elif [ "$STATO" = success ]; then esito=errore; motivo="dump fatto ma NON caricato su Drive"
+          else esito=fallita; motivo="il giro si e' fermato ($STATO)"; fi
+          psql "$DB_URL" -q -v ON_ERROR_STOP=1 -v esito="$esito" -v mb="${BACKUP_MB:-}"             -v nome="${BACKUP_NOME:-}" -v motivo="${motivo:-}" -v run="$RUN_URL" <<'SQL'
+          insert into public.s_test_automatici (suite, esito, passati, falliti, run_url, dettaglio)
+          values ('backup', :'esito', nullif(:'mb', '')::int, 0, :'run',
+                  jsonb_strip_nulls(jsonb_build_object('file', nullif(:'nome', ''), 'motivo', nullif(:'motivo', ''))));
+          SQL
+          echo "Verdetto registrato: $esito"

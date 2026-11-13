@@ -2567,9 +2567,9 @@ console.log("%c Gestionale caricato ✓", "color:green;font-weight:bold")
 // connessione lenta). Prova in ordine jsdelivr → esm.sh → skypack.
 async function __loadSupabase(){
   const cdns = [
-    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
-    'https://esm.sh/@supabase/supabase-js@2',
-    'https://cdn.skypack.dev/@supabase/supabase-js@2'
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/+esm',
+    'https://esm.sh/@supabase/supabase-js@2.119.0',
+    'https://cdn.skypack.dev/@supabase/supabase-js@2.119.0'
   ];
   let lastErr=null;
   for(const url of cdns){
