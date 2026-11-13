@@ -1,0 +1,60 @@
+# ══════════════════════════════════════════════════════════════════════
+# verify_jwt di ogni funzione server, SCRITTO NEL REPO (13/11/2026).
+#
+# Prima stava solo nei commenti e nel pannello di Supabase: una pubblicazione
+# senza il flag giusto faceva rispondere 401 ai giri automatici (o apriva al
+# pubblico una funzione riservata) senza un errore nel codice. La riga di
+# comando legge questo file a ogni «supabase functions deploy».
+#
+# false = la funzione risponde anche senza accesso e si difende DA SÉ (parola
+#         d'ordine, biglietto firmato, tetto di richieste): va scritto nel
+#         commento in testa alla funzione perché.
+# true  = Supabase rifiuta chi non ha un accesso valido prima ancora di
+#         avviare la funzione.
+#
+# I valori sono quelli letti su Supabase il 13/11/2026. Una funzione nuova
+# porta qui la sua riga: test/funzioni-config.test.* fallisce se manca.
+# ══════════════════════════════════════════════════════════════════════
+project_id = "gestionale-visite"
+
+[functions.chat-team]
+verify_jwt = false
+
+[functions.dati-impresa-ufficiali]
+verify_jwt = true
+
+[functions.documenti-personale]
+verify_jwt = false
+
+[functions.foto-appunti]
+verify_jwt = true
+
+[functions.geocode-cantieri]
+verify_jwt = true
+
+[functions.promemoria-invii]
+verify_jwt = true
+
+[functions.promemoria-ricontrolli]
+verify_jwt = false
+
+[functions.push-visite]
+verify_jwt = false
+
+[functions.request-access]
+verify_jwt = false
+
+[functions.send-ceiv]
+verify_jwt = true
+
+[functions.send-relazione-stage]
+verify_jwt = true
+
+[functions.send-verbale]
+verify_jwt = true
+
+[functions.upload-foto]
+verify_jwt = true
+
+[functions.upload-pdf]
+verify_jwt = true
