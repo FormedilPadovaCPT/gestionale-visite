@@ -27,7 +27,15 @@
     + 'is_presidenza,is_segreteria,deve_cambiare_password,impresa_previsita,committenti_duplicati,committenti_lista,'
     + 'committenti_simili,dash_macroaree,dash_macroaree_dettaglio,dash_ver_visite,rubrica_impresa_dettaglio,'
     + 'rubrica_imprese_cerca,rubrica_persona_dettaglio,rubrica_persone_cerca,visite_count_map,s_direzione_in_attesa,'
-    + 'coord_avviso_verbali_stato,incarichi_avanzamento,osservatorio_controllo,imprese_senza_cf,persona_verbali').split(','));
+    + 'coord_avviso_verbali_stato,incarichi_avanzamento,osservatorio_controllo,imprese_senza_cf,persona_verbali,'
+    /* (13/11/2026) le funzioni nate dopo il 03/10 che il database dichiara di sola lettura (STABLE): l'elenco
+       si ricava da _SISTEMA/schema_db/gestionale_schema.sql incrociato con le .rpc() del gestionale. Senza,
+       la prova a secco le fermava e la maschera lavorava con risposte vuote. */
+    + 'chat_elenco,chat_membri_quadro,chat_stato,cicli_coord,ciclo_proposta,corso_docente_cerca_impresa,'
+    + 'corso_docente_cerca_persona,corso_docente_corsi,dash_cicli,dash_commissione,dash_questionari,dash_voci_nc,'
+    + 'doc_miei,doc_quadro,fattura_questioni_aperte,fp_controllo,fp_rientri_dovuti,fp_riepilogo,imprese_mail_di_altri,'
+    + 'incarichi_del_cantiere,incarichi_per_cantiere,incarico_vale_per_cantiere,lotti_acc_complesso,lotti_del_cantiere,'
+    + 'mie_firme_archivio,s_riaggancio_candidati,verbale_posizione,visite_complesso,visite_ultima_map').split(','));
   const reg = window.__secco = {
     scritture: [],
     attivo: true,
