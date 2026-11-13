@@ -30,6 +30,8 @@ name: Prova di ripristino del backup
 # mancava: 329 errori a cascata. Da allora si ripristina come supabase_admin
 # su uno schema auth svuotato.
 
+# (13/11/2026) dal backup di oggi il dump porta anche i permessi (GRANT/REVOKE): questa prova
+# li ricarica insieme al resto, nella stessa immagine coi ruoli di Supabase.
 on:
   schedule:
     - cron: '30 3 1 * *'    # il 1° di ogni mese alle 03:30 UTC, dopo il backup delle 02:00
