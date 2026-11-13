@@ -3,8 +3,9 @@ name: Prove nel browser (Playwright)
 # Apre il gestionale PUBBLICATO come farebbe un tecnico, da telefono (Pixel 7) e
 # da computer, e controlla che si apra senza errori JavaScript e mostri
 # l'accesso (04/10/2026). Parte dopo ogni pubblicazione e ogni mattina feriale.
-# Le prove che entrano nell'app aspettano un database di prova: sul database
-# vero le prove finiscono nell'XML nazionale (vedi e2e/playwright.config.mjs).
+# Dal 13/11/2026 una prova ENTRA nell'app con l'account di prova
+# (prove/verbale-a-secco.spec.mjs): lavora a secco e il database rifiuta ogni
+# scrittura di quell'account, quindi niente finisce nell'XML nazionale.
 #
 # Se fallisce il job diventa rosso e GitHub manda l'email; il rapporto con la
 # traccia si scarica dagli artifact del run (tenuto 7 giorni, solo se fallisce).
@@ -16,6 +17,11 @@ on:
   schedule:
     - cron: '30 5 * * 1-5'     # feriali, 07:30 ora legale / 06:30 ora solare
   workflow_dispatch:
+  # (13/11/2026) anche quando cambiano le prove stesse: prima una prova nuova
+  # aspettava la pubblicazione successiva o il mattino feriale dopo
+  push:
+    branches: [main]
+    paths: ['e2e/**', 'tools/prova_a_secco.js', '.github/workflows/e2e.yml']
 
 permissions:
   contents: read
@@ -39,6 +45,10 @@ jobs:
         id: prove
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: risultati.json
+          # (13/11/2026) l'account di prova per verbale-a-secco.spec.mjs: senza questi due
+          # secret quella prova si salta. Il database rifiuta ogni scrittura di quell'account.
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
         run: npx playwright test --reporter=list,html,json
 
       # Il verdetto va in s_test_automatici e il cruscotto della segreteria lo
@@ -65,11 +75,15 @@ jobs:
           else
             esito=errore; passati=""; n_falliti=0; falliti=""
           fi
+          # (13/11/2026) il dettaglio dello scenario con l'account di prova va nel verdetto
+          # (database), non nei log, che in questo repository sono pubblici
+          scenario=$(cat esito-scenario-*.json 2>/dev/null | head -c 6000 || true)
           psql "$DB_URL" -q -v ON_ERROR_STOP=1 -v esito="$esito" -v passati="${passati:-}" \
-            -v n_falliti="${n_falliti:-0}" -v falliti="${falliti:-}" -v run="$RUN_URL" <<'SQL'
-          insert into public.s_test_automatici (suite, esito, passati, falliti, elenco_falliti, run_url)
+            -v n_falliti="${n_falliti:-0}" -v falliti="${falliti:-}" -v run="$RUN_URL" -v scenario="$scenario" <<'SQL'
+          insert into public.s_test_automatici (suite, esito, passati, falliti, elenco_falliti, run_url, dettaglio)
           values ('browser', :'esito', nullif(:'passati', '')::int, :'n_falliti'::int,
-                  nullif(string_to_array(:'falliti', '|'), '{}'), :'run');
+                  nullif(string_to_array(:'falliti', '|'), '{}'), :'run',
+                  case when :'scenario' = '' then null else jsonb_build_object('scenario_verbale', :'scenario') end);
           SQL
           echo "Verdetto registrato: $esito"
       - name: Rapporto (solo se qualcosa non va)

@@ -18,3 +18,4 @@ e2e/node_modules/
 e2e/test-results/
 e2e/playwright-report/
 e2e/package-lock.json
+e2e/esito-scenario-*.json
