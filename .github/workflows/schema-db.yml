@@ -118,14 +118,24 @@ jobs:
           if [ -n "${SERVIZI_DB_URL:-}" ]; then
             fase servizi
             if ! pg_dump "$SERVIZI_DB_URL" --schema-only --no-owner --schema=public > fuori/grezzo_servizi.sql 2> fuori/errori.txt; then
+              # (13/11/2026) il portale che non risponde NON ferma il deposito dello schema del
+              # Gestionale, che è quello che conta: si annota, si prosegue, e il giro risulta
+              # fallito solo alla fine (passo «Esito del portale»), col motivo nel verdetto
               echo "pg_dump del portale non riuscito ($(wc -l < fuori/errori.txt) righe di errore, non riportate)"
               tr '\n' ' ' < fuori/errori.txt | head -c 500 > fuori/motivo.txt
-              exit 1
+              rm -f fuori/grezzo_servizi.sql fuori/errori.txt
+              echo "servizi=non-letto" >> "$GITHUB_OUTPUT"
+            else
+              grep -vE '^\\(un)?restrict |^-- Dumped (from|by) ' fuori/grezzo_servizi.sql > fuori/servizi_schema.sql
+              rm -f fuori/grezzo_servizi.sql fuori/errori.txt
+              if [ "$(grep -c '^CREATE TABLE ' fuori/servizi_schema.sql)" -ge 8 ]; then
+                echo "servizi=si" >> "$GITHUB_OUTPUT"
+              else
+                echo "Schema del portale con troppe poche tabelle: non lo deposito."
+                echo 'schema del portale troppo piccolo' > fuori/motivo.txt; rm -f fuori/servizi_schema.sql
+                echo "servizi=non-letto" >> "$GITHUB_OUTPUT"
+              fi
             fi
-            grep -vE '^\\(un)?restrict |^-- Dumped (from|by) ' fuori/grezzo_servizi.sql > fuori/servizi_schema.sql
-            rm -f fuori/grezzo_servizi.sql fuori/errori.txt
-            [ "$(grep -c '^CREATE TABLE ' fuori/servizi_schema.sql)" -ge 8 ] || { echo "Schema del portale con troppe poche tabelle: non lo deposito."; echo 'schema del portale troppo piccolo' > fuori/motivo.txt; exit 1; }
-            echo "servizi=si" >> "$GITHUB_OUTPUT"
           else
             echo "Secret SERVIZI_DB_URL assente: lo schema del portale non si estrae."
             echo "servizi=secret-assente" >> "$GITHUB_OUTPUT"
@@ -202,6 +212,13 @@ jobs:
               print('cambiati=' + ','.join(cambiati), file=out)
           print('Depositato. File cambiati rispetto a ieri:', len(cambiati))
           PY
+
+      - name: Esito del portale
+        if: steps.estrai.outputs.servizi == 'non-letto'
+        run: |
+          echo "FASE=portale" >> "$GITHUB_ENV"
+          echo "Lo schema del Gestionale è depositato; quello del portale non è stato letto (motivo nel verdetto)."
+          exit 1
 
       # Il silenzio non è un esito: una riga ogni notte in s_test_automatici
       # (suite «schema»), che il cruscotto della segreteria mostra.
