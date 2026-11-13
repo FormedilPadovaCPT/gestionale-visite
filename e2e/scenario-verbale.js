@@ -49,8 +49,11 @@ window.__scenarioVerbale = async function (opzioni) {
     // 3. la maschera del verbale
     window.navTo('form');
     await finche('maschera del verbale', () => document.getElementById('btn-bozza') && document.getElementById('f-data') && Array.isArray(S.imprese));
+    /* «Nuova visita»: è initForm a preparare la maschera vuota (riga dell'impresa principale, data,
+       tecnico); aprire la pagina da sola non lo fa */
+    await app.initForm();
     await attendi(1500);
-    passo('maschera aperta');
+    passo('maschera aperta e inizializzata');
 
     const { data: cc, error: ec } = await sb.from('cantieri').select('*').not('cantiere_indirizzo', 'is', null).or('elimina.is.null,elimina.eq.0').order('created_at', { ascending: false }).limit(1);
     if (ec) throw new Error('cantieri non letti: ' + ec.message);
