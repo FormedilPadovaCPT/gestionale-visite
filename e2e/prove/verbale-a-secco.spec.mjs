@@ -13,6 +13,7 @@
 //     finisce in esito-scenario-*.json, che il workflow porta nel verdetto (database).
 //
 // Senza le credenziali (secret E2E_EMAIL ed E2E_PASSWORD) la prova si salta, e lo dice.
+// I due secret ci sono dal 13/11/2026; l'accesso di prova esiste dal 17/09/2026.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
