@@ -15,6 +15,9 @@ Metodo usato il 13/11/2026 per `esportazioni.js` (secondo modulo, dopo `osservat
 8. **L'analisi sbaglia per eccesso sui nomi corti**: una `const S` o `s` locale in un'altra funzione fa dire «riassegnata altrove» o inventa una dipendenza. Si guarda la riga indicata prima di aggiungere un getter.
 9. **Le prove che usano l'inizio del blocco come fine di quello prima** (es. «da `admGeneraReport` a `admGeneraReportOsservatorio`») vanno chiuse su un segno che resta nel file centrale (`window.admGeneraReport = …`).
 
-Fatti: `esportazioni.js` (13/11/2026), `report-osservatorio.js` (13/11/2026, 934 righe).
+10. **Lo spostamento lo fa `tools/estrai_blocco.py`** (righe, file, fabbrica, dipendenze, descrizione, nomi da restituire). Se il resto del file chiama una funzione del blocco da codice (non da un `onclick`), la fabbrica la restituisce: `const { admLoadCommittenti } = creaCommittenti(…)`.
+11. **Le prove che leggono il testo** usano `require('./_sorgente.cjs').sorgenteApp()`: file centrale più i moduli che importa.
 
-Blocchi adatti, in ordine: ~~report Osservatorio~~, regole statistiche pure, report attività, committenti, pagina del coordinatore. Da non toccare: salvataggio e maschera del verbale, invio e PDF, accesso.
+Fatti il 13/11/2026: `esportazioni.js`, `report-osservatorio.js` (934 righe), `report-visite.js` (987), `committenti.js` (239).
+
+Non adatti, visti da vicino: le regole statistiche pure (funzioni sparse fra quelle che disegnano la pagina: sarebbe un riordino, non uno spostamento) e la zona del coordinatore (costanti d'accesso e funzioni chiamate all'avvio). Da non toccare: salvataggio e maschera del verbale, invio e PDF, accesso.
