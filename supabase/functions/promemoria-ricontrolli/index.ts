@@ -148,6 +148,33 @@ serve(async (req)=>{
     const riepilogoOrfani = Object.values(orfani).map(o=>({ tecnico:o.nome, cantieri:o.rows.length }))
     if(dryRun) return new Response(JSON.stringify({ ok:true, dryRun:true, attivo, manuale, giorni, bcc:COORD, tecnici:riepilogo, da_riassegnare:riepilogoOrfani }, null, 2),{headers:{'Content-Type':'application/json',...CORS}})
 
+    // (13/11/2026) REGISTRO DEI GIRI: si PRENOTA prima di spedire. Prima un «Re-run» del
+    // workflow del lunedì, o due clic del coordinatore, mandavano due volte le scadenze a
+    // tutti i tecnici. Ora: un solo giro automatico al giorno (lo garantisce un indice unico
+    // del database), e i giri a mano non più di uno ogni 15 minuti.
+    // Se il REGISTRO stesso non risponde si spedisce comunque, come si è sempre fatto: una
+    // doppia mail è meno grave di nessuna mail.
+    const REG = `${SB_URL}/rest/v1/promemoria_ricontrolli_giri`
+    const hReg = { apikey:SRK, Authorization:`Bearer ${SRK}`, 'Content-Type':'application/json' }
+    let giroId: number | null = null
+    try{
+      if(manuale){
+        const da = new Date(Date.now() - 15*60*1000).toISOString()
+        const rr = await fetch(`${REG}?select=id,fatto_il&fatto_il=gte.${encodeURIComponent(da)}&order=fatto_il.desc&limit=1`, { headers:hReg })
+        const recenti = rr.ok ? await rr.json() : []
+        if(Array.isArray(recenti) && recenti.length){
+          return new Response(JSON.stringify({ ok:false, gia_fatto:true, error:'Il promemoria è appena partito (meno di 15 minuti fa): non lo rimando, per non mandare due volte la stessa mail a tutti.' }, null, 2),{status:409,headers:{'Content-Type':'application/json',...CORS}})
+        }
+      }
+      const pr = await fetch(REG, { method:'POST', headers:{ ...hReg, Prefer:'return=representation' }, body: JSON.stringify({ manuale, esito:'prenotato' }) })
+      if(pr.status === 409){
+        // l'indice unico ha rifiutato: il giro automatico di oggi c'è già
+        return new Response(JSON.stringify({ ok:true, gia_fatto:true, motivo:'il giro automatico di oggi è già partito: non rimando le mail' }, null, 2),{headers:{'Content-Type':'application/json',...CORS}})
+      }
+      if(pr.ok){ const riga = await pr.json(); giroId = Array.isArray(riga) && riga[0] ? riga[0].id : null }
+      else console.warn('promemoria-ricontrolli: registro dei giri non scritto (', pr.status, '): spedisco lo stesso')
+    }catch(e){ console.warn('promemoria-ricontrolli: registro dei giri non raggiungibile, spedisco lo stesso:', String((e as Error).message||e)) }
+
     const sa = JSON.parse(Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON')!)
     const token = await getToken(sa,'https://www.googleapis.com/auth/gmail.send')
 
@@ -180,6 +207,12 @@ serve(async (req)=>{
         + `</div></div>`
       try{ const id = await sendMail(token, COORD, `Rientri scaduti di tecnici non più in servizio – ${tot} cantieri da riassegnare`, html); esiti.push({email:COORD, ok:true, id, orfani:tot}) }
       catch(e){ esiti.push({email:COORD, ok:false, err:String(e.message||e), orfani:tot}) }
+    }
+    // il giro prenotato prende il suo esito (se non riesce, resta «prenotato»: si vede lo stesso che è partito)
+    if(giroId != null){
+      try{
+        await fetch(`${REG}?id=eq.${giroId}`, { method:'PATCH', headers:hReg, body: JSON.stringify({ inviate: esiti.filter(e=>e.ok).length, errori: esiti.filter(e=>!e.ok).length, esito: esiti.some(e=>!e.ok) ? 'con errori' : 'inviato' }) })
+      }catch(_e){ /* l'esito è nella risposta e nei log */ }
     }
     return new Response(JSON.stringify({ ok:true, manuale, giorni, bcc:COORD, inviate:esiti.filter(e=>e.ok).length, da_riassegnare:riepilogoOrfani, esiti }, null, 2),{headers:{'Content-Type':'application/json',...CORS}})
   }catch(e){
