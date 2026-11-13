@@ -85,7 +85,7 @@ assert.ok(/notaCeivFoto\(/.test(render) && /\.ceiv-foto-nota/.test(render), 'pag
 assert.ok(/x\.ceivRif==='data_visita'/.test(render) && /x\.ceivRif==='stato_attuale'/.test(render), 'pagina Statistiche: le provenienze vanno contate a parte')
 assert.strictEqual((html.match(/class="ceiv-foto-nota"/g) || []).length, 2, 'le due schede sulla Cassa devono dire da dove viene il dato')
 
-const rpt = estrai('async function admGeneraReport(){', 'async function admGeneraReportOsservatorio(){')
+const rpt = estrai('async function admGeneraReport(){', 'window.admGeneraReport = admGeneraReport')
 assert.ok(/'impresa_id','imprese\(stato_cassa\)','visite_cassa_foto\(impresa_id,stato,fonte,iscritta_ceiv,riferimento\)'/.test(rpt), 'Report visite: non scarica la foto col riferimento')
 assert.ok(/ceivFotoRif\(v\.visite_cassa_foto,v\.impresa_id\)==='data_visita'/.test(rpt) && /ceivFotoRif\(v\.visite_cassa_foto,v\.impresa_id\)==='stato_attuale'/.test(rpt), 'Report visite: le provenienze vanno contate a parte')
 assert.strictEqual((rpt.match(/ceivStatVisita\(v\.visite_cassa_foto,v\.impresa_id,v\.imprese\)/g) || []).length, 2, 'Report visite: i due grafici sulla Cassa devono usare la foto')

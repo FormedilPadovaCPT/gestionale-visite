@@ -12,4 +12,9 @@ Metodo usato il 13/11/2026 per `esportazioni.js` (secondo modulo, dopo `osservat
 6. **Prove**: tutte le `test/*.test.cjs`. Quelle che leggono il testo del blocco da `index.html` vanno fatte leggere anche dal file nuovo.
 7. **Verifica nel browser** dopo la pubblicazione: la prova automatica dice se l'app parte; le funzioni del blocco si provano a mano. Per le esportazioni si sostituisce `XLSX.writeFile` con una funzione che registra nome e fogli, così non si scarica niente.
 
-Blocchi adatti, in ordine: report Osservatorio, regole statistiche pure, report attività, committenti, pagina del coordinatore. Da non toccare: salvataggio e maschera del verbale, invio e PDF, accesso.
+8. **L'analisi sbaglia per eccesso sui nomi corti**: una `const S` o `s` locale in un'altra funzione fa dire «riassegnata altrove» o inventa una dipendenza. Si guarda la riga indicata prima di aggiungere un getter.
+9. **Le prove che usano l'inizio del blocco come fine di quello prima** (es. «da `admGeneraReport` a `admGeneraReportOsservatorio`») vanno chiuse su un segno che resta nel file centrale (`window.admGeneraReport = …`).
+
+Fatti: `esportazioni.js` (13/11/2026), `report-osservatorio.js` (13/11/2026, 934 righe).
+
+Blocchi adatti, in ordine: ~~report Osservatorio~~, regole statistiche pure, report attività, committenti, pagina del coordinatore. Da non toccare: salvataggio e maschera del verbale, invio e PDF, accesso.

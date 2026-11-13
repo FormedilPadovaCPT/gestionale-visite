@@ -8,7 +8,8 @@ const path = require('path')
 const vm = require('vm')
 const assert = require('assert')
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')
+/* (13/11/2026) il report Osservatorio sta in report-osservatorio.js (terzo modulo estratto dal file centrale): si legge insieme */
+const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8') + String.fromCharCode(10) + fs.readFileSync(path.join(__dirname, '..', 'report-osservatorio.js'), 'utf8')
 
 function estrai(inizio, fine) {
   const a = html.indexOf(inizio)
@@ -53,7 +54,7 @@ assert.ok(/comune:comuneStat\(/.test(dash), 'pagina Statistiche: comuni non unif
 // (dettaglio in test/stato-cassa-fotografato.test.cjs)
 assert.ok(/ceiv:ceivStatVisita\(r\.visite_cassa_foto,/.test(dash), 'pagina Statistiche: Cassa Edile non letta dalla lista')
 
-const rpt = estrai('async function admGeneraReport(){', 'async function admGeneraReportOsservatorio(){')
+const rpt = estrai('async function admGeneraReport(){', 'window.admGeneraReport = admGeneraReport')
 assert.ok(/'imprese\(stato_cassa\)'/.test(rpt), 'Report visite: non legge lo stato in lista')
 assert.ok(!/imprese\(cassa_edile\)/.test(rpt), 'Report visite: conta ancora dal campo cassa_edile')
 assert.ok(/ceivStatVisita\(v\.visite_cassa_foto,v\.impresa_id,v\.imprese\)/.test(rpt), 'Report visite: Cassa Edile non per visita')
