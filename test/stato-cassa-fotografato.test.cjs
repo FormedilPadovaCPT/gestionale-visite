@@ -11,7 +11,7 @@ const path = require('path')
 const vm = require('vm')
 const assert = require('assert')
 
-const html = fs.readFileSync(process.env.INDEX_HTML || path.join(__dirname, '..', 'index.html'), 'utf8')
+const html = require('./_sorgente.cjs').sorgenteApp(process.env.INDEX_HTML || path.join(__dirname, '..', 'index.html'))   // (13/11/2026) index.html + i moduli estratti
 const sql = fs.readFileSync(process.env.CASSA_FOTO_SQL || path.join(__dirname, '..', 'supabase', 'sql', '2026_10_20_visite_cassa_foto.sql'), 'utf8')
 // sera del 20/10/2026: per il 2025-26 senza liste conservate, lo stato attuale dichiarato come tale
 const sql2 = fs.readFileSync(process.env.CASSA_FOTO_SQL2 || path.join(__dirname, '..', 'supabase', 'sql', '2026_10_20b_visite_cassa_foto_stato_attuale.sql'), 'utf8')

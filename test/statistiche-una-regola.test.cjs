@@ -9,7 +9,7 @@ const vm = require('vm')
 const assert = require('assert')
 
 /* (13/11/2026) il report Osservatorio sta in report-osservatorio.js (terzo modulo estratto dal file centrale): si legge insieme */
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8') + String.fromCharCode(10) + fs.readFileSync(path.join(__dirname, '..', 'report-osservatorio.js'), 'utf8')
+const html = require('./_sorgente.cjs').sorgenteApp()   // (13/11/2026) index.html + i moduli estratti
 
 function estrai(inizio, fine) {
   const a = html.indexOf(inizio)

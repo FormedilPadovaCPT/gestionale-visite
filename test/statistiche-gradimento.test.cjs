@@ -7,7 +7,7 @@ const vm = require('vm')
 const assert = require('assert')
 
 const radice = path.join(__dirname, '..')
-const html = fs.readFileSync(path.join(radice, 'index.html'), 'utf8')
+const html = require('./_sorgente.cjs').sorgenteApp()   // (13/11/2026) index.html + i moduli estratti
 function estrai(inizio, fine) {
   const a = html.indexOf(inizio)
   assert.ok(a >= 0, 'non trovo: ' + inizio)

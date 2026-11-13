@@ -19,7 +19,7 @@ function delDatabase(np, nm, os) {
   return 'NR';
 }
 
-const index = leggi('index.html');
+const index = require('./_sorgente.cjs').sorgenteApp();   // (13/11/2026) index.html + i moduli estratti
 const estrai = (testo, inizio, cosa) => {
   const i = testo.indexOf(inizio);
   assert.ok(i >= 0, cosa + ': non trovata (è stata rinominata o spostata?)');

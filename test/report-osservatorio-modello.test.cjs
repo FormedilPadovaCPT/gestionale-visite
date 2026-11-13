@@ -9,7 +9,7 @@ const assert = require('assert')
 
 const dir = path.join(__dirname, '..')
 /* (13/11/2026) il report Osservatorio sta in report-osservatorio.js (terzo modulo estratto dal file centrale): si legge insieme */
-const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8') + String.fromCharCode(10) + fs.readFileSync(path.join(dir, 'report-osservatorio.js'), 'utf8')
+const html = require('./_sorgente.cjs').sorgenteApp()   // (13/11/2026) index.html + i moduli estratti
 const dati = fs.readFileSync(path.join(dir, 'app-data.js'), 'utf8')
 const oss = fs.readFileSync(path.join(dir, 'osservatorio.js'), 'utf8')
 
