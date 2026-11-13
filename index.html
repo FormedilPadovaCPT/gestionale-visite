@@ -10060,6 +10060,7 @@ async function inviEmailVerbaleFromList(vid,opz){
   if(error||!v){toast('Visita non trovata','err');return}
   if(v.stato!=='definitivo'){toast('Questo verbale è ancora in bozza: prima si chiude con «Definitivo», poi si invia all\'impresa.','warn',9000);return}   // (06/11/2026)
   window._evSerie=!!v.fp_serie_proposta   // (13/10/2026) il tecnico propone una serie di visite
+  window._evSerieVid=vid   // (13/11/2026) di quale verbale è: all'invio vale solo se è quello che parte
   const{data:impRows}=await sb.from('visite_imprese_presenti').select('impresa_id,is_principale,imprese(impresa_nome,impresa_email_ref,impresa_telefono,piva,cassa_edile,stato_cassa)').eq('visita_id',vid).order('ordine')
   // formazione mancante (25/09/2026): il pacchetto per la mail all'impresa e la segnalazione all'ufficio corsi
   {const _pr=(impRows||[]).find(x=>x.is_principale)||(impRows||[])[0]||null,_pi=_pr&&_pr.imprese||{}
@@ -10151,6 +10152,7 @@ Organismo Accreditato Regione Veneto per la formazione L.R. n. 19 del 09.08.02 c
 Ai sensi del Regolamento (UE) 2016/679 (GDPR) relativo alla protezione delle persone fisiche con riguardo al trattamento dei dati personali, la presente e-mail è destinata unicamente alle persone sopra indicate e le informazioni in essa contenute sono da considerarsi strettamente riservate. Se avete ricevuto questo messaggio per errore, siete pregati di rispedirlo al mittente, distruggendo qualunque copia in Vostro possesso, grazie.`
 
   window._evEmails=emails
+  if(window._evFormazione)window._evFormazione._vid=vid   // (13/11/2026) come sopra, per la formazione mancante
   window._evContext={vid,nr_verbale:_eNr,data_visita:v.data_visita||'',cantiere:cant,
     impresa:_eImp,tecnico:_eTec1,tecnico2:_eTec2,comune:_eCom,cantIndirizzo:_eInd,dataVisita:_eData}
   const btnInvia=$('btn-ev-invia')
@@ -10327,6 +10329,7 @@ $('btn-rett-si').onclick=async()=>{
   window._rettPending=null
   if(!window._evContext||window._evContext.vid!==p.vid){toast('La finestra d\'invio non è più quella di questo verbale: riapri l\'invio.','err',8000);return}
   window._evRettifica={
+    vid:p.vid,   // (13/11/2026) di quale verbale è
     modifiche:p.modifiche,
     note:$('rett-note').value.trim()||null,
     dataPrimoInvio:_rettFmtDate(p.last.inviato_at,true)
@@ -10402,15 +10405,20 @@ async function inviEmailVerbale(opz){
   const _fInd=[S.fd?.cantiere_indirizzo,S.fd?.cantiere_civico].filter(Boolean).join(' ')
   const _fCom=S.fd?.comune_nome||''
   const _fImp=(S.imprese&&S.imprese.length?S.imprese[0]?.impresa_nome:'')||''
+  /* (13/11/2026) formazione, serie e rettifica portano il verbale a cui appartengono: all'invio valgono solo se è
+     quello che parte. Il calcolo della formazione qui sotto si completa quando arriva la lettura dell'impresa: se
+     nel frattempo la finestra è stata aperta per un altro verbale, non deve scriverci sopra. */
+  const _vidForm=S.savedId||S.fd?.visita_id||null
   window._evSerie=!!(window.FuoriProcedura&&FuoriProcedura.serieProposta())   // (13/10/2026) il tecnico propone una serie di visite
+  window._evSerieVid=_vidForm
   // formazione mancante (25/09/2026): dal modulo appena salvato
   // (la funzione non e' asincrona: si calcola subito con quello che c'e', e la lettura
   //  dell'impresa aggiorna il pacchetto appena arriva, prima che il tecnico prema Invia)
   try{const _i0=(S.imprese&&S.imprese[0])||{}
-    const _calc=_ir=>{window._evFormazione=_evFormazioneCalc({sn:cGet('f-note-for-sn'),tipi:_tipiSel()||[],nota:vGet('f-note-for-m'),
+    const _calc=_ir=>{if(window._evContext&&window._evContext.vid!==_vidForm)return;window._evFormazione=_evFormazioneCalc({sn:cGet('f-note-for-sn'),tipi:_tipiSel()||[],nota:vGet('f-note-for-m'),
       ceiv:_ceivDa(_ir.cassa_edile||_i0.ceiv,_ir.stato_cassa),impresa:_i0.impresa_nome||null,piva:_ir.piva||_i0.piva||null,impresa_id:_i0.impresa_id||null,
       impresa_email:(_ir.impresa_email_ref||'').trim()||null,impresa_tel:_ir.impresa_telefono||null,
-      referente:[vGet('f-ppre-titolo'),vGet('f-ppre-nome'),vGet('f-ppre-cog')].filter(Boolean).join(' ')+(vGet('f-qual-ppre')?' ('+vGet('f-qual-ppre')+')':'')||null,referente_tel:vGet('f-tel-ppre')||null,tecnico_id:S.tecnico?.tecnico_id||null});_evAnteprima&&_evAnteprima()}
+      referente:[vGet('f-ppre-titolo'),vGet('f-ppre-nome'),vGet('f-ppre-cog')].filter(Boolean).join(' ')+(vGet('f-qual-ppre')?' ('+vGet('f-qual-ppre')+')':'')||null,referente_tel:vGet('f-tel-ppre')||null,tecnico_id:S.tecnico?.tecnico_id||null});if(window._evFormazione)window._evFormazione._vid=_vidForm;_evAnteprima&&_evAnteprima()}
     _calc({})
     _tipiFormazione().then(()=>_calc({})).catch(()=>{})
     if(_i0.impresa_id)sb.from('imprese').select('impresa_email_ref,impresa_telefono,piva,cassa_edile,stato_cassa').eq('impresa_id',_i0.impresa_id).maybeSingle().then(({data:_d})=>_calc(_d||{})).catch(()=>{})
@@ -10507,12 +10515,19 @@ $('btn-ev-invia').onclick=async()=>{
   /* (12/11/2026) la valutazione l'ha fatta l'apertura della finestra: senza, o con un verbale cambiato che non è in rettifica, non parte */
   const _val=window._evValutazione&&window._evValutazione.vid===vid?window._evValutazione:null
   const _stessa=window._evStessaVersione&&window._evStessaVersione.vid===vid?window._evStessaVersione:null
+  /* (13/11/2026) rettifica, formazione mancante e proposta di serie: come gli altri, valgono solo se sono di QUESTO
+     verbale. Prima erano le uniche tre cose lette senza confrontarle col verbale in partenza. */
+  const _rettX=window._evRettifica&&window._evRettifica.vid===vid?window._evRettifica:null
+  const _rett=_rettX?{modifiche:_rettX.modifiche,note:_rettX.note,dataPrimoInvio:_rettX.dataPrimoInvio}:null
+  const _formX=window._evFormazione&&window._evFormazione._vid===vid?window._evFormazione:null
+  const _form=_formX?(({_vid,...f})=>f)(_formX):null
+  const _serie=window._evSerieVid===vid&&!!window._evSerie
   if(!_reinvio&&!_val){toast('Invio fermato: non so se questo verbale è già stato inviato e se è cambiato. Chiudi la finestra e riapri l\'invio.','err',10000);return}
-  if(!_reinvio&&(_val.stato==='rettifica'||_val.stato==='da-chiedere')&&!window._evRettifica&&!_stessa){toast('Invio fermato: il verbale è cambiato rispetto a quello già inviato e può partire solo come rettifica. Chiudi la finestra e riapri l\'invio.','err',12000);return}
+  if(!_reinvio&&(_val.stato==='rettifica'||_val.stato==='da-chiedere')&&!_rett&&!_stessa){toast('Invio fermato: il verbale è cambiato rispetto a quello già inviato e può partire solo come rettifica. Chiudi la finestra e riapri l\'invio.','err',12000);return}
   // (03/10/2026, regola dell'utente) almeno un'impresa deve ricevere il verbale: senza, arriverebbe solo alle figure
   if(!_reinvio&&!emails.some(_evImpresa)&&tutti.some(_evImpresa)){toast('Hai tolto la spunta a tutte le imprese: il verbale arriverebbe solo alle figure del cantiere. Rimetti la spunta ad almeno un\'impresa e poi invia.','err',9000);return}
   if(!_reinvio&&!emails.some(_evImpresa)){toast('Nessuna impresa fra i destinatari: il verbale arriverebbe solo alle figure del cantiere. Aggiungi l\'indirizzo dell\'impresa con «+ Aggiungi» e poi invia.','err',9000);const _x=$('ev-extra');if(_x)_x.focus();return}
-  if(window._evInviiNonLetti===vid&&!window._evRettifica){toast('Non sono riuscito a verificare se questo verbale è già stato inviato: invio fermato. Ricarica e riapri la visita, così si capisce se è un primo invio o una rettifica.','err',9000);return}
+  if(window._evInviiNonLetti===vid&&!_rett){toast('Non sono riuscito a verificare se questo verbale è già stato inviato: invio fermato. Ricarica e riapri la visita, così si capisce se è un primo invio o una rettifica.','err',9000);return}
 
   const btn=$('btn-ev-invia')
   const status=$('email-verbale-status')
@@ -10543,8 +10558,8 @@ $('btn-ev-invia').onclick=async()=>{
         headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`,'apikey':SB_KEY},
         body:JSON.stringify({
           pdf_base64: pdfBase64,
-          nr_verbale: vGet('f-verbale')||window._evContext?.nr_verbale||'',
-          data_visita: vGet('f-data')||window._evContext?.data_visita||'',
+          nr_verbale: window._evContext?.nr_verbale||vGet('f-verbale')||'',   // (13/11/2026) prima il verbale in invio, poi la maschera
+          data_visita: window._evContext?.data_visita||vGet('f-data')||'',
           visita_id: vid,
           impronta: window._pdfImpronta||null   // (09/10/2026) stessi dati = il file in archivio non si riscrive
         })
@@ -10585,12 +10600,12 @@ $('btn-ev-invia').onclick=async()=>{
           cantIndirizzo: window._evContext?.cantIndirizzo||'',
           dataVisita: window._evContext?.dataVisita||'',
           campagna: await _evCampagnaPayload(),
-          rettifica: window._evRettifica||undefined,
-          formazione: (!window._evRettifica&&window._evFormazione)?{...window._evFormazione,visita_id:window._evContext?.vid||null}:undefined,   // 25/09/2026: date dei corsi all'impresa + segnalazione all'ufficio corsi
-          serieProposta: !window._evRettifica&&!!window._evSerie,   // 13/10/2026: il tecnico propone una serie di visite, l'impresa trova l'invito a chiederla dal portale
+          rettifica: _rett||undefined,
+          formazione: (!_rett&&_form)?{..._form,visita_id:vid}:undefined,   // 25/09/2026: date dei corsi all'impresa + segnalazione all'ufficio corsi
+          serieProposta: !_rett&&_serie,   // 13/10/2026: il tecnico propone una serie di visite, l'impresa trova l'invito a chiederla dal portale
           linkValuta,
           driveFileId: upData.drive_file_id,
-          fileName: (function(){const _ev=window._evContext||{};const _c=s=>(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim();const _cd=(_ev.nr_verbale||vGet('f-verbale')||'').replace(/\D/g,'').slice(-4);const _nm=[`Verb_${_cd}`+(window._evRettifica?' RETTIFICA':''),_c(_ev.impresa).slice(0,30).trim(),_c(_ev.comune),_c(_ev.tecnico),(_ev.dataVisita||'').replace(/\//g,'-')].filter(Boolean).join(' - ')+'.pdf';return _cd?_nm:upData.file_name})()
+          fileName: (function(){const _ev=window._evContext||{};const _c=s=>(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim();const _cd=(_ev.nr_verbale||vGet('f-verbale')||'').replace(/\D/g,'').slice(-4);const _nm=[`Verb_${_cd}`+(_rett?' RETTIFICA':''),_c(_ev.impresa).slice(0,30).trim(),_c(_ev.comune),_c(_ev.tecnico),(_ev.dataVisita||'').replace(/\//g,'-')].filter(Boolean).join(' - ')+'.pdf';return _cd?_nm:upData.file_name})()
         })
       })
     }finally{clearTimeout(tOut)}
@@ -10611,7 +10626,7 @@ $('btn-ev-invia').onclick=async()=>{
       /* la mail è partita: l'invio si registra comunque, ma senza la copia del verbale
          la prossima rettifica non potrà dire che cosa è cambiato — lo si dice ora */
       if(eSnap)toast('Invio registrato senza la copia del verbale trasmesso (lettura non riuscita: '+eSnap.message+'): una futura rettifica non potrà elencare le modifiche.','warn',9000)
-      const _ret=window._evRettifica||null
+      const _ret=_rett
       const{error:eLog}=await sb.from('verbali').insert({
         visita_id:vid,
         nr_verbale:window._evContext?.nr_verbale||vGet('f-verbale')||'',

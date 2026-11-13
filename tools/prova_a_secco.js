@@ -40,6 +40,10 @@
     scritture: [],
     attivo: true,
     ritardoNumero: 0,                                        // millisecondi: finge un telefono con poca linea
+    fintoFunzioni: {                                         // risposta finta delle funzioni SERVER fermate, per nome
+      'upload-pdf': { ok: true, secco: true, drive_file_id: 'SECCO-nessun-file', drive_url: '' },
+      'send-verbale': { ok: true, secco: true, id: 'SECCO-nessuna-mail' }
+    },
     finto: {                                                 // risposta finta delle funzioni fermate (valore, o funzione del corpo)
       chiudi_verbale: { ok: true, mancanze: [] },
       salva_figli_verbale: (c) => ({ ok: true, checklist: (c.p_checklist || []).length, lavorazioni: (c.p_lavorazioni || []).length, imprese: (c.p_imprese || []).length })
@@ -58,7 +62,14 @@
     reg.scritture.push({ method: metodo, url: url.replace(/^https:\/\/[^/]+/, ''), body: corpo });
     const J = (o, st = 200) => new Response(JSON.stringify(o), { status: st, headers: { 'Content-Type': 'application/json' } });
     if (m) { const f = reg.finto[m[1]]; return J(typeof f === 'function' ? f(corpo || {}) : (m[1] in reg.finto ? f : null)); }
-    if (url.includes('/functions/v1/')) return J({ ok: true, secco: true });
+    if (url.includes('/functions/v1/')) {
+      /* (13/11/2026) le funzioni server hanno una risposta finta per nome: senza, l'invio del verbale si
+         fermava al deposito del PDF («Upload Drive fallito») e non si arrivava a vedere che cosa sarebbe
+         partito con la mail. Con queste si percorre tutto l'invio e il corpo resta in __secco.scritture. */
+      const nf = /\/functions\/v1\/([a-z0-9-]+)/.exec(url);
+      const ff = nf && reg.fintoFunzioni[nf[1]];
+      return J(ff || { ok: true, secco: true });
+    }
     let pref = ''; try { const h = init.headers; pref = (h && (h.get ? h.get('Prefer') : (h.Prefer || h.prefer))) || ''; } catch (e) { /* niente */ }
     if (/return=representation/.test(pref)) return J([], metodo === 'POST' ? 201 : 200);
     return new Response(null, { status: metodo === 'POST' ? 201 : 204 });

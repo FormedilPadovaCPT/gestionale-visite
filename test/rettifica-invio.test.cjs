@@ -81,7 +81,7 @@ assert.ok(/async function inviEmailVerbale\(opz\)\{[\s\S]*?\n  await _evApri\(op
 assert.ok(!/show\('modal-email-verbale'\)\n\}\n/.test(html.slice(html.indexOf('async function inviEmailVerbaleFromList'), html.indexOf('// ── RETTIFICA VERBALE GIÀ INVIATO'))), 'nessuna strada apre la finestra senza valutazione');
 assert.ok(/if\(ultimo\.pdf_dati\)modifiche=RettificaInvio\.differenze\(ultimo\.pdf_dati,dati\)/.test(html), 'si confronta coi dati stampati dell’ultimo invio');
 assert.ok(/modifiche=diffSnapRettifica\(ultimo\.snapshot,sr\.snapshot,\{titoli:true\}\)/.test(html), 'per gli invii vecchi la copia della maschera, titoli compresi');
-assert.ok(/if\(!_reinvio&&\(_val\.stato==='rettifica'\|\|_val\.stato==='da-chiedere'\)&&!window\._evRettifica&&!_stessa\)\{toast\('Invio fermato/.test(html), 'un verbale cambiato non parte come primo invio');
+assert.ok(/if\(!_reinvio&&\(_val\.stato==='rettifica'\|\|_val\.stato==='da-chiedere'\)&&!_rett&&!_stessa\)\{toast\('Invio fermato/.test(html), 'un verbale cambiato non parte come primo invio');
 assert.ok(/if\(!_reinvio&&!_val\)\{toast\('Invio fermato/.test(html), 'senza valutazione non parte');
 assert.ok(/pdf_dati:\(window\._pdfDatiConfronto&&window\._pdfDatiConfronto\.vid===vid\)\?window\._pdfDatiConfronto\.dati:null/.test(html), 'l’invio salva ciò che era stampato');
 assert.ok(/if\(output==='dati'\)return _datiConfronto\n\s+const doc=window\.VerbalePDF\.crea/.test(html), 'genPDF in modalità dati non disegna');

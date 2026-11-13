@@ -73,7 +73,7 @@ assert.ok(/\['fp_tipo','fp_motivo_tipo','fp_motivo','fp_serie_proposta','fp_rif_
 assert.ok(/acc_cant,fp_tipo,fp_esito,cantieri\(/.test(html) && /FuoriProcedura\.badge\(v\)/.test(html), 'etichetta nell\'elenco visite');
 assert.ok(/qdSec\('⚠️ Fuori procedura \(interno\)'\)\+qdDl\(FuoriProcedura\.dettaglio\(v\)\)/.test(html), 'il dettaglio del verbale lo mostra');
 assert.ok((html.match(/window\._evSerie=!!\(window\.FuoriProcedura&&FuoriProcedura\.serieProposta\(\)\)/g) || []).length === 1 && /window\._evSerie=!!v\.fp_serie_proposta/.test(html), 'la serie proposta arriva alla mail dal modulo e dall\'elenco');
-assert.ok(/serieProposta: !window\._evRettifica&&!!window\._evSerie,/.test(html), 'e parte con l\'invio');
+assert.ok(/serieProposta: !_rett&&_serie,/.test(html) && /const _serie=window\._evSerieVid===vid&&!!window\._evSerie/.test(html), 'e parte con l\'invio, solo se è del verbale che parte');
 assert.ok(/window\.isCoordPageUser=isCoordPageUser/.test(html), 'isCoordPageUser raggiungibile dal modulo');
 assert.ok(/<script src="fuori-procedura\.js\?v=\d+"><\/script>/.test(html), 'lo script è incluso');
 assert.ok(/- 'fuori-procedura\.js'/.test(yml), 'e pubblicato (deploy-pages.yml)');
