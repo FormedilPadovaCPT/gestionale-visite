@@ -93,7 +93,7 @@ jobs:
           select format(E'\n-- %s.%s · %s · %s · ruoli: %s\n-- USING: %s\n-- WITH CHECK: %s', schemaname, tablename, policyname, cmd, array_to_string(roles, ', '), coalesce(qual, '—'), coalesce(with_check, '—'))
             from pg_policies where schemaname = 'storage' order by tablename, policyname;
           select E'\n-- ══ TABELLE IN TEMPO REALE ══';
-          select format('-- %s · %s.%s', pubname, schemaname, tablename) from pg_publication_tables order by 1, 2, 3;
+          select format('-- %s · %s.%s', pubname, schemaname, tablename) from pg_publication_tables order by pubname, schemaname, tablename;
           select E'\n-- ══ FUNZIONI CHE SCATTANO SUGLI UTENTI (trigger su auth) ══';
           select format('-- %s su %s.%s → %s', t.tgname, n.nspname, c.relname, p.proname)
             from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace
