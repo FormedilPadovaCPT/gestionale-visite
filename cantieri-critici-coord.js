@@ -203,7 +203,11 @@
         testo: `Coordinatore: ${tipo === 'altro' ? testo : DECISIONI[tipo] + (testo ? '. ' + testo : '.')}`, dati: { decisione: tipo, da: 'gestionale' },
       });
       if (e) throw e;
-      if (d.stato === 'nuovo') await window.sb.from('s_cantieri_critici').update({ stato: 'in_gestione' }).eq('id', d.id).eq('stato', 'nuovo');
+      if (d.stato === 'nuovo') {
+        /* (13/11/2026) la decisione è già registrata: se il cambio di stato non riesce lo si dice, senza perdere la decisione */
+        const { error: eSt } = await window.sb.from('s_cantieri_critici').update({ stato: 'in_gestione' }).eq('id', d.id).eq('stato', 'nuovo');
+        if (eSt) avviso('Decisione registrata, ma il caso è rimasto «nuovo»: ' + eSt.message, 'err');
+      }
       avviso('Decisione registrata: la segreteria la trova nel caso.', 'ok');
       dopo();
     });

@@ -2689,6 +2689,12 @@ async function sbTutte(fai){
 }
 function fmtDate(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDateString('it-IT')}
 function toast(msg,type='',ms=3500){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;$('toast-area').appendChild(t);setTimeout(()=>t.remove(),ms)}
+/* (13/11/2026) Una scrittura il cui esito non si legge dice «fatto» anche quando il database ha rifiutato:
+   supabase-js non lancia, restituisce `error`. Qui l'errore diventa un'eccezione col nome di ciò che non è
+   riuscito. Si usa al posto di una scrittura lasciata senza controllo; test/scritture-controllate.test.cjs
+   fallisce se ne ricompare uno. */
+async function scrivi(q,cosa){const{data,error}=await q;if(error)throw new Error(cosa+': '+error.message);return data}
+window.scrivi=scrivi
 function show(id){$(id).classList.remove('hidden')}
 function hide(id){$(id).classList.add('hidden')}
 window.show=show;window.hide=hide;
@@ -6270,12 +6276,13 @@ async function getOrCreateTecnicoId(t){
     const parts=t.nome.replace(/^[^.]+\.\s*/,'').split(' ')
     const nome=parts[0]||''
     const cognome=parts.slice(1).join(' ')||''
-    const{data:nt}=await sb.from('tecnici').insert({
+    const{data:nt,error:eNt}=await sb.from('tecnici').insert({
       tecnico_id:uuid(),
       tecnico_nome:nome,
       tecnico_cognome:cognome,
       email:t.email
     }).select('tecnico_id').single()
+    if(eNt)console.warn('scheda tecnico non creata per',t.email,eNt.message)   // la scheda la crea la segreteria: qui resta senza, e chi chiama lo vede dal valore vuoto
     data=nt
   }
   return data?.tecnico_id||''
@@ -9029,10 +9036,10 @@ async function salvaSegnalazione(){
       })
       const up=await res.json()
       if(res.ok&&up.drive_file_id){
-        await sb.from('segnalazioni_cantiere').update({
+        await scrivi(sb.from('segnalazioni_cantiere').update({
           drive_file_id:up.drive_file_id,drive_url:up.drive_url||null,thumb_url:up.thumb_url||null,
           nome_file:nome,dimensione_kb:Math.round(b64.length*3/4/1024)
-        }).eq('id',row.id)
+        }).eq('id',row.id),'la foto è su Drive ma non è stata agganciata alla segnalazione')
       }else{
         toast('Segnalazione salvata ma foto non caricata: '+(up.error||'errore Drive'),'warn',6000)
       }
@@ -9647,10 +9654,10 @@ async function upsertPersoneVisita(){
         if(!(r.ruoli||[]).includes(s.ruolo))upd.ruoli=[...(r.ruoli||[]),s.ruolo]
         if(Object.keys(upd).length){
           upd.updated_at=new Date().toISOString();upd.updated_by=S.user?.email||null
-          await sb.from('persone').update(upd).eq('persona_id',r.persona_id)
+          await scrivi(sb.from('persone').update(upd).eq('persona_id',r.persona_id),'persona non aggiornata')
         }
       }else{
-        await sb.from('persone').insert({titolo,nome:nome||null,cognome:cog||null,email,telefono:tel,qualifica:qual,ruoli:[s.ruolo],updated_by:S.user?.email||null})
+        await scrivi(sb.from('persone').insert({titolo,nome:nome||null,cognome:cog||null,email,telefono:tel,qualifica:qual,ruoli:[s.ruolo],updated_by:S.user?.email||null}),'persona non inserita')
       }
     }catch(_e){console.warn('upsertPersone:',_e);_nonLette.push([nome,cog].filter(Boolean).join(' '))}
   }
@@ -11286,7 +11293,7 @@ async function loadAvvisi(){
 }
 window.loadAvvisi=loadAvvisi
 async function presaVisione(id,btn){
-  try{await sb.from('avvisi_letture').upsert({avviso_id:id,email:S.user.email},{onConflict:'avviso_id,email'})
+  try{await scrivi(sb.from('avvisi_letture').upsert({avviso_id:id,email:S.user.email},{onConflict:'avviso_id,email'}),'presa visione non registrata')
     if(btn)btn.outerHTML='<span style="font-size:11px;color:#27ae60;white-space:nowrap">✓ Letto</span>'
   }catch(e){toast('Errore: '+(e.message||e),'err')}
 }
@@ -11327,11 +11334,11 @@ async function admLoadAvvisi(){
   box.innerHTML='<div style="overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch">'+h+'</div>'
 }
 window.admLoadAvvisi=admLoadAvvisi
-async function admToggleAvviso(id,cur){ await sb.from('avvisi').update({attivo:!cur}).eq('id',id); admLoadAvvisi() }
+async function admToggleAvviso(id,cur){ try{ await scrivi(sb.from('avvisi').update({attivo:!cur}).eq('id',id),'avviso non aggiornato') }catch(e){ toast(e.message,'err') } admLoadAvvisi() }
 window.admToggleAvviso=admToggleAvviso
-async function admArchiveAvviso(id){ await sb.from('avvisi').update({archiviato:true}).eq('id',id); admLoadAvvisi() }
+async function admArchiveAvviso(id){ try{ await scrivi(sb.from('avvisi').update({archiviato:true}).eq('id',id),'avviso non archiviato') }catch(e){ toast(e.message,'err') } admLoadAvvisi() }
 window.admArchiveAvviso=admArchiveAvviso
-async function admRestoreAvviso(id){ await sb.from('avvisi').update({archiviato:false}).eq('id',id); admLoadAvvisi() }
+async function admRestoreAvviso(id){ try{ await scrivi(sb.from('avvisi').update({archiviato:false}).eq('id',id),'avviso non ripristinato') }catch(e){ toast(e.message,'err') } admLoadAvvisi() }
 window.admRestoreAvviso=admRestoreAvviso
 
 async function admLoadStats(){
@@ -17325,7 +17332,7 @@ document.addEventListener('input',function(ev){
 <script src="stage-relazione.js?v=3"></script>
 <!-- accesso negato al cantiere: il tecnico segnala, la segreteria gestisce -->
 <script src="diniego-accesso.js?v=5"></script>
-<script src="cantieri-critici-coord.js?v=5"></script>
+<script src="cantieri-critici-coord.js?v=6"></script>
 <script src="controllo-verbale.js?v=2"></script>
 <!-- riepilogo mensile dei verbali da sistemare: riusa i controlli qui sopra -->
 <script src="riepilogo-verbali.js?v=4"></script>
