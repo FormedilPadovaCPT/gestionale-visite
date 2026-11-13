@@ -54,12 +54,18 @@ jobs:
           [ -n "${DB_URL:-}" ] || { echo "Secret SUPABASE_DB_URL mancante."; exit 1; }
           export PATH="/usr/lib/postgresql/17/bin:$PATH"
           mkdir -p fuori
+          # i log di questo repository sono pubblici e non si possono leggere senza
+          # accesso: a che punto ci si ferma, e perché, lo si porta nel verdetto
+          # (che sta nel database, privato), non qui
+          fase() { echo "FASE=$1" >> "$GITHUB_ENV"; }
+          fase pg_dump
           # 1. schema applicativo, CON i permessi (grant/revoke): sono parte della
           #    sicurezza, e il backup dei dati non li porta (--no-privileges)
           if ! pg_dump "$DB_URL" --schema-only --no-owner \
                  --schema=public --schema=planning --schema=cpt_admin --schema=archivio \
                  > fuori/grezzo.sql 2> fuori/errori.txt; then
             echo "pg_dump non riuscito ($(wc -l < fuori/errori.txt) righe di errore, non riportate: il repository è pubblico)"
+            tr '\n' ' ' < fuori/errori.txt | head -c 500 > fuori/motivo.txt
             exit 1
           fi
           # righe che cambiano a ogni giro senza che lo schema sia cambiato:
@@ -70,7 +76,8 @@ jobs:
           # 2. il contorno che pg_dump degli schemi applicativi non vede: lavori
           #    programmati, policy dello storage, tabelle in tempo reale, estensioni,
           #    bucket. Niente valori di configurazione: solo struttura.
-          psql "$DB_URL" -q -At -v ON_ERROR_STOP=1 > fuori/gestionale_contorno.sql <<'SQL'
+          fase contorno
+          psql "$DB_URL" -q -At -v ON_ERROR_STOP=1 > fuori/gestionale_contorno.sql 2> fuori/motivo.txt <<'SQL'
           select '-- CONTORNO DELLO SCHEMA: ciò che sta fuori dagli schemi applicativi.' ||
                  E'\n-- Si rigenera ogni notte (gestionale-visite/.github/workflows/schema-db.yml). Non è un file da eseguire.';
           select E'\n-- ══ LAVORI PROGRAMMATI (pg_cron) ══';
@@ -94,6 +101,8 @@ jobs:
             where n.nspname in ('auth', 'storage') and not t.tgisinternal order by 1;
           SQL
 
+          rm -f fuori/motivo.txt
+          fase controlli
           # numeri per il verdetto (solo conteggi: nessun contenuto nei log)
           {
             echo "kb=$(( $(wc -c < fuori/gestionale_schema.sql) / 1024 ))"
@@ -101,6 +110,7 @@ jobs:
             echo "funzioni=$(grep -cE '^CREATE (OR REPLACE )?(FUNCTION|PROCEDURE) ' fuori/gestionale_schema.sql || true)"
             echo "policy=$(grep -c '^CREATE POLICY ' fuori/gestionale_schema.sql || true)"
           } >> "$GITHUB_OUTPUT"
+          fase deposito
           # un dump troppo piccolo è un dump sbagliato: meglio fermarsi che sovrascrivere quello buono
           [ "$(grep -c '^CREATE TABLE ' fuori/gestionale_schema.sql)" -ge 150 ] || { echo "Schema con troppe poche tabelle: non lo deposito."; exit 1; }
           [ "$(grep -cE '^CREATE (OR REPLACE )?(FUNCTION|PROCEDURE) ' fuori/gestionale_schema.sql)" -ge 300 ] || { echo "Schema con troppe poche funzioni: non lo deposito."; exit 1; }
@@ -188,12 +198,14 @@ jobs:
         run: |
           [ -n "${DB_URL:-}" ] || { echo "SUPABASE_DB_URL assente: non posso registrare"; exit 0; }
           export PATH="/usr/lib/postgresql/17/bin:$PATH"
-          if [ "$STATO" = success ] && [ "${DEPOSITATO:-}" = si ]; then esito=riuscita; else esito=fallita; fi
-          psql "$DB_URL" -q -v ON_ERROR_STOP=1 -v esito="$esito" -v kb="${KB:-}" -v tabelle="${TABELLE:-}" -v funzioni="${FUNZIONI:-}" -v policy="${POLICY:-}" -v cambiati="${CAMBIATI:-}" -v run="$RUN_URL" <<'SQL'
+          if [ "$STATO" = success ] && [ "${DEPOSITATO:-}" = si ]; then esito=riuscita; fase=""; else esito=fallita; fase="${FASE:-avvio}"; fi
+          motivo=$(head -c 500 fuori/motivo.txt 2>/dev/null | tr '\n' ' ' || true)
+          psql "$DB_URL" -q -v ON_ERROR_STOP=1 -v fase="$fase" -v motivo="$motivo" -v esito="$esito" -v kb="${KB:-}" -v tabelle="${TABELLE:-}" -v funzioni="${FUNZIONI:-}" -v policy="${POLICY:-}" -v cambiati="${CAMBIATI:-}" -v run="$RUN_URL" <<'SQL'
           insert into public.s_test_automatici (suite, esito, passati, falliti, run_url, dettaglio)
           values ('schema', :'esito', nullif(:'kb', '')::int, 0, :'run',
                   jsonb_strip_nulls(jsonb_build_object(
                     'tabelle', nullif(:'tabelle', '')::int, 'funzioni', nullif(:'funzioni', '')::int,
-                    'policy', nullif(:'policy', '')::int, 'file_cambiati', nullif(:'cambiati', ''))));
+                    'policy', nullif(:'policy', '')::int, 'file_cambiati', nullif(:'cambiati', ''),
+                    'fermo_a', nullif(:'fase', ''), 'motivo', nullif(:'motivo', ''))));
           SQL
           echo "Verdetto registrato: $esito"
