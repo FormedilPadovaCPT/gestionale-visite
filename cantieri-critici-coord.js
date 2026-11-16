@@ -18,11 +18,12 @@
    · scrive la RISPOSTA AL TECNICO (la stessa «risposta dell'ufficio»
      dell'app Segreteria: il tecnico la legge nel suo elenco);
    · registra una DECISIONE — ulteriore visita, proporre una conferenza
-     di cantiere, demandare a Presidenza / Commissione Sicurezza;
+     di cantiere, portare il caso al Presidente o alla Commissione;
    · scrive il TESTO DI MERITO della segnalazione agli organi di
      vigilanza: la segreteria lo ritrova già nella maschera «Segnala a
-     SPISAL / ITL». Se segnalare lo decidono Presidenza e Commissione,
-     il Direttore conferma: qui si prepara il merito, non si decide.
+     SPISAL / ITL». Se segnalare lo decide il Presidente, legale
+     rappresentante; Direttore e Commissione Sicurezza propongono
+     (regola del 05/10/2026): qui si istruisce il caso, non si decide.
    Lettere, protocolli e invii restano alla segreteria.
 
    Tabelle s_cantieri_critici e s_cantieri_critici_eventi (SQL in
@@ -46,13 +47,13 @@
   const DECISIONI = {
     visita: 'Ulteriore visita',
     conferenza: "Proporre all'impresa una conferenza di cantiere",
-    demanda: 'Demandare a Presidenza / Commissione Sicurezza',
+    demanda: 'Portare il caso al Presidente (decide) o alla Commissione Sicurezza (propone)',
     altro: 'Altro',
   };
   const EVENTI = { apertura: 'Apertura', stato: 'Stato', nota: 'Nota', lettera_impresa: "Comunicazione all'impresa", sollecito: 'Sollecito',
     pec_richiesta: 'PEC chiesta all\'Amministrazione', contatto_impresa: "L'impresa ha ricontattato", visita_riprogrammata: 'Visita riprogrammata',
     visita_successiva: 'Verbale successivo', decisione: 'Decisione', risposta_tecnico: 'Risposta al tecnico', conferenza_proposta: 'Proposta di conferenza',
-    demandata: 'Demandata', decisione_organo: 'Decisione di Presidenza / Commissione', autorizzazione_direttore: 'Conferma del Direttore',
+    demandata: 'Passata per proposta o decisione', decisione_organo: 'Decisione del Presidente', autorizzazione_direttore: 'Proposta del Direttore',
     segnalazione_organi: 'Segnalazione a SPISAL / ITL', riscontro_organo: "Riscontro dell'organo di vigilanza" };
 
   let abilitato = null;   /* coordinatore o segreteria: lo dice il database, non un elenco di indirizzi */
@@ -150,7 +151,7 @@
       ${verbali.length ? `<div class="cc-sez">Verbali sul cantiere</div>${verbali.map((v) => `<div class="cc-riga">${esc(v.nr_verbale)} del ${dIt(v.data_visita)}${v.ipc ? ' &mdash; IPC ' + esc(v.ipc) : ''}${v.segnalazione ? ' &mdash; <b>propone la segnalazione</b>' : ''}</div>`).join('')}` : ''}
 
       <div class="cc-sez">Risposta al tecnico <span style="font-weight:400;color:#888">— la legge nel suo elenco delle segnalazioni</span></div>
-      <div class="field"><textarea id="ccc-risposta" rows="3" maxlength="2000" placeholder="Che cosa si fa: torniamo in cantiere, proponiamo una conferenza, la questione passa alla Presidenza…">${esc(d.gestione_note || '')}</textarea></div>
+      <div class="field"><textarea id="ccc-risposta" rows="3" maxlength="2000" placeholder="Che cosa si fa: torniamo in cantiere, proponiamo una conferenza, la questione passa al Presidente…">${esc(d.gestione_note || '')}</textarea></div>
       <div style="text-align:right"><button class="btn-primary btn-sm" id="ccc-salva-risposta">Salva la risposta</button></div>
 
       <div class="cc-sez">Decisione <span style="font-weight:400;color:#888">— resta in cronologia; lettere e mail le prepara la segreteria</span></div>
@@ -160,12 +161,12 @@
         <button class="btn-outline btn-sm" id="ccc-salva-dec" style="margin-bottom:10px">Registra</button>
       </div>
       ${!['chiuso', 'annullato'].includes(d.stato) ? `<div style="margin-top:6px">
-        <button class="btn-primary btn-sm" id="ccc-coinvolgi-pres" data-aiuto="A differenza di «Demandare» qui sopra (una nota in cronologia), coinvolge davvero Presidente e Vicepresidente: ricevono un avviso e rispondono dall'app, come già fa il Direttore.">🏛 Coinvolgi la Presidenza — avviso reale nell'app</button></div>` : ''}
+        <button class="btn-primary btn-sm" id="ccc-coinvolgi-pres" data-aiuto="A differenza di «Portare il caso» qui sopra (una nota in cronologia), porta davvero il caso al Presidente, che decide se segnalare: riceve un avviso (anche il Vicepresidente) e decide dall'app.">🏛 Porta il caso al Presidente — avviso reale nell'app</button></div>` : ''}
 
       <div class="cc-sez">Testo di merito della segnalazione a SPISAL / ITL
         <span style="font-weight:400;color:#888">— le criticit&agrave; riscontrate, che cosa &egrave; stato segnalato all'impresa e non sanato. La segreteria lo ritrova nella maschera della segnalazione.${d.merito_il ? ` Ultima modifica ${oraIt(d.merito_il)} (${esc(d.merito_da || '')}).` : ''}</span></div>
       <div class="field"><textarea id="ccc-merito" rows="8" maxlength="6000" placeholder="Nel corso delle visite sono state riscontrate…">${esc(d.testo_merito || '')}</textarea></div>
-      <p style="font-size:11px;color:#888;margin:-4px 0 6px">Scrivere il merito non &egrave; decidere di segnalare: lo decidono la Presidenza e la Commissione Sicurezza, il Direttore conferma. Fatti e verbali, non giudizi sulle persone.</p>
+      <p style="font-size:11px;color:#888;margin:-4px 0 6px">Scrivere il merito non &egrave; decidere di segnalare: lo decide il Presidente; Direttore e Commissione Sicurezza propongono. Fatti e verbali, non giudizi sulle persone.</p>
       <div style="text-align:right"><button class="btn-primary btn-sm" id="ccc-salva-merito">Salva il testo di merito</button></div>
 
       <div class="cc-sez">Cronologia</div>
@@ -221,10 +222,10 @@
     });
 
     $('ccc-coinvolgi-pres')?.addEventListener('click', (ev) => con(ev.currentTarget, async () => {
-      if (!confirm('Coinvolgo la Presidenza: Presidente e Vicepresidente ricevono un avviso e trovano il caso nella loro pagina. Procedo?')) return;
+      if (!confirm('Porto il caso al Presidente, che decide se segnalare: lui e il Vicepresidente ricevono un avviso e trovano il caso nella loro pagina. Procedo?')) return;
       const { error: e } = await window.sb.rpc('s_critico_coinvolgi_presidenza', { p_id: d.id, p_nota: null });
       if (e) throw e;
-      avviso('Presidenza coinvolta: hanno ricevuto un avviso nell\'app.', 'ok');
+      avviso('Caso portato al Presidente: ha ricevuto un avviso nell\'app.', 'ok');
       dopo();
     }));
   }

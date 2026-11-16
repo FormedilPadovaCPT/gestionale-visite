@@ -2844,7 +2844,7 @@ async function onLogin(user){
     document.body.classList.add('viewer-mode')
     await loadVoci().catch(()=>{})
     showScr('app')
-    // link diretto a un caso critico (#critico-<id>, dalla mail «Chiedi conferma al
+    // link diretto a un caso critico (#critico-<id>, dalla mail «Chiedi la proposta del
     // Direttore» / «Coinvolgi la Presidenza»): apre già sulla scheda giusta (25/09/2026,
     // prima il link non faceva niente — nessuna route lo intercettava)
     const _hc=(location.hash||'').match(/^#critico-(\d+)$/)

@@ -9,10 +9,13 @@
        riempie loadAutorizzazioni di index.html; il collegamento apre la
        maschera dell'app Segreteria già collegata, perché le due app
        stanno sulla stessa origine e condividono l'accesso);
-     · le CONFERME richieste sui cantieri critici: qui il Direttore legge
-       il caso, i verbali e la cronologia, e preme «Confermo» o «Non
-       confermo» (funzione s_critico_conferma_direttore, che accetta solo
-       lui — la stessa maschera dell'app Segreteria, portata qui);
+     · le PROPOSTE richieste sui cantieri critici: qui il Direttore legge
+       il caso, i verbali e la cronologia, e propone di segnalare o di non
+       segnalare (funzione s_critico_conferma_direttore, che accetta solo
+       lui e porta il caso al Presidente). Decide il Presidente, legale
+       rappresentante (regola del 05/10/2026: Direttore e Commissione
+       Sicurezza propongono); fino al 16/11/2026 qui il Direttore
+       «confermava»;
      · il REGISTRO delle questioni in attesa: le righe automatiche (ciò che
        il database sa già: autorizzazioni e conferme) e quelle scritte a
        mano da coordinatore e segreteria. Si ordina per giorni di attesa.
@@ -54,8 +57,8 @@
   const EVENTI = { apertura: 'Aperta', modifica: 'Modificata', decisione: 'Decisione', rinvio: 'Rinvio', incontro_proposto: 'Incontro proposto', presa_in_carico: 'Presa in carico', seguito: 'Seguito (task nel second brain)', ritiro: 'Ritirata', riapertura: 'Riaperta', proposta: 'Proposta dal second brain', pubblicazione: 'Resa visibile' };
   const EV_CRIT = { apertura: 'Apertura', nota: 'Nota', lettera_impresa: "Comunicazione all'impresa", sollecito: 'Sollecito', pec_richiesta: 'PEC chiesta all\'Amministrazione',
     contatto_impresa: "L'impresa ha ricontattato", visita_riprogrammata: 'Visita riprogrammata', visita_successiva: 'Verbale successivo', decisione: 'Decisione',
-    risposta_tecnico: 'Risposta al tecnico', conferenza_proposta: 'Proposta di conferenza', demandata: 'Demandata', decisione_organo: 'Decisione di Presidenza / Commissione',
-    autorizzazione_direttore: 'Conferma del Direttore', segnalazione_organi: 'Segnalazione a SPISAL / ITL', riscontro_organo: "Riscontro dell'organo di vigilanza" };
+    risposta_tecnico: 'Risposta al tecnico', conferenza_proposta: 'Proposta di conferenza', demandata: 'Passata per proposta o decisione', decisione_organo: 'Decisione del Presidente',
+    autorizzazione_direttore: 'Proposta del Direttore', segnalazione_organi: 'Segnalazione a SPISAL / ITL', riscontro_organo: "Riscontro dell'organo di vigilanza" };
 
   /* ── chi sono: lo dice il database, non un elenco di indirizzi ── */
   let _ruoli = null;
@@ -148,7 +151,7 @@
   }
 
   /* ════════════════════════════════════════════════════════════
-     1. CANTIERI CRITICI — le conferme che aspettano il Direttore
+     1. CANTIERI CRITICI — le proposte del Direttore, la decisione del Presidente
      ════════════════════════════════════════════════════════════ */
   /* ── ANTEPRIMA «VEDI COME…» (veste v2, 03/10/2026) ──
      La segreteria che guarda la pagina «come Presidenza» o «come Direttore» deve vedere ciò che vedrebbe
@@ -191,18 +194,20 @@
     return data || { autorizzazioni: [], critici: [] };
   }
 
-  function boxCritici(host, critici, errore) {
+  function boxCritici(host, critici, errore, pres) {
     if (!host) return;
+    /* (16/11/2026) il Direttore propone, il Presidente decide */
+    const una = pres ? 'decisione richiesta' : 'proposta richiesta', tante = pres ? 'decisioni richieste' : 'proposte richieste';
     if (errore) {
-      host.innerHTML = `<div class="card" style="border-left:4px solid #c0392b"><h3>⚠️ Cantieri critici — conferme richieste</h3><p style="font-size:13px;color:#c0392b;margin:0">Non sono riuscito a leggere le conferme richieste: ${esc(errore)}</p></div>`;
+      host.innerHTML = `<div class="card" style="border-left:4px solid #c0392b"><h3>⚠️ Cantieri critici — ${tante}</h3><p style="font-size:13px;color:#c0392b;margin:0">Non sono riuscito a leggere i casi che aspettano te: ${esc(errore)}</p></div>`;
       return;
     }
     if (!critici.length) {
-      host.innerHTML = `<div class="card" style="border-left:4px solid #95C22F"><h3>⚠️ Cantieri critici — conferme richieste</h3><p style="font-size:13px;color:#555;margin:0">Nessuna conferma in attesa.</p></div>`;
+      host.innerHTML = `<div class="card" style="border-left:4px solid #95C22F"><h3>⚠️ Cantieri critici — ${tante}</h3><p style="font-size:13px;color:#555;margin:0">Nessun caso in attesa.</p></div>`;
       return;
     }
-    host.innerHTML = `<div class="card" style="border-left:4px solid #8e44ad"><h3>⚠️ Cantieri critici — <span style="color:#8e44ad">${critici.length} ${critici.length === 1 ? 'conferma richiesta' : 'conferme richieste'}</span></h3>
-      <p style="font-size:12.5px;color:#555;margin:0 0 6px">Segnalazioni agli organi di vigilanza su cui la segreteria ha chiesto la tua conferma. Tocca la riga: vedi caso, verbali e cronologia, e rispondi.</p>
+    host.innerHTML = `<div class="card" style="border-left:4px solid #8e44ad"><h3>⚠️ Cantieri critici — <span style="color:#8e44ad">${critici.length} ${critici.length === 1 ? una : tante}</span></h3>
+      <p style="font-size:12.5px;color:#555;margin:0 0 6px">${pres ? 'Casi su cui decidere se segnalare agli organi di vigilanza: la decisione è tua, Direttore e Commissione Sicurezza propongono.' : 'Casi su cui ti è chiesta una proposta: se segnalare agli organi di vigilanza lo decide il Presidente.'} Tocca la riga: vedi caso, verbali e cronologia, e rispondi.</p>
       ${critici.map((c) => { const g = giorni(c.dal); return `<div data-crit="${c.id}" data-aiuto="Apre il caso con i verbali del cantiere e la cronologia: da lì rispondi. La risposta resta in cronologia col tuo nome, data e ora." style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid #f0e6dd;cursor:pointer">
         <strong style="font-size:12px">n° ${c.id}</strong>
         <span style="font-size:13px;flex:1;min-width:220px"><strong>${esc(c.impresa || '—')}</strong> — ${esc(c.cantiere || '')}</span>
@@ -226,7 +231,8 @@
       verbali = (r.data || []).filter((v) => !v.elimina);
     }
     const fermo = ['chiuso', 'annullato'].includes(d.stato);
-    /* 25/09/2026: la conferma vera è del Direttore (autorizzazione_direttore) o della
+    /* 25/09/2026, rivisto il 16/11/2026: il Direttore PROPONE (autorizzazione_direttore), il
+       Presidente DECIDE (decisione_organo, scritto dalla funzione della Presidenza). Prima: la conferma vera è del Direttore (autorizzazione_direttore) o della
        Presidenza (decisione_organo, con «chi» = Presidente/Vicepresidente); chi non è
        né l'uno né l'altra (coordinatore/segreteria, quando apre il caso dalla lista
        automatica delle questioni) vede solo la cronologia: risponde da dove gestisce
@@ -239,24 +245,24 @@
         ? [...(eventi || [])].reverse().find((e) => e.tipo === 'decisione_organo')
         : null;
     const riga = (k, v) => `<div style="padding:4px 0;border-bottom:1px solid #f2f2f2;font-size:13px"><strong>${k}:</strong> ${v}</div>`;
-    const azioni = fermo ? `<p style="font-size:13px;color:#555">Il caso è ${esc(d.stato)}: non c'è niente da confermare.</p>`
+    const azioni = fermo ? `<p style="font-size:13px;color:#555">Il caso è ${esc(d.stato)}: non c'è niente da proporre né da decidere.</p>`
       : perDirettore ? `
         ${gia ? `<p style="font-size:12.5px;color:#555">Hai già risposto: ${esc(gia.testo || '')} Puoi rispondere di nuovo: vale l'ultima.</p>` : ''}
-        <p style="font-size:12.5px;color:#555">Se segnalare lo decidono la Presidenza e la Commissione Sicurezza; qui dai la tua conferma. Resta in cronologia col tuo nome, data e ora. La segnalazione la prepara poi la segreteria.</p>
+        <p style="font-size:12.5px;color:#555">Se segnalare lo decide il Presidente: qui fai la tua proposta. Resta in cronologia col tuo nome, data e ora, e porta il caso al Presidente, che riceve un avviso nell'app. La segnalazione la prepara poi la segreteria, dopo la sua decisione.</p>
         <label style="font-size:12px">Una nota (facoltativa)</label><textarea id="dir-cd-nota" rows="3" style="width:100%;box-sizing:border-box"></textarea>
         <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px">
-          <button type="button" class="btn-outline btn-sm" id="dir-cd-no" data-aiuto="Registra in cronologia che NON confermi la segnalazione agli organi di vigilanza. La segreteria lo vede nel caso.">⛔ Non confermo</button>
-          <button type="button" class="btn-primary btn-sm" id="dir-cd-si" data-aiuto="Registra in cronologia che CONFERMI la segnalazione a SPISAL / ITL. Da qui la segreteria prepara e protocolla la lettera.">✅ Confermo la segnalazione</button>
-          <button type="button" class="btn-outline btn-sm" id="dir-cd-pres" data-aiuto="Coinvolge anche Presidente e Vicepresidente: ricevono un avviso e rispondono dall'app come te. Utile se non riesci a risolvere da solo, o se preferisci decidano loro.">🏛 Coinvolgo la Presidenza</button></div>`
+          <button type="button" class="btn-outline btn-sm" id="dir-cd-no" data-aiuto="Registra in cronologia che proponi di NON segnalare agli organi di vigilanza, e porta il caso al Presidente, che decide.">⛔ Propongo di non segnalare</button>
+          <button type="button" class="btn-primary btn-sm" id="dir-cd-si" data-aiuto="Registra in cronologia che proponi di SEGNALARE a SPISAL / ITL, e porta il caso al Presidente, che decide.">✅ Propongo di segnalare</button>
+          <button type="button" class="btn-outline btn-sm" id="dir-cd-pres" data-aiuto="Porta il caso al Presidente senza una tua proposta: riceve un avviso (anche il Vicepresidente) e decide dall'app.">🏛 Porto il caso al Presidente senza proposta</button></div>`
       : perPresidenza ? `
         ${gia ? `<p style="font-size:12.5px;color:#555">Hai già risposto (${esc(miaCarica || 'Presidenza')}): ${esc(gia.testo || '')} Puoi rispondere di nuovo: vale l'ultima.</p>` : ''}
-        <p style="font-size:12.5px;color:#555">Decidi tu se segnalare agli organi di vigilanza: resta in cronologia col tuo nome (${esc(miaCarica || 'Presidenza')}), data e ora. Il Direttore vede la tua decisione e conferma.</p>
+        <p style="font-size:12.5px;color:#555">Se segnalare agli organi di vigilanza lo decidi tu, come legale rappresentante: Direttore e Commissione Sicurezza propongono. Resta in cronologia col tuo nome (${esc(miaCarica || 'Presidenza')}), data e ora; poi la segreteria prepara la segnalazione.</p>
         <label style="font-size:12px">Una nota (facoltativa)</label><textarea id="dir-cd-nota" rows="3" style="width:100%;box-sizing:border-box"></textarea>
         <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px">
           <button type="button" class="btn-outline btn-sm" id="dir-cd-no" data-aiuto="Registra in cronologia che decidi di NON segnalare agli organi di vigilanza.">⛔ Decido di non segnalare</button>
-          <button type="button" class="btn-primary btn-sm" id="dir-cd-si" data-aiuto="Registra in cronologia che decidi di SEGNALARE agli organi di vigilanza. Il Direttore la vede e conferma.">✅ Decido di segnalare</button></div>`
+          <button type="button" class="btn-primary btn-sm" id="dir-cd-si" data-aiuto="Registra in cronologia che decidi di SEGNALARE agli organi di vigilanza. Da qui la segreteria prepara e protocolla la segnalazione.">✅ Decido di segnalare</button></div>`
       : '<p style="font-size:12.5px;color:#555">Si risponde da dove si gestisce il caso (Zona Coordinatore o app segreteria): qui solo la cronologia.</p>';
-    finestra(`⚠️ Cantiere critico n° ${d.id} — conferma della segnalazione`, `
+    finestra(`⚠️ Cantiere critico n° ${d.id} — segnalazione agli organi di vigilanza`, `
       ${riga('Cantiere', esc(d.cantiere_desc))}
       ${riga('Impresa', esc(d.impresa_nome))}
       ${riga('Evento', dIt(d.data_evento) + ' · tecnico: ' + esc(d.tecnico_nome || '—'))}
@@ -268,14 +274,14 @@
       ${azioni}`);
     const rispondi = (btn, cosa) => con(btn, async () => {
       const domanda = perDirettore
-        ? (cosa === 'segnalare' ? 'CONFERMI la segnalazione agli organi di vigilanza per questo cantiere?' : 'NON confermi la segnalazione?')
+        ? (cosa === 'segnalare' ? 'PROPONI al Presidente di segnalare agli organi di vigilanza per questo cantiere?' : 'PROPONI al Presidente di non segnalare?')
         : (cosa === 'segnalare' ? 'DECIDI di segnalare agli organi di vigilanza per questo cantiere?' : 'DECIDI di non segnalare?');
       if (!confirm(domanda)) return;
       const { error: e } = perDirettore
         ? await sb.rpc('s_critico_conferma_direttore', { p_id: d.id, p_cosa: cosa, p_nota: ($('dir-cd-nota').value || '').trim() || null })
         : await sb.rpc('s_critico_decide_presidenza', { p_id: d.id, p_cosa: cosa, p_nota: ($('dir-cd-nota').value || '').trim() || null });
       if (e) throw new Error(e.message);
-      avviso('Registrato in cronologia.' + (perDirettore ? ' La segreteria lo vede nel caso.' : ' Il Direttore lo vede e conferma.'), 'ok');
+      avviso('Registrato in cronologia.' + (perDirettore ? ' Il caso è passato al Presidente, che decide.' : ' La segreteria lo vede nel caso.'), 'ok');
       chiudi();
       carica();
     });
@@ -284,10 +290,10 @@
     if (no) no.addEventListener('click', (ev) => rispondi(ev.currentTarget, 'non_segnalare'));
     const coinvolgi = $('dir-cd-pres');
     if (coinvolgi) coinvolgi.addEventListener('click', (ev) => con(ev.currentTarget, async () => {
-      if (!confirm('Coinvolgo la Presidenza: Presidente e Vicepresidente ricevono un avviso e trovano il caso nella loro pagina. Procedo?')) return;
+      if (!confirm('Porto il caso al Presidente, che decide se segnalare: lui e il Vicepresidente ricevono un avviso e trovano il caso nella loro pagina. Procedo?')) return;
       const { error: e } = await sb.rpc('s_critico_coinvolgi_presidenza', { p_id: d.id, p_nota: null });
       if (e) throw new Error(e.message);
-      avviso('Presidenza coinvolta: hanno ricevuto un avviso nell\'app.', 'ok');
+      avviso('Caso portato al Presidente: ha ricevuto un avviso nell\'app.', 'ok');
       chiudi();
       carica();
     }));
@@ -372,7 +378,7 @@
     // una lista sola: automatiche + manuali, ordinate per giorni di attesa
     const lista = [];
     (auto.autorizzazioni || []).forEach((a) => lista.push({ k: 'auto', gg: giorni(a.dal), testo: `Autorizzazione: ${a.tipo} n° ${a.progressivo != null ? a.progressivo : 'm' + a.id} · ${a.chi}`, chi: 'segreteria', decisore: 'direttore', link: a.link, dal: a.dal }));
-    (auto.critici || []).forEach((c) => lista.push({ k: 'auto', gg: giorni(c.dal), testo: `Conferma della segnalazione agli organi di vigilanza: ${c.impresa || '—'} — ${c.cantiere || ''}`, chi: 'segreteria', decisore: 'direttore', critico: c.id, dal: c.dal }));
+    (auto.critici || []).forEach((c) => lista.push({ k: 'auto', gg: giorni(c.dal), testo: `${R.presidenza && !R.direttore ? 'Decisione' : 'Proposta'} sulla segnalazione agli organi di vigilanza: ${c.impresa || '—'} — ${c.cantiere || ''}`, chi: 'segreteria', decisore: 'direttore', critico: c.id, dal: c.dal }));
     const aperte = righe.filter((r) => r.stato === 'aperta' || (r.stato === 'rinviata' && r.rinviata_al && r.rinviata_al <= T));
     const rinviate = righe.filter((r) => r.stato === 'rinviata' && r.rinviata_al && r.rinviata_al > T);
     const decise = righe.filter((r) => r.stato === 'decisa');
@@ -415,7 +421,7 @@
       const apertaQ = _aperteQ.has(id);
       const alta = !!(r && r.priorita === 'alta');
       const apri = x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener" class="btn-outline btn-sm" style="text-decoration:none" data-aiuto="Apre la pratica nell'app che la gestisce, con lo stesso accesso.">Apri la pratica ↗</a>` : '';
-      const critico = x.critico ? `<button type="button" class="btn-primary btn-sm" data-crit-apri="${x.critico}" data-aiuto="Apre il caso critico: verbali, cronologia e i pulsanti «Confermo» / «Non confermo».">Apri il caso</button>` : '';
+      const critico = x.critico ? `<button type="button" class="btn-primary btn-sm" data-crit-apri="${x.critico}" data-aiuto="Apre il caso critico: verbali, cronologia e i pulsanti della proposta (Direttore) o della decisione (Presidente).">Apri il caso</button>` : '';
       const azioni = [];
       if (r && puoRispondere(r.decisore)) {
         azioni.push(`<button type="button" class="btn-primary btn-sm" data-rispondi="${r.id}" data-aiuto="Apre due righe per scrivere la decisione: resta col tuo nome, data e ora, e chi ha aperto la questione riceve un avviso.">✅ Decidi</button>`);
@@ -482,7 +488,7 @@
         <summary style="cursor:pointer;font-size:13px;font-weight:600;color:#345">📥 Proposte da spuntare — ${proposte.length} task del second brain che aspettano il Direttore <span style="font-weight:400;color:#678">(le vedi solo tu: spunta quelle da rendere visibili, scarta le altre)</span></summary>
         ${proposte.map(rigaProposta).join('')}</details>` : (R.segr && modo === 'coord' ? '<p style="font-size:12px;color:#888;margin:4px 0 10px">📥 Nessuna proposta da spuntare: le task del second brain che aspettano il Direttore arrivano qui tre volte al giorno.</p>' : '');
     const intro = modo === 'coord'
-      ? 'Quello che aspetta una decisione di Direttore, Presidenza o Commissione Sicurezza. Le righe <em>automatiche</em> vengono dalle pratiche (autorizzazioni, conferme sui cantieri critici); le altre le scrivete voi. Si ordina per giorni di attesa.'
+      ? 'Quello che aspetta una decisione di Direttore, Presidenza o Commissione Sicurezza. Le righe <em>automatiche</em> vengono dalle pratiche (autorizzazioni, proposte e decisioni sui cantieri critici); le altre le scrivete voi. Si ordina per giorni di attesa.'
       : 'Quello che aspetta una tua decisione, ordinato per giorni di attesa. Le righe <em>automatiche</em> vengono dalle pratiche; le altre le hanno scritte coordinatore e segreteria, o le hai aperte tu per altri. Rispondi qui: decidi, oppure rinvia a una data. Le questioni che apri tu le gestisci tu, e quando hanno risposta le prendi in carico.';
     host.innerHTML = `<div class="card" style="border-left:4px solid #e7500f">
       <h3>📋 Questioni in attesa di decisione ${lista.length ? `<span style="color:#b35c00">— ${lista.length} in attesa</span>` : '<span style="color:#2d7a06">— niente in attesa</span>'}</h3>
@@ -707,9 +713,9 @@
     if (tit && tit.nodeType === 3) tit.textContent = (R.presidenza && !R.direttore ? '🏛️ Presidenza — ' : '🏛️ Direzione — ');
     const intro = $('dir-intro');
     if (intro) intro.textContent = R.direttore
-      ? 'Quello che aspetta te: autorizzazioni dei servizi CPT, preventivi, programmi e piani di asseverazione da approvare, conferme sui cantieri critici e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
+      ? 'Quello che aspetta te: autorizzazioni dei servizi CPT, preventivi, programmi e piani di asseverazione da approvare, proposte sui cantieri critici e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
       : R.presidenza
-        ? 'Quello che aspetta te: cantieri critici demandati alla Presidenza e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
+        ? 'Quello che aspetta te: cantieri critici su cui decidere se segnalare agli organi di vigilanza e le questioni aperte da coordinatore e segreteria. La mappa e le statistiche sono nelle altre due schede.'
         : 'Le questioni che coordinatore e segreteria hanno aperto per la Presidenza. La mappa e le statistiche sono nelle altre due schede.';
     const aut = $('dir-autorizzazioni'), cri = $('dir-critici');
     if (R.direttore && typeof window.loadAutorizzazioni === 'function') window.loadAutorizzazioni().catch((e) => console.warn('autorizzazioni:', e));
@@ -718,8 +724,8 @@
       try {
         // nell'anteprima i casi demandati a quel ruolo si leggono dalle tabelle: la funzione del database risponde per chi è collegato
         const critici = _come ? await criticiCome(_come) : ((await inAttesa()).critici || []);
-        boxCritici(cri, critici);
-      } catch (e) { boxCritici(cri, [], e.message || String(e)); }
+        boxCritici(cri, critici, null, R.presidenza && !R.direttore);
+      } catch (e) { boxCritici(cri, [], e.message || String(e), R.presidenza && !R.direttore); }
     } else if (cri) cri.innerHTML = '';
     try { await firmeBox(Rv, _come); } catch (e) { console.warn('da firmare:', e); }
     try { await approvazioniBox(Rv, _come); } catch (e) { console.warn('da approvare:', e); }
