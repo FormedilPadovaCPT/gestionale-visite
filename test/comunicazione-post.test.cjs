@@ -37,8 +37,9 @@ assert.ok(/<section id="view-comunicazione" class="hidden"><\/section>/.test(htm
 assert.ok(/\$\('view-comunicazione'\)\?\.classList\.toggle\('hidden',view!=='comunicazione'\)/.test(html), 'navTo la mostra e la nasconde');
 assert.ok(/if\(view==='comunicazione'&&window\.comunicazionePost\)window\.comunicazionePost\.apri\(\)/.test(html), 'aprendola si carica');
 assert.ok(/<script src="comunicazione-post\.js\?v=\d+"><\/script>/.test(html), 'lo script è caricato');
-assert.ok(/direttore: +\{ nome: 'Direttore', +menu: \['direzione', 'comunicazione',/.test(veste), 'nel menu del Direttore');
-assert.ok(/coordinatore: \{ nome: 'Coordinatore', +menu: \[[^\]]*'\|', 'comunicazione', 'admin'\]/.test(veste), 'nel menu del Coordinatore');
+// (16/11/2026) fra «Direzione» e «Comunicazione», e prima di «Comunicazione» per il Coordinatore, c'è «📋 Task» (task-ufficio.js)
+assert.ok(/direttore: +\{ nome: 'Direttore', +menu: \['direzione', ('task', )?'comunicazione',/.test(veste), 'nel menu del Direttore');
+assert.ok(/coordinatore: \{ nome: 'Coordinatore', +menu: \[[^\]]*'\|', ('task', )?'comunicazione', 'admin'\]/.test(veste), 'nel menu del Coordinatore');
 // (09/11/2026) la Presidenza ha la voce, ma la vede solo quando c'è un suo passaggio (spento finché il Direttore non conferma)
 assert.ok(/presidenza: +\{ nome: 'Presidenza', +menu: \['direzione', 'comunicazione',/.test(veste), 'nel menu della Presidenza');
 assert.ok(/\(v === 'comunicazione' && ruolo\(\) === 'presidenza' && !simula\(\) && b\.dataset\.comVisibile !== '1'\)/.test(veste), 'per la Presidenza la voce resta nascosta senza un suo passaggio, tranne nell\'anteprima');

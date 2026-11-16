@@ -63,13 +63,15 @@
   /* (03/11/2026, chiesto dall'utente) «🎓 Corsi in programma» (corsi-programmati.js) è di tutti, docenti esterni esclusi:
      è la programmazione della Scuola, non il calendario d'ufficio, che resta del solo Direttore. */
   const RUOLI = {
-    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', 'corsi', 'chat', 'documenti', '|', 'segreteria'], apre: 'segreteria' },
+    /* (16/11/2026, chiesto dall'utente) «📋 Task»: le task del second brain in sola lettura (task-ufficio.js), per segreteria,
+       Coordinatore e Direttore; che cosa vede ognuno lo decide il database */
+    segreteria:   { nome: 'Segreteria (tu)', menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'statistiche', 'corsi', 'task', 'chat', 'documenti', '|', 'segreteria'], apre: 'segreteria' },
     tecnico:      { nome: 'Tecnico',         menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'documenti', 'statistiche', 'corsi', 'formazione'], apre: 'dashboard' },
-    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'documenti', 'statistiche', 'corsi', 'formazione', '|', 'comunicazione', 'admin'], apre: 'dashboard' },
+    coordinatore: { nome: 'Coordinatore',    menu: ['dashboard', 'form', 'lista', 'cantieri', 'rubrica', 'scadenze', 'incarichi', 'chat', 'documenti', 'statistiche', 'corsi', 'formazione', '|', 'task', 'comunicazione', 'admin'], apre: 'dashboard' },
     // (13/10/2026) il docente esterno, col solo ruolo «docente»: la sola pagina Formazione (le sue firme, poi i suoi corsi)
     docente:      { nome: 'Docente',         menu: ['formazione'], apre: 'formazione', lettura: true },
     // (06/11/2026, chiesto dall'utente) «📣 Comunicazione»: i post per i social da approvare (comunicazione-post.js); anche al Coordinatore, per il visto
-    direttore:    { nome: 'Direttore',       menu: ['direzione', 'comunicazione', 'statistiche', 'dashboard', 'appuntamenti', 'corsi'], apre: 'direzione', lettura: true },
+    direttore:    { nome: 'Direttore',       menu: ['direzione', 'task', 'comunicazione', 'statistiche', 'dashboard', 'appuntamenti', 'corsi'], apre: 'direzione', lettura: true },
     // il calendario è del solo Direttore (deciso dall'utente il 03/10/2026): la Presidenza vede quello che le compete
     // (09/11/2026, chiesto dall'utente) «📣 Comunicazione»: i post che toccano le parti li approvano Presidente e Vicepresidente.
     // La voce compare solo quando c'è un passaggio della Presidenza (data-com-visibile, comunicazione-post.js): spento finché il Direttore non conferma
@@ -118,7 +120,7 @@
   /* (21/10/2026) la Chat del team è nel menu solo di chi ci partecipa e la vede: lo dice il database a chat-team.js,
      che segna la voce con data-chat-visibile="1". Senza quel segno la voce resta nascosta anche se è nel menu del ruolo.
      Lo stesso per i Documenti (documenti.js, data-doc-visibile="1"): tecnici in servizio, Coordinatore e segreteria. */
-  const ETICHETTE = { chat: '💬 Chat', documenti: '📄 Documenti', dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', comunicazione: '📣 Comunicazione', appuntamenti: '📅 Appuntamenti', corsi: '🎓 Corsi', formazione: '📚 Formazione' };
+  const ETICHETTE = { chat: '💬 Chat', documenti: '📄 Documenti', dashboard: '🏠 Oggi', admin: '🧭 Coordinamento', segreteria: '🗂️ Ufficio', form: '➕ Nuova visita', direzione: '🏛️ Direzione', comunicazione: '📣 Comunicazione', task: '📋 Task', appuntamenti: '📅 Appuntamenti',corsi: '🎓 Corsi', formazione: '📚 Formazione' };
 
   const CHIAVE_TECNICO = 'gv-v2-tecnico';   // sessionStorage: di quale tecnico si guarda la pagina in «Vedi come: Tecnico»
   let _tecnici = null;       // l'elenco dei tecnici, letto una volta, per la tendina dell'anteprima

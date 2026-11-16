@@ -713,6 +713,17 @@
       "motivo": "incarichi"
     },
     {
+      "id": "gest.tu-gruppo",
+      "app": "gestionale",
+      "classe": "filtro",
+      "fonte": {
+        "tipo": "html",
+        "file": "task-ufficio.js",
+        "id": "tu-gruppo"
+      },
+      "motivo": "ambito delle task da vedere (pagina Task, sola lettura)"
+    },
+    {
       "id": "gest.q-ipc",
       "app": "gestionale",
       "classe": "filtro",

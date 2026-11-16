@@ -82,6 +82,8 @@ window.AIUTO_TESTI = {
   'v:comunicazione': 'I post per i social prima che escano: il Coordinatore dà il visto o chiede modifiche, il Direttore approva, approva con indicazioni o non approva; quelli che toccano le parti li approvano Presidente e Vicepresidente, ciascuno per sé. Li manda e li pubblica la segreteria.',
   'nav-comunicazione': 'I post per i social prima che escano: il Coordinatore dà il visto o chiede modifiche, il Direttore approva, approva con indicazioni o non approva; quelli che toccano le parti li approvano Presidente e Vicepresidente, ciascuno per sé. Li manda e li pubblica la segreteria.',
   'nav-formazione': 'La pagina della formazione: i documenti dei corsi che aspettano la tua firma (incarichi, registri, verbali), e in seguito la scheda formativa e la pagina del docente per il corso.',
+  'v:task': 'Le task del second brain in sola lettura: aperte, in scadenza, fatte di recente, legate a una questione del Direttore. Ognuno vede le sue; si cambiano in Obsidian, qui si guardano.',
+  'nav-task': 'Le task del second brain in sola lettura: aperte, in scadenza, fatte di recente, legate a una questione del Direttore. Ognuno vede le sue; si cambiano in Obsidian, qui si guardano.',
   'v:appuntamenti': 'Il calendario d\'ufficio, alimentato dalla segreteria: date di attività, commissioni e altri impegni utili. Lo vede solo il Direttore.',
   'nav-appuntamenti': 'Il calendario d\'ufficio, alimentato dalla segreteria: date di attività, commissioni e altri impegni utili. Lo vede solo il Direttore.',
   'v:corsi': 'I corsi della Scuola in programma, con date, sede, ore e quote (imprese C.E.I.V. e listino). Sola lettura: la programmazione la manda l\'Ufficio Corsi e la carica la segreteria. Per iscrizioni: corsi@formedilpadova.it.',
