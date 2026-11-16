@@ -3,9 +3,12 @@
    prova della pagina: «sì mi piace, costruiscila»)
 
    Le task del second brain (le checkbox di Obsidian: scadenze_ufficio,
-   pratiche_aperte, i tasks.md di pratiche, progetti ed eventi) in SOLA
-   LETTURA, per chi lavora dal gestionale: segreteria, Coordinatore, Direttore.
-   La fonte resta il vault: una task si cambia in Obsidian. Le legge da Drive
+   pratiche_aperte, i tasks.md di pratiche, progetti ed eventi) per chi lavora
+   dal gestionale: segreteria, Coordinatore, Direttore. La fonte resta il vault.
+   Coordinatore e Direttore le guardano soltanto; la segreteria (lei sola,
+   decisione dell'utente del 16/11/2026) può chiuderle, riaprirle, metterle in
+   attesa, annotarle o passarle al Direttore: l'app registra la RICHIESTA e la
+   scrive nella task il second brain (vedi «le richieste della segreteria» sotto). Le legge da Drive
    la funzione server task-ufficio, che le scrive in s_task_vault; la pagina
    la chiama da sola quando il caricamento ha più di 10 minuti, e col tasto
    «Aggiorna adesso».
@@ -116,8 +119,41 @@
     return 'in attesa di decisione';
   }
 
+  /* ── le richieste della segreteria (16/11/2026, chiesto dall'utente: «non posso dire è stato deciso,
+     la chiudo, la apro, la metto in stand-by, la passo al direttore») ──
+     Agisce SOLO la segreteria (decisione dell'utente). L'app non scrive nel vault: registra una richiesta
+     in s_task_azioni (s_task_azione) e la scrive nella task _SISTEMA/scripts/task_azioni.py, in sessione o al
+     giro allinea-task-ufficio. Finché non è scritta, la pagina mostra già la task come sarà, con
+     «⏳ da scrivere nel second brain». «Passa al Direttore» apre subito la questione nel registro. */
+  const AZIONI = {
+    fatta: { et: '✅ Fatta', ph: 'In una riga la prova: che cosa è stato fatto (es. «mail partita il 16/11», «deciso in riunione»)', aiuto: 'Chiude la task nel second brain con la prova che scrivi. Lo scrive il second brain: subito se c\'è una sessione aperta, altrimenti al giro delle 8:15, 13:15 o 17:15.' },
+    riapri: { et: '↩ Riapri', ph: 'Perché si riapre', aiuto: 'Riapre nel second brain una task chiusa, col motivo.' },
+    attesa: { et: '⏸ In attesa', ph: 'Che cosa si aspetta (es. «risposta della Cassa»)', aiuto: 'Sposta la scadenza alla data che scegli e scrive che cosa si aspetta.' },
+    nota: { et: '💬 Nota', ph: 'La nota da aggiungere alla task', aiuto: 'Aggiunge una riga datata alla task, senza cambiarne lo stato.' },
+    direttore: { et: '🏛️ Passa al Direttore', ph: 'Che cosa gli chiedi (facoltativo)', aiuto: 'Apre subito la questione nel registro del Direttore, visibile a lui nella pagina Direzione, e la lega a questa task (🆔 decNN).' },
+  };
+  function azioniPossibili(t) {
+    if (t.stato === 'fatta') return ['riapri', 'nota'];
+    return ['fatta', 'attesa', 'nota'].concat(t.dec_id == null ? ['direttore'] : []);
+  }
+  /* la task come sarà dopo le richieste ancora da scrivere: { t, pendenti, scartate } */
+  function conRichieste(t, azioni, oggi) {
+    const mie = (azioni || []).filter((a) => a.chiave === t.chiave).sort((a, b) => a.id - b.id);
+    const pendenti = mie.filter((a) => a.stato === 'in_attesa');
+    const scartate = mie.filter((a) => a.stato === 'non_applicabile');
+    const x = Object.assign({}, t);
+    pendenti.forEach((a) => {
+      if (a.azione === 'fatta') { x.stato = 'fatta'; x.fatta_il = oggi; }
+      if (a.azione === 'riapri') { x.stato = 'aperta'; x.fatta_il = null; }
+      if (a.azione === 'attesa') x.scadenza = a.data;
+      if (a.azione === 'direttore' && a.dec_id != null) x.dec_id = a.dec_id;
+    });
+    return { t: x, pendenti, scartate };
+  }
+
   /* ── la pagina ── */
   let _t = [], _dec = {}, _giro = null, _filtro = 'aperte', _gruppo = '', _cerca = '', _aperte = new Set(), _inCorso = false, _errore = '';
+  let _azioni = [], _form = null, _formErr = '', _salva = false;
 
   function chiVede() {
     try { const v = radice.vesteV2; if (v && v.simula && v.simula()) { const r = v.ruolo(); if (r === 'coordinatore' || r === 'direttore') return r; } } catch (_e) { /* niente */ }
@@ -125,6 +161,8 @@
     return 'segreteria';
   }
   const anteprima = () => { try { return !!(radice.vesteV2 && radice.vesteV2.simula && radice.vesteV2.simula()); } catch (_e) { return false; } };
+  /* i pulsanti si disegnano solo a chi il database lascia agire: la segreteria vera, non in anteprima */
+  const puoAgire = () => !anteprima() && chiVede() === 'segreteria';
 
   async function leggi() {
     const sb = radice.sb;
@@ -143,6 +181,29 @@
       if (d.error) throw new Error('questioni: ' + d.error.message);
       (d.data || []).forEach((x) => { _dec[x.id] = x; });
     }
+    await leggiAzioni();
+  }
+
+  async function leggiAzioni() {
+    _azioni = [];
+    if (!puoAgire()) return;
+    const sette = new Date(Date.now() - 7 * 86400000).toISOString();
+    const a = await radice.sb.from('s_task_azioni').select('id,chiave,azione,testo,data,dec_id,stato,esito,creata_il,applicata_il')
+      .or('stato.eq.in_attesa,and(stato.eq.non_applicabile,applicata_il.gte.' + sette + ')').order('id');
+    if (a.error) throw new Error('richieste: ' + a.error.message);
+    _azioni = a.data || [];
+    const nuove = _azioni.map((x) => x.dec_id).filter((x) => x != null && !_dec[x]);
+    if (nuove.length) {
+      const d = await radice.sb.from('s_decisioni').select('id,stato,ritiro_tipo,ritirata_motivo,decisione,rinviata_al').in('id', nuove);
+      if (!d.error) (d.data || []).forEach((x) => { _dec[x.id] = x; });
+    }
+  }
+
+  async function registra(chiave, azione, testo, data) {
+    const { data: r, error } = await radice.sb.rpc('s_task_azione', { p: { chiave, azione, testo, data: data || null } });
+    if (error) throw new Error(error.message);
+    if (!r || r.ok !== true) throw new Error('il database non ha confermato la richiesta');
+    return r;
   }
 
   async function aggiorna(forza) {
@@ -171,7 +232,10 @@
     if (!host) return;
     const oggi = oggiRoma();
     const chi = chiVede();
-    const mie = anteprima() ? _t.filter((t) => vedeRuolo(t, chi, _dec)) : _t;
+    const _info = {};
+    const base = _t.map((t) => { const x = conRichieste(t, _azioni, oggi); _info[t.chiave] = x; return x.t; });
+    disegna._info = _info;
+    const mie = anteprima() ? base.filter((t) => vedeRuolo(t, chi, _dec)) : base;
     const filtri = chi === 'direttore' ? ['aperte', 'fatte', 'tutte'] : Object.keys(FILTRI);
     if (!filtri.includes(_filtro)) _filtro = 'aperte';
     const c = conta(mie, oggi);
@@ -196,7 +260,7 @@
         <input id="tu-cerca" type="search" placeholder="Cerca (es. Vilnai, DURC, Commissione)" value="${esc(_cerca)}" style="flex:1;min-width:200px;max-width:380px">
         ${chi === 'direttore' ? '' : `<select id="tu-gruppo" style="width:auto">${[['', 'Tutti gli ambiti'], ['ufficio', 'Ufficio'], ['asseverazione', 'Asseverazione'], ['progetto', 'Progetti'], ['eventi', 'Eventi']].map(([v, l]) => `<option value="${v}"${v === _gruppo ? ' selected' : ''}>${l}</option>`).join('')}</select>`}
       </div>
-      <div style="font-size:12px;color:#888;margin:4px 0 8px">${esc(nota)} Si guardano soltanto: una task si cambia in Obsidian.</div>
+      <div style="font-size:12px;color:#888;margin:4px 0 8px">${esc(nota)} ${puoAgire() ? 'Apri una task per chiuderla, rimandarla, annotarla o passarla al Direttore: lo scrive il second brain nel vault.' : 'Si guardano soltanto: una task si cambia nel second brain.'}</div>
       <div class="card" style="padding:4px 12px">${lista.length ? lista.map((t) => riga(t, oggi)).join('') : `<div style="font-size:13px;color:#777;padding:12px 0">${_t.length ? 'Niente con questo filtro.' : 'Ancora nessuna task caricata.'}</div>`}</div>
       <div style="font-size:12px;color:#888;margin-top:6px">${lista.length} task${_filtro === 'fatte' ? ' fatte negli ultimi 60 giorni' : ''}.</div>`;
   }
@@ -206,17 +270,42 @@
     const d = t.dec_id != null ? _dec[t.dec_id] : null;
     const aperta = _aperte.has(t.chiave);
     const prio = t.priorita === 'altissima' || t.priorita === 'alta' ? ` <span style="font-size:11px;padding:1px 7px;border-radius:6px;background:#fcebeb;color:#a32d2d">${t.priorita}</span>` : '';
-    return `<div data-tu-riga="${esc(t.chiave)}" style="border-top:1px solid #f0f0f0;padding:9px 2px;cursor:pointer">
-      <div style="display:flex;gap:10px;align-items:flex-start">
+    const info = (disegna._info && disegna._info[t.chiave]) || { pendenti: [], scartate: [] };
+    const attesa = info.pendenti.length ? ` <span style="font-size:11px;padding:1px 7px;border-radius:6px;background:#e6f1fb;color:#0c447c">⏳ da scrivere nel second brain</span>` : '';
+    const scartata = info.scartate.length ? ` <span style="font-size:11px;padding:1px 7px;border-radius:6px;background:#fcebeb;color:#a32d2d">⚠ richiesta non scritta</span>` : '';
+    return `<div data-tu-riga="${esc(t.chiave)}" style="border-top:1px solid #f0f0f0;padding:9px 2px">
+      <div data-tu-testa style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
         <span aria-hidden="true" style="font-size:15px;line-height:1.3;color:${t.stato === 'fatta' ? '#3b6d11' : '#bbb'}">${t.stato === 'fatta' ? '✔' : '○'}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-size:14px;${t.stato === 'fatta' ? 'color:#666' : 'color:#222'};line-height:1.35">${formatta(t.titolo)}${prio}</div>
+          <div style="font-size:14px;${t.stato === 'fatta' ? 'color:#666' : 'color:#222'};line-height:1.35">${formatta(t.titolo)}${prio}${attesa}${scartata}</div>
           <div style="font-size:12px;color:#888;margin-top:2px">${esc(t.ambito)}${t.dec_id != null ? ` · <span style="color:#185fa5">questione n° ${t.dec_id}${d ? ': ' + esc(testoQuestione(d)) : ''}</span>` : ''}</div>
         </div>
         <span style="font-size:11.5px;padding:2px 8px;border-radius:6px;white-space:nowrap;${COLORI[e.tipo]}">${esc(e.testo)}</span>
       </div>
-      ${aperta ? `<div style="font-size:13px;color:#444;margin:8px 0 2px 25px;line-height:1.55">${t.dettaglio ? formatta(t.dettaglio) : '<i style="color:#999">nessun dettaglio oltre al titolo</i>'}<div style="font-size:11.5px;color:#999;margin-top:6px">Nel second brain: ${esc(t.file)}, riga ${esc(t.riga)}</div></div>` : ''}
+      ${aperta ? `<div style="font-size:13px;color:#444;margin:8px 0 2px 25px;line-height:1.55">${t.dettaglio ? formatta(t.dettaglio) : '<i style="color:#999">nessun dettaglio oltre al titolo</i>'}<div style="font-size:11.5px;color:#999;margin-top:6px">Nel second brain: ${esc(t.file)}, riga ${esc(t.riga)}</div>${pannello(t, info)}</div>` : ''}
     </div>`;
+  }
+
+  const ETICHETTA_RICHIESTA = { fatta: 'chiusa', riapri: 'riaperta', attesa: 'in attesa', nota: 'nota', direttore: 'passata al Direttore' };
+  /* sotto il dettaglio: le richieste non ancora scritte, quelle non riuscite e (alla sola segreteria) i pulsanti */
+  function pannello(t, info) {
+    const righeRich = info.pendenti.map((a) => `<div style="font-size:12.5px;color:#0c447c;margin-top:6px">⏳ ${esc(ETICHETTA_RICHIESTA[a.azione])}${a.data ? ' fino al ' + esc(it(a.data)) : ''}${a.dec_id ? ' (questione n° ' + esc(a.dec_id) + ')' : ''}${a.testo ? ': «' + esc(a.testo) + '»' : ''} — da scrivere nel second brain${a.azione !== 'direttore' && puoAgire() ? ` · <a href="#" data-tu-annulla="${esc(a.id)}" style="color:#0c447c">annulla</a>` : ''}</div>`).join('')
+      + info.scartate.map((a) => `<div style="font-size:12.5px;color:#a32d2d;margin-top:6px">⚠ ${esc(ETICHETTA_RICHIESTA[a.azione])}${a.testo ? ' «' + esc(a.testo) + '»' : ''}: non scritta nel second brain (${esc(a.esito || 'motivo non indicato')}). Va fatta a mano in Obsidian.</div>`).join('');
+    if (!puoAgire()) return righeRich;
+    if (_form && _form.chiave === t.chiave) {
+      const A = AZIONI[_form.azione];
+      const domani = new Date(Date.now() + 86400000).toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+      return righeRich + `<div data-tu-form style="margin-top:10px;padding:10px;border:1px solid #d6e0ea;border-radius:8px;background:#f5f8fb">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px">${esc(A.et)}</div>
+        ${_form.azione === 'attesa' ? `<label style="font-size:12.5px;display:block;margin-bottom:6px">Fino al <input type="date" id="tu-data" min="${domani}" value="${esc(_form.data || '')}" style="width:auto"></label>` : ''}
+        <textarea id="tu-testo" rows="2" placeholder="${esc(A.ph)}" style="width:100%;font-size:13px">${esc(_form.testo || '')}</textarea>
+        ${_formErr ? `<div style="color:#a32d2d;font-size:12.5px;margin-top:4px">${esc(_formErr)}</div>` : ''}
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button type="button" class="btn-outline btn-sm" data-tu-form-annulla>Annulla</button>
+          <button type="button" class="btn-primary btn-sm" data-tu-conferma${_salva ? ' disabled' : ''}>${_salva ? 'Un attimo…' : 'Conferma'}</button>
+        </div></div>`;
+    }
+    return righeRich + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${azioniPossibili(t).map((k) => `<button type="button" class="btn-outline btn-sm" data-tu-azione="${k}" data-aiuto="${esc(AZIONI[k].aiuto)}">${AZIONI[k].et}</button>`).join('')}</div>`;
   }
 
   async function mostra(host) {
@@ -257,9 +346,42 @@
         return;
       }
       const r = el.closest('[data-tu-riga]');
-      if (r) { const k = r.dataset.tuRiga; if (_aperte.has(k)) _aperte.delete(k); else _aperte.add(k); disegna(host()); }
+      if (!r) return;
+      const k = r.dataset.tuRiga;
+      const b = el.closest('[data-tu-azione]');
+      if (b) { _form = { chiave: k, azione: b.dataset.tuAzione, testo: '', data: '' }; _formErr = ''; disegna(host()); const ta = document.getElementById('tu-testo'); if (ta) ta.focus(); return; }
+      if (el.closest('[data-tu-form-annulla]')) { _form = null; _formErr = ''; disegna(host()); return; }
+      if (el.closest('[data-tu-conferma]') && _form && !_salva) {
+        _form.testo = (document.getElementById('tu-testo') || {}).value || '';
+        _form.data = (document.getElementById('tu-data') || {}).value || '';
+        if (_form.azione !== 'direttore' && !_form.testo.trim()) { _formErr = 'Scrivi una riga: senza, il second brain non sa che cosa annotare.'; disegna(host()); return; }
+        if (_form.azione === 'attesa' && !_form.data) { _formErr = 'Scegli fino a quando.'; disegna(host()); return; }
+        _salva = true; _formErr = ''; disegna(host());
+        try {
+          const ris = await registra(_form.chiave, _form.azione, _form.testo.trim(), _form.data);
+          const fu = _form.azione;
+          _form = null;
+          await leggiAzioni();
+          if (radice.toast) radice.toast(fu === 'direttore' ? 'Passata al Direttore: questione n° ' + ris.dec_id + ', la vede già nella sua pagina.' : 'Registrata: la scrive il second brain nella task.', 'ok');
+        } catch (err) { _formErr = 'Non registrata: ' + err.message; }
+        _salva = false; disegna(host());
+        return;
+      }
+      const an = el.closest('[data-tu-annulla]');
+      if (an) {
+        e.preventDefault();
+        const { error } = await radice.sb.rpc('s_task_azione_annulla', { p_id: Number(an.dataset.tuAnnulla) });
+        if (error) { _errore = 'Richiesta non annullata: ' + error.message; } else { await leggiAzioni(); if (radice.toast) radice.toast('Richiesta annullata.', 'ok'); }
+        disegna(host());
+        return;
+      }
+      if (el.closest('[data-tu-form]')) return;
+      if (el.closest('[data-tu-testa]')) { if (_aperte.has(k)) _aperte.delete(k); else _aperte.add(k); disegna(host()); }
     });
     document.addEventListener('input', (e) => {
+      /* il testo della richiesta resta scritto anche se la pagina si ridisegna */
+      if (e.target && _form && e.target.id === 'tu-testo') { _form.testo = e.target.value; return; }
+      if (e.target && _form && e.target.id === 'tu-data') { _form.data = e.target.value; return; }
       if (e.target && e.target.id === 'tu-cerca') {
         _cerca = e.target.value; const pos = e.target.selectionStart;
         disegna(host());
@@ -270,7 +392,7 @@
     radice.addEventListener && radice.addEventListener('gestionale-logout', () => { _t = []; _dec = {}; _giro = null; _aperte = new Set(); });
   }
 
-  const api = { mostra, vedeRuolo, decVisibile, etichettaData, ordina, filtra, conta, formatta, testoQuestione, FILTRI };
+  const api = { mostra, vedeRuolo, decVisibile, etichettaData, ordina, filtra, conta, formatta, testoQuestione, FILTRI, AZIONI, azioniPossibili, conRichieste };
   radice.taskUfficio = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

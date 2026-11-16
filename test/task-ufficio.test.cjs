@@ -91,6 +91,24 @@ const P = require(path.join(dir, 'task-ufficio.js'));
   /* ── il testo si mostra sempre ripulito: niente HTML dalla task ── */
   assert.strictEqual(P.formatta('**ok** <script>x</script> ¶ `c`'), '<b>ok</b> &lt;script&gt;x&lt;/script&gt;<br><code style="font-size:12px;background:#f3f3f3;padding:0 3px;border-radius:3px">c</code>');
 
+  /* ── le richieste della segreteria (16/11/2026): la task si mostra già come sarà ── */
+  const base = T({ chiave: 'k1', titolo: 'x', scadenza: '2026-11-20' });
+  const R = (o) => Object.assign({ chiave: 'k1', stato: 'in_attesa' }, o);
+  assert.strictEqual(P.conRichieste(base, [R({ id: 1, azione: 'fatta', testo: 'ok' })], oggi).t.stato, 'fatta', 'chiusa dalla pagina: si vede già fatta');
+  assert.strictEqual(P.conRichieste(base, [R({ id: 1, azione: 'attesa', data: '2026-12-01', testo: 'x' })], oggi).t.scadenza, '2026-12-01', 'in attesa: la data nuova');
+  assert.strictEqual(P.conRichieste(base, [R({ id: 1, azione: 'direttore', dec_id: 200 })], oggi).t.dec_id, 200, 'passata al Direttore: già legata alla questione');
+  assert.strictEqual(P.conRichieste(base, [R({ id: 1, azione: 'fatta', testo: 'a' }), R({ id: 2, azione: 'riapri', testo: 'b' })], oggi).t.stato, 'aperta', 'le richieste valgono in ordine');
+  assert.strictEqual(P.conRichieste(base, [R({ id: 1, azione: 'fatta', stato: 'scritta' })], oggi).t.stato, 'aperta', 'una richiesta già scritta non cambia niente: vale il vault');
+  assert.strictEqual(P.conRichieste(base, [R({ id: 1, azione: 'nota', stato: 'non_applicabile', esito: 'non trovata' })], oggi).scartate.length, 1, 'una richiesta non scritta si mostra');
+  assert.strictEqual(P.conRichieste(base, [R({ chiave: 'altra', id: 1, azione: 'fatta' })], oggi).pendenti.length, 0, 'solo le richieste di questa task');
+  assert.deepStrictEqual(P.azioniPossibili(T({})), ['fatta', 'attesa', 'nota', 'direttore']);
+  assert.deepStrictEqual(P.azioniPossibili(T({ dec_id: 5 })), ['fatta', 'attesa', 'nota'], 'già legata a una questione: niente «Passa al Direttore»');
+  assert.deepStrictEqual(P.azioniPossibili(T({ stato: 'fatta' })), ['riapri', 'nota']);
+  const src = leggi('task-ufficio.js');
+  assert.ok(/const puoAgire = \(\) => !anteprima\(\) && chiVede\(\) === 'segreteria'/.test(src), 'i pulsanti solo alla segreteria vera, mai nell\'anteprima');
+  assert.ok(/if \(!puoAgire\(\)\) return righeRich;/.test(src), 'senza permesso, niente pulsanti');
+  assert.ok(src.includes("rpc('s_task_azione'"), 'la richiesta passa dalla funzione del database, che controlla di nuovo chi è');
+
   /* ── l'aggancio nell'app: voce, pagina, script, pubblicazione, nuvoletta, verify_jwt ── */
   assert.ok(html.includes('id="nav-task"') && html.includes('<section id="view-task"') && html.includes('<script src="task-ufficio.js'), 'voce, pagina e script in index.html');
   assert.ok(html.includes("$('view-task')?.classList.toggle('hidden',view!=='task')"), 'la pagina si mostra e si nasconde');
