@@ -239,10 +239,12 @@
        davvero il caso — Zona Coordinatore o l'app segreteria. */
     const perDirettore = R.direttore, perPresidenza = R.presidenza && !R.direttore;
     const miaCarica = S().carica === 'presidente' ? 'Presidente' : S().carica === 'vicepresidente' ? 'Vicepresidente' : null;
+    /* (16/11/2026) Presidente e Vicepresidente ne parlano insieme, la parola è solo del Presidente: il Vicepresidente scrive un parere */
+    const sonoVice = perPresidenza && miaCarica === 'Vicepresidente';
     const gia = perDirettore
       ? [...(eventi || [])].reverse().find((e) => e.tipo === 'autorizzazione_direttore')
       : perPresidenza
-        ? [...(eventi || [])].reverse().find((e) => e.tipo === 'decisione_organo')
+        ? [...(eventi || [])].reverse().find((e) => e.tipo === 'decisione_organo' && (!miaCarica || !e.dati || !e.dati.chi || e.dati.chi === miaCarica))
         : null;
     const riga = (k, v) => `<div style="padding:4px 0;border-bottom:1px solid #f2f2f2;font-size:13px"><strong>${k}:</strong> ${v}</div>`;
     const azioni = fermo ? `<p style="font-size:13px;color:#555">Il caso è ${esc(d.stato)}: non c'è niente da proporre né da decidere.</p>`
@@ -256,11 +258,16 @@
           <button type="button" class="btn-outline btn-sm" id="dir-cd-pres" data-aiuto="Porta il caso al Presidente senza una tua proposta: riceve un avviso (anche il Vicepresidente) e decide dall'app.">🏛 Porto il caso al Presidente senza proposta</button></div>`
       : perPresidenza ? `
         ${gia ? `<p style="font-size:12.5px;color:#555">Hai già risposto (${esc(miaCarica || 'Presidenza')}): ${esc(gia.testo || '')} Puoi rispondere di nuovo: vale l'ultima.</p>` : ''}
-        <p style="font-size:12.5px;color:#555">Se segnalare agli organi di vigilanza lo decidi tu, come legale rappresentante: Direttore e Commissione Sicurezza propongono. Resta in cronologia col tuo nome (${esc(miaCarica || 'Presidenza')}), data e ora; poi la segreteria prepara la segnalazione.</p>
+        ${sonoVice
+          ? `<p style="font-size:12.5px;color:#555">Se segnalare agli organi di vigilanza lo decide il Presidente: di norma ne parlate insieme, sentito il parere del coordinatore ed eventualmente del Direttore, ma la parola è sua. Qui scrivi il tuo parere: resta in cronologia col tuo nome, data e ora, e il Presidente lo vede nel caso.</p>`
+          : `<p style="font-size:12.5px;color:#555">Se segnalare agli organi di vigilanza lo decidi tu, come legale rappresentante: di norma ne parli col Vicepresidente, sentito il parere del coordinatore ed eventualmente del Direttore, ma la parola è solo tua. Resta in cronologia col tuo nome (${esc(miaCarica || 'Presidenza')}), data e ora; poi la segreteria prepara la segnalazione.</p>`}
         <label style="font-size:12px">Una nota (facoltativa)</label><textarea id="dir-cd-nota" rows="3" style="width:100%;box-sizing:border-box"></textarea>
         <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px">
-          <button type="button" class="btn-outline btn-sm" id="dir-cd-no" data-aiuto="Registra in cronologia che decidi di NON segnalare agli organi di vigilanza.">⛔ Decido di non segnalare</button>
-          <button type="button" class="btn-primary btn-sm" id="dir-cd-si" data-aiuto="Registra in cronologia che decidi di SEGNALARE agli organi di vigilanza. Da qui la segreteria prepara e protocolla la segnalazione.">✅ Decido di segnalare</button></div>`
+          ${sonoVice
+            ? `<button type="button" class="btn-outline btn-sm" id="dir-cd-no" data-aiuto="Registra in cronologia il tuo parere di NON segnalare. Decide il Presidente.">⛔ Parere: non segnalare</button>
+          <button type="button" class="btn-primary btn-sm" id="dir-cd-si" data-aiuto="Registra in cronologia il tuo parere di SEGNALARE agli organi di vigilanza. Decide il Presidente.">✅ Parere: segnalare</button>`
+            : `<button type="button" class="btn-outline btn-sm" id="dir-cd-no" data-aiuto="Registra in cronologia che decidi di NON segnalare agli organi di vigilanza.">⛔ Decido di non segnalare</button>
+          <button type="button" class="btn-primary btn-sm" id="dir-cd-si" data-aiuto="Registra in cronologia che decidi di SEGNALARE agli organi di vigilanza. Da qui la segreteria prepara e protocolla la segnalazione.">✅ Decido di segnalare</button>`}</div>`
       : '<p style="font-size:12.5px;color:#555">Si risponde da dove si gestisce il caso (Zona Coordinatore o app segreteria): qui solo la cronologia.</p>';
     finestra(`⚠️ Cantiere critico n° ${d.id} — segnalazione agli organi di vigilanza`, `
       ${riga('Cantiere', esc(d.cantiere_desc))}
@@ -269,19 +276,21 @@
       <div style="padding:4px 0;border-bottom:1px solid #f2f2f2;font-size:13px;white-space:pre-wrap"><strong>Note del tecnico:</strong>\n${esc(d.note)}</div>
       ${verbali.length ? riga('Verbali sul cantiere', '<br>' + verbali.map((v) => `${esc(v.nr_verbale)} del ${dIt(v.data_visita)}${v.ipc ? ` — IPC ${esc(v.ipc)}` : ''}${v.segnalazione ? ' — <strong>il tecnico propone la segnalazione</strong>' : ''}`).join('<br>')) : ''}
       <div style="font-weight:600;margin:10px 0 4px">Cronologia</div>
-      ${(eventi || []).filter((e) => e.tipo !== 'stato').map((e) => `<div style="font-size:12.5px;padding:3px 0;white-space:pre-wrap"><span style="color:#888">${oraIt(e.created_at)}</span> <strong>${esc(EV_CRIT[e.tipo] || e.tipo)}</strong>${e.testo ? ' — ' + esc(e.testo) : ''}</div>`).join('') || '<p style="color:#888;font-size:12.5px">Ancora niente.</p>'}
+      ${(eventi || []).filter((e) => e.tipo !== 'stato').map((e) => `<div style="font-size:12.5px;padding:3px 0;white-space:pre-wrap"><span style="color:#888">${oraIt(e.created_at)}</span> <strong>${esc(e.tipo === 'decisione_organo' && e.dati && e.dati.valore === 'parere' ? 'Parere del Vicepresidente' : (EV_CRIT[e.tipo] || e.tipo))}</strong>${e.testo ? ' — ' + esc(e.testo) : ''}</div>`).join('') || '<p style="color:#888;font-size:12.5px">Ancora niente.</p>'}
       <hr style="margin:10px 0;border:0;border-top:1px solid #eee">
       ${azioni}`);
     const rispondi = (btn, cosa) => con(btn, async () => {
       const domanda = perDirettore
         ? (cosa === 'segnalare' ? 'PROPONI al Presidente di segnalare agli organi di vigilanza per questo cantiere?' : 'PROPONI al Presidente di non segnalare?')
-        : (cosa === 'segnalare' ? 'DECIDI di segnalare agli organi di vigilanza per questo cantiere?' : 'DECIDI di non segnalare?');
+        : sonoVice
+          ? (cosa === 'segnalare' ? 'Il tuo PARERE è di segnalare agli organi di vigilanza? Decide il Presidente.' : 'Il tuo PARERE è di non segnalare? Decide il Presidente.')
+          : (cosa === 'segnalare' ? 'DECIDI di segnalare agli organi di vigilanza per questo cantiere?' : 'DECIDI di non segnalare?');
       if (!confirm(domanda)) return;
       const { error: e } = perDirettore
         ? await sb.rpc('s_critico_conferma_direttore', { p_id: d.id, p_cosa: cosa, p_nota: ($('dir-cd-nota').value || '').trim() || null })
         : await sb.rpc('s_critico_decide_presidenza', { p_id: d.id, p_cosa: cosa, p_nota: ($('dir-cd-nota').value || '').trim() || null });
       if (e) throw new Error(e.message);
-      avviso('Registrato in cronologia.' + (perDirettore ? ' Il caso è passato al Presidente, che decide.' : ' La segreteria lo vede nel caso.'), 'ok');
+      avviso('Registrato in cronologia.' + (perDirettore ? ' Il caso è passato al Presidente, che decide.' : sonoVice ? ' Il Presidente vede il tuo parere: la decisione è sua.' : ' La segreteria lo vede nel caso.'), 'ok');
       chiudi();
       carica();
     });

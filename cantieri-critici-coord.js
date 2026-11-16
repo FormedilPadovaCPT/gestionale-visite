@@ -166,11 +166,11 @@
       <div class="cc-sez">Testo di merito della segnalazione a SPISAL / ITL
         <span style="font-weight:400;color:#888">— le criticit&agrave; riscontrate, che cosa &egrave; stato segnalato all'impresa e non sanato. La segreteria lo ritrova nella maschera della segnalazione.${d.merito_il ? ` Ultima modifica ${oraIt(d.merito_il)} (${esc(d.merito_da || '')}).` : ''}</span></div>
       <div class="field"><textarea id="ccc-merito" rows="8" maxlength="6000" placeholder="Nel corso delle visite sono state riscontrate…">${esc(d.testo_merito || '')}</textarea></div>
-      <p style="font-size:11px;color:#888;margin:-4px 0 6px">Scrivere il merito non &egrave; decidere di segnalare: lo decide il Presidente; Direttore e Commissione Sicurezza propongono. Fatti e verbali, non giudizi sulle persone.</p>
+      <p style="font-size:11px;color:#888;margin:-4px 0 6px">Scrivere il merito non &egrave; decidere di segnalare: la parola &egrave; solo del Presidente, che di norma ne parla col Vicepresidente sentito il parere del coordinatore ed eventualmente del Direttore. Fatti e verbali, non giudizi sulle persone.</p>
       <div style="text-align:right"><button class="btn-primary btn-sm" id="ccc-salva-merito">Salva il testo di merito</button></div>
 
       <div class="cc-sez">Cronologia</div>
-      ${(eventi || []).map((e) => `<div class="cc-ev"><small>${oraIt(e.created_at)}</small> <b>${esc(EVENTI[e.tipo] || e.tipo)}</b>${e.testo ? ' — ' + esc(e.testo) : ''} <small>${esc(e.autore || '')}</small></div>`).join('') || '<div class="cc-ev">Ancora niente.</div>'}
+      ${(eventi || []).map((e) => `<div class="cc-ev"><small>${oraIt(e.created_at)}</small> <b>${esc(e.tipo === 'decisione_organo' && e.dati && e.dati.valore === 'parere' ? 'Parere del Vicepresidente' : (EVENTI[e.tipo] || e.tipo))}</b>${e.testo ? ' — ' + esc(e.testo) : ''} <small>${esc(e.autore || '')}</small></div>`).join('') || '<div class="cc-ev">Ancora niente.</div>'}
 
       <div style="text-align:right;margin-top:14px"><button class="btn-secondary btn-sm" id="ccc-chiudi">Chiudi</button></div>
     </div>`;
