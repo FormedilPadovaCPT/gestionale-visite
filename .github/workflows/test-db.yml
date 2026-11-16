@@ -15,6 +15,11 @@ on:
   schedule:
     - cron: '0 5 * * 1'      # ogni lunedi' alle 05:00 UTC
   workflow_dispatch:
+  # (16/11/2026) come backup-db, schema-db ed e2e: riparte quando si tocca questo file,
+  # così dopo una correzione del database la prova si rifà subito, senza aspettare lunedì
+  push:
+    branches: [main]
+    paths: ['.github/workflows/test-db.yml']
 
 permissions:
   contents: read
