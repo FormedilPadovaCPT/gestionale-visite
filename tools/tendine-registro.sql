@@ -52,5 +52,6 @@ insert into public.s_tendine_registro (id, app, dove, tabella, colonna, voci) va
   ('gest.tp-stato', 'gestionale', 'formazione.js tp-stato', 's_corsi_tipologie', 'stato', array['attiva', 'superata']::text[]),
   ('segr.tp-att', 'segreteria', 'js/corsi-tipologie.js TIPI_ATT', 's_corsi_tipologie', 'tipo_attestato', array['partecipazione', 'frequenza', 'frequenza_verifica']::text[]),
   ('segr.tp-stato', 'segreteria', 'js/corsi-tipologie.js tp-stato', 's_corsi_tipologie', 'stato', array['attiva', 'superata']::text[]),
-  ('segr.fc-origine', 'segreteria', 'js/corsi.js ORIGINI', 's_corsi', 'origine_tipo', array['progetto_finanziato', 'richiesta_impresa', 'conferenza', 'ufficio']::text[]);
+  ('segr.fc-origine', 'segreteria', 'js/corsi.js ORIGINI', 's_corsi', 'origine_tipo', array['progetto_finanziato', 'richiesta_impresa', 'conferenza', 'ufficio']::text[]),
+  ('segr.dtf-tipo', 'segreteria', 'js/documenti-tecnici.js dtf-tipo', 's_doc_tecnico', 'tipo', array['attestato', 'aggiornamento', 'docenza']::text[]);
 commit;

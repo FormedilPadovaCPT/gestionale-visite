@@ -154,6 +154,8 @@
       + 'Quelli che vanno <b>firmati</b> (per esempio la lettera di affiancamento) si firmano qui sotto, in «Documenti da firmare»: non per mail, non su carta.</p>';
     // tutto quello che aspetta la mia firma, col riquadro di sempre (firme.js): i documenti di questa pagina e le lettere
     h += '<div id="doc-firme"></div>';
+    // (17/11/2026) aggiornamenti obbligatori: il tecnico i suoi, il Coordinatore tutti (crediti-formativi.js)
+    h += '<div id="doc-crediti"></div>';
     if (!docs.length) h += '<div class="doc-card doc-vuoto">Per ora non ci sono documenti per te.</div>';
     h += docs.map(cartaDoc).join('');
     const prec = _miei.precedenti || [];
@@ -166,6 +168,10 @@
     if (_quadro) h += quadro();
     h += '</div>';
     v.innerHTML = h;
+    const hostCrediti = $('doc-crediti');
+    if (hostCrediti && radice.creditiFormativi) {
+      radice.creditiFormativi.box(hostCrediti).catch((e) => { hostCrediti.innerHTML = '<div class="doc-card doc-ko">Non sono riuscito a leggere gli aggiornamenti obbligatori: ' + esc(e.message) + '</div>'; });
+    }
     const host = $('doc-firme');
     if (host) {
       if (radice.firmeApp && typeof radice.firmeApp.box === 'function') {

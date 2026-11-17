@@ -1560,6 +1560,23 @@
         "id": "pg-colore"
       },
       "motivo": "colore del pilastro nell'immagine proposta (arancio, grigio, verde, senza colore): decide come si disegna, non scrive nel database"
+    },
+    {
+      "id": "segr.dtf-tipo",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "js/documenti-tecnici.js",
+        "id": "dtf-tipo"
+      },
+      "tabella": "s_doc_tecnico",
+      "colonna": "tipo",
+      "voci": [
+        "attestato",
+        "aggiornamento",
+        "docenza"
+      ]
     }
   ],
   "segreteria_gia_presenti": [
