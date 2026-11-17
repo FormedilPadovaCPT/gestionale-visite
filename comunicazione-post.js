@@ -295,6 +295,13 @@
       ${attesa.length ? attesa.map((r) => (r.verso === 'presidenza' && !R.segr ? schedaPres(r, F, R, { pulsanti, esempio: eEsempio }) : scheda(r, F, pulsanti, R))).join('') : `<div class="card" style="border-left:4px solid #95C22F"><p style="margin:0;font-size:13px;color:#555">Nessun post da ${R.coord ? 'vedere' : (R.direttore || R.pres) ? 'approvare' : 'vedere o approvare'}.</p></div>`}
       ${fatti.length ? `<div class="card"><h3 style="margin:0 0 6px">Visti di recente</h3>${fatti.map((r) => `<div class="cp-fatto">${esc(ESITI[r.stato] || r.stato)} — <b>${esc((r.testi && r.testi.titolo) || 'Post')}</b>${R.segr ? ` (${NOME_VERSO[r.verso] || r.verso})` : ''}, ${oraIt(r.deciso_il)}${r.nota ? ': «' + esc(r.nota) + '»' : ''}</div>`).join('')}</div>` : ''}`;
     riempiKit(host).catch((e) => console.warn('comunicazione, materiale per l\'agenzia:', e));
+    /* (17/11/2026, chiesto dall'utente) «l'ha visto?»: chi decide ha aperto la pagina coi post in attesa.
+       Lo scrive il server solo per chi decide quel passaggio (s_post_visto): nell'anteprima «Vedi come…»
+       e nell'esempio non si chiama. La segreteria lo legge nel suo cruscotto. */
+    if (pulsanti && !eEsempio && attesa.length) {
+      const ids = attesa.map((r) => r.id).filter((x) => Number.isInteger(x));
+      if (ids.length) radice.sb.rpc('s_post_visto', { p_passaggi: ids }).then(({ error }) => { if (error) console.warn('comunicazione, visto:', error.message); }, () => {});
+    }
     numero().catch(() => {});
   }
 

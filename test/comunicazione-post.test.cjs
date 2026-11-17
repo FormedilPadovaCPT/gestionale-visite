@@ -119,3 +119,6 @@ assert.ok(/createSignedUrls\(percorsi, 3600\)/.test(js) && /Non sono riuscito a 
 const F = fs.readFileSync(path.join(__dirname, '..', 'post-formato.js'), 'utf8');
 assert.ok(/export function postInTelegramHtml/.test(F), 'la copia è quella con le esportazioni');
 console.log('comunicazione-post: ok');
+
+// 17/11/2026: chi decide, aprendo la pagina, segna «visto» i post in attesa (s_post_visto); nell'anteprima e nell'esempio no
+assert.ok(/if \(pulsanti && !eEsempio && attesa\.length\)/.test(js) && /rpc\('s_post_visto', \{ p_passaggi: ids \}\)/.test(js), 'il visto lo scrive solo chi decide');
