@@ -70,6 +70,15 @@
   }
   /* il link al video: solo YouTube, e solo https */
   const videoOk = (u) => /^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(String(u || ''));
+  /* il video per Telegram (17/11/2026): un MP4 nel bucket pubblico social-video del progetto; sul canale
+     il post esce come video col testo sotto, e le immagini non partono */
+  const videoFileOk = (u) => /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/public\/social-video\/[^?#]+\.mp4$/i.test(String(u || ''));
+  /* il materiale per l'agenzia della fotografia: solo voci con un percorso nel bucket social-kit */
+  function kitDi(t) {
+    return (Array.isArray(t && t.kit_allegati) ? t.kit_allegati : [])
+      .filter((a) => a && typeof a.path === 'string' && /^post-\d+\//.test(a.path))
+      .map((a) => ({ nome: String(a.nome || a.path.split('/').pop()), path: a.path, video: a.mime === 'video/mp4' || /\.mp4$/i.test(a.path) }));
+  }
 
   /* ════════ chi sono ════════ */
   let _R = null;
@@ -103,16 +112,73 @@
     return _righe;
   }
 
+  /* ════════ il post come uscirà su Telegram: schermata di telefono ════════
+     (09/11/2026 per la Presidenza; dal 17/11/2026 anche per Coordinatore e Direttore, chiesto
+     dall'utente: «vede i post come apparirebbero, quindi anche il video di Telegram») */
+  function telefono(t, F) {
+    const imm = immaginiDi(t);
+    const tg = t.testo_telegram || '', app = t.testo_app || '';
+    const video = videoFileOk(t.video_file_url) ? t.video_file_url : '';
+    const media = video
+      ? `<div class="cp-tel-img"><video src="${esc(video)}" controls playsinline preload="metadata"${imm[0] ? ` poster="${esc(imm[0])}"` : ''}></video></div>`
+      : imm.length ? `<div class="cp-tel-img"><img src="${esc(imm[0])}" alt="Immagine del post">${imm.length > 1 ? `<span class="cp-tel-n">1 / ${imm.length}</span>` : ''}</div>` : '<div class="cp-tel-noimg">Post senza immagine</div>';
+    const carosello = !video && imm.length > 1 ? `<div class="cp-imm">${imm.slice(1).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener" title="immagine ${i + 2}"><img src="${esc(u)}" alt=""></a>`).join('')}</div>` : '';
+    const testo = tg ? (F ? F.postInTelegramHtml(tg) : esc(tg)) : esc(F ? F.postInTestoSemplice(app) : app);
+    return `<div class="cp-tel">
+          <div class="cp-tel-testa"><img src="logo_formedil.png" alt="FORMEDIL PADOVA"><span>Area Sicurezza e Salute</span></div>
+          ${media}${carosello}
+          <div class="cp-tel-testo">${testo}</div>
+          ${t.hashtag ? `<div class="cp-tel-hash">${esc(t.hashtag)}</div>` : ''}
+          ${!video && t.video_url && videoOk(t.video_url) ? `<div class="cp-tel-hash">▶ <a href="${esc(t.video_url)}" target="_blank" rel="noopener">video su YouTube</a></div>` : ''}
+        </div>`;
+  }
+  /* accanto al telefono: com'è fatto il post negli altri canali */
+  function lato(t, F) {
+    const imm = immaginiDi(t);
+    const tg = t.testo_telegram || '', app = t.testo_app || '';
+    const semplice = (x) => esc(F ? F.postInTestoSemplice(x || '') : (x || ''));
+    const video = videoFileOk(t.video_file_url);
+    return `<div class="cp-canale">Così esce su Telegram</div>
+          <p class="cp-pres-p">${video ? 'Sul canale Telegram dell\'Area il post esce come <b>video</b>, col testo sotto: si guarda col tasto play.' : 'La schermata col bordo arrotondato è il messaggio come esce nel canale Telegram dell\'Area.'}</p>
+          <details class="cp-det"><summary>🔔 Nell'app servizi</summary>
+            ${imm.length ? `<div class="cp-imm">${imm.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt=""></a>`).join('')}</div>` : ''}
+            ${t.video_url && videoOk(t.video_url) ? `<p class="cp-pres-p">▶ col video: <a href="${esc(t.video_url)}" target="_blank" rel="noopener">${esc(t.video_url)}</a></p>` : ''}
+            <div class="cp-app">${F ? F.postInHtmlNotizia(app || tg) : esc(app || tg)}</div></details>
+          ${t.testo_instagram ? `<details class="cp-det"><summary>📸 Instagram e Facebook (li pubblica l'agenzia)</summary><div class="cp-semplice">${semplice(t.testo_instagram)}</div></details>` : ''}
+          ${t.testo_linkedin ? `<details class="cp-det"><summary>💼 LinkedIn (lo pubblica l'agenzia)</summary><div class="cp-semplice">${semplice(t.testo_linkedin)}</div></details>` : ''}`;
+  }
+  /* il materiale per l'agenzia: i file si vedono dopo, con indirizzi firmati (bucket privato) */
+  function bloccoKit(r, t) {
+    const k = kitDi(t);
+    if (!k.length) return '';
+    return `<div class="cp-kit" data-cp-kit="${esc(r.id)}"><div class="cp-canale">📦 Per l'agenzia: Instagram, Facebook e LinkedIn</div>
+      <p class="cp-pres-p">I file che la segreteria manda all'agenzia insieme ai testi, nei formati dei loro canali.</p>
+      <div class="cp-kit-file">${k.map((a) => `<span class="cp-kit-voce" data-cp-kit-path="${esc(a.path)}">${a.video ? '🎬' : '🖼'} ${esc(a.nome)}</span>`).join('')}</div></div>`;
+  }
+  async function riempiKit(host) {
+    const voci = [...host.querySelectorAll('[data-cp-kit-path]')];
+    if (!voci.length) return;
+    const percorsi = [...new Set(voci.map((v) => v.dataset.cpKitPath))];
+    const { data, error } = await radice.sb.storage.from('social-kit').createSignedUrls(percorsi, 3600);
+    if (error) {
+      host.querySelectorAll('.cp-kit-file').forEach((d) => d.insertAdjacentHTML('beforeend', `<p class="cp-pres-p" style="color:#b03a2e">Non sono riuscito a leggere i file per l'agenzia: ${esc(error.message)}</p>`));
+      return;
+    }
+    const url = new Map((data || []).filter((x) => x && x.signedUrl).map((x) => [x.path, x.signedUrl]));
+    voci.forEach((v) => {
+      const u = url.get(v.dataset.cpKitPath);
+      if (!u) { v.insertAdjacentHTML('beforeend', ' <em style="color:#b03a2e">(non letto)</em>'); return; }
+      const nome = v.textContent.trim();
+      v.innerHTML = /\.mp4$/i.test(v.dataset.cpKitPath)
+        ? `<video src="${esc(u)}" controls playsinline preload="metadata"></video><small>${esc(nome)}</small>`
+        : `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt=""></a><small>${esc(nome)}</small>`;
+    });
+  }
+
   /* ════════ la scheda di un post ════════ */
   function scheda(r, F, pulsanti, R) {
     const t = r.testi || {};
-    const imm = immaginiDi(t);
-    const tg = t.testo_telegram || '';
-    const app = t.testo_app || '';
     const vc = t.visto_coordinatore;
-    const tgHtml = F ? F.postInTelegramHtml(tg) : esc(tg);
-    const appHtml = F ? F.postInHtmlNotizia(app) : esc(app);
-    const semplice = (x) => esc(F ? F.postInTestoSemplice(x || '') : (x || ''));
     const mio = pulsanti && r.verso === verso(R);
     return `<div class="card cp-post" data-cp="${r.id}" style="border-left:4px solid var(--orange,#e7500f)">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;justify-content:space-between">
@@ -125,13 +191,8 @@
       ${vc ? `<div class="cp-nota cp-visto"><b>👍 Visto del Coordinatore</b> (${esc(vc.nome || '')}, ${oraIt(vc.il)})${vc.nota ? ': ' + esc(vc.nota) : ''}</div>` : ''}
       ${t.verifica ? `<div class="cp-nota"><b>Da verificare:</b> ${esc(t.verifica)}</div>` : ''}
       ${t.fonte || t.norma ? `<p style="font-size:12.5px;color:#555;margin:6px 0">${t.fonte ? '<b>Fonte:</b> ' + esc(t.fonte) : ''}${t.fonte_url && /^https?:\/\//.test(t.fonte_url) ? ` · <a href="${esc(t.fonte_url)}" target="_blank" rel="noopener">apri</a>` : ''}${t.norma ? `${t.fonte ? ' · ' : ''}<b>Norma citata:</b> ${esc(t.norma)}` : ''}</p>` : ''}
-      ${imm.length ? `<div class="cp-imm">${imm.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener" title="${i === 0 ? 'copertina' : 'immagine ' + (i + 1)}"><img src="${esc(u)}" alt=""></a>`).join('')}</div>` : ''}
-      ${t.video_url && videoOk(t.video_url) ? `<p style="font-size:12.5px;margin:4px 0">▶ Video: <a href="${esc(t.video_url)}" target="_blank" rel="noopener">${esc(t.video_url)}</a></p>` : ''}
-      ${tg ? `<div class="cp-canale">📋 Telegram — come uscirà</div><div class="cp-bolla">${tgHtml}</div>` : ''}
-      ${app && app.trim() !== tg.trim() ? `<details class="cp-det"><summary>🔔 App servizi — notizia estesa</summary><div class="cp-app">${appHtml}</div></details>` : ''}
-      ${t.testo_linkedin ? `<details class="cp-det"><summary>💼 LinkedIn</summary><div class="cp-semplice">${semplice(t.testo_linkedin)}</div></details>` : ''}
-      ${t.testo_instagram ? `<details class="cp-det"><summary>📸 Instagram / Facebook</summary><div class="cp-semplice">${semplice(t.testo_instagram)}</div></details>` : ''}
-      ${t.hashtag ? `<p style="font-size:12px;color:#555;margin:6px 0">${esc(t.hashtag)}</p>` : ''}
+      <div class="cp-pres-corpo">${telefono(t, F)}<div class="cp-pres-lato">${lato(t, F)}</div></div>
+      ${bloccoKit(r, t)}
       ${mio ? (r.verso === 'coordinatore'
         ? `<div class="cp-azioni">
             <button class="btn-primary btn-sm" type="button" data-cp-esito="visto" data-cp-id="${r.id}" data-aiuto="Dai il visto: il post passa al Direttore per l'approvazione, con il tuo visto scritto accanto. Puoi aggiungere una nota.">👍 Visto</button>
@@ -148,7 +209,6 @@
   /* ════════ la scheda per la Presidenza: il post come uscirà (09/11/2026) ════════ */
   function schedaPres(r, F, R, opz) {
     const t = r.testi || {};
-    const imm = immaginiDi(t);
     const tg = t.testo_telegram || '';
     const app = t.testo_app || '';
     const semplice = (x) => esc(F ? F.postInTestoSemplice(x || '') : (x || ''));
@@ -168,14 +228,7 @@
       </div>
       ${r.nota_richiesta ? `<div class="cp-nota"><b>Perché è qui:</b> ${esc(r.nota_richiesta)}</div>` : ''}
       <div class="cp-pres-corpo">
-        <div class="cp-tel">
-          <div class="cp-tel-testa"><img src="logo_formedil.png" alt="FORMEDIL PADOVA"><span>Area Sicurezza e Salute</span></div>
-          ${imm.length ? `<div class="cp-tel-img"><img src="${esc(imm[0])}" alt="Immagine del post">${imm.length > 1 ? `<span class="cp-tel-n">1 / ${imm.length}</span>` : ''}</div>` : '<div class="cp-tel-noimg">Post senza immagine</div>'}
-          ${imm.length > 1 ? `<div class="cp-imm">${imm.slice(1).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener" title="immagine ${i + 2}"><img src="${esc(u)}" alt=""></a>`).join('')}</div>` : ''}
-          <div class="cp-tel-testo">${tg ? (F ? F.postInTelegramHtml(tg) : esc(tg)) : semplice(app)}</div>
-          ${t.hashtag ? `<div class="cp-tel-hash">${esc(t.hashtag)}</div>` : ''}
-          ${t.video_url && videoOk(t.video_url) ? `<div class="cp-tel-hash">▶ <a href="${esc(t.video_url)}" target="_blank" rel="noopener">video su YouTube</a></div>` : ''}
-        </div>
+        ${telefono(t, F)}
         <div class="cp-pres-lato">
           <div class="cp-canale">Così esce su Telegram</div>
           <p class="cp-pres-p">La schermata col bordo arrotondato è il messaggio come esce nel canale Telegram dell'Area. Gli stessi contenuti escono come notizia nell'app servizi.</p>
@@ -241,6 +294,7 @@
       ${eEsempio ? '<div class="cp-nota cp-esempio"><b>Anteprima con un esempio.</b> Il passaggio alla Presidenza è ancora spento: nessun post le è stato mandato. Qui sotto ci sono i post della serie «918 visite» in bozza, come li vedrebbero Presidente e Vicepresidente. I pulsanti non fanno niente.</div>' : ''}
       ${attesa.length ? attesa.map((r) => (r.verso === 'presidenza' && !R.segr ? schedaPres(r, F, R, { pulsanti, esempio: eEsempio }) : scheda(r, F, pulsanti, R))).join('') : `<div class="card" style="border-left:4px solid #95C22F"><p style="margin:0;font-size:13px;color:#555">Nessun post da ${R.coord ? 'vedere' : (R.direttore || R.pres) ? 'approvare' : 'vedere o approvare'}.</p></div>`}
       ${fatti.length ? `<div class="card"><h3 style="margin:0 0 6px">Visti di recente</h3>${fatti.map((r) => `<div class="cp-fatto">${esc(ESITI[r.stato] || r.stato)} — <b>${esc((r.testi && r.testi.titolo) || 'Post')}</b>${R.segr ? ` (${NOME_VERSO[r.verso] || r.verso})` : ''}, ${oraIt(r.deciso_il)}${r.nota ? ': «' + esc(r.nota) + '»' : ''}</div>`).join('')}</div>` : ''}`;
+    riempiKit(host).catch((e) => console.warn('comunicazione, materiale per l\'agenzia:', e));
     numero().catch(() => {});
   }
 
@@ -351,6 +405,12 @@
       + '.cp-pres-stato{display:flex;gap:6px 14px;flex-wrap:wrap;margin-top:12px;padding-top:8px;border-top:1px solid #f0f1f2}'
       + '.cp-pres-dec{font-size:12.5px;color:#555}.cp-dec-approvato,.cp-dec-approvato_indicazioni{color:#4b7a12}.cp-dec-non_approvato{color:#b03a2e}'
       + '.cp-azioni button[disabled]{opacity:.55;cursor:not-allowed}'
+      + '.cp-tel-img video{display:block;width:100%;height:auto;background:#000;max-height:560px}'
+      + '.cp-kit{margin-top:12px;padding-top:8px;border-top:1px solid #f0f1f2}'
+      + '.cp-kit-file{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}'
+      + '.cp-kit-voce{display:flex;flex-direction:column;gap:3px;font-size:12px;color:#555;max-width:200px}'
+      + '.cp-kit-voce img,.cp-kit-voce video{width:180px;max-height:320px;object-fit:contain;border:1px solid #e3e4e6;border-radius:8px;background:#f7f7f8;display:block}'
+      + '.cp-kit-voce small{word-break:break-all}'
       + '@media (max-width:560px){.cp-tel{flex-basis:100%;max-width:none}}';
     document.head.appendChild(st);
   }
@@ -370,7 +430,7 @@
     radice.addEventListener('gestionale-logout', () => { _R = null; _righe = []; });
   }
 
-  const api = { apri, numero, immaginiDi, daVedere, decisiDiRecente, videoOk, verso, miaDecisione, schedaPres };
+  const api = { apri, numero, immaginiDi, daVedere, decisiDiRecente, videoOk, videoFileOk, kitDi, telefono, scheda, verso, miaDecisione, schedaPres };
   radice.comunicazionePost = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

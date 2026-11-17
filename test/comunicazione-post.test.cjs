@@ -86,7 +86,36 @@ assert.ok(/if \(error\) throw new Error\(error\.message\);/.test(js) && /Non son
 for (const campo of ['t.titolo || \'Post\'', 'r.nota_richiesta', 'vc.nota', 't.verifica', 't.fonte', 't.norma', 't.hashtag', 'r.nota', 'e.message']) {
   assert.ok(js.includes('esc(' + campo + ')'), `${campo} deve passare da esc()`);
 }
-assert.ok(/const tgHtml = F \? F\.postInTelegramHtml\(tg\) : esc\(tg\);/.test(js), 'senza il convertitore il testo esce ripulito');
+assert.ok(/const testo = tg \? \(F \? F\.postInTelegramHtml\(tg\) : esc\(tg\)\)/.test(js), 'senza il convertitore il testo esce ripulito');
+
+// 17/11/2026: Coordinatore e Direttore vedono il post COME USCIRÀ, video per Telegram e materiale per l'agenzia compresi
+const VID = 'https://utdantrfugnmqsuujxbe.supabase.co/storage/v1/object/public/social-video/post-99/video-1.mp4';
+assert.strictEqual(C.videoFileOk(VID), true, 'il video del bucket social-video si mostra');
+assert.strictEqual(C.videoFileOk('https://altro.example.com/v.mp4'), false, 'un indirizzo qualsiasi no');
+assert.strictEqual(C.videoFileOk('javascript:alert(1)'), false);
+assert.strictEqual(C.videoFileOk(VID + '?x=1'), false, 'niente parametri');
+assert.deepStrictEqual(C.kitDi({ kit_allegati: [
+  { nome: 'a.jpg', path: 'post-99/1-a.jpg', mime: 'image/jpeg' },
+  { nome: 'v.mp4', path: 'post-99/2-v.mp4', mime: 'video/mp4' },
+  { nome: 'fuori', path: '../segreti/x.jpg' }, { nome: 'senza percorso' }, null] }),
+  [{ nome: 'a.jpg', path: 'post-99/1-a.jpg', video: false }, { nome: 'v.mp4', path: 'post-99/2-v.mp4', video: true }],
+  'solo voci col percorso del bucket');
+assert.deepStrictEqual(C.kitDi({}), []);
+const IMG = 'https://utdantrfugnmqsuujxbe.supabase.co/storage/v1/object/public/social-media/post-99/c.jpg';
+const conVideo = C.telefono({ testo_telegram: 'Ciao', immagine_url: IMG, video_file_url: VID, video_url: 'https://youtube.com/shorts/x' }, null);
+assert.ok(conVideo.includes('<video src="' + VID + '"') && conVideo.includes('poster="' + IMG + '"'), 'col video per Telegram il telefono mostra il video, con la copertina come anteprima');
+assert.ok(!conVideo.includes('video su YouTube'), 'col video vero il link YouTube su Telegram non esce, e non si mostra');
+const senza = C.telefono({ testo_telegram: 'Ciao', immagine_url: IMG, video_url: 'https://youtube.com/shorts/x' }, null);
+assert.ok(!senza.includes('<video') && senza.includes('<img src="' + IMG + '"') && senza.includes('video su YouTube'), 'senza video: immagine e link YouTube');
+assert.ok(C.telefono({ testo_telegram: '<b>x</b>' }, null).includes('&lt;b&gt;x&lt;/b&gt;'), 'il testo passa da esc()');
+const R = { direttore: true };
+const sch = C.scheda({ id: 5, verso: 'direttore', testi: { titolo: 'T', testo_telegram: 'Ciao', video_file_url: VID, kit_allegati: [{ nome: 'a.jpg', path: 'post-99/1-a.jpg' }] } }, null, true, R);
+assert.ok(sch.includes('class="cp-tel"') && sch.includes('<video src="' + VID + '"'), 'la scheda del Direttore ha il telefono col video');
+assert.ok(sch.includes('data-cp-kit-path="post-99/1-a.jpg"') && sch.includes('Per l\'agenzia'), 'e il materiale per l\'agenzia');
+assert.ok(sch.includes('data-cp-esito="approvato"'), 'e i suoi pulsanti');
+const pres = C.schedaPres({ id: 6, verso: 'presidenza', stato: 'in_attesa', decisioni: {}, testi: { titolo: 'P', testo_telegram: 'Ciao', video_file_url: VID } }, null, { pres: true, carica: 'presidente' }, { pulsanti: true });
+assert.ok(pres.includes('<video src="' + VID + '"'), 'anche la Presidenza vede il video');
+assert.ok(/createSignedUrls\(percorsi, 3600\)/.test(js) && /Non sono riuscito a leggere i file per l'agenzia/.test(js), 'i file privati con indirizzi firmati, e una lettura fallita si dice');
 const F = fs.readFileSync(path.join(__dirname, '..', 'post-formato.js'), 'utf8');
 assert.ok(/export function postInTelegramHtml/.test(F), 'la copia è quella con le esportazioni');
 console.log('comunicazione-post: ok');
