@@ -4,14 +4,17 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { genera, DEST } = require('../tools/genera-crediti-ore.cjs');
+const { genera, FONTE, DEST } = require('../tools/genera-crediti-ore.cjs');
+// La fonte sta nel repo della segreteria: su GitHub (pubblicazione) non c'è, e i due
+// confronti si fanno solo sul PC, dove i due repo stanno uno accanto all'altro.
+const SENZA_FONTE = fs.existsSync(FONTE) ? false : 'fonte della segreteria non presente (GitHub)';
 
-test('crediti-ore.js è la copia generata da segreteria-app/js/doc-tecnici-ore.js', () => {
+test('crediti-ore.js è la copia generata da segreteria-app/js/doc-tecnici-ore.js', { skip: SENZA_FONTE }, () => {
   const attuale = fs.readFileSync(DEST, 'utf8').replace(/\r\n/g, '\n');
   assert.equal(attuale, genera(), 'copia non allineata: lancia node tools/genera-crediti-ore.cjs');
 });
 
-test('il riquadro calcola come la segreteria (stessi dati, stesso esito)', async () => {
+test('il riquadro calcola come la segreteria (stessi dati, stesso esito)', { skip: SENZA_FONTE }, async () => {
   globalThis.creditiOre = require('../crediti-ore.js');
   const { calcola } = require('../crediti-formativi.js');
   const fonte = await import(require('url').pathToFileURL(path.join(__dirname, '..', '..', 'segreteria-app', 'js', 'doc-tecnici-ore.js')).href);
