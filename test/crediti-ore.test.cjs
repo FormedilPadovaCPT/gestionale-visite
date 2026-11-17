@@ -39,6 +39,29 @@ test('il riquadro calcola come la segreteria (stessi dati, stesso esito)', { ski
   assert.equal(x.voci[1].s.scadenza, form.scadenza);
 });
 
+test('caricamento del tecnico: che cosa si può caricare per quale requisito', () => {
+  globalThis.creditiOre = require('../crediti-ore.js');
+  const { tipiPer } = require('../crediti-formativi.js');
+  assert.deepEqual(tipiPer({ id: 5 }), ['attestato'], 'il corso da 120 ore è solo un attestato');
+  assert.deepEqual(tipiPer({ ore_soglia: 40 }), ['aggiornamento', 'attestato'], 'coordinatore: niente docenza');
+  assert.deepEqual(tipiPer({ ore_soglia: 24, docenza_alternativa: true }), ['aggiornamento', 'docenza', 'attestato']);
+});
+
+test('caricamento del tecnico: i controlli prima dell’invio', () => {
+  globalThis.creditiOre = require('../crediti-ore.js');
+  const { controlla } = require('../crediti-formativi.js');
+  const file = { type: 'application/pdf', size: 1000 };
+  const buono = { requisito_id: 6, tipo: 'aggiornamento', data_inizio: '2026-10-01', descrizione: 'Corso', ore: 8, ore_di_corso: null, file };
+  assert.equal(controlla(buono, '2026-11-17'), '');
+  assert.match(controlla({ ...buono, data_inizio: '2026-12-01' }, '2026-11-17'), /futuro/);
+  assert.match(controlla({ ...buono, ore: null }, '2026-11-17'), /ore/);
+  assert.equal(controlla({ ...buono, tipo: 'attestato', ore: null }, '2026-11-17'), '', 'l’attestato di base può non avere ore');
+  assert.match(controlla({ ...buono, ore_di_corso: 10 }, '2026-11-17'), /superare/);
+  assert.match(controlla({ ...buono, file: null }, '2026-11-17'), /file/);
+  assert.match(controlla({ ...buono, file: { type: 'application/zip', size: 10 } }, '2026-11-17'), /PDF/);
+  assert.match(controlla({ ...buono, file: { type: 'application/pdf', size: 11 * 1024 * 1024 } }, '2026-11-17'), /10 MB/);
+});
+
 test('senza documenti il requisito è «mancante», non in regola', () => {
   globalThis.creditiOre = require('../crediti-ore.js');
   const { stato } = require('../crediti-formativi.js');

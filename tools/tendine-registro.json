@@ -1577,6 +1577,56 @@
         "aggiornamento",
         "docenza"
       ]
+    },
+    {
+      "id": "segr.dti-tipo",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "html",
+        "file": "js/documenti-tecnici.js",
+        "id": "dti-tipo"
+      },
+      "tabella": "s_doc_tecnico",
+      "colonna": "tipo",
+      "voci": [
+        "attestato",
+        "aggiornamento",
+        "docenza"
+      ]
+    },
+    {
+      "id": "segr.dti-req",
+      "app": "segreteria",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "js/documenti-tecnici.js",
+        "id": "dti-req"
+      },
+      "motivo": "elenco dei requisiti a ore e di quelli d'origine, dal catalogo"
+    },
+    {
+      "id": "gest.cr-req",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "crediti-formativi.js",
+        "id": "cr-req"
+      },
+      "motivo": "elenco dei requisiti a ore, letto da crediti_formativi()"
+    },
+    {
+      "id": "gest.cr-tipo",
+      "app": "gestionale",
+      "classe": "dinamica",
+      "fonte": {
+        "tipo": "html",
+        "file": "crediti-formativi.js",
+        "id": "cr-tipo"
+      },
+      "motivo": "voci da tipiPer() secondo il requisito; la colonna s_doc_tecnico_invii.tipo ha il vincolo attestato/aggiornamento/docenza"
     }
   ],
   "segreteria_gia_presenti": [

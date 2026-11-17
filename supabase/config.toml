@@ -29,6 +29,9 @@ verify_jwt = false
 [functions.foto-appunti]
 verify_jwt = true
 
+[functions.crediti-attestato]
+verify_jwt = true
+
 [functions.geocode-cantieri]
 verify_jwt = true
 
