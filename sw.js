@@ -1,25 +1,80 @@
 /* ============================================================
-   Service worker del Gestionale Visite — SOLO NOTIFICHE
-   (17/09/2026, chiesto dall'utente)
+   Service worker del Gestionale Visite — notifiche e copie dei file
+   (17/09/2026 le notifiche; 17/11/2026 le copie, chieste dall'utente:
+   «l'accensione delle app tramite cellulare è lentissima»)
 
-   ⚠️ QUI NON SI METTE NIENTE IN CACHE, E NON È UNA DIMENTICANZA.
-   Il gestionale è un file unico che cambia quasi ogni giorno: un
-   service worker che salvasse le pagine farebbe lavorare i tecnici
-   con la versione di ieri senza che nessuno se ne accorga. Per questo
-   NON c'è un gestore «fetch»: il gestionale si carica dalla rete
-   esattamente come prima, e ogni pubblicazione arriva subito a tutti.
-   Chi un domani volesse l'uso senza linea deve prima risolvere
-   l'aggiornamento delle versioni, non aggiungere una cache qui.
+   LA PAGINA PRINCIPALE NON SI SALVA MAI. index.html arriva sempre dalla
+   rete, come prima: è lei a dire quale versione di ogni file serve
+   (`x.js?v=12`), quindi una pubblicazione nuova arriva subito a tutti.
+   Il timore scritto qui il 17/09 («i tecnici lavorerebbero con la
+   versione di ieri») riguardava il salvataggio della pagina, che resta
+   escluso.
 
-   Che cosa fa: riceve la notifica (la decifra il browser) e la mostra;
-   al tocco porta sull'app, alla pagina indicata. Basta.
+   GLI ALTRI FILE DEL GESTIONALE (script, fogli di stile, immagini) si
+   servono dalla copia sul telefono, così l'accensione non aspetta più
+   una sessantina di richieste in rete (GitHub Pages li tiene in memoria
+   solo 10 minuti, poi il telefono li ricontrollava uno per uno prima di
+   aprire l'app). Una copia più vecchia di 10 minuti si ricontrolla in
+   SOTTOFONDO: è lo stesso margine di prima, ma non blocca l'avvio.
+   Un file cambiato col numero di versione nuovo nella pagina si scarica
+   subito; uno cambiato senza toccare il `?v=` arriva all'apertura dopo.
+   Di ogni file si tiene una copia sola (la versione vecchia si toglie).
+   Non si toccano: le richieste ad altri siti (Supabase, CDN, mappe), le
+   altre app sullo stesso dominio, questo file.
 
-   Per toglierlo del tutto: pubblicare una versione che in «activate»
-   chiama self.registration.unregister(). Il gestionale torna com'era.
+   Le notifiche: riceve la notifica (la decifra il browser) e la mostra;
+   al tocco porta sull'app, alla pagina indicata.
+
+   Per togliere le copie: cambiare COPIE (il vecchio nome si cancella da
+   solo in «activate») o togliere il gestore «fetch». Per togliere tutto:
+   una versione che in «activate» chiama self.registration.unregister().
    ============================================================ */
 
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener('activate', (e) => e.waitUntil((async () => {
+  for (const k of await caches.keys()) if (k.startsWith('gv-') && k !== COPIE) await caches.delete(k);
+  await self.clients.claim();
+})()));
+
+// ── Copie dei file (17/11/2026) ──
+const COPIE = 'gv-file-1';
+const FRESCO_MS = 10 * 60 * 1000;   // come la cache di GitHub Pages
+const DA_COPIARE = /\.(js|css|png|jpe?g|svg|webp|webmanifest)$/i;
+
+self.addEventListener('fetch', (e) => {
+  const req = e.request;
+  if (req.method !== 'GET' || req.mode === 'navigate') return;   // la pagina: sempre dalla rete
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;                // Supabase, CDN, mappe: non si toccano
+  if (!url.pathname.startsWith(new URL(self.registration.scope).pathname)) return;   // altre app del dominio
+  if (/\/sw\.js$/.test(url.pathname) || !DA_COPIARE.test(url.pathname)) return;
+  e.respondWith(dallaCopia(req, e));
+});
+
+async function dallaCopia(req, e) {
+  let cache;
+  try { cache = await caches.open(COPIE); } catch (err) { return fetch(req); }   // spazio negato: come prima
+  const salvata = await cache.match(req);
+  if (salvata) {
+    const eta = Date.now() - Date.parse(salvata.headers.get('date') || '');
+    if (!(eta < FRESCO_MS)) e.waitUntil(aggiorna(cache, req).catch(() => {}));
+    return salvata;
+  }
+  return aggiorna(cache, req);
+}
+
+async function aggiorna(cache, req) {
+  const r = await fetch(req, { cache: 'no-cache' });   // chiede al server se è cambiato
+  if (r.ok && r.type === 'basic') {
+    await cache.put(req, r.clone());
+    const u = new URL(req.url);
+    for (const k of await cache.keys()) {           // di ogni file una copia sola
+      const ku = new URL(k.url);
+      if (ku.pathname === u.pathname && ku.search !== u.search) await cache.delete(k);
+    }
+  }
+  return r;
+}
 
 // Il messaggio arriva cifrato: { titolo, testo, url, tag }. I testi li scrive il
 // database e sono fissi, senza nomi di imprese o cantieri: una notifica si legge

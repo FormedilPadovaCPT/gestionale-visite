@@ -259,7 +259,7 @@
   async function solopdf() {
     const d = leggi();
     if (!d.azienda) { toast('Serve almeno l\'azienda', 'warn'); return; }
-    if (!window.jspdf?.jsPDF) { toast('Libreria PDF non caricata — ricarica la pagina', 'err'); return; }
+    try { await window.libreria('pdf'); } catch (e) { toast(e.message, 'err'); return; }
     scaricaPdf(pdfRelazione(d, corrente), nomeFile(d));
   }
 
@@ -268,7 +268,7 @@
     if (!d.data || !d.azienda) { toast('Servono la data e l\'azienda', 'warn'); return; }
     if (!d.relazione) { toast('La relazione non puo\' restare vuota', 'warn'); return; }
     if (!d.richiedente_email) { toast('Scegli a chi va la relazione', 'warn'); return; }
-    if (!window.jspdf?.jsPDF) { toast('Libreria PDF non caricata — ricarica la pagina', 'err'); return; }
+    try { await window.libreria('pdf'); } catch (e) { toast(e.message, 'err'); return; }
     if (btn) { btn.disabled = true; btn.textContent = 'Salvo…'; }
     try {
       const vid = $('srel-salva').dataset.vid;

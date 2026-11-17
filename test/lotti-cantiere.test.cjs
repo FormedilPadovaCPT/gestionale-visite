@@ -53,7 +53,9 @@ assert.ok(/if\(window\.__isCoord\)\{\n\s+const _be=[^\n]*\n\s+\}\n/.test(html), 
 /* (08/10/2026, chiesto dall'utente) anche la chiusura del cantiere al coordinatore: nella scheda e col lucchetto delle Scadenze */
 assert.ok(/\}else if\(window\.__isCoord\|\|window\.__isCoordinatoreVero\)\{\n\s+const _bc=[^\n]*chiudiCantiere\(cantId,label\)/.test(html), 'il coordinatore deve vedere «Chiudi cantiere» nella scheda');
 assert.ok(/\$\{\(window\.__isSegreteria\|\|window\.__isCoordinatoreVero\)\?'<button class="btn-warn btn-sm" data-act="chiudi-cant"/.test(html), 'il coordinatore deve avere il lucchetto nelle Scadenze');
-assert.ok(/window\.__isCoordinatoreVero=null\n\s+if\(!isSegreteria\)\{try\{const r=await sb\.rpc\('is_coordinatore'\)/.test(html), 'il ruolo di coordinatore si chiede al database all’accesso');
+/* (17/11/2026) la lettura parte insieme alle altre dell'accesso (_pCoord) e si usa qui */
+assert.ok(/const _pCoord=_subito\(sb\.rpc\('is_coordinatore'\)\)/.test(html), 'il ruolo di coordinatore si chiede al database all’accesso');
+assert.ok(/window\.__isCoordinatoreVero=null\n\s+if\(!isSegreteria\)\{try\{const r=await _pCoord;if\(r\.error\)throw r\.error;/.test(html), 'e la risposta si usa all’accesso, errore compreso');
 const _pc = fs.readFileSync(path.join(__dirname, '..', 'proposte-chiusura.js'), 'utf8');
 assert.ok(_pc.includes('const ufficio = () => !!(window.__isCoord || window.__isSegreteria || window.__isCoordinatoreVero);') && html.includes('proposte-chiusura.js?v=3'), 'il coordinatore non propone alla segreteria: chiude o respinge');
 /* (09/10/2026, chiesto dall'utente) i PDF dei verbali vanno nell'archivio dei verbali, un file per verbale:

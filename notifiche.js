@@ -40,7 +40,7 @@
   let riallineata = false;
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=2').then((r) => { registrazione = r; }).catch((e) => console.warn('[notifiche] service worker:', e));
+    navigator.serviceWorker.register('sw.js?v=3').then((r) => { registrazione = r; }).catch((e) => console.warn('[notifiche] service worker:', e));
     navigator.serviceWorker.addEventListener('message', (ev) => {
       if (ev.data && ev.data.tipo === 'apri-vista') apriVista(ev.data.vista);
     });

@@ -87,6 +87,7 @@ async function _getChkVoci(){
   return _chkVociCache
 }
 async function admEsportaExcel(){
+  try{await window.libreria('xlsx')}catch(e){toast(e.message,'err');return}
   const verbale=($('adm-excel-verbale')?.value||'').trim()
   const msgEl=$('adm-excel-exp-msg')
   const btn=$('btn-adm-excel-exp')
@@ -448,6 +449,7 @@ async function ceivEsportaExcel(){
   try{
     const data = await _ceivFetch(p.dal, p.al);
     if(!data.length){ _ceivStatus('Nessuna visita su cantieri con codice CNCE nel periodo.', true); toast('Nessuna visita trovata','warn'); return; }
+    await window.libreria('xlsx');
     XLSX.writeFile(_ceivBuildWb(data), _ceivFname('Q','xlsx'));
     _ceivStatus(`✓ Excel generato: ${data.length} visite.`);
     toast('Excel CEIV scaricato ✓','ok');
@@ -459,6 +461,7 @@ async function ceivEsportaPdf(){
   try{
     const data = await _ceivFetch(p.dal, p.al);
     if(!data.length){ _ceivStatus('Nessuna visita su cantieri con codice CNCE nel periodo.', true); toast('Nessuna visita trovata','warn'); return; }
+    await window.libreria('pdf');
     _ceivBuildDoc(data, p).save(_ceivFname('R','pdf'));
     _ceivStatus(`✓ PDF generato: ${data.length} visite.`);
     toast('PDF CEIV scaricato ✓','ok');
@@ -478,6 +481,7 @@ async function ceivInviaMail(){
       '\n\nLa mail parte SUBITO e non si richiama. Hai gia\u2019 guardato i due file?\n\nOK = invia, Annulla = non inviare')){
       _ceivStatus('Invio annullato: non e\u2019 partito niente.'); return; }
     _ceivStatus('⏳ Generazione allegati…');
+    await window.libreria('xlsx'); await window.libreria('pdf');
     const xlsxB64 = XLSX.write(_ceivBuildWb(data), { type:'base64', bookType:'xlsx' });
     const pdfB64 = _ceivBuildDoc(data, p).output('datauristring').split(',')[1];
     _ceivStatus('⏳ Invio email a CEIV…');
@@ -547,6 +551,7 @@ function _caricaXlsxStile(){
 }
 // → { X, wb, colori }: X è la libreria con cui va SCRITTO il file (solo quella con gli stili scrive i colori)
 async function _ceiviWb(data){
+  await window.libreria('xlsx');
   let X=XLSX, colori=true;
   try{ X=await _caricaXlsxStile(); }catch(e){ console.warn('Excel CEIV senza colori:',e); X=XLSX; colori=false; }
   const wb = X.utils.book_new();
@@ -587,6 +592,7 @@ async function ceivImpExcel(){
 async function ceivImpPdf(){
   try{
     const r = await _ceiviDati(); if(!r) return;
+    await window.libreria('pdf');
     _ceiviDoc(r.data, r.p).save(_ceiviFname('pdf'));
     _ceiviStatus('✓ PDF generato: '+_ceiviEsito(r.data)+'.'); toast('PDF imprese scaricato ✓','ok');
   }catch(e){ console.error('ceivImpPdf',e); _ceiviStatus('Non sono riuscito a leggere i dati: '+(e.message||e), true); toast('Errore: '+(e.message||e),'err'); }
@@ -604,6 +610,7 @@ async function ceivImpInvia(){
     _ceiviStatus('⏳ Generazione allegati…');
     const x = await _ceiviWb(r.data);
     const xlsxB64 = x.X.write(x.wb, { type:'base64', bookType:'xlsx' });
+    await window.libreria('pdf');
     const pdfB64 = _ceiviDoc(r.data, r.p).output('datauristring').split(',')[1];
     _ceiviStatus('⏳ Invio email a CEIV…');
     const { data:res, error } = await sb.functions.invoke('send-ceiv', { body:{
@@ -711,8 +718,9 @@ function _admXlsxShowPreview(snap,fname){
 }
 function _admReadXlsx(file){
   const reader=new FileReader()
-  reader.onload=function(e){
+  reader.onload=async function(e){
     try{
+      await window.libreria('xlsx')
       const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'})
       _admXlsxShowPreview(_parseXlsxSnap(wb),file.name)
     }catch(err){console.error(err);toast('Errore lettura xlsx: '+err.message,'err')}

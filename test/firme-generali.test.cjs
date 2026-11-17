@@ -57,9 +57,11 @@ assert.ok(/\['is_rpf', 'is_docente', 'is_segreteria'\]/.test(formazione), 'i ruo
 // ── l'accesso del docente ──
 assert.ok(/S\.docente=!!\(_roleRow&&_roleRow\.ruolo==='docente'&&_roleRow\.stato==='attivo'\)/.test(index), 'onLogin riconosce il ruolo docente');
 const ramo = index.slice(index.indexOf('if(S.docente){'), index.indexOf('if(S.viewer){'));
-assert.ok(/obbligaCambioPassword\(\)/.test(ramo) && /navTo\('formazione'\)/.test(ramo) && /b\.dataset\.view==='formazione'\?'':'none'/.test(ramo), 'il docente cambia la password se richiesto, vede solo Formazione e ci atterra');
+assert.ok(/obbligaCambioPassword\(_pPwd\)/.test(ramo) && /navTo\('formazione'\)/.test(ramo) && /b\.dataset\.view==='formazione'\?'':'none'/.test(ramo), 'il docente cambia la password se richiesto, vede solo Formazione e ci atterra');
 assert.ok(!/from\('tecnici'\)/.test(ramo), 'il docente non passa dalla scheda tecnico');
-assert.ok(index.indexOf('if(S.docente){') < index.indexOf("let{data:tec,error:_tecErr}=await sb.from('tecnici')"), 'il ramo docente viene prima della lettura della scheda tecnico, che chiuderebbe l\'account');
+// (17/11/2026) la lettura della scheda tecnico parte all'accesso insieme alle altre (_pTec), ma la sua
+// RISPOSTA, che senza scheda chiude l'account, si guarda solo dopo il ramo docente
+assert.ok(index.indexOf('if(S.docente){') < index.indexOf("let{data:tec,error:_tecErr}=await _pTec"), 'il ramo docente viene prima della lettura della scheda tecnico, che chiuderebbe l\'account');
 assert.ok(/S\.carica=null;S\.docente=false/.test(index), 'un tecnico che entra dopo un docente nella stessa scheda non resta docente');
 
 // ── la veste ──

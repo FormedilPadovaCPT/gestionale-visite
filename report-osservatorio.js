@@ -411,6 +411,7 @@ function oxTbl(doc,opt){
 
 // ══════════ FUNZIONE PRINCIPALE ══════════
 async function admGeneraReportOsservatorio(){
+  try{await window.libreria('pdf')}catch(e){toast(e.message,'err');return}
   if(!S.user||S.user.email!==ADMIN_EMAIL){toast('Accesso negato','err');return}
   const dal=($('sgr-dal')?.value)||''
   const al=($('sgr-al')?.value)||''
