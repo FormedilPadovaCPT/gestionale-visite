@@ -25,7 +25,7 @@ function genera() {
     '(function (radice) {',
     corpo.trimEnd(),
     '',
-    '  const api = { statoConOre, dettaglioOre, requisitoAOre, aggiungiMesiIso };',
+    '  const api = { statoConOre, dettaglioOre, requisitoAOre, aggiungiMesiIso, statoScadenza, testoScadenza };',
     '  radice.creditiOre = api;',
     "  if (typeof module !== 'undefined' && module.exports) module.exports = api;",
     "})(typeof window !== 'undefined' ? window : globalThis);",

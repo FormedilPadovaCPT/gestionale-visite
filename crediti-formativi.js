@@ -189,7 +189,8 @@
     const testo = btn.textContent;
     btn.disabled = true; btn.textContent = 'Scarico…';
     try {
-      const body = tipo === 'invio' ? { azione: 'scarica', invio_id: Number(id) } : { azione: 'scarica', doc_id: Number(id) };
+      const body = tipo === 'invio' ? { azione: 'scarica', invio_id: Number(id) }
+        : tipo === 'iscr' ? { azione: 'scarica', iscrizione_id: Number(id) } : { azione: 'scarica', doc_id: Number(id) };
       const { data, error } = await radice.sb.functions.invoke('crediti-attestato', { body });
       let msg = '';
       if (error) {
@@ -348,7 +349,78 @@
       ${tessere ? `<div class="cr-due">${tessere}</div>` : '<p class="doc-piccolo">Nessun requisito da seguire.</p>'}
       <div class="cr-tit"><strong>I tuoi documenti</strong></div>
       ${elencoDocumenti(x, invii, req)}
-      <div id="cr-modulo">${formCarica(req)}</div></div>`;
+      <div id="cr-modulo">${formCarica(req)}</div></div>
+      ${contrattoPolizze(dati)}
+      ${attestatiEmessi(dati)}`;
+  }
+
+  /* ── contratto e polizze (18/11/2026, chiesto dall'utente) ──
+     Solo al tecnico per sé: i requisiti a scadenza del catalogo con lo stato
+     calcolato come nella pagina «Documenti tecnici» della segreteria
+     (statoScadenza, regola condivisa) e l'elenco delle sue righe, la più
+     recente in vista e le precedenti chiuse. */
+  const NOME_SCAD = { ok: 'In regola', scade: 'In scadenza', scaduto: 'Scaduto', senzadata: 'Senza data', mancante: 'Mancante' };
+  function contrattoPolizze(dati) {
+    const C = radice.creditiOre;
+    const req = dati.altri_requisiti || [];
+    if (!req.length || !C || !C.statoScadenza) return '';
+    const oggi = oggiIso();
+    const tessere = req.map((r) => {
+      const suoi = (dati.altri_documenti || []).filter((d) => d.requisito_id === r.id);
+      const s = C.statoScadenza(r, suoi, oggi);
+      const quando = s.senza_scadenza ? 'senza scadenza'
+        : s.una_tantum ? (s.doc && s.doc.data_inizio ? `dal ${dataIt(s.doc.data_inizio)}` : '')
+          : s.scadenza ? `${s.classe === 'scaduto' ? 'il' : 'fino al'} ${dataIt(s.scadenza)}` : '';
+      const pill = `<span class="doc-pill ${PILL[s.classe] || 'ap'}">${esc(NOME_SCAD[s.classe] || s.classe)}${quando ? ' ' + esc(quando) : ''}</span>`;
+      const nota = s.tacito ? 'Rinnovo tacito: si rinnova da solo ogni anno finché nessuno lo disdice.'
+        : s.classe === 'scade' ? `Scade${giorniTesto(s.scadenza)}: manda alla segreteria la polizza o la quietanza nuova.`
+          : s.classe === 'scaduto' ? 'Manda alla segreteria il documento in corso di validità.'
+            : s.classe === 'senzadata' ? 'Sul documento registrato manca la data di scadenza: la segreteria la verifica.'
+              : s.classe === 'mancante' ? 'Nessun documento registrato.' : '';
+      const riga = (d) => `<tr><td>${esc(d.data_inizio ? dataIt(d.data_inizio) : '—')}</td><td>${esc(d.data_fine ? dataIt(d.data_fine) : (d.senza_scadenza ? 'senza scadenza' : '—'))}</td><td>${esc(d.descrizione || '')}${d.disdetto_il ? ` <span class="doc-pill da">disdetto il ${esc(dataIt(d.disdetto_il))}</span>` : ''}${d.protocollo_txt ? ` <span class="doc-piccolo">Prot. ${esc(d.protocollo_txt)}</span>` : ''}</td><td>${d.ha_file && d.id ? `<button type="button" class="doc-btn" data-cr-scarica="doc:${d.id}" data-aiuto="Scarica il file sul tuo dispositivo: lo prende dal fascicolo in ufficio.">⬇️ Scarica</button>` : ''}</td></tr>`;
+      const testa = '<thead><tr><th>Dal</th><th>Al</th><th>Documento</th><th></th></tr></thead>';
+      const [primo, ...prima] = suoi;
+      return `<div class="cr-tessera s-${BORDO[s.classe] || ''}">
+        <div class="cr-riga"><span class="cr-etich">${esc(r.breve || r.descrizione)}</span> ${pill}</div>
+        ${nota ? `<div class="doc-piccolo" style="margin-top:4px">${esc(nota)}</div>` : ''}
+        ${primo ? `<div class="cr-tab"><table>${testa}<tbody>${riga(primo)}</tbody></table></div>` : ''}
+        ${prima.length ? `<details class="doc-prec"><summary>Precedenti (${prima.length})</summary><div class="cr-tab"><table>${testa}<tbody>${prima.map(riga).join('')}</tbody></table></div></details>` : ''}
+      </div>`;
+    }).join('');
+    return `<div class="doc-card doc-pannello"><h3>📑 Il tuo contratto e le tue polizze</h3>
+      <p class="doc-piccolo">Quello che risulta in segreteria, con le scadenze. Le polizze si consegnano in ufficio (contratto, art. 5): quando ne rinnovi una, manda alla segreteria la polizza o la quietanza nuova. Se qualcosa non torna, scrivi alla segreteria.</p>
+      <div class="cr-due">${tessere}</div></div>`;
+  }
+
+  /* ── attestati rilasciati da FORMEDIL PADOVA (18/11/2026, chiesto dall'utente) ──
+     Convegni, seminari, corsi a cui il tecnico ha partecipato (iscrizioni con
+     esito «presente» in s_corsi_iscritti). Il PDF si scarica dove è collegato;
+     il collegamento lo cerca crediti-attestato (collega_attestati) in
+     attestati_emessi/<anno>/, al più una volta a settimana da questo browser. */
+  const TIPO_EVENTO = { corso: 'Corso', convegno: 'Convegno', seminario: 'Seminario', conferenza: 'Conferenza' };
+  function attestatiEmessi(dati) {
+    const a = dati.attestati_emessi || [];
+    if (!a.length) return '';
+    const data = (x) => x.attestato_data || x.data_fine || x.data_inizio;
+    const riga = (x) => `<tr><td>${esc(dataIt(data(x)))}</td><td>${esc(x.titolo || '')} <span class="doc-piccolo">${esc(TIPO_EVENTO[x.tipo] || x.tipo || '')}</span></td><td>${x.ore_frequentate != null ? ore(x.ore_frequentate) : x.durata_ore != null ? ore(x.durata_ore) : '—'}</td><td>${esc(x.attestato_numero && /\//.test(x.attestato_numero) ? 'n. ' + x.attestato_numero : x.attestato_numero ? 'Prot. ' + x.attestato_numero : '')}</td><td>${x.ha_file ? `<button type="button" class="doc-btn" data-cr-scarica="iscr:${x.id}" data-aiuto="Scarica il PDF dell’attestato che ti abbiamo rilasciato.">⬇️ Scarica</button>` : '<span class="doc-piccolo">PDF non in archivio</span>'}</td></tr>`;
+    const testa = '<thead><tr><th>Data</th><th>Evento</th><th>Ore</th><th>Numero</th><th></th></tr></thead>';
+    const primi = a.slice(0, 8), altri = a.slice(8);
+    return `<div class="doc-card doc-pannello"><h3>🏅 Attestati che ti abbiamo rilasciato</h3>
+      <p class="doc-piccolo">Corsi, convegni e seminari di FORMEDIL PADOVA a cui risulti presente. Quelli che valgono come aggiornamento sono anche nel conto qui sopra; se ne manca uno, scrivi alla segreteria.</p>
+      <div class="cr-tab"><table>${testa}<tbody>${primi.map(riga).join('')}</tbody></table></div>
+      ${altri.length ? `<details class="doc-prec"><summary>Precedenti (${altri.length})</summary><div class="cr-tab"><table>${testa}<tbody>${altri.map(riga).join('')}</tbody></table></div></details>` : ''}</div>`;
+  }
+  /* una volta a settimana per browser: si cercano i PDF degli attestati non
+     ancora collegati; se ne trova, si ridisegna il riquadro */
+  async function collegaAttestati(host, dati) {
+    const manca = (dati.attestati_emessi || []).some((x) => !x.ha_file);
+    if (!manca) return;
+    const chiave = 'cr-collega-' + ((dati.tecnici || [])[0] || {}).tecnico_id;
+    try { const v = Number(localStorage.getItem(chiave) || 0); if (Date.now() - v < 7 * 86400000) return; } catch (_e) { /* niente */ }
+    const { data, error } = await radice.sb.functions.invoke('crediti-attestato', { body: { azione: 'collega_attestati' } });
+    if (error || !data || !data.ok) return;   // riprova la prossima volta
+    try { localStorage.setItem(chiave, String(Date.now())); } catch (_e) { /* niente */ }
+    if (data.collegati > 0) await box(host);
   }
 
   function tabella(lista) {
@@ -374,11 +446,11 @@
     _dati = dati;
     stile();
     const lista = calcola(dati);
-    if (dati.ruolo === 'tecnico') { host.innerHTML = cartaMia(lista[0], dati, messaggio); aggancia(host); adatta(); }
+    if (dati.ruolo === 'tecnico') { host.innerHTML = cartaMia(lista[0], dati, messaggio); aggancia(host); adatta(); collegaAttestati(host, dati).catch(() => {}); }
     else host.innerHTML = tabella(lista);
   }
 
-  const api = { box, calcola, stato, controlla, tipiPer, contaFino, cartaMia, tabella };
+  const api = { box, calcola, stato, controlla, tipiPer, contaFino, cartaMia, tabella, contrattoPolizze, attestatiEmessi };
   radice.creditiFormativi = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

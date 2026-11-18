@@ -12,9 +12,12 @@
 // nessuno carica per conto di un altro. Se il database non risponde, la
 // risposta è un errore, mai un «inviato».
 //
-// POST JSON { azione:'scarica', doc_id | invio_id } → { ok, nome, mime, base64 }  (18/11/2026)
+// POST JSON { azione:'scarica', doc_id | invio_id | iscrizione_id } → { ok, nome, mime, base64 }  (18/11/2026)
 //   il proprietario della riga o la segreteria; se manca drive_file_id il file
 //   si trova dal percorso «File: …» della nota e se ne salva l'id
+// POST JSON { azione:'collega_attestati' } → { ok, collegati, senza_file }  (18/11/2026)
+//   collega ai PDF di attestati_emessi/<anno>/ gli attestati emessi da noi
+//   (il tecnico i suoi, la segreteria di tutti i tecnici attivi)
 // POST JSON { requisito_id, tipo, data_inizio, ore?, ore_di_corso?, descrizione,
 //             ente?, nota?, nome_file, mime_type, base64 } → { ok, id, nome_file }
 //
@@ -97,19 +100,40 @@ Deno.serve(async (req) => {
     try {
       const { data: segr, error: es } = await comeUtente.rpc('is_segreteria')
       if (es) throw new Error('non sono riuscito a sapere chi sei: ' + es.message)
+      /* attestato rilasciato da noi: si scarica il PDF collegato all'iscrizione,
+         se l'iscrizione è del tecnico (persona o codice fiscale) */
+      if (b.iscrizione_id != null) {
+        const { data: i, error: ei2 } = await servizio.from('s_corsi_iscritti')
+          .select('id, persona_id, cf, attestato_drive_id, attestato_revocato_il').eq('id', Number(b.iscrizione_id)).maybeSingle()
+        if (ei2) throw new Error('attestato non letto: ' + ei2.message)
+        if (!i || i.attestato_revocato_il) return risposta({ ok: false, error: 'attestato non trovato' }, 404)
+        if (segr !== true) {
+          const { data: t } = await servizio.from('tecnici').select('persona_id').eq('tecnico_id', tecId || '').maybeSingle()
+          const { data: p } = t?.persona_id ? await servizio.from('persone').select('cf').eq('persona_id', t.persona_id).maybeSingle() : { data: null }
+          const mio = !!t && ((t.persona_id && i.persona_id === t.persona_id) || (p?.cf && String(i.cf || '').toUpperCase() === String(p.cf).toUpperCase()))
+          if (!mio) return risposta({ ok: false, error: 'puoi scaricare solo i tuoi attestati' }, 403)
+        }
+        if (!i.attestato_drive_id) return risposta({ ok: false, error: 'il PDF di questo attestato non è nell\'archivio: chiedilo alla segreteria' }, 404)
+        b.__file = i.attestato_drive_id
+      }
       const invio = b.invio_id != null
       const id = Number(invio ? b.invio_id : b.doc_id)
-      if (!id) return risposta({ ok: false, error: 'documento non indicato' }, 400)
-      const { data: riga, error: er } = await servizio.from(invio ? 's_doc_tecnico_invii' : 's_doc_tecnico')
-        .select(invio ? 'id, tecnico_id, drive_file_id, nome_file' : 'id, tecnico_id, drive_file_id, note').eq('id', id).maybeSingle()
-      if (er) throw new Error('documento non letto: ' + er.message)
-      if (!riga) return risposta({ ok: false, error: 'documento non trovato' }, 404)
-      if (segr !== true && (!tecId || riga.tecnico_id !== tecId)) return risposta({ ok: false, error: 'puoi scaricare solo i tuoi documenti' }, 403)
+      if (!b.__file && !id) return risposta({ ok: false, error: 'documento non indicato' }, 400)
+      // deno-lint-ignore no-explicit-any
+      let riga: any = null
+      if (!b.__file) {
+        const r0 = await servizio.from(invio ? 's_doc_tecnico_invii' : 's_doc_tecnico')
+          .select(invio ? 'id, tecnico_id, drive_file_id, nome_file' : 'id, tecnico_id, requisito_id, drive_file_id, note').eq('id', id).maybeSingle()
+        if (r0.error) throw new Error('documento non letto: ' + r0.error.message)
+        riga = r0.data
+        if (!riga) return risposta({ ok: false, error: 'documento non trovato' }, 404)
+        if (segr !== true && (!tecId || riga.tecnico_id !== tecId)) return risposta({ ok: false, error: 'puoi scaricare solo i tuoi documenti' }, 403)
+      }
 
       const SA = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON')
       if (!SA) throw new Error('configurazione Drive mancante')
       const tk = await getAccessToken(JSON.parse(SA))
-      let fid = riga.drive_file_id as string | null
+      let fid = (b.__file || riga.drive_file_id) as string | null
       if (!fid && !invio) {
         const m = String(riga.note || '').match(/File: ([0-9]_?[A-Z].*?\.(?:pdf|jpe?g|png|docx?|xlsx?|msg|eml))(?=[\s.;,)]|$)/i)
         if (!m) return risposta({ ok: false, error: 'per questo documento non è registrato il file: chiedilo alla segreteria' }, 404)
@@ -133,7 +157,15 @@ Deno.serve(async (req) => {
       /* privacy: alcune righe puntano a raccolte (attestati di più tecnici,
          registri firmati da tutti i partecipanti). Il tecnico scarica solo i
          file che portano il suo cognome nel nome; i suoi caricamenti sempre. */
-      if (segr !== true && !invio) {
+      /* (vale per i crediti formativi, dove la ricostruzione ha collegato raccolte;
+         contratto, polizze e attestati emessi da noi sono documenti individuali) */
+      let aOre = false
+      if (riga && !invio && riga.requisito_id) {
+        const { data: rq } = await servizio.from('s_doc_requisito').select('ore_soglia, id').eq('id', riga.requisito_id).maybeSingle()
+        const { data: og } = await servizio.from('s_doc_requisito').select('id').eq('origine_requisito_id', riga.requisito_id).limit(1)
+        aOre = Number(rq?.ore_soglia) > 0 || !!og?.length
+      }
+      if (segr !== true && aOre) {
         const { data: t } = await servizio.from('tecnici').select('tecnico_cognome').eq('tecnico_id', tecId).maybeSingle()
         const cogn = chiaveCartella(String(t?.tecnico_cognome || ''))
         if (!cogn || !chiaveCartella(String(meta.name || '')).includes(cogn)) {
@@ -146,6 +178,98 @@ Deno.serve(async (req) => {
       let bin = ''
       for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
       return risposta({ ok: true, nome: meta.name, mime: meta.mimeType || 'application/octet-stream', base64: btoa(bin) })
+    } catch (e) {
+      return risposta({ ok: false, error: String((e as Error).message || e) }, 500)
+    }
+  }
+
+  /* ── collega_attestati (18/11/2026): gli attestati rilasciati da FORMEDIL
+     PADOVA (s_corsi_iscritti, esito «presente») di solito non hanno il
+     collegamento al PDF, che sta in 2_AREE/Formazione/attestati_emessi/<anno>/
+     col codice fiscale nel nome. Qui si trova il file e si salva
+     attestato_drive_id, SOLO dove manca e SOLO se il file è uno:
+     1) codice fiscale + numero («Prot_4473», «_n4-2026»; senza numero vale l'id
+        dell'iscrizione, che negli storici è lo stesso);
+     2) altrimenti codice fiscale + data del corso, per i file senza numero.
+     Provato sul disco il 18/11/2026: 78 trovati su 137, nessun doppio.
+     Il tecnico collega i suoi, la segreteria quelli di tutti. ── */
+  if (b.azione === 'collega_attestati') {
+    try {
+      const { data: segr } = await comeUtente.rpc('is_segreteria')
+      let q1 = servizio.from('tecnici').select('tecnico_id, persona_id').eq('attivo', true)
+      if (segr !== true) {
+        if (!tecId) return risposta({ ok: false, error: 'solo i tecnici e la segreteria' }, 403)
+        q1 = q1.eq('tecnico_id', tecId)
+      }
+      const { data: tec, error: e1 } = await q1
+      if (e1) throw new Error('tecnici non letti: ' + e1.message)
+      const pid = (tec || []).map((t: { persona_id: string }) => t.persona_id).filter(Boolean)
+      if (!pid.length) return risposta({ ok: true, collegati: 0, senza_file: 0 })
+      const { data: pers, error: e2 } = await servizio.from('persone').select('persona_id, cf').in('persona_id', pid)
+      if (e2) throw new Error('persone non lette: ' + e2.message)
+      const cfDi = new Map((pers || []).filter((p: { cf: string }) => p.cf).map((p: { persona_id: string; cf: string }) => [p.persona_id, p.cf.toUpperCase()]))
+      const cfs = [...new Set(cfDi.values())]
+      const ors = [`persona_id.in.(${pid.join(',')})`, ...(cfs.length ? [`cf.in.(${cfs.join(',')})`] : [])].join(',')
+      const { data: iscr, error: e3 } = await servizio.from('s_corsi_iscritti')
+        .select('id, persona_id, cf, attestato_numero, attestato_data, s_corsi(data_inizio, data_fine)')
+        .eq('esito', 'presente').is('attestato_revocato_il', null).is('attestato_drive_id', null).or(ors)
+      if (e3) throw new Error('attestati non letti: ' + e3.message)
+      // deno-lint-ignore no-explicit-any
+      const righe = (iscr || []).map((i: any) => ({ ...i, cfx: String(i.cf || cfDi.get(i.persona_id) || '').toUpperCase() })).filter((i: { cfx: string }) => i.cfx)
+      if (!righe.length) return risposta({ ok: true, collegati: 0, senza_file: 0 })
+
+      const SA = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+      if (!SA) throw new Error('configurazione Drive mancante')
+      const tk = await getAccessToken(JSON.parse(SA))
+      const giu = async (padre: string, nome: string) => (await cartelle(tk, padre)).find((f) => f.name === nome)?.id
+      const aree = await giu('root', '2_AREE'); const form = aree && await giu(aree, 'Formazione')
+      const ae = form && await giu(form, 'attestati_emessi')
+      if (!ae) throw new Error('cartella attestati_emessi non trovata su Drive')
+      const anni = await cartelle(tk, ae)
+      const perAnno = new Map<string, { id: string; name: string }[]>()
+      const fileAnno = async (a: number) => {
+        const k = String(a)
+        if (perAnno.has(k)) return perAnno.get(k)!
+        const cart = anni.find((f) => f.name === k)
+        const tutti: { id: string; name: string }[] = []
+        if (cart) {
+          let tok = ''
+          do {
+            const u = 'https://www.googleapis.com/drive/v3/files?' + new URLSearchParams({
+              q: `'${cart.id}' in parents and trashed=false and mimeType='application/pdf'`,
+              fields: 'nextPageToken,files(id,name)', pageSize: '1000', ...(tok ? { pageToken: tok } : {}) })
+            const j = await gapi(tk, u)
+            tutti.push(...(j.files || [])); tok = j.nextPageToken || ''
+          } while (tok)
+        }
+        perAnno.set(k, tutti)
+        return tutti
+      }
+      const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      let collegati = 0, senza = 0
+      for (const r of righe) {
+        const c = r.s_corsi || {}
+        const date = [r.attestato_data, c.data_inizio, c.data_fine].filter(Boolean) as string[]
+        if (!date.length) { senza++; continue }
+        const ys = date.map((d) => Number(d.slice(0, 4)))
+        const n = String(r.attestato_numero || r.id)
+        const pat = [new RegExp('Prot_' + esc(n) + '(?![0-9])')]
+        if (n.includes('/')) { const [a, bb] = n.split('/'); pat.push(new RegExp('_n' + esc(a) + '-' + esc(bb) + '(?![0-9])')) }
+        let trovati: { id: string; name: string }[] = []
+        const candidati: { id: string; name: string }[] = []
+        for (let a = Math.min(...ys); a <= Math.max(...ys) + 1; a++) {
+          candidati.push(...(await fileAnno(a)).filter((f) => f.name.toUpperCase().includes(r.cfx)))
+        }
+        trovati = candidati.filter((f) => pat.some((p) => p.test(f.name)))
+        if (!trovati.length) {
+          trovati = candidati.filter((f) => date.includes(f.name.slice(0, 10).replace(/_/g, '-')) && !/Prot_?[0-9]|_n[0-9]+-[0-9]{4}/.test(f.name))
+        }
+        if (trovati.length !== 1) { senza++; continue }
+        const { error: eu2 } = await servizio.from('s_corsi_iscritti').update({ attestato_drive_id: trovati[0].id }).eq('id', r.id).is('attestato_drive_id', null)
+        if (eu2) throw new Error('collegamento non salvato: ' + eu2.message)
+        collegati++
+      }
+      return risposta({ ok: true, collegati, senza_file: senza })
     } catch (e) {
       return risposta({ ok: false, error: String((e as Error).message || e) }, 500)
     }

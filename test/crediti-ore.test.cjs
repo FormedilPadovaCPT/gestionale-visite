@@ -127,3 +127,38 @@ test('senza documenti il requisito è «mancante», non in regola', () => {
   const { stato } = require('../crediti-formativi.js');
   assert.equal(stato({ ore_soglia: 24, durata_mesi: 36 }, [], [], '2026-11-17').classe, 'mancante');
 });
+
+/* contratto, polizze e attestati emessi (18/11/2026) */
+test('contratto e polizze: stato con la regola della segreteria, file solo dove c’è', () => {
+  globalThis.creditiOre = require('../crediti-ore.js');
+  const { contrattoPolizze } = require('../crediti-formativi.js');
+  const dati = {
+    altri_requisiti: [
+      { id: 1, breve: 'Contratto', rinnovo: 'tacito', durata_mesi: 12, preavviso_giorni: 60 },
+      { id: 2, breve: 'RC professionale', rinnovo: 'scadenza', durata_mesi: 12, preavviso_giorni: 60 },
+      { id: 3, breve: 'RC terzi', rinnovo: 'scadenza', durata_mesi: 12, preavviso_giorni: 60 },
+    ],
+    altri_documenti: [
+      { id: 125, requisito_id: 1, descrizione: 'contratto prot 2406/2025', data_inizio: '2025-04-17', ha_file: false },
+      { id: 119, requisito_id: 2, descrizione: 'Assicurazione', data_inizio: '2023-04-08', data_fine: '2024-04-08', ha_file: true },
+    ],
+  };
+  const html = contrattoPolizze(dati);
+  assert.match(html, /Rinnovo tacito/);
+  assert.match(html, /Scaduto il 08\/04\/2024/);
+  assert.match(html, /Mancante/, 'RC terzi senza documenti');
+  assert.equal((html.match(/data-cr-scarica="doc:/g) || []).length, 1);
+  assert.equal(contrattoPolizze({}), '', 'chi non è tecnico non riceve niente');
+});
+
+test('attestati emessi: scarica solo dove il PDF è collegato', () => {
+  const { attestatiEmessi } = require('../crediti-formativi.js');
+  const html = attestatiEmessi({ attestati_emessi: [
+    { id: 6700, titolo: 'Formazione Tecnici', tipo: 'corso', attestato_data: '2026-09-25', ore_frequentate: 3.5, attestato_numero: '4/2026', ha_file: true },
+    { id: 5348, titolo: 'Formazione tecnici', tipo: 'corso', data_inizio: '2023-06-26', attestato_numero: '5348', ha_file: false },
+  ] });
+  assert.match(html, /data-cr-scarica="iscr:6700"/);
+  assert.match(html, /n\. 4\/2026/);
+  assert.match(html, /PDF non in archivio/);
+  assert.equal(attestatiEmessi({}), '');
+});
