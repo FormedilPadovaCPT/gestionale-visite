@@ -53,8 +53,11 @@
     const reqOre = (dati.requisiti || []).filter((r) => radice.creditiOre && radice.creditiOre.requisitoAOre(r));
     return (dati.tecnici || []).map((t) => {
       const suoiDi = (id) => (dati.documenti || []).filter((d) => d.tecnico_id === t.tecnico_id && d.requisito_id === id);
+      const origini = {};
+      reqOre.forEach((r) => { if (r.origine_requisito_id) origini[r.origine_requisito_id] = suoiDi(r.origine_requisito_id); });
       return {
         t,
+        origini,
         voci: reqOre.map((r) => {
           const suoi = suoiDi(r.id);
           return { r, suoi, s: stato(r, suoi, r.origine_requisito_id ? suoiDi(r.origine_requisito_id) : [], oggi) };
@@ -74,15 +77,6 @@
     confermato: ['ok', 'Confermato dalla segreteria'],
     rifiutato: ['da', 'Non accettato'],
   };
-  function elencoInvii(invii, req) {
-    if (!invii.length) return '';
-    const nomeReq = (id) => (req.find((r) => r.id === id) || {}).descrizione || '';
-    return `<div class="doc-q"><strong>Attestati che hai caricato</strong>${invii.map((i) => {
-      const [cl, tx] = STATO_INVIO[i.stato] || ['ap', i.stato];
-      return `<div class="doc-riga"><span>${esc(dataIt(i.data_inizio))}</span><span>${esc(i.descrizione)} <span class="doc-piccolo">(${esc(nomeReq(i.requisito_id))}${i.ore ? `, ${ore(i.ore)} ore` : ''})</span></span>
-        <span class="doc-pill ${cl}">${esc(tx)}</span>${i.stato === 'rifiutato' && i.motivo ? `<span class="doc-piccolo">Motivo: ${esc(i.motivo)}</span>` : ''}</div>`;
-    }).join('')}</div>`;
-  }
 
   /* ── il modulo con cui il tecnico carica un attestato ── */
   let _dati = null, _host = null, _scelto = null, _inviando = false;
@@ -202,34 +196,127 @@
     });
   }
 
+  /* ── veste «Tessere» (scelta dall'utente il 18/11/2026, proposta A in
+     proposte_grafiche/2026_11_18_crediti-formativi/) ── */
+  const STILE = `
+.cr-griglia{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));margin-top:10px}
+.cr-due{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:10px}
+.cr-tessera{background:#fff;border:1px solid #e3e4e6;border-left:4px solid #e3e4e6;border-radius:8px;padding:12px 14px;min-width:0}
+.cr-tessera.s-ok{border-left-color:#2e7d32}.cr-tessera.s-ap{border-left-color:#c79a00}.cr-tessera.s-da{border-left-color:#c0392b}
+.cr-tessera h4{margin:0 0 6px;font-size:16px}
+.cr-voce{display:grid;gap:4px;margin-top:10px}
+.cr-etich{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6b717b}
+.cr-riga{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cr-barra{flex:1;min-width:110px;height:8px;border-radius:4px;background:#eceef0;position:relative;overflow:hidden}
+.cr-barra>i{position:absolute;inset:0 auto 0 0;border-radius:4px;background:#6b717b}
+.cr-barra.ok>i{background:#2e7d32}.cr-barra.ap>i{background:#c79a00}.cr-barra.da>i{background:#c0392b}
+.cr-num{font-variant-numeric:tabular-nums}
+.cr-manca{border-top:1px dashed #e3e4e6;margin-top:8px;padding-top:8px}
+.cr-tab{overflow-x:auto;margin-top:6px}
+.cr-tab table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+.cr-tab th{text-align:left;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#6b717b;padding:6px 8px;border-bottom:1px solid #e3e4e6}
+.cr-tab td{padding:7px 8px;border-bottom:1px solid #eee;vertical-align:top}
+.cr-tab tr.cr-chiuso td{color:#8a9099}
+.cr-tit{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-top:16px}
+#cr-modulo .doc-form label{min-width:0}
+#cr-modulo .doc-form input,#cr-modulo .doc-form select,#cr-modulo .doc-form textarea{width:100%;max-width:100%;min-width:0;box-sizing:border-box}`;
+  function stile() {
+    if (typeof document === 'undefined' || document.getElementById('cr-stile')) return;
+    const s = document.createElement('style'); s.id = 'cr-stile'; s.textContent = STILE; document.head.appendChild(s);
+  }
+  const GRAVITA = { scaduto: 0, mancante: 1, scade: 2, senzadata: 3, ok: 4 };
+  const BORDO = { ok: 'ok', scade: 'ap', senzadata: 'ap', scaduto: 'da', mancante: 'da' };
+  const peggiore = (voci) => voci.reduce((m, v) => (GRAVITA[v.s.classe] ?? 9) < (GRAVITA[m] ?? 9) ? v.s.classe : m, 'ok');
+  const nomeBreve = (r) => (/coord/i.test(r.codice || r.descrizione) ? 'Coordinatore' : /formator/i.test(r.codice || r.descrizione) ? 'Formatore' : (r.breve || r.descrizione));
+  const giorniTesto = (iso) => { const g = giorniA(iso); return g >= 0 ? ` (fra ${g} ${g === 1 ? 'giorno' : 'giorni'})` : ''; };
+  function barra(s) {
+    if (!(Number(s.soglia) > 0)) return '';
+    const p = Math.min(100, Math.round((Number(s.ore) || 0) / Number(s.soglia) * 100));
+    return `<div class="cr-riga"><div class="cr-barra ${PILL[s.classe] || ''}" role="img" aria-label="${ore(s.ore)} ore su ${ore(s.soglia)}"><i style="width:${p}%"></i></div><span class="cr-num doc-piccolo">${ore(s.ore)}/${ore(s.soglia)} ore</span></div>`;
+  }
+  /* che cosa manca, detto in una frase (solo quando c'è una data davanti) */
+  function manca(s) {
+    if (s.classe !== 'scade' || !(s.manca > 0) || !s.scadenza) return '';
+    return `<div class="cr-manca"><b>Mancano ${ore(s.manca)} ore entro il ${esc(dataIt(s.scadenza))}</b>${esc(giorniTesto(s.scadenza))}${s.docenza_alternativa ? ', oppure ' + ore(s.soglia) + ' ore di docenza nel triennio' : ''}.</div>`;
+  }
+  function voce(v, grande) {
+    return `<div class="cr-voce"><div class="cr-riga"><span class="cr-etich">${esc(nomeBreve(v.r))}</span> ${riga(v)}</div>
+      ${barra(v.s)}<div class="doc-piccolo">${esc(v.s.dettaglio || v.s.testo || '')}</div>${grande ? manca(v.s) : ''}</div>`;
+  }
+
+  /* fino a quando conta un documento: per il coordinatore cinque anni dalla
+     data (i corsi prima dell'abilitazione non contano), per il formatore la
+     fine del triennio in cui cade. Il recupero di un triennio chiuso non si
+     mostra riga per riga: lo dice la frase del requisito. */
+  function contaFino(r, s, d) {
+    const C = radice.creditiOre, D = Number(r.durata_mesi) || 0, B = s && s.doc && s.doc.data_inizio;
+    if (!C || !D || !B || !d.data_inizio || d.tipo === 'attestato') return { testo: '—' };
+    if (d.data_inizio < B) return { testo: 'prima dell’abilitazione: non conta', chiuso: true };
+    if (r.periodo_mobile) {
+      const f = C.aggiungiMesiIso(d.data_inizio, D);
+      return f < oggiIso() ? { testo: `contava fino al ${dataIt(f)}`, chiuso: true } : { testo: `fino al ${dataIt(f)}` };
+    }
+    let fine = C.aggiungiMesiIso(B, D), giri = 0;
+    while (fine <= d.data_inizio && giri++ < 60) fine = C.aggiungiMesiIso(fine, D);
+    return fine < oggiIso() ? { testo: `triennio chiuso il ${dataIt(fine)}`, chiuso: true } : { testo: `fino al ${dataIt(fine)}` };
+  }
+  function elencoDocumenti(x, invii, req) {
+    const apri = (u) => (/^https:\/\//.test(u || '') ? `<a class="doc-btn" href="${esc(u)}" target="_blank" rel="noopener">📄 Apri</a>` : '');
+    const basi = [];
+    /* lo stesso corso registrato per due requisiti è UNA riga, con una
+       colonna «conta» per requisito */
+    const corsi = new Map();
+    for (const v of x.voci) {
+      const orig = v.r.origine_requisito_id ? (x.origini[v.r.origine_requisito_id] || []) : [];
+      for (const d of [...v.suoi, ...orig]) {
+        if (d.tipo === 'aggiornamento' || d.tipo === 'docenza') {
+          const k = `${d.data_inizio}|${d.tipo}|${d.descrizione || ''}`;
+          if (!corsi.has(k)) corsi.set(k, { d, per: {} });
+          corsi.get(k).per[v.r.id] = contaFino(v.r, v.s, d);
+        } else if (!basi.some((b) => b.d === d)) basi.push({ d, v });
+      }
+    }
+    const righe = [...corsi.values()].sort((a, b) => String(b.d.data_inizio || '').localeCompare(String(a.d.data_inizio || '')));
+    righe.forEach((r) => { r.chiuso = x.voci.every((v) => !r.per[v.r.id] || r.per[v.r.id].chiuso); });
+    basi.sort((a, b) => String(b.d.data_inizio || '').localeCompare(String(a.d.data_inizio || '')));
+    const attesa = invii.filter((i) => i.stato !== 'confermato');
+    const nomeReq = (id) => nomeBreve(req.find((r) => r.id === id) || {});
+    const colonne = x.voci.map((v) => `<th>${esc(nomeBreve(v.r))}: conta</th>`).join('');
+    const riga1 = (r) => `<tr${r.chiuso ? ' class="cr-chiuso"' : ''}><td>${esc(dataIt(r.d.data_inizio))}</td><td>${esc(r.d.descrizione || (r.d.tipo === 'docenza' ? 'Docenza' : 'Aggiornamento'))}${r.d.tipo === 'docenza' ? ' <span class="doc-pill ap">docenza</span>' : ''}</td><td>${ore(r.d.ore)}</td>${x.voci.map((v) => `<td>${r.per[v.r.id] ? esc(r.per[v.r.id].testo) : '—'}</td>`).join('')}<td>${apri(r.d.drive_url)}</td></tr>`;
+    const testa = `<thead><tr><th>Data</th><th>Corso o docenza</th><th>Ore</th>${colonne}<th></th></tr></thead>`;
+    const tBasi = basi.length ? `<div class="cr-tab"><table><thead><tr><th>Data</th><th>Attestato di base</th><th>Per</th><th></th></tr></thead><tbody>
+      ${basi.map(({ d, v }) => `<tr><td>${esc(dataIt(d.data_inizio))}</td><td>${esc(d.descrizione || 'Attestato')}</td><td>${esc(nomeBreve(v.r))}</td><td>${apri(d.drive_url)}</td></tr>`).join('')}</tbody></table></div>` : '';
+    const vivi = righe.filter((r) => !r.chiuso), chiusi = righe.filter((r) => r.chiuso);
+    const tRighe = (vivi.length || attesa.length) ? `<div class="cr-tab"><table>${testa}<tbody>
+      ${attesa.map((i) => { const [cl, tx] = STATO_INVIO[i.stato] || ['ap', i.stato]; return `<tr><td>${esc(dataIt(i.data_inizio))}</td><td>${esc(i.descrizione)} <span class="doc-piccolo">(${esc(nomeReq(i.requisito_id))})</span></td><td>${i.ore ? ore(i.ore) : '—'}</td><td colspan="${x.voci.length}"><span class="doc-pill ${cl}">${esc(tx)}</span>${i.stato === 'rifiutato' && i.motivo ? `<div class="doc-piccolo">Motivo: ${esc(i.motivo)}</div>` : ''}</td><td></td></tr>`; }).join('')}
+      ${vivi.map(riga1).join('')}</tbody></table></div>` : '<p class="doc-piccolo">Nessun corso che conta adesso.</p>';
+    const tChiusi = chiusi.length ? `<details class="doc-prec"><summary>Documenti che non contano più (${chiusi.length})</summary><div class="cr-tab"><table>${testa}<tbody>${chiusi.map(riga1).join('')}</tbody></table></div></details>` : '';
+    if (!tBasi && !righe.length && !attesa.length) return '<p class="doc-piccolo">Nessun documento registrato.</p>';
+    return `${tBasi}${tRighe}${tChiusi}<p class="doc-piccolo">Coordinatore: ogni corso conta cinque anni dalla sua data, e quelli prima dell’abilitazione non contano. Formatore: un corso conta fino alla fine del triennio in cui cade.</p>`;
+  }
+
   function cartaMia(x, dati, messaggio) {
-    const blocchi = x.voci.map((v) => {
-      const corsi = v.suoi.filter((d) => d.tipo === 'aggiornamento' || d.tipo === 'docenza')
-        .sort((a, b) => String(b.data_inizio || '').localeCompare(String(a.data_inizio || '')))
-        .map((d) => `<div class="doc-riga"><span>${esc(dataIt(d.data_inizio))}</span><span>${esc(d.descrizione || (d.tipo === 'docenza' ? 'Docenza' : 'Aggiornamento'))}</span><span class="doc-piccolo">${ore(d.ore)} ore${d.tipo === 'docenza' ? ' di docenza' : ''}</span>${/^https:\/\//.test(d.drive_url || '') ? `<a class="doc-btn" href="${esc(d.drive_url)}" target="_blank" rel="noopener">📄 Apri</a>` : ''}</div>`).join('');
-      return `<div class="doc-q">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><strong>${esc(v.r.descrizione)}</strong> ${riga(v)}</div>
-        ${v.s.dettaglio ? `<div class="doc-piccolo">${esc(v.s.dettaglio)}</div>` : v.s.testo ? `<div class="doc-piccolo">${esc(v.s.testo)}</div>` : ''}
-        ${corsi ? `<details class="doc-prec"><summary>Corsi e docenze che contano</summary>${corsi}</details>` : ''}
-      </div>`;
-    }).join('');
     const req = dati.requisiti || [];
     const invii = (dati.invii || []).filter((i) => i.tecnico_id === x.t.tecnico_id);
+    const tessere = x.voci.map((v) => `<div class="cr-tessera s-${BORDO[v.s.classe] || ''}">${voce(v, true)}</div>`).join('');
     return `<div class="doc-card doc-pannello"><h3>🎓 I tuoi aggiornamenti obbligatori</h3>
-      <p class="doc-piccolo">Coordinatore: 40 ore di aggiornamento negli ultimi cinque anni (dopo i primi cinque dal corso da 120 ore). Formatore: 24 ore ogni tre anni, di cui almeno 8 in corsi, oppure 24 ore di docenza. La segreteria tiene il conto e ti avvisa prima che le ore non bastino più. Se manca un corso che hai fatto, carica l’attestato qui sotto.</p>
+      <p class="doc-piccolo">Coordinatore: 40 ore di aggiornamento negli ultimi cinque anni, dopo i primi cinque dal corso da 120 ore. Formatore: 24 ore ogni tre anni, di cui almeno 8 in corsi, oppure 24 ore di docenza. La segreteria tiene il conto e ti avvisa prima che le ore non bastino più.</p>
       ${messaggio ? `<p class="doc-piccolo" style="color:#2e7d32"><b>${esc(messaggio)}</b></p>` : ''}
-      ${blocchi || '<p class="doc-piccolo">Nessun requisito da seguire.</p>'}
-      ${elencoInvii(invii, req)}
+      ${tessere ? `<div class="cr-due">${tessere}</div>` : '<p class="doc-piccolo">Nessun requisito da seguire.</p>'}
+      <div class="cr-tit"><strong>I tuoi documenti</strong></div>
+      ${elencoDocumenti(x, invii, req)}
       <div id="cr-modulo">${formCarica(req)}</div></div>`;
   }
 
   function tabella(lista) {
-    const reqOre = lista.length ? lista[0].voci.map((v) => v.r) : [];
-    const testata = reqOre.map((r) => `<th>${esc(r.breve || r.descrizione)}</th>`).join('');
-    const corpo = lista.map((x) => `<tr><td>${esc(`${x.t.tecnico_cognome || ''} ${x.t.tecnico_nome || ''}`.trim())}</td>${x.voci.map((v) => `<td>${riga(v)}<div class="doc-piccolo">${esc(v.s.dettaglio || v.s.testo || '')}</div></td>`).join('')}</tr>`).join('');
+    const ordinati = [...lista].sort((a, b) => (GRAVITA[peggiore(a.voci)] ?? 9) - (GRAVITA[peggiore(b.voci)] ?? 9)
+      || String(a.t.tecnico_cognome || '').localeCompare(String(b.t.tecnico_cognome || '')));
+    const tessere = ordinati.map((x) => `<div class="cr-tessera s-${BORDO[peggiore(x.voci)] || ''}">
+      <h4>${esc(`${x.t.tecnico_cognome || ''} ${x.t.tecnico_nome || ''}`.trim())}</h4>
+      ${x.voci.map((v) => voce(v, false)).join('')}</div>`).join('');
     return `<div class="doc-card doc-pannello"><h3>🎓 Aggiornamenti obbligatori dei tecnici</h3>
-      <p class="doc-piccolo">Sola lettura. «Da programmare» vuol dire che entro sei mesi le ore non bastano più: la segreteria avvisa il tecnico. Gli attestati li carica ogni tecnico dalla sua pagina e li conferma la segreteria.</p>
-      <div class="doc-tab"><table><thead><tr><th>Tecnico</th>${testata}</tr></thead><tbody>${corpo}</tbody></table></div></div>`;
+      <p class="doc-piccolo">Sola lettura, prima chi ha bisogno. «Da programmare» vuol dire che entro sei mesi le ore non bastano più: la segreteria avvisa il tecnico. Gli attestati li carica ogni tecnico dalla sua pagina e li conferma la segreteria.</p>
+      <div class="cr-griglia">${tessere}</div></div>`;
   }
 
   async function box(host, messaggio) {
@@ -242,12 +329,13 @@
     const dati = data || {};
     if (dati.ruolo === 'nessuno' || !(dati.tecnici || []).length) { host.innerHTML = ''; return; }
     _dati = dati;
+    stile();
     const lista = calcola(dati);
     if (dati.ruolo === 'tecnico') { host.innerHTML = cartaMia(lista[0], dati, messaggio); aggancia(host); adatta(); }
     else host.innerHTML = tabella(lista);
   }
 
-  const api = { box, calcola, stato, controlla, tipiPer };
+  const api = { box, calcola, stato, controlla, tipiPer, contaFino, cartaMia, tabella };
   radice.creditiFormativi = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
