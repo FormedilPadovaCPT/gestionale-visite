@@ -102,6 +102,17 @@ test('tessere: lo stesso corso per due requisiti è una riga sola', () => {
   assert.match(html, /cr-tessera s-ok/, 'il coordinatore è nei primi cinque anni');
 });
 
+test('documenti: «Scarica» solo dove c’è un file, e anche sui caricamenti in attesa', () => {
+  globalThis.creditiOre = require('../crediti-ore.js');
+  const { calcola, cartaMia } = require('../crediti-formativi.js');
+  const doc = DOC_CAON.map((d, i) => ({ ...d, id: 100 + i, ha_file: i === 3 }));
+  const dati = { requisiti: REQ, tecnici: [{ tecnico_id: 'C' }], documenti: doc, invii: [{ id: 7, tecnico_id: 'C', requisito_id: 8, stato: 'da_verificare', data_inizio: '2026-11-10', descrizione: 'Nuovo', ore: 8 }] };
+  const html = cartaMia(calcola(dati)[0], dati, '');
+  assert.match(html, /data-cr-scarica="doc:103"/, 'il corso del 2025 si scarica dalla riga che ha il file (quella del formatore)');
+  assert.match(html, /data-cr-scarica="invio:7"/);
+  assert.equal((html.match(/data-cr-scarica="doc:/g) || []).length, 1, 'niente pulsante dove il file non c’è');
+});
+
 test('tessere: nel quadro di tutti prima chi ha bisogno', () => {
   globalThis.creditiOre = require('../crediti-ore.js');
   const { calcola, tabella } = require('../crediti-formativi.js');

@@ -181,6 +181,41 @@
       if (btn) btn.disabled = false;
     }
   }
+  /* ⬇️ Scarica: la funzione controlla di chi è la riga e consegna il file;
+     qui diventa un download col suo nome. Un errore si dice, non si tace. */
+  async function scaricaDoc(btn) {
+    const [tipo, id] = String(btn.dataset.crScarica || '').split(':');
+    if (!id || btn.disabled) return;
+    const testo = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Scarico…';
+    try {
+      const body = tipo === 'invio' ? { azione: 'scarica', invio_id: Number(id) } : { azione: 'scarica', doc_id: Number(id) };
+      const { data, error } = await radice.sb.functions.invoke('crediti-attestato', { body });
+      let msg = '';
+      if (error) {
+        msg = error.message || 'errore';
+        try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (_e) { /* niente */ }
+      } else if (!data || !data.ok || !data.base64) msg = (data && data.error) || 'nessuna risposta dal server';
+      if (msg) { btn.textContent = 'Non scaricato'; btn.title = msg; alertoFallito(btn, msg); return; }
+      const bin = atob(data.base64), u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([u8], { type: data.mime || 'application/octet-stream' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = data.nome || 'documento'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      btn.textContent = testo;
+    } catch (e) {
+      btn.textContent = 'Non scaricato'; alertoFallito(btn, e.message || String(e));
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  function alertoFallito(btn, msg) {
+    let n = btn.parentElement && btn.parentElement.querySelector('.cr-errore');
+    if (!n && btn.parentElement) { n = document.createElement('div'); n.className = 'doc-piccolo cr-errore'; n.style.color = '#c0392b'; btn.parentElement.appendChild(n); }
+    if (n) n.textContent = msg;
+  }
+
   function aggancia(host) {
     if (host.dataset.crAgganciato) return;
     host.dataset.crAgganciato = '1';
@@ -192,7 +227,10 @@
       } else if (ev.target.id === 'cr-tipo') adatta();
     });
     host.addEventListener('click', (ev) => {
-      if (ev.target.closest && ev.target.closest('#cr-invia')) invia();
+      if (!ev.target.closest) return;
+      if (ev.target.closest('#cr-invia')) invia();
+      const s = ev.target.closest('[data-cr-scarica]');
+      if (s) scaricaDoc(s);
     });
   }
 
@@ -261,7 +299,10 @@
     return fine < oggiIso() ? { testo: `triennio chiuso il ${dataIt(fine)}`, chiuso: true } : { testo: `fino al ${dataIt(fine)}` };
   }
   function elencoDocumenti(x, invii, req) {
-    const apri = (u) => (/^https:\/\//.test(u || '') ? `<a class="doc-btn" href="${esc(u)}" target="_blank" rel="noopener">📄 Apri</a>` : '');
+    /* (18/11/2026) il file sta sul Drive dell'ufficio, che il tecnico non apre:
+       lo consegna la funzione crediti-attestato dopo aver controllato di chi è */
+    const scarica = (chiave) => `<button type="button" class="doc-btn" data-cr-scarica="${esc(chiave)}" data-aiuto="Scarica il file sul tuo dispositivo: lo prende dal fascicolo in ufficio.">⬇️ Scarica</button>`;
+    const apri = (d) => (d && d.ha_file && d.id ? scarica('doc:' + d.id) : '');
     const basi = [];
     /* lo stesso corso registrato per due requisiti è UNA riga, con una
        colonna «conta» per requisito */
@@ -272,7 +313,9 @@
         if (d.tipo === 'aggiornamento' || d.tipo === 'docenza') {
           const k = `${d.data_inizio}|${d.tipo}|${d.descrizione || ''}`;
           if (!corsi.has(k)) corsi.set(k, { d, per: {} });
-          corsi.get(k).per[v.r.id] = contaFino(v.r, v.s, d);
+          const c = corsi.get(k);
+          c.per[v.r.id] = contaFino(v.r, v.s, d);
+          if (!c.d.ha_file && d.ha_file) c.d = d;   // si scarica dalla riga che ha il file
         } else if (!basi.some((b) => b.d === d)) basi.push({ d, v });
       }
     }
@@ -282,13 +325,13 @@
     const attesa = invii.filter((i) => i.stato !== 'confermato');
     const nomeReq = (id) => nomeBreve(req.find((r) => r.id === id) || {});
     const colonne = x.voci.map((v) => `<th>${esc(nomeBreve(v.r))}: conta</th>`).join('');
-    const riga1 = (r) => `<tr${r.chiuso ? ' class="cr-chiuso"' : ''}><td>${esc(dataIt(r.d.data_inizio))}</td><td>${esc(r.d.descrizione || (r.d.tipo === 'docenza' ? 'Docenza' : 'Aggiornamento'))}${r.d.tipo === 'docenza' ? ' <span class="doc-pill ap">docenza</span>' : ''}</td><td>${ore(r.d.ore)}</td>${x.voci.map((v) => `<td>${r.per[v.r.id] ? esc(r.per[v.r.id].testo) : '—'}</td>`).join('')}<td>${apri(r.d.drive_url)}</td></tr>`;
+    const riga1 = (r) => `<tr${r.chiuso ? ' class="cr-chiuso"' : ''}><td>${esc(dataIt(r.d.data_inizio))}</td><td>${esc(r.d.descrizione || (r.d.tipo === 'docenza' ? 'Docenza' : 'Aggiornamento'))}${r.d.tipo === 'docenza' ? ' <span class="doc-pill ap">docenza</span>' : ''}</td><td>${ore(r.d.ore)}</td>${x.voci.map((v) => `<td>${r.per[v.r.id] ? esc(r.per[v.r.id].testo) : '—'}</td>`).join('')}<td>${apri(r.d)}</td></tr>`;
     const testa = `<thead><tr><th>Data</th><th>Corso o docenza</th><th>Ore</th>${colonne}<th></th></tr></thead>`;
     const tBasi = basi.length ? `<div class="cr-tab"><table><thead><tr><th>Data</th><th>Attestato di base</th><th>Per</th><th></th></tr></thead><tbody>
-      ${basi.map(({ d, v }) => `<tr><td>${esc(dataIt(d.data_inizio))}</td><td>${esc(d.descrizione || 'Attestato')}</td><td>${esc(nomeBreve(v.r))}</td><td>${apri(d.drive_url)}</td></tr>`).join('')}</tbody></table></div>` : '';
+      ${basi.map(({ d, v }) => `<tr><td>${esc(dataIt(d.data_inizio))}</td><td>${esc(d.descrizione || 'Attestato')}</td><td>${esc(nomeBreve(v.r))}</td><td>${apri(d)}</td></tr>`).join('')}</tbody></table></div>` : '';
     const vivi = righe.filter((r) => !r.chiuso), chiusi = righe.filter((r) => r.chiuso);
     const tRighe = (vivi.length || attesa.length) ? `<div class="cr-tab"><table>${testa}<tbody>
-      ${attesa.map((i) => { const [cl, tx] = STATO_INVIO[i.stato] || ['ap', i.stato]; return `<tr><td>${esc(dataIt(i.data_inizio))}</td><td>${esc(i.descrizione)} <span class="doc-piccolo">(${esc(nomeReq(i.requisito_id))})</span></td><td>${i.ore ? ore(i.ore) : '—'}</td><td colspan="${x.voci.length}"><span class="doc-pill ${cl}">${esc(tx)}</span>${i.stato === 'rifiutato' && i.motivo ? `<div class="doc-piccolo">Motivo: ${esc(i.motivo)}</div>` : ''}</td><td></td></tr>`; }).join('')}
+      ${attesa.map((i) => { const [cl, tx] = STATO_INVIO[i.stato] || ['ap', i.stato]; return `<tr><td>${esc(dataIt(i.data_inizio))}</td><td>${esc(i.descrizione)} <span class="doc-piccolo">(${esc(nomeReq(i.requisito_id))})</span></td><td>${i.ore ? ore(i.ore) : '—'}</td><td colspan="${x.voci.length}"><span class="doc-pill ${cl}">${esc(tx)}</span>${i.stato === 'rifiutato' && i.motivo ? `<div class="doc-piccolo">Motivo: ${esc(i.motivo)}</div>` : ''}</td><td>${scarica('invio:' + i.id)}</td></tr>`; }).join('')}
       ${vivi.map(riga1).join('')}</tbody></table></div>` : '<p class="doc-piccolo">Nessun corso che conta adesso.</p>';
     const tChiusi = chiusi.length ? `<details class="doc-prec"><summary>Documenti che non contano più (${chiusi.length})</summary><div class="cr-tab"><table>${testa}<tbody>${chiusi.map(riga1).join('')}</tbody></table></div></details>` : '';
     if (!tBasi && !righe.length && !attesa.length) return '<p class="doc-piccolo">Nessun documento registrato.</p>';

@@ -12,6 +12,9 @@
 // nessuno carica per conto di un altro. Se il database non risponde, la
 // risposta è un errore, mai un «inviato».
 //
+// POST JSON { azione:'scarica', doc_id | invio_id } → { ok, nome, mime, base64 }  (18/11/2026)
+//   il proprietario della riga o la segreteria; se manca drive_file_id il file
+//   si trova dal percorso «File: …» della nota e se ne salva l'id
 // POST JSON { requisito_id, tipo, data_inizio, ore?, ore_di_corso?, descrizione,
 //             ente?, nota?, nome_file, mime_type, base64 } → { ok, id, nome_file }
 //
@@ -55,13 +58,13 @@ async function creaCartella(token: string, nome: string, padre: string) {
 
 /* come si scrive un pezzo di nome: niente accenti né spazi */
 export function pezzo(s: string, max = 60) {
-  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, max).replace(/-+$/g, '')
 }
 /* le cartelle dei tecnici non sono tutte uguali (Claudio_Simonetto, Caon_Franco):
    va bene l'una e l'altra forma, maiuscole e spazi ignorati */
 export function chiaveCartella(s: string) {
-  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
 Deno.serve(async (req) => {
@@ -80,12 +83,79 @@ Deno.serve(async (req) => {
   if (eu || !u?.user?.email) return risposta({ ok: false, error: 'accesso non autorizzato' }, 401)
   const { data: tecId, error: et } = await comeUtente.rpc('mio_tecnico_id')
   if (et) return risposta({ ok: false, error: 'non sono riuscito a sapere chi sei: ' + et.message }, 500)
+
+  // deno-lint-ignore no-explicit-any
+  let b: any
+  try { b = await req.json() } catch { return risposta({ ok: false, error: 'richiesta non leggibile' }, 400) }
+
+  /* ── scarica (18/11/2026): il tecnico scarica un suo documento; la segreteria
+     qualunque. Il file sta sul Drive dell'ufficio e il tecnico non ha accesso
+     diretto: passa da qui, che controlla di chi è la riga. Le righe della
+     ricostruzione del 17/11 hanno solo il percorso nella nota («File: …»): la
+     prima volta si trova il file seguendo il percorso e se ne salva l'id. ── */
+  if (b.azione === 'scarica') {
+    try {
+      const { data: segr, error: es } = await comeUtente.rpc('is_segreteria')
+      if (es) throw new Error('non sono riuscito a sapere chi sei: ' + es.message)
+      const invio = b.invio_id != null
+      const id = Number(invio ? b.invio_id : b.doc_id)
+      if (!id) return risposta({ ok: false, error: 'documento non indicato' }, 400)
+      const { data: riga, error: er } = await servizio.from(invio ? 's_doc_tecnico_invii' : 's_doc_tecnico')
+        .select(invio ? 'id, tecnico_id, drive_file_id, nome_file' : 'id, tecnico_id, drive_file_id, note').eq('id', id).maybeSingle()
+      if (er) throw new Error('documento non letto: ' + er.message)
+      if (!riga) return risposta({ ok: false, error: 'documento non trovato' }, 404)
+      if (segr !== true && (!tecId || riga.tecnico_id !== tecId)) return risposta({ ok: false, error: 'puoi scaricare solo i tuoi documenti' }, 403)
+
+      const SA = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+      if (!SA) throw new Error('configurazione Drive mancante')
+      const tk = await getAccessToken(JSON.parse(SA))
+      let fid = riga.drive_file_id as string | null
+      if (!fid && !invio) {
+        const m = String(riga.note || '').match(/File: ([0-9]_?[A-Z].*?\.(?:pdf|jpe?g|png|docx?|xlsx?|msg|eml))(?=[\s.;,)]|$)/i)
+        if (!m) return risposta({ ok: false, error: 'per questo documento non è registrato il file: chiedilo alla segreteria' }, 404)
+        const pezzi = m[1].split('/').filter(Boolean)
+        let padre = 'root'
+        for (let i = 0; i < pezzi.length; i++) {
+          const ultimo = i === pezzi.length - 1
+          const trovati = await cerca(tk, `'${padre}' in parents and trashed=false and name='${q(pezzi[i])}'` +
+            (ultimo ? '' : " and mimeType='application/vnd.google-apps.folder'"))
+          if (!trovati.length) return risposta({ ok: false, error: `file non trovato su Drive (${pezzi.slice(0, i + 1).join('/')}): avvisa la segreteria` }, 404)
+          padre = trovati[0].id
+        }
+        fid = padre
+        /* l'id si salva: la volta dopo non si cerca più */
+        await servizio.from('s_doc_tecnico').update({ drive_file_id: fid }).eq('id', id).is('drive_file_id', null)
+      }
+      if (!fid) return risposta({ ok: false, error: 'file non registrato' }, 404)
+      const meta = await gapi(tk, `https://www.googleapis.com/drive/v3/files/${fid}?fields=name,mimeType,size,trashed`)
+      if (meta.trashed) return risposta({ ok: false, error: 'il file è nel cestino di Drive: avvisa la segreteria' }, 404)
+      if (Number(meta.size) > 15 * 1024 * 1024) return risposta({ ok: false, error: 'file oltre 15 MB: chiedilo alla segreteria' }, 413)
+      /* privacy: alcune righe puntano a raccolte (attestati di più tecnici,
+         registri firmati da tutti i partecipanti). Il tecnico scarica solo i
+         file che portano il suo cognome nel nome; i suoi caricamenti sempre. */
+      if (segr !== true && !invio) {
+        const { data: t } = await servizio.from('tecnici').select('tecnico_cognome').eq('tecnico_id', tecId).maybeSingle()
+        const cogn = chiaveCartella(String(t?.tecnico_cognome || ''))
+        if (!cogn || !chiaveCartella(String(meta.name || '')).includes(cogn)) {
+          return risposta({ ok: false, error: 'questo file contiene anche dati di altre persone: chiedi alla segreteria la tua parte' }, 403)
+        }
+      }
+      const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fid}?alt=media`, { headers: { Authorization: `Bearer ${tk}` } })
+      if (!r.ok) throw new Error('Drive non ha consegnato il file (' + r.status + ')')
+      const bytes = new Uint8Array(await r.arrayBuffer())
+      let bin = ''
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+      return risposta({ ok: true, nome: meta.name, mime: meta.mimeType || 'application/octet-stream', base64: btoa(bin) })
+    } catch (e) {
+      return risposta({ ok: false, error: String((e as Error).message || e) }, 500)
+    }
+  }
+
   if (!tecId) return risposta({ ok: false, error: 'caricano gli attestati solo i tecnici, ciascuno per sé' }, 403)
 
   let fileId: string | null = null
   let token = ''
   try {
-    const b = await req.json()
     const requisitoId = Number(b.requisito_id)
     const tipo = String(b.tipo || '')
     const data = String(b.data_inizio || '')
