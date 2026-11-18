@@ -32,6 +32,12 @@ const CORS = {
 }
 const risposta = (dati: unknown, status = 200) =>
   new Response(JSON.stringify(dati), { status, headers: { 'Content-Type': 'application/json', ...CORS } })
+/* (18/11/2026, avvisi CodeQL n. 35) il messaggio di un'eccezione non esce nella risposta:
+   può portare dettagli interni (Drive, database). Resta nel log della funzione. */
+const nonRiuscito = (cosa: string, e: unknown) => {
+  console.error('crediti-attestato:', cosa, String((e as Error)?.message || e))
+  return risposta({ ok: false, error: `${cosa}: non riuscito. Riprova; se si ripete, avvisa la segreteria (il dettaglio è nel log della funzione).` }, 500)
+}
 
 const MAX_BYTE = 10 * 1024 * 1024
 const TIPI_FILE: Record<string, string> = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' }
@@ -179,7 +185,7 @@ Deno.serve(async (req) => {
       for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
       return risposta({ ok: true, nome: meta.name, mime: meta.mimeType || 'application/octet-stream', base64: btoa(bin) })
     } catch (e) {
-      return risposta({ ok: false, error: String((e as Error).message || e) }, 500)
+      return nonRiuscito('Apertura del file', e)
     }
   }
 
@@ -271,7 +277,7 @@ Deno.serve(async (req) => {
       }
       return risposta({ ok: true, collegati, senza_file: senza })
     } catch (e) {
-      return risposta({ ok: false, error: String((e as Error).message || e) }, 500)
+      return nonRiuscito('Collegamento degli attestati', e)
     }
   }
 
@@ -366,6 +372,6 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ trashed: true }),
       }).catch(() => {})
     }
-    return risposta({ ok: false, error: String((e as Error).message || e) }, 500)
+    return nonRiuscito("Caricamento dell'attestato", e)
   }
 })

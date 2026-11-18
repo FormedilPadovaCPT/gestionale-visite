@@ -161,6 +161,9 @@ serve(async (req) => {
   } catch (e) {
     const msg = String((e as Error)?.message || e)
     try { await admin.rpc('s_task_vault_giro_fallito', { p_da: da, p_esito: msg }) } catch (_e) { /* il giro fallito resta nel log della funzione */ }
-    return json({ ok: false, errore: msg }, 500)
+    /* (18/11/2026, avviso CodeQL n. 34) il messaggio resta nel registro del giro, che la pagina Task
+       mostra («L'ultimo aggiornamento non è riuscito…»), e nel log: non esce nella risposta */
+    console.error('task-ufficio:', msg)
+    return json({ ok: false, errore: 'aggiornamento non riuscito: il motivo è scritto nella pagina Task' }, 500)
   }
 })
