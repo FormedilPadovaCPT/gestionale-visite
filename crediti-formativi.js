@@ -405,8 +405,12 @@
       const riga = (d) => `<tr><td>${esc(d.data_inizio ? dataIt(d.data_inizio) : '—')}</td><td>${esc(d.data_fine ? dataIt(d.data_fine) : (d.senza_scadenza ? 'senza scadenza' : '—'))}</td><td>${esc(d.descrizione || '')}${d.disdetto_il ? ` <span class="doc-pill da">disdetto il ${esc(dataIt(d.disdetto_il))}</span>` : ''}${d.protocollo_txt ? ` <span class="doc-piccolo">Prot. ${esc(d.protocollo_txt)}</span>` : ''}</td><td>${d.ha_file && d.id ? `<button type="button" class="doc-btn" data-cr-scarica="doc:${d.id}" data-aiuto="Scarica il file sul tuo dispositivo: lo prende dal fascicolo in ufficio.">⬇️ Scarica</button>` : ''}</td></tr>`;
       const testa = '<thead><tr><th>Dal</th><th>Al</th><th>Documento</th><th></th></tr></thead>';
       const [primo, ...prima] = suoi;
+      /* (18/11/2026) che cosa copre la polizza, scritto sotto il nome: sul
+         telefono il passaggio del mouse non c'è */
+      const spiega = C.spiegaRequisito ? C.spiegaRequisito(r) : '';
       return `<div class="cr-tessera s-${BORDO[s.classe] || ''}">
         <div class="cr-riga"><span class="cr-etich">${esc(r.breve || r.descrizione)}</span> ${pill}</div>
+        ${spiega ? `<div class="doc-piccolo cr-spiega" style="margin-top:4px;font-style:italic">${esc(spiega)}</div>` : ''}
         ${nota ? `<div class="doc-piccolo" style="margin-top:4px">${esc(nota)}</div>` : ''}
         ${primo ? `<div class="cr-tab"><table>${testa}<tbody>${riga(primo)}</tbody></table></div>` : ''}
         ${prima.length ? `<details class="doc-prec"><summary>Precedenti (${prima.length})</summary><div class="cr-tab"><table>${testa}<tbody>${prima.map(riga).join('')}</tbody></table></div></details>` : ''}

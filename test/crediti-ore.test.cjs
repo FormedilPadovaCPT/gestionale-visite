@@ -151,6 +151,23 @@ test('contratto e polizze: stato con la regola della segreteria, file solo dove 
   assert.equal(contrattoPolizze({}), '', 'chi non è tecnico non riceve niente');
 });
 
+test('contratto e polizze: sotto ogni polizza c’è che cosa copre (18/11/2026)', () => {
+  globalThis.creditiOre = require('../crediti-ore.js');
+  const { contrattoPolizze } = require('../crediti-formativi.js');
+  const html = contrattoPolizze({
+    altri_requisiti: [
+      { id: 2, codice: 'polizza_rc_prof', breve: 'RC professionale', rinnovo: 'scadenza', durata_mesi: 12, preavviso_giorni: 60 },
+      { id: 3, codice: 'polizza_rc_terzi', breve: 'RC terzi', rinnovo: 'scadenza', durata_mesi: 12, preavviso_giorni: 60 },
+      { id: 4, codice: 'polizza_infortuni', breve: 'Infortuni', rinnovo: 'scadenza', durata_mesi: 12, preavviso_giorni: 60 },
+    ],
+    altri_documenti: [],
+  });
+  assert.equal((html.match(/class="doc-piccolo cr-spiega"/g) || []).length, 3);
+  assert.match(html, /un tuo errore nel lavoro/);
+  assert.match(html, /a una persona, a un animale o a una cosa/);
+  assert.match(html, /Copre te/);
+});
+
 test('attestati emessi: scarica solo dove il PDF è collegato', () => {
   const { attestatiEmessi } = require('../crediti-formativi.js');
   const html = attestatiEmessi({ attestati_emessi: [
