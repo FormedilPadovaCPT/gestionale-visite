@@ -58,8 +58,14 @@
       return {
         t,
         origini,
-        voci: reqOre.map((r) => {
+        /* UNI 11751-2 solo per gli asseveratori; le loro verifiche (app
+           asseverazione) entrano come righe «verifica» (18/11/2026) */
+        voci: reqOre.filter((r) => r.per_chi !== 'asseveratori' || t.asseveratore).map((r) => {
           const suoi = suoiDi(r.id);
+          if ((r.verifiche_soglia || r.affiancamento_giorni_soglia) && suoi.length) {
+            suoi.push(...(dati.verifiche || []).filter((v) => v.tecnico_id === t.tecnico_id && v.data)
+              .map((v) => ({ tipo: 'verifica', tecnico_id: v.tecnico_id, requisito_id: r.id, data_inizio: v.data, gu: v.gu, giornate: v.giornate, ruolo: v.ruolo, rgv: v.rgv, pratica: v.pratica, tipo_pratica: v.tipo })));
+          }
           return { r, suoi, s: stato(r, suoi, r.origine_requisito_id ? suoiDi(r.origine_requisito_id) : [], oggi) };
         }),
       };
@@ -266,7 +272,8 @@
   const GRAVITA = { scaduto: 0, mancante: 1, scade: 2, senzadata: 3, ok: 4 };
   const BORDO = { ok: 'ok', scade: 'ap', senzadata: 'ap', scaduto: 'da', mancante: 'da' };
   const peggiore = (voci) => voci.reduce((m, v) => (GRAVITA[v.s.classe] ?? 9) < (GRAVITA[m] ?? 9) ? v.s.classe : m, 'ok');
-  const nomeBreve = (r) => (/coord/i.test(r.codice || r.descrizione) ? 'Coordinatore' : /formator/i.test(r.codice || r.descrizione) ? 'Formatore' : (r.breve || r.descrizione));
+  const nomeBreve = (r) => (/coord/i.test(r.codice || r.descrizione) ? 'Coordinatore' : /formator/i.test(r.codice || r.descrizione) ? 'Formatore'
+    : /11751/.test(r.codice || r.descrizione || '') ? 'Tecnico verificatore' : (r.breve || r.descrizione));
   const giorniTesto = (iso) => { const g = giorniA(iso); return g >= 0 ? ` (fra ${g} ${g === 1 ? 'giorno' : 'giorni'})` : ''; };
   function barra(s) {
     if (!(Number(s.soglia) > 0)) return '';
@@ -275,8 +282,16 @@
   }
   /* che cosa manca, detto in una frase (solo quando c'è una data davanti) */
   function manca(s) {
-    if (s.classe !== 'scade' || !(s.manca > 0) || !s.scadenza) return '';
-    return `<div class="cr-manca"><b>Mancano ${ore(s.manca)} ore entro il ${esc(dataIt(s.scadenza))}</b>${esc(giorniTesto(s.scadenza))}${s.docenza_alternativa ? ', oppure ' + ore(s.soglia) + ' ore di docenza nel triennio' : ''}.</div>`;
+    if (s.classe === 'senzadata' && s.affiancamento_soglia) {
+      return `<div class="cr-manca"><b>Ti mancano ${ore(Math.max(0, s.affiancamento_soglia - s.affiancamento))} giorni di affiancamento</b> per diventare operativo come tecnico verificatore (UNI 11751-2): contano le giornate da osservatore nei gruppi di verifica.</div>`;
+    }
+    if (s.classe !== 'scade' || !s.scadenza) return '';
+    const pezzi = [];
+    if (s.manca > 0) pezzi.push(`${ore(s.manca)} ore${s.docenza_alternativa ? ' (oppure ' + ore(s.soglia) + ' ore di docenza)' : ''}`);
+    if (s.manca_verifiche > 0) pezzi.push(`${s.manca_verifiche} ${s.manca_verifiche === 1 ? 'verifica' : 'verifiche'} di asseverazione`);
+    if (s.manca_gu > 0) pezzi.push(`${ore(s.manca_gu)} g/u di verifica`);
+    if (!pezzi.length) return '';
+    return `<div class="cr-manca"><b>Mancano ${esc(pezzi.join(' e '))} entro il ${esc(dataIt(s.scadenza))}</b>${esc(giorniTesto(s.scadenza))}.</div>`;
   }
   function voce(v, grande) {
     return `<div class="cr-voce"><div class="cr-riga"><span class="cr-etich">${esc(nomeBreve(v.r))}</span> ${riga(v)}</div>
@@ -311,6 +326,7 @@
     for (const v of x.voci) {
       const orig = v.r.origine_requisito_id ? (x.origini[v.r.origine_requisito_id] || []) : [];
       for (const d of [...v.suoi, ...orig]) {
+        if (d.tipo === 'verifica') continue;   // le verifiche hanno la loro tabella
         if (d.tipo === 'aggiornamento' || d.tipo === 'docenza') {
           const k = `${d.data_inizio}|${d.tipo}|${d.descrizione || ''}`;
           if (!corsi.has(k)) corsi.set(k, { d, per: {} });
@@ -335,8 +351,17 @@
       ${attesa.map((i) => { const [cl, tx] = STATO_INVIO[i.stato] || ['ap', i.stato]; return `<tr><td>${esc(dataIt(i.data_inizio))}</td><td>${esc(i.descrizione)} <span class="doc-piccolo">(${esc(nomeReq(i.requisito_id))})</span></td><td>${i.ore ? ore(i.ore) : '—'}</td><td colspan="${x.voci.length}"><span class="doc-pill ${cl}">${esc(tx)}</span>${i.stato === 'rifiutato' && i.motivo ? `<div class="doc-piccolo">Motivo: ${esc(i.motivo)}</div>` : ''}</td><td>${scarica('invio:' + i.id)}</td></tr>`; }).join('')}
       ${vivi.map(riga1).join('')}</tbody></table></div>` : '<p class="doc-piccolo">Nessun corso che conta adesso.</p>';
     const tChiusi = chiusi.length ? `<details class="doc-prec"><summary>Documenti che non contano più (${chiusi.length})</summary><div class="cr-tab"><table>${testa}<tbody>${chiusi.map(riga1).join('')}</tbody></table></div></details>` : '';
-    if (!tBasi && !righe.length && !attesa.length) return '<p class="doc-piccolo">Nessun documento registrato.</p>';
-    return `${tBasi}${tRighe}${tChiusi}<p class="doc-piccolo">Coordinatore: ogni corso conta cinque anni dalla sua data, e quelli prima dell’abilitazione non contano. Formatore: un corso conta fino alla fine del triennio in cui cade.</p>`;
+    /* verifiche di asseverazione (tecnico verificatore UNI 11751-2), dall'app asseverazione */
+    const verifiche = [...new Map(x.voci.flatMap((v) => v.suoi.filter((d) => d.tipo === 'verifica')).map((d) => [d.pratica + '|' + d.data_inizio, d])).values()]
+      .sort((a, b) => String(b.data_inizio).localeCompare(String(a.data_inizio)));
+    const oggi = oggiIso();
+    const tVer = verifiche.length ? `<div class="cr-tit"><strong>Verifiche di asseverazione</strong> <span class="doc-piccolo">dall'app asseverazione</span></div>
+      <div class="cr-tab"><table><thead><tr><th>Data</th><th>Pratica</th><th>Tipo</th><th>Ruolo</th><th>Tue giornate</th><th>g/u della pratica</th></tr></thead><tbody>
+      ${verifiche.map((d) => `<tr${d.data_inizio > oggi ? ' class="cr-chiuso"' : ''}><td>${esc(dataIt(d.data_inizio))}${d.data_inizio > oggi ? ' (in programma)' : ''}</td><td>${esc(d.pratica || '')}</td><td>${esc(d.tipo_pratica || '')}</td><td>${esc(d.ruolo || '')}${d.rgv ? ' (RGV)' : ''}</td><td>${d.giornate != null ? ore(d.giornate) : '—'}</td><td>${d.gu != null ? ore(d.gu) : '—'}</td></tr>`).join('')}
+      </tbody></table></div>
+      <p class="doc-piccolo">Tecnico verificatore: per diventare operativo servono 10 giorni da osservatore (contano anche quelli prima dell’attestato); poi, in ogni triennio, almeno 3 verifiche (anche mantenimenti, anche da osservatore) per 6 g/u in tutto e 16 ore di aggiornamento su MOG, SGSL e audit.</p>` : '';
+    if (!tBasi && !righe.length && !attesa.length && !tVer) return '<p class="doc-piccolo">Nessun documento registrato.</p>';
+    return `${tBasi}${tRighe}${tChiusi}${tVer}<p class="doc-piccolo">Coordinatore: ogni corso conta cinque anni dalla sua data, e quelli prima dell’abilitazione non contano. Formatore: un corso conta fino alla fine del triennio in cui cade.</p>`;
   }
 
   function cartaMia(x, dati, messaggio) {

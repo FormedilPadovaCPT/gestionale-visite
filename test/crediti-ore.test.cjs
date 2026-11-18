@@ -162,3 +162,28 @@ test('attestati emessi: scarica solo dove il PDF è collegato', () => {
   assert.match(html, /PDF non in archivio/);
   assert.equal(attestatiEmessi({}), '');
 });
+
+/* tecnico verificatore UNI 11751-2 (18/11/2026) */
+test('tecnico verificatore: solo agli asseveratori, con le verifiche dall’app asseverazione', () => {
+  globalThis.creditiOre = require('../crediti-ore.js');
+  const { calcola, cartaMia } = require('../crediti-formativi.js');
+  const UNI = { id: 7, codice: 'uni_11751', descrizione: 'Attestato Tecnico verificatore UNI 11751-2', per_chi: 'asseveratori', ore_soglia: 16, durata_mesi: 36, preavviso_giorni: 180, verifiche_soglia: 3, verifiche_gu_soglia: 6, affiancamento_giorni_soglia: 10 };
+  const dati = {
+    requisiti: [UNI],
+    tecnici: [{ tecnico_id: 'V', tecnico_cognome: 'Visentini', asseveratore: true }, { tecnico_id: 'C', tecnico_cognome: 'Caon', asseveratore: false }],
+    documenti: [{ id: 133, tecnico_id: 'V', requisito_id: 7, tipo: 'attestato', data_inizio: '2026-04-23' }],
+    verifiche: [
+      { tecnico_id: 'V', pratica: 'P 2026/03', tipo: 'asseverazione', ruolo: 'osservatore', data: '2026-11-10', gu: 3.5, giornate: 3.5 },
+      { tecnico_id: 'V', pratica: 'P 2026/04', tipo: 'asseverazione', ruolo: 'osservatore', data: '2026-11-09', gu: 4.5, giornate: 4.5 },
+    ],
+    invii: [],
+  };
+  const lista = calcola(dati);
+  assert.equal(lista[1].voci.length, 0, 'chi non è asseveratore non ha il requisito');
+  const [v] = lista[0].voci;
+  assert.equal(v.s.classe, 'senzadata');
+  assert.equal(v.s.affiancamento, 8);
+  const html = cartaMia(lista[0], dati, '');
+  assert.match(html, /Ti mancano 2 giorni di affiancamento/);
+  assert.match(html, /P 2026\/03/);
+});
