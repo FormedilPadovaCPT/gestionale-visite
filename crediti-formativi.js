@@ -75,7 +75,9 @@
   function riga(v) {
     const s = v.s;
     const fino = s.classe === 'scaduto' && s.scadenza ? `dal ${dataIt(s.scadenza)}` : s.scadenza ? `fino al ${dataIt(s.scadenza)}` : '';
-    return `<span class="doc-pill ${PILL[s.classe] || 'ap'}">${esc(ETICHETTA[s.classe] || s.classe)}${fino ? ' ' + esc(fino) : ''}</span>`;
+    /* (19/11/2026) titolo da coordinatore «valido da confermare»: mancano solo gli attestati vecchi */
+    const nome = s.da_confermare ? 'Valido da confermare' : (ETICHETTA[s.classe] || s.classe);
+    return `<span class="doc-pill ${PILL[s.classe] || 'ap'}">${esc(nome)}${fino ? ' ' + esc(fino) : ''}</span>`;
   }
 
   const STATO_INVIO = {
@@ -284,6 +286,9 @@
   function manca(s) {
     if (s.classe === 'senzadata' && s.affiancamento_soglia) {
       return `<div class="cr-manca"><b>Ti mancano ${ore(Math.max(0, s.affiancamento_soglia - s.affiancamento))} giorni di affiancamento</b> per diventare operativo come tecnico verificatore (UNI 11751-2): contano le giornate da osservatore nei gruppi di verifica.</div>`;
+    }
+    if (s.da_confermare) {
+      return `<div class="cr-manca"><b>Valido da confermare.</b> In archivio mancano attestati di aggiornamento: caricali qui con «📤 Carica un attestato che manca», oppure mandali all’ufficio, che li carica in massa.</div>`;
     }
     if (s.classe !== 'scade' || !s.scadenza) return '';
     const pezzi = [];

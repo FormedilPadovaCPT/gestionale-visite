@@ -1576,7 +1576,8 @@
         "attestato",
         "aggiornamento",
         "docenza",
-        "riconoscimento"
+        "riconoscimento",
+        "da_confermare"
       ]
     },
     {
@@ -1594,7 +1595,8 @@
         "attestato",
         "aggiornamento",
         "docenza",
-        "riconoscimento"
+        "riconoscimento",
+        "da_confermare"
       ]
     },
     {
