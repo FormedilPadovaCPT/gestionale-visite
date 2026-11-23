@@ -1631,6 +1631,24 @@
         "id": "cr-tipo"
       },
       "motivo": "voci da tipiPer() secondo il requisito; la colonna s_doc_tecnico_invii.tipo ha il vincolo attestato/aggiornamento/docenza"
+    },
+    {
+      "id": "segr.cons-n-tipo",
+      "app": "segreteria",
+      "classe": "dato",
+      "fonte": {
+        "tipo": "js",
+        "file": "js/consulenti-impresa.js",
+        "nome": "TIPI"
+      },
+      "select": "cons-n-tipo",
+      "tabella": "consulenti",
+      "colonna": "tipo",
+      "voci": [
+        "",
+        "studio",
+        "professionista"
+      ]
     }
   ],
   "segreteria_gia_presenti": [
