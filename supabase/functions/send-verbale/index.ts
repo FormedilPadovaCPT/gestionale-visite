@@ -13,6 +13,8 @@
 //      solo all'ufficio corsi (scelta dell'utente: «son utili a noi interni, non all'azienda»).
 // 13/10/2026: serieProposta — il tecnico propone una serie di visite (visita fuori procedura):
 //      l'impresa trova l'invito a chiederla dal portale. Il motivo del rientro resta interno.
+// 27/11/2026: veste delle feste (feste.js) — dal 01/12/2026 al 06/01/2027 banner natalizio
+//      e riquadro d'augurio dopo i saluti; mai nella rettifica. Poi torna da sola com'era.
 //
 // Secret richiesto: GOOGLE_SERVICE_ACCOUNT_JSON
 // Scopes DWD richiesti:
@@ -21,6 +23,10 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { FESTE, inFeste, augurioHtml } from './feste.js'
+
+/* Il banner di sempre (URL firmato dello storage, scade nel 2032). Fuori dal periodo delle feste è questo. */
+const BANNER_CANTIERI = 'https://utdantrfugnmqsuujxbe.supabase.co/storage/v1/object/sign/firme-tecnici/Banner%20mail%20cantieri.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9mNTBkZTA3NS02NDYwLTRkYzEtYjcwMy04ODBiMTY2ZDk5YTEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmaXJtZS10ZWNuaWNpL0Jhbm5lciBtYWlsIGNhbnRpZXJpLnBuZyIsImlhdCI6MTc3OTA0NzUxNCwiZXhwIjoxOTY4MjYzNTE0fQ.d0vkp_LZAWs3yMzD0ZNnQgjCifM8GqRKjQSiqYcjens'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -392,6 +398,13 @@ serve(async (req) => {
     <p style="margin:0 0 24px">Rimanendo a disposizione per ogni eventuale chiarimento porgiamo distinti saluti.</p>`
     }
 
+    /* veste delle feste (27/11/2026): nel periodo di FESTE banner natalizio e riquadro d'augurio,
+       mai nella rettifica; fuori dal periodo resta tutto com'era */
+    const feste = !isRett && inFeste()
+    const bannerSrc = feste ? FESTE.banner : BANNER_CANTIERI
+    const bannerAlt = feste ? FESTE.alt : 'Formedil Padova – Area Sicurezza e Salute'
+    const augurio = feste ? augurioHtml() : ''
+
     const htmlBody = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#333">
@@ -407,8 +420,8 @@ serve(async (req) => {
   <!-- BANNER cantieri con link ai servizi -->
   <tr><td style="padding:0;line-height:0">
     <a href="https://formedilpadovacpt.github.io/servizi/" style="display:block;text-decoration:none">
-      <img src="https://utdantrfugnmqsuujxbe.supabase.co/storage/v1/object/sign/firme-tecnici/Banner%20mail%20cantieri.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9mNTBkZTA3NS02NDYwLTRkYzEtYjcwMy04ODBiMTY2ZDk5YTEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmaXJtZS10ZWNuaWNpL0Jhbm5lciBtYWlsIGNhbnRpZXJpLnBuZyIsImlhdCI6MTc3OTA0NzUxNCwiZXhwIjoxOTY4MjYzNTE0fQ.d0vkp_LZAWs3yMzD0ZNnQgjCifM8GqRKjQSiqYcjens"
-           width="600" alt="Formedil Padova – Area Sicurezza e Salute" style="display:block;width:100%;max-width:600px;height:auto;border:0">
+      <img src="${bannerSrc}"
+           width="600" alt="${bannerAlt}" style="display:block;width:100%;max-width:600px;height:auto;border:0">
     </a>
   </td></tr>
 
@@ -428,6 +441,7 @@ serve(async (req) => {
     ${comuneLabel ? `<p style="font-weight:bold;margin:0 0 16px">Cantiere di ${comuneLabel}</p>` : ''}
 
     ${corpoHtml}
+    ${augurio}
     ${valutaHtml}
 
     ${campagnaHtml}

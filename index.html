@@ -9725,6 +9725,13 @@ function _evRenderList(){
 /* Anteprima del testo che parte davvero: e' la copia di quello composto dalla
    funzione send-verbale (supabase/functions/send-verbale/index.ts). Se cambia
    il testo la', va cambiato anche qui. (23/09/2026) */
+/* Veste delle feste (27/11/2026): stesse date di FESTE in supabase/functions/send-verbale/feste.js,
+   giorno letto sull'ora di Roma. La prova feste-verbale controlla che coincidano. */
+const _EV_FESTE={dal:'2026-12-01',al:'2027-01-06'}
+function _evFeste(){
+  const g=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Rome',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
+  return g>=_EV_FESTE.dal&&g<=_EV_FESTE.al
+}
 function _evAnteprima(){
   const el=$('email-verbale-testo');if(!el)return
   const c=window._evContext||{},r=window._evRettifica
@@ -9750,6 +9757,7 @@ function _evAnteprima(){
       ..._evFormazioneTesto(),'',
       ...(window._evSerie?['[Il tecnico propone una serie di visite: l\'app aggiunge qui l\'invito a chiederla dal portale dei servizi (modulo «Richiesta visita in cantiere», voce «Serie di visite»).]','']:[]),
       'Rimanendo a disposizione per ogni eventuale chiarimento porgiamo distinti saluti.','',
+      ...(_evFeste()?['[Veste delle feste: banner natalizio in testa e riquadro d\'augurio «Buon riposo, e a presto in cantiere»]','']:[]),
       '[Riquadro «Com\'è andata la visita?» con il pulsante «Valuta la visita →»]')
   }
   const cw=$('ev-campagna-wrap')
