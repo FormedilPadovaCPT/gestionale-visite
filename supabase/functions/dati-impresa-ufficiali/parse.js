@@ -100,6 +100,7 @@ export function parseInfocamere(xml) {
       const agg = attributi((b.match(/<data-aggiornamento\b[^>]*>/) || [''])[0])
       const via = [ind.toponimo, ind.via].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
       const forma = fgTag ? decodifica(fgTag[2]).trim() : ''
+      const { comune, prov } = comuneEProvincia(ind.comune, ind.provincia)
       return {
         ragione_sociale: (testa.denominazione || '').replace(/\s+/g, ' ').trim(),
         cf: testa['c-fiscale'] || '',
@@ -112,12 +113,31 @@ export function parseInfocamere(xml) {
         forma_app: formaApp(forma),
         indirizzo: [via, ind['n-civico']].filter(Boolean).join(', '),
         cap: ind.cap || '',
-        comune: ind.comune || '',
-        prov: ind.provincia || '',
+        comune,
+        prov,
         aggiornato_al: agg.data || '',
       }
     }),
   }
+}
+
+// Sigle delle province italiane (comprese le sarde soppresse nel 2016, che
+// possono restare nel Registro) ed EE per l'estero.
+const SIGLE_PROVINCIA = new Set(('AG AL AN AO AP AQ AR AT AV BA BG BI BL BN BO BR BS BT BZ CA CB CE CH CI CL CN CO CR CS CT CZ ' +
+  'EE EN FC FE FG FI FM FR GE GO GR IM IS KR LC LE LI LO LT LU MB MC ME MI MN MO MS MT NA NO NU OG OR OT PA PC PD PE PG ' +
+  'PI PN PO PR PT PU PV PZ RA RC RE RG RI RM RN RO SA SI SO SP SR SS SU SV TA TE TN TO TP TR TS TV UD VA VB VC VE VI VR VS VT VV').split(' '))
+
+// InfoCamere a volte manda comune e provincia scambiati: comune="PD"
+// provincia="CITTADELLA" (visto il 27/11/2026 sull'impresa Basso, e sei
+// imprese erano già state salvate così). Si scambiano solo quando il «comune»
+// è una sigla di provincia e la «provincia» no: Vo' (PD), Ne (GE) e Lu (AL)
+// restano come sono.
+export function comuneEProvincia(comune, provincia) {
+  const c = String(comune == null ? '' : comune).trim()
+  const p = String(provincia == null ? '' : provincia).trim()
+  const sigla = s => SIGLE_PROVINCIA.has(s.toUpperCase())
+  if (c && p && sigla(c) && !sigla(p)) return { comune: p, prov: c.toUpperCase() }
+  return { comune: c, prov: p }
 }
 
 // La descrizione camerale -> la voce della tendina «Forma giuridica» delle app.

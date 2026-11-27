@@ -48,6 +48,16 @@ const assert = require('assert')
   assert.strictEqual(i0.comune, 'ROMA'); assert.strictEqual(i0.prov, 'RM'); assert.strictEqual(i0.cap, '22333')
   assert.strictEqual(i0.forma_app, 'S.r.l.')
   assert.strictEqual(i0.nace, '41.2')
+  // InfoCamere con comune e provincia scambiati (Basso, 27/11/2026): si rimettono a posto
+  const scambiata = parse.parseInfocamere(xml.replace('comune="ROMA" provincia="RM"', 'comune="PD" provincia="CITTADELLA"')).imprese[0]
+  assert.strictEqual(scambiata.comune, 'CITTADELLA', 'il nome del comune va nel comune')
+  assert.strictEqual(scambiata.prov, 'PD', 'la sigla va nella provincia')
+  assert.deepStrictEqual(parse.comuneEProvincia('PD', 'VO'), { comune: 'VO', prov: 'PD' })
+  // comuni di due lettere: restano come sono
+  assert.deepStrictEqual(parse.comuneEProvincia('VO', 'PD'), { comune: 'VO', prov: 'PD' })
+  assert.deepStrictEqual(parse.comuneEProvincia('NE', 'GE'), { comune: 'NE', prov: 'GE' })
+  assert.deepStrictEqual(parse.comuneEProvincia('LU', 'AL'), { comune: 'LU', prov: 'AL' })
+  assert.deepStrictEqual(parse.comuneEProvincia('', 'PD'), { comune: '', prov: 'PD' })
   // nessuna impresa: la risposta ha solo la data di erogazione
   assert.strictEqual(parse.parseInfocamere('<imprese><data-erogazione data="06/06/2024"/></imprese>').imprese.length, 0)
 
