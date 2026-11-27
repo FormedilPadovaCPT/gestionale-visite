@@ -13,7 +13,7 @@
 //      solo all'ufficio corsi (scelta dell'utente: «son utili a noi interni, non all'azienda»).
 // 13/10/2026: serieProposta — il tecnico propone una serie di visite (visita fuori procedura):
 //      l'impresa trova l'invito a chiederla dal portale. Il motivo del rientro resta interno.
-// 27/11/2026: veste delle feste (feste.js) — dal 01/12/2026 al 06/01/2027 banner natalizio
+// 27/11/2026: veste delle feste (feste.js) — dal 27/11/2026 al 06/01/2027 banner natalizio
 //      e riquadro d'augurio dopo i saluti; mai nella rettifica. Poi torna da sola com'era.
 //
 // Secret richiesto: GOOGLE_SERVICE_ACCOUNT_JSON

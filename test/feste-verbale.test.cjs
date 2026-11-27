@@ -13,10 +13,10 @@ const leggi = (f) => fs.readFileSync(path.join(dir, f), 'utf8');
   const F = await import(pathToFileURL(path.join(dir, 'supabase/functions/send-verbale/feste.js')).href);
 
   /* ── il periodo, giorno per giorno sull'ora di Roma ── */
-  assert.strictEqual(F.FESTE.dal, '2026-12-01');
+  assert.strictEqual(F.FESTE.dal, '2026-11-27', "anticipato al 27/11 su richiesta dell'utente");
   assert.strictEqual(F.FESTE.al, '2027-01-06');
-  assert.strictEqual(F.inFeste(new Date('2026-11-30T22:30:00Z')), false, '30/11 alle 23:30 di Roma: ancora fuori');
-  assert.strictEqual(F.inFeste(new Date('2026-11-30T23:30:00Z')), true, '1/12 alle 00:30 di Roma: già dentro, anche se in UTC è il 30/11');
+  assert.strictEqual(F.inFeste(new Date('2026-11-26T22:30:00Z')), false, '26/11 alle 23:30 di Roma: ancora fuori');
+  assert.strictEqual(F.inFeste(new Date('2026-11-26T23:30:00Z')), true, '27/11 alle 00:30 di Roma: già dentro, anche se in UTC è il 26/11');
   assert.strictEqual(F.inFeste(new Date('2026-12-25T10:00:00Z')), true);
   assert.strictEqual(F.inFeste(new Date('2027-01-06T22:30:00Z')), true, '6/1 alle 23:30 di Roma: ultimo giorno');
   assert.strictEqual(F.inFeste(new Date('2027-01-06T23:30:00Z')), false, '7/1 alle 00:30 di Roma: tornata la mail di sempre');

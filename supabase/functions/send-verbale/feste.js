@@ -8,7 +8,7 @@
    Modulo puro: niente import, così la prova lo carica con node. */
 
 export const FESTE = {
-  dal: '2026-12-01',
+  dal: '2026-11-27', // anticipato dal 01/12 al 27/11 su richiesta dell'utente, il giorno stesso
   al: '2027-01-06',
   // Pubblicato da GitHub Pages: deploy-pages copia ogni .png della radice del repo.
   // Il sito è /gestionale-visite/ (nome del repo), non /gestionale/: provato il 27/11/2026.
@@ -18,7 +18,7 @@ export const FESTE = {
   frase: "La sicurezza si costruisce insieme, un giorno alla volta. Grazie per la collaborazione del 2026 e auguri di buone feste dall'Area Sicurezza e Salute di FORMEDIL PADOVA.",
 };
 
-/* Il giorno si legge sull'ora di Roma, non su UTC: una mail spedita alle 00:30 del 1° dicembre
+/* Il giorno si legge sull'ora di Roma, non su UTC: una mail spedita alle 00:30 del primo giorno
    ha già la veste delle feste, una spedita alle 00:30 del 7 gennaio non più. */
 export function giornoRoma(d = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
