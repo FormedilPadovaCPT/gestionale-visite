@@ -70,6 +70,8 @@ const SPIEGAZIONI = {
   polizza_rc_prof: 'Ti copre se un tuo errore nel lavoro causa un danno economico a qualcuno: per esempio un\'indicazione sbagliata in un verbale o in una consulenza che fa spendere soldi a un\'impresa. È la responsabilità civile professionale.',
   polizza_rc_terzi: 'Ti copre se, mentre lavori, causi senza volerlo un danno a una persona, a un animale o a una cosa: per esempio urti e rompi un\'attrezzatura in cantiere o fai male a qualcuno. Di solito non copre gli errori professionali: per quelli serve la RC professionale.',
   polizza_infortuni: 'Copre te: se ti fai male mentre lavori, ti paga un indennizzo, per esempio per un\'invalidità. Le due RC invece coprono i danni che fai agli altri. Formedil Padova non risponde dei danni che subisci, come dice il contratto.',
+  /* (27/11/2026) facoltativa: il contratto non la chiede, si tiene se il tecnico la consegna */
+  polizza_tutela_legale: 'Facoltativa, il contratto non la chiede. Ti paga l\'avvocato e le spese se per il tuo lavoro finisci in un procedimento penale (e, secondo la polizza, civile o amministrativo). Non sostituisce le altre tre polizze: se ce l\'hai, la segreteria ne segue la scadenza.',
 };
 function spiegaRequisito(req) {
   return (req && SPIEGAZIONI[req.codice]) || '';
@@ -85,7 +87,8 @@ function spiegaRequisito(req) {
    - altrimenti scaduto, in scadenza dentro il preavviso, in regola.
    Ritorna { classe, doc, scadenza?, tacito?, una_tantum?, senza_scadenza? }. */
 function statoScadenza(req, suoi, oggi) {
-  if (!suoi || !suoi.length) return { classe: 'mancante' };
+  /* (27/11/2026) un requisito facoltativo (tutela legale) senza documenti non manca: non si chiede */
+  if (!suoi || !suoi.length) return req && req.facoltativo ? { classe: 'na', facoltativo: true } : { classe: 'mancante' };
   const doc = [...suoi].sort((a, b) =>
     (b.data_inizio || b.data_fine || '').localeCompare(a.data_inizio || a.data_fine || ''))[0];
   if (doc.senza_scadenza) return { classe: 'ok', doc, senza_scadenza: true };
@@ -109,6 +112,7 @@ function statoScadenza(req, suoi, oggi) {
 function testoScadenza(s, fmt = (x) => x) {
   if (!s) return '';
   if (s.classe === 'mancante') return 'mancante';
+  if (s.classe === 'na') return '—';
   if (s.senza_scadenza) return 'senza scadenza';
   if (s.una_tantum) return s.doc && s.doc.data_inizio ? fmt(s.doc.data_inizio) : 'presente';
   if (s.classe === 'senzadata') return 'senza data';

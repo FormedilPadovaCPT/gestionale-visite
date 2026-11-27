@@ -168,6 +168,22 @@ test('contratto e polizze: sotto ogni polizza c’è che cosa copre (18/11/2026)
   assert.match(html, /Copre te/);
 });
 
+test('contratto e polizze: la tutela legale facoltativa si vede solo se consegnata (27/11/2026)', () => {
+  globalThis.creditiOre = require('../crediti-ore.js');
+  const { contrattoPolizze } = require('../crediti-formativi.js');
+  const req = [
+    { id: 4, codice: 'polizza_infortuni', breve: 'Infortuni', rinnovo: 'scadenza', durata_mesi: 12, preavviso_giorni: 60 },
+    { id: 9, codice: 'polizza_tutela_legale', breve: 'Tutela legale', rinnovo: 'scadenza', durata_mesi: 12, preavviso_giorni: 60, facoltativo: true },
+  ];
+  const senza = contrattoPolizze({ altri_requisiti: req, altri_documenti: [] });
+  assert.doesNotMatch(senza, /Tutela legale/, 'chi non l’ha consegnata non la vede');
+  assert.match(senza, /Infortuni/);
+  const con = contrattoPolizze({ altri_requisiti: req, altri_documenti: [
+    { id: 500, requisito_id: 9, descrizione: 'Roland 82.0006567', data_inizio: '2026-01-31', data_fine: '2027-01-31', ha_file: true }] });
+  assert.match(con, /Tutela legale/);
+  assert.match(con, /Facoltativa/);
+});
+
 test('attestati emessi: scarica solo dove il PDF è collegato', () => {
   const { attestatiEmessi } = require('../crediti-formativi.js');
   const html = attestatiEmessi({ attestati_emessi: [

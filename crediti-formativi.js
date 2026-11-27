@@ -392,7 +392,9 @@
   const NOME_SCAD = { ok: 'In regola', scade: 'In scadenza', scaduto: 'Scaduto', senzadata: 'Senza data', mancante: 'Mancante' };
   function contrattoPolizze(dati) {
     const C = radice.creditiOre;
-    const req = dati.altri_requisiti || [];
+    /* (27/11/2026) un requisito facoltativo (tutela legale) si mostra solo a chi l'ha consegnato */
+    const req = (dati.altri_requisiti || []).filter((r) => !r.facoltativo ||
+      (dati.altri_documenti || []).some((d) => d.requisito_id === r.id));
     if (!req.length || !C || !C.statoScadenza) return '';
     const oggi = oggiIso();
     const tessere = req.map((r) => {
