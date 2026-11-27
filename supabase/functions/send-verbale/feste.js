@@ -11,7 +11,8 @@ export const FESTE = {
   dal: '2026-12-01',
   al: '2027-01-06',
   // Pubblicato da GitHub Pages: deploy-pages copia ogni .png della radice del repo.
-  banner: 'https://formedilpadovacpt.github.io/gestionale/natale-2026-verbale.png',
+  // Il sito è /gestionale-visite/ (nome del repo), non /gestionale/: provato il 27/11/2026.
+  banner: 'https://formedilpadovacpt.github.io/gestionale-visite/natale-2026-verbale.png',
   alt: 'Buone Feste da FORMEDIL PADOVA – Area Sicurezza e Salute',
   titolo: 'Buon riposo, e a presto in cantiere',
   frase: "La sicurezza si costruisce insieme, un giorno alla volta. Grazie per la collaborazione del 2026 e auguri di buone feste dall'Area Sicurezza e Salute di FORMEDIL PADOVA.",

@@ -28,7 +28,8 @@ const leggi = (f) => fs.readFileSync(path.join(dir, f), 'utf8');
   assert.ok(h.includes('La sicurezza si costruisce insieme, un giorno alla volta.'), 'frase 5 delle proposte');
   assert.ok(h.includes('bgcolor="#3f444c"'), 'fondo anche come attributo, per Outlook');
   assert.ok(F.augurioHtml({ ...F.FESTE, titolo: '<b>x</b>' }).includes('&lt;b&gt;x&lt;/b&gt;'), 'il testo si scappa');
-  assert.ok(/^https:\/\/formedilpadovacpt\.github\.io\/gestionale\/natale-2026-verbale\.png$/.test(F.FESTE.banner));
+  assert.ok(/^https:\/\/formedilpadovacpt\.github\.io\/gestionale-visite\/natale-2026-verbale\.png$/.test(F.FESTE.banner),
+    'il sito Pages del repo è /gestionale-visite/ (con /gestionale/ il banner dava 404)');
 
   /* ── send-verbale ── */
   const sv = leggi('supabase/functions/send-verbale/index.ts');
